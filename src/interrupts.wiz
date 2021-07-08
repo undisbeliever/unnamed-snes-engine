@@ -1,0 +1,40 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "memmap";
+
+
+in code {
+
+
+#[nmi]
+func nmi_handler() {
+    nmireturn;
+}
+
+
+#[irq]
+func irq_handler() {
+    irqreturn;
+}
+
+
+#[irq]
+func break_handler() {
+    // ::TODO show Blue Screen of Death::
+    while true {
+    }
+}
+
+
+#[irq]
+func invalid_handler() {
+    // ::TODO show Red Screen of Death::
+    while true {
+    }
+}
+
+
+}
+
+

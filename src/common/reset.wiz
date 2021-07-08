@@ -1,0 +1,160 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../main";
+import "../memmap";
+import "../../wiz/common/snes/snes";
+
+
+in code {
+
+
+const @ 0x80ffb6 : u8 = 0;
+extern const empty_byte @ 0x80ffb6 : u8;
+
+
+#[fallthrough]
+func reset() {
+    goto reset_far;
+}
+
+
+#[fallthrough]
+far func reset_far() {
+    nointerrupt = true;
+    decimal = false;
+    carry = false;
+    swap_carry_emulation();
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        ss = aa = STACK_TOP;
+
+        direct_page = aa = 0;
+    }
+
+
+    mem8();
+    #[mem8, idx16] {
+        push8(program_bank);
+        data_bank = pop8();
+    // DB = 0x00 (access registers)
+
+
+        // Clear the Work RAM
+
+        snes.wram.address_l = 0;
+        snes.wram.address_h = 0;
+        snes.wram.address_bank = 0;
+
+        snes.dma0.control = a = snes.dma.CONTROL_MODE_A | snes.dma.CONTROL_MDMA_NO_INCREMENT;
+        snes.dma0.src_address_hl = xx = &empty_byte as u16;
+        snes.dma0.src_address_bank = a = #:far &empty_byte;
+        snes.dma0.mdma_dest = a = <:&snes.wram.data;
+        snes.dma0.mdma_size_hl = xx = 0;
+
+        a = snes.dma.ENABLE_0;
+
+        // Clear first 64K of WRAM
+        snes.dma.mdma_enable = a;
+
+        // Clear second 64K of WRAM
+        // snes.dma0.mdma_size_hl is 0, no need to set it again
+        snes.dma.mdma_enable = a;
+
+
+        reset_registers();
+
+
+        goto main;
+    }
+}
+
+
+
+// Reset registers to a good initial state
+//
+// NOTE: Does not reset the mode 7 registers
+func reset_registers() {
+    push8(p);
+    push8(data_bank);
+
+    mem8_idx8();
+    #[mem8, idx8] {
+        push8(program_bank);
+        data_bank = pop8();
+    // DB = 0x80 (access registers)
+
+        // Disable HDMA
+        snes.dma.hdma_enable = 0;
+
+        // Force screen blank
+        snes.ppu.brightness = a = snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK;
+
+        // Enable NMI and autoJoy
+        snes.ppu.irq_enable = a = snes.ppu.IRQ_ENABLE_NMI | snes.ppu.IRQ_ENABLE_AUTOJOY;
+
+        // 8x8 and 16x16 objects
+        snes.ppu.obj_control = 0;
+
+
+        // Registers $2105 - 210c
+        // BG settings and VRAM base addresses
+        x = 0x210c - 0x2105;
+        do {
+            (0x2105 as *u8)[x] = 0;
+            x--;
+        } while !negative;
+
+
+        // Registers $210d - $2114
+        // BG scroll locations
+        a = 0xff;
+        x = (4 - 1) * 2;
+        do {
+            // Set X scroll to 0;
+            (&snes.ppu.bg1_scroll_x as *u8)[x] = 0;
+            (&snes.ppu.bg1_scroll_x as *u8)[x] = 0;
+            // Set Y scroll to -1;
+            (&snes.ppu.bg1_scroll_y as *u8)[x] = a;
+            (&snes.ppu.bg1_scroll_y as *u8)[x] = a;
+            x--;
+            x--;
+        } while !negative;
+
+        // Increment VRAM by 1 word on reading/writing the high byte of VRAM
+        snes.ppu.vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 + snes.ppu.VRAM_CONTROL_SIZE_2;
+
+
+        // Skipping Mode 7 registers
+
+
+        // Registers $2123 - $2133
+        // Window Settings, BG/OBJ designation, Color Math, Screen Mode
+        // All disabled
+        x = 0x2133 - 0x2123;
+        do {
+            (0x2123 as *u8)[x] = 0;
+            x--;
+        } while !negative;
+
+
+        // Reset the DMA registers
+        mem16();
+        #[mem16] {
+            x = 0x80 - 2;
+            do {
+                *((0x4300 as u16 + x as u16) as *u16) = 0;
+                x--;
+                x--;
+            } while !negative;
+        }
+    }
+
+    data_bank = pop8();
+    p = pop8();
+}
+
+
+}
+

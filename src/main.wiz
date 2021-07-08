@@ -1,0 +1,21 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "memmap";
+import "../wiz/common/snes/snes";
+
+
+in code {
+
+
+#[fallthrough, mem8, idx16]
+// DB = 0x80
+func main() {
+    while true {
+    }
+}
+
+
+}
+
+
