@@ -1,0 +1,337 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "memmap";
+import "../wiz/common/snes/snes";
+
+import "entities/_variables";
+
+
+namespace metasprites {
+
+let N_OBJECTS = 128;
+
+
+
+struct OamEntry {
+    xPos : u8,
+    yPos : u8,
+    char : u8,
+    attr : u8
+};
+
+let OAM_V_FLIP = 0x80;
+let OAM_H_FLIP = 0x40;
+
+
+
+let OFFSCREEN_YPOS = 255 - 16;
+
+let SHADOW_SMALL_CHAR  = 0;
+let SHADOW_MEDIUM_CHAR = 1;
+let SHADOW_LARGE_CHAR  = 2;
+
+
+in zeropage {
+    // The current index within `buffer`.
+    //
+    // `buffer` is read back to front.
+    //
+    // This value if negative if the buffer is full.
+    var bufferPos : u16;
+
+    // Queue of pending bits to write to `hiTableBuffer`.
+    //
+    // Bits are pushed leftwise into the queue using `lsr` or `rol`
+    // instructions.
+    //
+    // An empty queue has the value of `HI_TABLE_QUEUE_INIT_VALUE` (`1`).  This
+    // This allows for the queue-full state to be checked by reading the carry
+    // flag after every second bit-shift.  When the carry flag is set, the
+    // queue is full, and `_hiTableQueue_full()` must be called.
+    //
+    var hiTableQueue : u8;
+
+    let HI_TABLE_QUEUE_INIT_VALUE = 1;
+
+    let INITIAL_BUFFER_POS = (N_OBJECTS - 1) * sizeof(OamEntry);
+}
+
+
+in wram7e {
+    var buffer : [OamEntry ; N_OBJECTS];
+    var hiTableBuffer : [u8 ; N_OBJECTS / 4];
+
+    var hiTableBufferPos : u16;
+
+    var oldBufferPos : u16;
+}
+
+
+in code {
+
+
+// REQUIRES: Force-Blank
+// DB = 0x80
+#[mem8, idx16]
+inline func setup__fblank() {
+    snes.ppu.obj_control = a = (VRAM_OBJ_WADDR / 8192) | (snes.ppu.OBJ_CONTROL_8x8_16x16 << 4);
+
+    {
+        push8(data_bank);
+
+        push8(a = 0x7e);
+        data_bank = pop8();
+    // DB = 0x7e
+
+        reset_buffers();
+
+        data_bank = pop8();
+    }
+
+    update_oam__vblank();
+}
+
+
+
+// DB = 0x80
+// REQUIRES: VBlank or Force-Blank
+// Uses DMA channel 0
+#[mem8, idx16]
+inline func update_oam__vblank() {
+
+    // ::ANNOY snes.ppu.oam_address_hl address is wrong (should be 0x2102)
+    *(&snes.ppu.oam_address_l as *u16) = xx = 0;
+
+    snes.dma0.control = a = snes.dma.CONTROL_MODE_A;
+    snes.dma0.mdma_dest = a = <:&snes.ppu.oam_write_data;
+    snes.dma0.src_address_hl = xx = &buffer as u16;
+    snes.dma0.src_address_bank = a = #:far &buffer;
+    snes.dma0.mdma_size_hl = xx = sizeof(typeof(buffer)) + sizeof(typeof(hiTableBuffer));
+
+    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx16]
+func reset_buffers() {
+    xx = (N_OBJECTS - 1) * sizeof(OamEntry);
+    bufferPos = xx;
+    oldBufferPos = xx;
+
+    a = OFFSCREEN_YPOS;
+    do {
+        // ::ANNOY cannot do `buffer[unaligned xx].yPos = a;` ::
+
+        (&buffer[0].yPos)[unaligned xx] = a;
+
+        // subtract 4
+        xx--; xx--; xx--; xx--;
+    } while !negative;
+
+
+    // ::ANNOY cannot run this loop backwards::
+    for xx in 0 .. sizeof(typeof(hiTableBuffer)) - 1 {
+        hiTableBuffer[xx] = a = 0xff;
+    }
+
+    hiTableQueue = a = HI_TABLE_QUEUE_INIT_VALUE;
+    hiTableBufferPos = xx = sizeof(typeof(hiTableBuffer)) - 1;
+}
+
+
+
+// KEEP: Y
+// DB = 0x7e
+#[idx16]
+inline func _decrement_buffer_index(pos : u16 in xx) : u16 in xx {
+    // xx -= sizeof(OamEntry);
+    xx--;
+    xx--;
+    xx--;
+    xx--;
+
+    return xx;
+}
+
+
+
+// Update `hiTableBuffer` and reset the `hiTableQueue`
+// KEEP: X and Y
+// DB = 0x7e
+#[mem8, idx16]
+func _hiTableQueue_full() {
+    push16(xx);
+
+    xx = hiTableBufferPos;
+
+    hiTableBuffer[xx] = a = hiTableQueue;
+    xx--;
+
+    hiTableBufferPos = xx;
+
+
+    hiTableQueue = a = HI_TABLE_QUEUE_INIT_VALUE;
+
+    xx = pop16();
+}
+
+
+
+// NOTE: Resets the buffer positions.
+// MUST be called before any MetaSprites are drawn.
+// DB = 0x7e
+#[mem8, idx16]
+inline func draw_shadows() {
+    // KEEP: X and Y
+    #[mem8, idx16]
+    inline func _update_hi_table_size_small() {
+        hiTableQueue <<= 1;
+    }
+
+
+    // KEEP: X and Y
+    #[mem8, idx16]
+    inline func _update_hi_table_x9(x9 : bool in carry) {
+        // Invert carry flag
+        a = 0;
+        a +#= 0xff;
+        a >>>= 1;
+
+        hiTableQueue <<<<#= 1;
+        if carry {
+            _hiTableQueue_full();
+        }
+    }
+
+    // KEEP: X and Y
+    #[mem8, idx16]
+    inline func _update_hi_table_x9_0() {
+        hiTableQueue <<= 1;
+        if carry {
+            _hiTableQueue_full();
+        }
+    }
+
+
+    // Reset buffer positions
+    hiTableQueue = a = HI_TABLE_QUEUE_INIT_VALUE;
+    hiTableBufferPos = xx = sizeof(typeof(hiTableBuffer)) - 1;
+
+    // xx = bufferPos
+    xx = INITIAL_BUFFER_POS;
+
+
+    // yy = entity pos
+    yy = entities.SoA.LAST_INDEX;
+    ^do {
+        a = entities.SoA.shadowSize[unaligned yy] as u8;
+
+        if a == entities.ShadowSize.SMALL as u8 {
+            // ::ANNOY cannot do `buffer[xx].xPos = a`::
+            // ::ANNOY cannot do `u8_array[xx + 4] = a`::
+
+            // yPos
+            (&buffer[0].yPos as *u8)[xx] = a = entities.SoA.yPos_px[unaligned yy] - 4;
+            // char
+            (&buffer[0].char as *u8)[xx] = SHADOW_SMALL_CHAR;
+            // attr
+            (&buffer[0].attr as *u8)[xx] = 0;
+
+            // xPos
+            _update_hi_table_size_small();
+            // carry clear from shift in _update_hi_table_size_small()
+            (&buffer[0].xPos as *u8)[xx] = a = entities.SoA.xPos_px[unaligned yy] +# (-4 as u8);
+            _update_hi_table_x9(carry);
+
+            xx = _decrement_buffer_index(xx);
+        }
+        else {
+            if a == entities.ShadowSize.MEDIUM as u8 {
+                a = SHADOW_MEDIUM_CHAR;
+            }
+            else {
+                a = SHADOW_LARGE_CHAR;
+            }
+            // char
+            (&buffer[ 0].char as *u8)[xx] = a;
+            (&buffer[-1].char as *u8)[xx] = a;
+
+            // yPos
+            a = entities.SoA.yPos_px[unaligned yy] - 4;
+            (&buffer[ 0].yPos as *u8)[xx] = a;
+            (&buffer[-1].yPos as *u8)[xx] = a;
+
+            // attr
+            (&buffer[ 0].attr as *u8)[xx] = a = OAM_H_FLIP;
+            (&buffer[-1].attr as *u8)[xx] = 0;
+
+            // xPos
+            _update_hi_table_size_small();
+            (&buffer[ 0].xPos as *u8)[xx] = a = entities.SoA.xPos_px[unaligned yy];
+            _update_hi_table_x9_0();
+
+            _update_hi_table_size_small();
+            // carry clear from shift in _update_hi_table_size_small()
+            (&buffer[-1].xPos as *u8)[xx] = a = entities.SoA.xPos_px[unaligned yy] +# (-8 as u8);
+            _update_hi_table_x9(carry);
+
+
+            xx = _decrement_buffer_index(xx);
+            xx = _decrement_buffer_index(xx);
+        }
+
+
+        yy--;
+        yy--;
+    } while !negative;
+
+
+    bufferPos = xx;
+}
+
+
+
+#[mem8, idx16]
+inline func finalize_buffer() {
+    xx = bufferPos;
+    if !negative {
+        // ::ANNOY greater-than comparison `>` operator is not allowed in conditional::
+        // ::: `if xx > oldBufferPos {``
+        if { cmp(xx, oldBufferPos); } && carry && !zero {
+            // The previous frame had more sprites onscreen the this frame.
+            // Move them offscreen.
+            do {
+                (&buffer[0].yPos)[unaligned xx] = a = OFFSCREEN_YPOS;
+
+                // subtract 4
+                xx = _decrement_buffer_index(xx);
+            } while xx != oldBufferPos;
+
+            xx = bufferPos;
+        }
+    }
+    oldBufferPos = xx;
+
+
+    a = hiTableQueue;
+    if a != HI_TABLE_QUEUE_INIT_VALUE {
+        // hiTableQueue is not empty.
+
+        // fill buffer
+        do {
+            a <<= 2;
+        } while !carry;
+
+        xx = hiTableBufferPos;
+        hiTableBuffer[xx] = a;
+    }
+}
+
+}
+
+}
+
+

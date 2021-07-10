@@ -53,3 +53,9 @@ const @ 0x80FFFE = invalid_handler; // emu irq
 }
 
 
+// VRAM Map
+// ========
+
+let VRAM_OBJ_WADDR = 0x6000;
+
+

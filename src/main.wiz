@@ -4,15 +4,162 @@
 import "memmap";
 import "../wiz/common/snes/snes";
 
+import "entities/_variables";
+
+import "metasprites";
+import "resources";
+import "common/dma";
+
 
 in code {
 
 
-#[fallthrough, mem8, idx16]
 // DB = 0x80
+#[fallthrough, mem8, idx16]
 func main() {
-    while true {
+    metasprites.setup__fblank();
+
+    snes.ppu.irq_enable = a = snes.ppu.IRQ_ENABLE_AUTOJOY | snes.ppu.IRQ_ENABLE_NMI;
+
+
+    // Setup screen
+    {
+        wait_until_interrupt();
+
+
+        // Set background colour to green
+        let GREEN_COLOR = 15 << 5;
+        snes.ppu.cgram_address = 0;
+        snes.ppu.cgram_write_data = a = <:GREEN_COLOR;
+        snes.ppu.cgram_write_data = a = >:GREEN_COLOR;
+
+
+        // Transfer common sprite tiles to VRAM
+        snes.ppu.vram_address_hl = xx = VRAM_OBJ_WADDR;
+        dma.transfer_to_vram__forceblank(#:far& resources.obj_base_tiles, &resources.obj_base_tiles as u16, sizeof(typeof(resources.obj_base_tiles)));
+
+        // Transfer common sprite palette
+        snes.ppu.cgram_address = a = 128;
+        dma.transfer_to_cgram__forceblank(#:far& resources.obj_base_palette, &resources.obj_base_palette as u16, sizeof(typeof(resources.obj_base_palette)));
+
+        // Only show sprites
+        snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_OBJ;
+
+        snes.ppu.brightness = a = 0xf;
     }
+
+
+    push8(a = 0x7e);
+    data_bank = pop8();
+// DB = 0x7e
+
+
+
+    create_dummy_entities();
+
+
+    ^while true {
+        move_dummy_entities();
+
+        metasprites.draw_shadows();
+
+        metasprites.finalize_buffer();
+
+        // VBlank
+        {
+            push8(program_bank);
+            data_bank = pop8();
+        // DB = 0x80
+
+            wait_until_interrupt();
+
+            metasprites.update_oam__vblank();
+
+            push8(a = 0x7e);
+            data_bank = pop8();
+        // DB = 0x7e
+        }
+    }
+}
+
+
+
+// Create some dummy entities
+// DB = 0x7e
+#[mem8, idx16]
+func create_dummy_entities() {
+    entities.SoA.xPos[0].px = a = 32;
+    entities.SoA.yPos[0].px = a = 64;
+
+    entities.SoA.xPos[1].px = a = 64;
+    entities.SoA.yPos[1].px = a = 64;
+
+    entities.SoA.xPos[2].px = a = 128;
+    entities.SoA.yPos[2].px = a = 64;
+
+    entities.SoA.xPos[3].px = a = 192;
+    entities.SoA.yPos[3].px = a = 64;
+
+    entities.SoA.xPos[4].px = a = 224;
+    entities.SoA.yPos[4].px = a = 64;
+
+
+    entities.SoA.xPos[5].px = a = 64;
+    entities.SoA.yPos[5].px = a = 112;
+
+    entities.SoA.xPos[6].px = a = 192;
+    entities.SoA.yPos[6].px = a = 112;
+
+
+    entities.SoA.xPos[7].px = a = 32;
+    entities.SoA.yPos[7].px = a = 160;
+
+    entities.SoA.xPos[8].px = a = 64;
+    entities.SoA.yPos[8].px = a = 160;
+
+    entities.SoA.xPos[9].px = a = 128;
+    entities.SoA.yPos[9].px = a = 160;
+
+    entities.SoA.xPos[10].px = a = 192;
+    entities.SoA.yPos[10].px = a = 160;
+
+    entities.SoA.xPos[11].px = a = 224;
+    entities.SoA.yPos[11].px = a = 160;
+
+
+    a = entities.ShadowSize.SMALL as u8;
+    entities.SoA._shadowAndBlank[0].shadowSize = a as entities.ShadowSize;
+    entities.SoA._shadowAndBlank[4].shadowSize = a as entities.ShadowSize;
+    entities.SoA._shadowAndBlank[5].shadowSize = a as entities.ShadowSize;
+    entities.SoA._shadowAndBlank[6].shadowSize = a as entities.ShadowSize;
+    entities.SoA._shadowAndBlank[7].shadowSize = a as entities.ShadowSize;
+    entities.SoA._shadowAndBlank[11].shadowSize = a as entities.ShadowSize;
+
+    a = entities.ShadowSize.MEDIUM as u8;
+    entities.SoA._shadowAndBlank[1].shadowSize = a as entities.ShadowSize;
+    entities.SoA._shadowAndBlank[3].shadowSize = a as entities.ShadowSize;
+    entities.SoA._shadowAndBlank[8].shadowSize = a as entities.ShadowSize;
+    entities.SoA._shadowAndBlank[10].shadowSize = a as entities.ShadowSize;
+
+    a = entities.ShadowSize.LARGE as u8;
+    entities.SoA._shadowAndBlank[2].shadowSize = a as entities.ShadowSize;
+    entities.SoA._shadowAndBlank[9].shadowSize = a as entities.ShadowSize;
+}
+
+
+
+// Create some dummy entities
+// DB = 0x7e
+#[mem8, idx16]
+func move_dummy_entities() {
+    xx = entities.SoA.LAST_INDEX;
+    do {
+        entities.SoA.xPos_px[xx]--;
+        entities.SoA.yPos_px[xx]++;
+
+        xx--;
+        xx--;
+    } while !negative;
 }
 
 

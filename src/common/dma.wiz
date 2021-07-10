@@ -1,0 +1,68 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+import "../../wiz/common/snes/snes";
+
+
+namespace dma {
+
+
+in code {
+
+
+// Transfer data to VRAM
+// Uses DMA channel 0
+// REQUIRES: Force-Blank
+// DB = 0x80
+#[mem8, idx16]
+func transfer_to_vram__forceblank(data_bank : u8 in a, data_addr : u16 in xx, size : u16 in yy) {
+
+    snes.dma.hdma_enable = 0;
+
+    snes.dma0.src_address_bank = a;
+    snes.dma0.src_address_hl = xx;
+    snes.dma0.mdma_size_hl = yy;
+
+    // Ensure we are in force blank;
+    snes.ppu.brightness = a = snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK;
+
+    snes.ppu.vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
+
+    snes.dma0.control = a = snes.dma.CONTROL_MODE_AB;
+    snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
+
+    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+}
+
+
+
+// Transfer data to CGRAM
+// Uses DMA channel 0
+// REQUIRES: Force-Blank
+// DB = 0x80
+#[mem8, idx16]
+func transfer_to_cgram__forceblank(data_bank : u8 in a, data_addr : u16 in xx, size : u16 in yy) {
+
+    snes.dma.hdma_enable = 0;
+
+    snes.dma0.src_address_bank = a;
+    snes.dma0.src_address_hl = xx;
+    snes.dma0.mdma_size_hl = yy;
+
+    // Ensure we are in force blank;
+    snes.ppu.brightness = a = snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK;
+
+
+    snes.dma0.control = a = snes.dma.CONTROL_MODE_A;
+    snes.dma0.mdma_dest = a = <:&snes.ppu.cgram_write_data;
+
+    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+}
+
+
+}
+
+}
+
+

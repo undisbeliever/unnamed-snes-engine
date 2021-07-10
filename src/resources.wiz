@@ -1,0 +1,17 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "memmap";
+
+namespace resources {
+
+in rodata0 {
+
+const obj_base_tiles = embed "../gen/obj/base-4bpp-tiles.tiles";
+const obj_base_palette = embed "../gen/obj/base-4bpp-tiles.pal";
+
+}
+
+}
+
+

@@ -1,0 +1,46 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+namespace entities {
+    let N_ENTITIES = 12;
+
+    struct pos {
+        sx : u8,
+        px : u8
+    };
+
+    enum ShadowSize : u8 {
+        SMALL,
+        MEDIUM,
+        LARGE,
+    };
+
+    struct _ShadowAndBlank {
+        shadowSize : ShadowSize,
+
+        // ::TODO use this variable for something::
+        _blank : u8
+    };
+
+    namespace SoA {
+        let LAST_INDEX = (N_ENTITIES - 1) * 2;
+
+        in wram7e {
+            var xPos : [pos ; N_ENTITIES];
+            let xPos_sx = &xPos[0].sx as *u8;
+            let xPos_px = &xPos[0].px as *u8;
+
+            var yPos : [pos ; N_ENTITIES];
+            let yPos_sx = &yPos[0].sx as *u8;
+            let yPos_px = &yPos[0].px as *u8;
+
+
+            var _shadowAndBlank : [_ShadowAndBlank ; N_ENTITIES];
+            let shadowSize = &_shadowAndBlank[0].shadowSize as *ShadowSize;
+        }
+    }
+}
+
+
