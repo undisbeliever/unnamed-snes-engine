@@ -17,6 +17,16 @@ namespace entities {
         LARGE,
     };
 
+    namespace MovementState {
+        let RIGHT_COLLISION = 1 << 0;
+        let LEFT_COLLISION  = 1 << 1;
+        let UP_COLLISION    = 1 << 2;
+        let DOWN_COLLISION  = 1 << 3;
+
+        let X_AXIS_COLLISION = RIGHT_COLLISION | LEFT_COLLISION;
+        let Y_AXIS_COLLISION = UP_COLLISION | DOWN_COLLISION;
+    };
+
     struct _ShadowAndBlank {
         shadowSize : ShadowSize,
 
@@ -24,21 +34,51 @@ namespace entities {
         _blank : u8
     };
 
+    struct _u8pair {
+        first : u8,
+        second : u8,
+    }
+
     namespace SoA {
         let LAST_INDEX = (N_ENTITIES - 1) * 2;
 
         in wram7e {
             var xPos : [pos ; N_ENTITIES];
+            let xPos_u16 = &xPos[0].sx as *u16;
             let xPos_sx = &xPos[0].sx as *u8;
             let xPos_px = &xPos[0].px as *u8;
 
             var yPos : [pos ; N_ENTITIES];
+            let yPos_u16 = &yPos[0].sx as *u16;
             let yPos_sx = &yPos[0].sx as *u8;
             let yPos_px = &yPos[0].px as *u8;
 
 
             var _shadowAndBlank : [_ShadowAndBlank ; N_ENTITIES];
             let shadowSize = &_shadowAndBlank[0].shadowSize as *ShadowSize;
+
+
+            // Signed 16 bit X velocity
+            var xVelocity : [ u16 ; N_ENTITIES ];
+            let xVelocity_sx = &<:xVelocity[0] as *u8;
+            let xVelocity_px = &>:xVelocity[0] as *u8;
+
+            // Signed 16 bit Y velocity
+            var yVelocity : [ u16 ; N_ENTITIES ];
+            let yVelocity_sx = &<:yVelocity[0] as *u8;
+            let yVelocity_px = &>:yVelocity[0] as *u8;
+
+
+            var tileHitbox : [ _u8pair ; N_ENTITIES ];
+            let tileHitbox_halfWidth  = &tileHitbox[0].first as *u8;
+            let tileHitbox_halfHeight = &tileHitbox[0].second as *u8;
+
+
+            var _movementStateAndBlank : [ u16 ; N_ENTITIES ];
+
+            // Updated by `metatiles.move_entity_and_collision_test`
+            // (bitfield of `entities.MovementState`)
+            let movementState = &<:_movementStateAndBlank[0] as *u8;
         }
     }
 }

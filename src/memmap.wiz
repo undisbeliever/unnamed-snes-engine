@@ -52,6 +52,13 @@ const @ 0x80FFFE = invalid_handler; // emu irq
 
 }
 
+in zeropage {
+    var dpTmp0 : u16;
+    var dpTmp1 : u16;
+    var dpTmp2 : u16;
+    var dpTmp3 : u16;
+}
+
 
 // VRAM Map
 // ========
