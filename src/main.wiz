@@ -27,13 +27,21 @@ func main() {
     {
         wait_until_interrupt();
 
+        snes.ppu.brightness = a = snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK;
 
-        // Set background colour to green
-        let GREEN_COLOR = 15 << 5;
-        snes.ppu.cgram_address = 0;
-        snes.ppu.cgram_write_data = a = <:GREEN_COLOR;
-        snes.ppu.cgram_write_data = a = >:GREEN_COLOR;
 
+        snes.ppu.bg_mode = a = 1 | snes.ppu.BG_MODE_MODE1_BG3_PRIORITY;
+        snes.ppu.bg1_tilemap = a = (VRAM_BG1_MAP_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT) | snes.ppu.BG_TILEMAP_MIRROR_X;
+
+        snes.ppu.bg12_tileset = a = (VRAM_BG1_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG1_SHIFT);
+
+
+        snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_BG1 | snes.ppu.SCREEN_ENABLE_OBJ;
+
+
+
+        metatiles.load_tileset__forceblank(#:far& resources.metatile_tilesets.dungeon,
+                                           &resources.metatile_tilesets.dungeon as u16);
 
         // Transfer common sprite tiles to VRAM
         snes.ppu.vram_address_hl = xx = VRAM_OBJ_WADDR;
@@ -42,11 +50,6 @@ func main() {
         // Transfer common sprite palette
         snes.ppu.cgram_address = a = 128;
         dma.transfer_to_cgram__forceblank(#:far& resources.obj_base_palette, &resources.obj_base_palette as u16, sizeof(typeof(resources.obj_base_palette)));
-
-        // Only show sprites
-        snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_OBJ;
-
-        snes.ppu.brightness = a = 0xf;
     }
 
 
@@ -55,9 +58,14 @@ func main() {
 // DB = 0x7e
 
 
-
     create_dummy_map();
     create_dummy_entities();
+
+
+    idx8();
+    #[idx8] {
+        metatiles.draw_map__forceblank();
+    }
 
 
     ^while true {
@@ -81,6 +89,8 @@ func main() {
 
             metasprites.update_oam__vblank();
 
+            snes.ppu.brightness = a = 0xf;
+
             push8(a = 0x7e);
             data_bank = pop8();
         // DB = 0x7e
@@ -95,6 +105,11 @@ func main() {
 func create_dummy_map() {
     for xx in 0 .. sizeof(typeof(metatiles.collisions)) - 1 {
         metatiles.collisions[xx] = a = example_map_collisions[xx];
+
+        if !zero {
+            a = 0x10;
+        }
+        metatiles.map[xx] = a;
     }
 }
 

@@ -12,6 +12,13 @@ const obj_base_palette = embed "../gen/obj/base-4bpp-tiles.pal";
 
 }
 
+namespace metatile_tilesets {
+in rodata0 {
+    const dungeon = embed "../gen/metatiles/dungeon.bin";
+}
+
+}
+
 }
 
 

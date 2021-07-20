@@ -26,6 +26,10 @@ RESOURCES  += $(patsubst resources/%.png,gen/%.pal, $(4BPP_TILES_SRC))
 RESOURCES  += $(patsubst resources/%.png,gen/%.pal, $(2BPP_TILES_SRC))
 
 
+METATILE_TILESETS = dungeon
+RESOURCES  += $(patsubst %,gen/metatiles/%.bin, $(METATILE_TILESETS))
+
+
 
 .PHONY: all
 all: $(BINARY)
@@ -59,6 +63,10 @@ gen/%-8bpp-tiles.tiles gen/%-8bpp-tiles.pal &: resources/%-8bpp-tiles.png
 RESOURCES += $(2BPP_TILES) $(2BPP_PALETTES)
 RESOURCES += $(4BPP_TILES) $(4BPP_PALETTES)
 RESOURCES += $(8BPP_TILES) $(8BPP_PALETTES)
+
+
+gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palette.png tools/convert-tileset.py
+	python3 tools/convert-tileset.py -o "$@" "resources/metatiles/$*-tiles.png" "resources/metatiles/$*-palette.png"
 
 
 

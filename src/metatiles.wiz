@@ -18,6 +18,34 @@ let MAP_HEIGHT = 14;
 let COLLISION_SOLID_BIT = 7;
 
 
+// Tileset data stored in RAM
+struct _Tileset {
+    // Mapping of each of the 4 tiles within each MetaTile.
+    topLeft_low :      [u8 ; 256],
+    topLeft_high :     [u8 ; 256],
+    topRight_low :     [u8 ; 256],
+    topRight_high :    [u8 ; 256],
+    bottomLeft_low :   [u8 ; 256],
+    bottomLeft_high :  [u8 ; 256],
+    bottomRight_low :  [u8 ; 256],
+    bottomRight_high : [u8 ; 256],
+
+    // ::TODO add tile collision data::
+};
+
+
+// Tileset data format in ROM.
+struct _DataFormat {
+    tile_data_size : u16,
+
+    ram_data : _Tileset,
+
+    palette_data : [u16 ; 128],
+
+    tile_data : u8,
+};
+
+
 in zeropage {
 
 }
@@ -28,10 +56,165 @@ in wram7e {
 
     #[align(256)]
     var collisions : [u8 ; 256];
+
+    // this hack allows me to write `tileset.topLeft[y]` without a compile error.
+    #[align(256)]
+    var __far_tileset : _Tileset;
+    let tileset = *(&__far_tileset as *_Tileset);
 }
 
 
 in code {
+
+
+// Load a tileset into memory and the PPU
+//
+// REQUIRES: Force-Blank
+// Uses DMA channel 0
+//
+// NOTE: tileset address cannot be in RAM.
+//
+// DB = 0x80
+#[mem8, idx16]
+func load_tileset__forceblank(tileset_bank : u8 in a, tileset_addr : u16 in xx) {
+let _tilesetPtr = dpTmp_farPtr;
+
+    // Save pointer so we can retrieve `_DataFormat.tile_data_size` later
+    #:_tilesetPtr = a;
+    *(&_tilesetPtr as *u16) = xx;
+
+    // Skip _DataFormat.tile_data_size in DMA's below
+    xx++;
+    xx++;
+
+
+    snes.dma.hdma_enable = 0;
+
+    snes.dma0.src_address_bank = a;
+    snes.dma0.src_address_hl = xx;
+
+
+    // Copy first data block (tileset) into RAM
+    snes.wram.address_hl = xx = &tileset as u16;
+    snes.wram.address_bank = a = (#:far &__far_tileset) & 1;
+
+    snes.dma0.control = a = snes.dma.CONTROL_MODE_A;
+    snes.dma0.mdma_dest = a = <:&snes.wram.data;
+    snes.dma0.mdma_size_hl = xx = sizeof(_Tileset);
+
+    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+
+
+    // Load palette to CGRAM
+    snes.ppu.cgram_address = 0;
+
+    snes.dma0.mdma_dest = a = <:&snes.ppu.cgram_write_data;
+    snes.dma0.mdma_size_hl = yy = 128 * 2;
+
+    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+
+
+    // Load tiles into VRAM
+    snes.ppu.vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
+    snes.ppu.vram_address_hl = xx = VRAM_BG1_TILES_WADDR;
+
+    snes.dma0.control = a = snes.dma.CONTROL_MODE_AB;
+    snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
+
+    mem16();
+    #[mem16] {
+        snes.dma0.mdma_size_hl = aa = **(&_tilesetPtr as *far *u16);
+    }
+    mem8();
+
+    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+}
+
+
+
+// Draws the entire map to BG1.
+//
+// REQUIRES: Force-Blank, Tileset loaded into memory.
+//
+// DB = unknown
+#[mem8, idx8]
+func draw_map__forceblank() {
+let _rowsLeft    = <:dpTmp0;
+let _columnsLeft = >:dpTmp0;
+
+    push8(data_bank);
+
+    push8(program_bank);
+    data_bank = pop8();
+// DB = 0x80
+
+    snes.ppu.brightness = a = snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK;
+
+    snes.ppu.vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
+    snes.ppu.vram_address_l = <:VRAM_BG1_MAP_WADDR;
+    snes.ppu.vram_address_h = >:VRAM_BG1_MAP_WADDR;
+
+
+    // Reset BG1 scroll
+    snes.ppu.bg1_scroll_x = 0;
+    snes.ppu.bg1_scroll_x = 0;
+
+    a = 0xff;
+    snes.ppu.bg1_scroll_y = a;
+    snes.ppu.bg1_scroll_y = a;
+
+
+
+    push8(a = 0x7e);
+    data_bank = pop8();
+// DB = 0x7e
+
+
+    // ::TODO setup variables::
+
+
+    // X = map position
+    x = 0;
+
+    _rowsLeft = a = MAP_HEIGHT;
+    do {
+        push8(x);
+
+        _columnsLeft = a = MAP_WIDTH;
+        do {
+            y = map[x];
+
+            *(far &snes.ppu.vram_write_data_l) = a = tileset.topLeft_low[y];
+            *(far &snes.ppu.vram_write_data_h) = a = tileset.topLeft_high[y];
+            *(far &snes.ppu.vram_write_data_l) = a = tileset.topRight_low[y];
+            *(far &snes.ppu.vram_write_data_h) = a = tileset.topRight_high[y];
+
+            x++;
+            _columnsLeft--;
+        } while !zero;
+
+        x = pop8();
+
+        _columnsLeft = a = MAP_WIDTH;
+        do {
+            y = map[x];
+
+            *(far &snes.ppu.vram_write_data_l) = a = tileset.bottomLeft_low[y];
+            *(far &snes.ppu.vram_write_data_h) = a = tileset.bottomLeft_high[y];
+            *(far &snes.ppu.vram_write_data_l) = a = tileset.bottomRight_low[y];
+            *(far &snes.ppu.vram_write_data_h) = a = tileset.bottomRight_high[y];
+
+            x++;
+            _columnsLeft--;
+        } while !zero;
+
+
+        _rowsLeft--;
+    } while !zero;
+
+
+    data_bank = pop8();
+}
 
 
 
@@ -40,6 +223,7 @@ in code {
 // OUTPUT: entities.SoA.movementState bits will be set if there is a collision, otherwise cleared.
 //
 // KEEP: X
+// DB = 0x7e
 #[mem8, idx8]
 func move_entity_and_collision_test(entityId : u8 in x) : u8 in x {
     // Clear movementState flags;
@@ -156,6 +340,7 @@ let _right  = <:dpTmp1;
 //
 // OUTPUT: entities.SoA.movementState bits will be set if there is a collision, otherwise cleared.
 // KEEP: X
+// DB = 0x7e
 #[mem8, idx8]
 func _move_entity_and_collision_test_y_axis(entityId : u8 in x) : u8 in x {
 let _tmp    = <:dpTmp0;
