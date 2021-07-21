@@ -65,8 +65,8 @@ RESOURCES += $(4BPP_TILES) $(4BPP_PALETTES)
 RESOURCES += $(8BPP_TILES) $(8BPP_PALETTES)
 
 
-gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palette.png tools/convert-tileset.py
-	python3 tools/convert-tileset.py -o "$@" "resources/metatiles/$*-tiles.png" "resources/metatiles/$*-palette.png"
+gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palette.png resources/metatiles/%-properties.json tools/convert-tileset.py
+	python3 tools/convert-tileset.py -o "$@" "resources/metatiles/$*-tiles.png" "resources/metatiles/$*-palette.png" "resources/metatiles/$*-properties.json"
 
 
 

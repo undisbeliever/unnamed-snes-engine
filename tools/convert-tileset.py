@@ -7,12 +7,16 @@ import PIL.Image
 import argparse
 import struct
 import array
+import json
 from collections import namedtuple
 
 
 TILE_DATA_BPP = 4
 
 DEFAULT_ORDER_BIT = 1
+
+
+TILE_PROPERTY_SOLID_BIT = 7
 
 
 TileMapEntry = namedtuple('TileMapEntry', ('tile_id', 'palette_id'))
@@ -166,7 +170,28 @@ def create_metatile_map(tilemap):
 
 
 
-def create_tileset_data(palette, metatile_map, tile_data):
+def create_properties_array(json_input):
+    data = bytearray(256)
+
+    def process_bit(name, shift):
+        flag = 1 << shift
+
+        values = json_input[name]
+
+        if not isinstance(values, list) or len(values) != 256:
+            raise ValueError(f"Invalid {name} in json file: expected array containing 256 elements")
+
+        for i, tile in enumerate(values):
+            if tile:
+                data[i] |= flag
+
+    process_bit('solid', TILE_PROPERTY_SOLID_BIT)
+
+    return data
+
+
+
+def create_tileset_data(palette, tile_data, metatile_map, properties):
     data = bytearray()
 
     # First Word: tile data size
@@ -178,14 +203,16 @@ def create_tileset_data(palette, metatile_map, tile_data):
     assert(len(metatile_map) == 2048)
     data += metatile_map
 
-    # ::TODO add collision data::
+    # 256 bytes = properties map
+    assert(len(properties) == 256)
+    data += properties
 
     # Next 256 bytes = palette data
     for pal, p_map in palette:
         for c in pal:
             data.append(c & 0xff)
             data.append(c >> 8)
-    assert(len(data) == 256 + 2048 + 2)
+    assert(len(data) == 2 + 2048 + 256 * 2)
 
     # Next data: tile data
     data += tile_data
@@ -202,6 +229,8 @@ def parse_arguments():
                         help='Indexed png image')
     parser.add_argument('palette_filename', action='store',
                         help='palette PNG image')
+    parser.add_argument('properties_filename', action='store',
+                        help='properties json file')
 
     args = parser.parse_args()
 
@@ -218,10 +247,14 @@ def main():
         with PIL.Image.open(args.image_filename) as image:
             tilemap, tileset = convert_tilemap_and_tileset(extract_tiles(image), palette)
 
+    with open(args.properties_filename, 'r') as json_file:
+        properties_input = json.load(json_file)
+
     metatile_map = create_metatile_map(tilemap)
     tile_data = convert_snes_tileset_4bpp(tileset)
+    properties = create_properties_array(properties_input)
 
-    tileset_data = create_tileset_data(palette, metatile_map, tile_data)
+    tileset_data = create_tileset_data(palette, tile_data, metatile_map, properties)
 
     with open(args.output, 'wb') as fp:
         fp.write(tileset_data)
