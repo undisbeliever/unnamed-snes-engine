@@ -103,8 +103,8 @@ func main() {
 // DB = 0x7e
 #[mem8, idx16]
 func create_dummy_map() {
-    for xx in 0 .. sizeof(typeof(metatiles.collisions)) - 1 {
-        metatiles.collisions[xx] = a = example_map_collisions[xx];
+    for xx in 0 .. sizeof(typeof(metatiles.mapTileProperties)) - 1 {
+        metatiles.mapTileProperties[xx] = a = example_map_collisions[xx];
 
         if !zero {
             a = 0x10;

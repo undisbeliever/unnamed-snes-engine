@@ -15,7 +15,7 @@ let MAP_WIDTH = 16;
 let MAP_HEIGHT = 14;
 
 
-let COLLISION_SOLID_BIT = 7;
+let TILE_PROPERTY_SOLID_BIT = 7;
 
 
 // Tileset data stored in RAM
@@ -51,11 +51,20 @@ in zeropage {
 }
 
 in wram7e {
+    // The map for the current room.
+    //
+    // NOTE: Whenever the map is updated the corresponding `mapTileProperties` cells must be changed.
     #[align(256)]
     var map : [u8 ; 256];
 
+    // The MetaTile tileset tile properties for each map tile.
+    //
+    // (bitfield of `TILE_PROPERTY_*_BIT`s for each map tile.)
+    //
+    // Whenever the map is updated the corresponding `mapTileProperties` cells must be changed.
     #[align(256)]
-    var collisions : [u8 ; 256];
+    var mapTileProperties : [u8 ; 256];
+
 
     // this hack allows me to write `tileset.topLeft[y]` without a compile error.
     #[align(256)]
@@ -272,7 +281,7 @@ let _right  = <:dpTmp1;
         _tmp = a = a >>> 4;
         y = a = (_top & 0xf0) + _tmp;
 
-        a = collisions[y];
+        a = mapTileProperties[y];
         if negative {
             // solid collision
             entities.SoA.xPos_px[x] = a = (~_left & 0xf) + 1 + entities.SoA.xPos_px[x];
@@ -282,7 +291,7 @@ let _right  = <:dpTmp1;
             // Check if the hitbox touches the tile below this one
             a = (_top & 0xf) + entities.SoA.tileHitbox_halfHeight[x] + entities.SoA.tileHitbox_halfHeight[x];
             if a >= METATILE_SIZE {
-                a = (&collisions[MAP_WIDTH])[y];
+                a = (&mapTileProperties[MAP_WIDTH])[y];
                 if negative {
                     entities.SoA.xPos_px[x] = a = (~_left & 0xf) + 1 + entities.SoA.xPos_px[x];
                     entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.LEFT_COLLISION;
@@ -305,7 +314,7 @@ let _right  = <:dpTmp1;
         _tmp = a = a >>> 4;
         y = a = (_top & 0xf0) + _tmp;
 
-        a = collisions[y];
+        a = mapTileProperties[y];
         if negative {
             // solid collision
             a = (_right & 0xf0) - entities.SoA.tileHitbox_halfWidth[x];
@@ -318,7 +327,7 @@ let _right  = <:dpTmp1;
             // Check if the hitbox touches the tile below this one
             a = (_top & 0xf) + entities.SoA.tileHitbox_halfHeight[x] + entities.SoA.tileHitbox_halfHeight[x];
             if a >= METATILE_SIZE {
-                a = (&collisions[MAP_WIDTH])[y];
+                a = (&mapTileProperties[MAP_WIDTH])[y];
                 if negative {
                     // solid collision
                     a = (_right & 0xf0) - entities.SoA.tileHitbox_halfWidth[x];
@@ -369,7 +378,7 @@ let _bottom = <:dpTmp1;
         _tmp = a = _left >>> 4;
         y = a = (_top & 0xf0) + _tmp;
 
-        a = collisions[y];
+        a = mapTileProperties[y];
         if negative {
             // solid collision
             entities.SoA.yPos_px[x] = a = (~_top & 0xf) + 1 + entities.SoA.yPos_px[x];
@@ -379,7 +388,7 @@ let _bottom = <:dpTmp1;
             // Check if the hitbox touches the tile to the right of this one
             a = (_left & 0xf) + entities.SoA.tileHitbox_halfWidth[x] + entities.SoA.tileHitbox_halfWidth[x];
             if a >= METATILE_SIZE {
-                a = (&collisions[1])[y];
+                a = (&mapTileProperties[1])[y];
                 if negative {
                     entities.SoA.yPos_px[x] = a = (~_top & 0xf) + 1 + entities.SoA.yPos_px[x];
                     entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.UP_COLLISION;
@@ -402,7 +411,7 @@ let _bottom = <:dpTmp1;
         _tmp = a = _left >>> 4;
         y = a = (_bottom & 0xf0) + _tmp;
 
-        a = collisions[y];
+        a = mapTileProperties[y];
         if negative {
             // solid collision
             a = (_bottom & 0xf0) - entities.SoA.tileHitbox_halfHeight[x];
@@ -415,7 +424,7 @@ let _bottom = <:dpTmp1;
             // Check if the hitbox touches the tile to the right of this one
             a = (_left & 0xf) + entities.SoA.tileHitbox_halfWidth[x] + entities.SoA.tileHitbox_halfWidth[x];
             if a >= METATILE_SIZE {
-                a = (&collisions[1])[y];
+                a = (&mapTileProperties[1])[y];
                 if negative {
                     a = (_bottom & 0xf0) - entities.SoA.tileHitbox_halfHeight[x];
                     if !carry { a = 1; }
