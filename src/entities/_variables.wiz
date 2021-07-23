@@ -12,6 +12,9 @@ namespace entities {
     };
 
     enum ShadowSize : u8 {
+        // Deleted entities MUST NOT have a shadow
+        NONE,
+
         SMALL,
         MEDIUM,
         LARGE,
