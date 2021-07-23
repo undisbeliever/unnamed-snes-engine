@@ -5,6 +5,7 @@ import "memmap";
 import "../wiz/common/snes/snes";
 
 import "entities/_variables";
+import "entities/player";
 
 import "metatiles";
 import "metasprites";
@@ -74,6 +75,8 @@ func main() {
     ^while true {
         idx8();
         #[idx8] {
+            entities.player.process(0);
+
             move_dummy_entities();
         }
         idx16();
@@ -107,8 +110,8 @@ func main() {
 // DB = 0x7e
 #[mem8, idx16]
 func create_dummy_entities() {
-    entities.SoA.xPos[0].px = a = 32;
-    entities.SoA.yPos[0].px = a = 64;
+    entities.SoA.xPos[0].px = a = 128;
+    entities.SoA.yPos[0].px = a = 112;
 
     entities.SoA.xPos[1].px = a = 64;
     entities.SoA.yPos[1].px = a = 64;
@@ -147,7 +150,6 @@ func create_dummy_entities() {
 
 
     a = entities.ShadowSize.SMALL as u8;
-    entities.SoA._shadowAndBlank[0].shadowSize = a as entities.ShadowSize;
     entities.SoA._shadowAndBlank[4].shadowSize = a as entities.ShadowSize;
     entities.SoA._shadowAndBlank[5].shadowSize = a as entities.ShadowSize;
     entities.SoA._shadowAndBlank[6].shadowSize = a as entities.ShadowSize;
@@ -155,6 +157,7 @@ func create_dummy_entities() {
     entities.SoA._shadowAndBlank[11].shadowSize = a as entities.ShadowSize;
 
     a = entities.ShadowSize.MEDIUM as u8;
+    entities.SoA._shadowAndBlank[0].shadowSize = a as entities.ShadowSize;
     entities.SoA._shadowAndBlank[1].shadowSize = a as entities.ShadowSize;
     entities.SoA._shadowAndBlank[3].shadowSize = a as entities.ShadowSize;
     entities.SoA._shadowAndBlank[8].shadowSize = a as entities.ShadowSize;
@@ -226,7 +229,7 @@ func move_dummy_entities() {
 
         x--;
         x--;
-    } while !negative;
+    } while !zero;
 }
 
 }

@@ -1,0 +1,76 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "_variables";
+
+import "../metatiles";
+import "../../wiz/common/snes/snes";
+
+
+namespace entities {
+namespace player {
+
+let xPos = entities.SoA.xPos[0];
+let yPos = entities.SoA.yPos[0];
+
+let xVelocity = entities.SoA.xVelocity[0];
+let yVelocity = entities.SoA.yVelocity[0];
+
+
+in code {
+
+// Entity process routine.
+//
+// Called once per frame.
+//
+// INPUT: entityId (x) is always 0
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process(entityId : u8 in x) : u8 in x {
+
+    // ::TODO add proper controller support::
+    let joy1_l = snes.joy.pad1_l;
+    let joy1_h = snes.joy.pad1_h;
+
+    idx16();
+    #[idx16] {
+        a = *far &joy1_h;
+
+        if a & (1 << snes.joy.bit_h.UP) != 0 {
+            yy = -0x0160 as u16;
+        }
+        else if a & (1 << snes.joy.bit_h.DOWN) != 0 {
+            yy = 0x0160;
+        }
+        else {
+            yy = 0;
+        }
+        yVelocity = yy;
+
+        if a & (1 << snes.joy.bit_h.LEFT) != 0 {
+            yy = -0x0160 as u16;
+        }
+        else if a & (1 << snes.joy.bit_h.RIGHT) != 0 {
+            yy = 0x0160;
+        }
+        else {
+            yy = 0;
+        }
+        xVelocity = yy;
+    }
+    idx8();
+
+    x = metatiles.move_entity_and_collision_test(x);
+
+    return x;
+}
+
+
+}
+
+}
+}
+
