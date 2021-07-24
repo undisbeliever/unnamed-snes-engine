@@ -5,9 +5,7 @@
 
 import PIL.Image
 import argparse
-import struct
-import array
-import json
+import xml.etree.ElementTree
 from collections import namedtuple
 
 
@@ -170,22 +168,50 @@ def create_metatile_map(tilemap):
 
 
 
-def create_properties_array(json_input):
+def check_objectgroup_tag(tag):
+    if len(tag) != 1:
+        return False
+
+    childTag = tag[0]
+
+    if childTag.tag != 'object':
+        return False
+
+    return (childTag.tag == 'object'
+        and childTag.attrib['x'] == '0'
+        and childTag.attrib['y'] == '0'
+        and childTag.attrib['width'] == '16'
+        and childTag.attrib['height'] == '16')
+
+
+
+def read_tile_tag(tile_tag):
+    """ Returns (tile_id, properties_value) """
+
+    tile_id = int(tile_tag.attrib['id']);
+
+    if tile_id > 255:
+        raise ValueError("Invalid tileid")
+
+    properties = 0;
+
+    for tag in tile_tag:
+        if tag.tag == 'objectgroup':
+            if not check_objectgroup_tag(tag):
+                raise ValueError('Tile collision MUST cover the whole tile in a single rectangle')
+            properties |= 1 << TILE_PROPERTY_SOLID_BIT
+
+    return tile_id, properties
+
+
+
+def create_properties_array(tsx_et):
     data = bytearray(256)
 
-    def process_bit(name, shift):
-        flag = 1 << shift
-
-        values = json_input[name]
-
-        if not isinstance(values, list) or len(values) != 256:
-            raise ValueError(f"Invalid {name} in json file: expected array containing 256 elements")
-
-        for i, tile in enumerate(values):
-            if tile:
-                data[i] |= flag
-
-    process_bit('solid', TILE_PROPERTY_SOLID_BIT)
+    for tag in tsx_et.getroot():
+        if tag.tag == 'tile':
+            tile_id, p = read_tile_tag(tag)
+            data[tile_id] = p
 
     return data
 
@@ -229,8 +255,8 @@ def parse_arguments():
                         help='Indexed png image')
     parser.add_argument('palette_filename', action='store',
                         help='palette PNG image')
-    parser.add_argument('properties_filename', action='store',
-                        help='properties json file')
+    parser.add_argument('tsx_filename', action='store',
+                        help='Tiled tsx file')
 
     args = parser.parse_args()
 
@@ -247,12 +273,12 @@ def main():
         with PIL.Image.open(args.image_filename) as image:
             tilemap, tileset = convert_tilemap_and_tileset(extract_tiles(image), palette)
 
-    with open(args.properties_filename, 'r') as json_file:
-        properties_input = json.load(json_file)
+    with open(args.tsx_filename, 'r') as tsx_fp:
+        tsx_et = xml.etree.ElementTree.parse(tsx_fp)
 
     metatile_map = create_metatile_map(tilemap)
     tile_data = convert_snes_tileset_4bpp(tileset)
-    properties = create_properties_array(properties_input)
+    properties = create_properties_array(tsx_et)
 
     tileset_data = create_tileset_data(palette, tile_data, metatile_map, properties)
 
