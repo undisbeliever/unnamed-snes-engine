@@ -21,6 +21,33 @@ let yVelocity = entities.SoA.yVelocity[0];
 
 in code {
 
+
+// Initialize player.
+//
+// Only called once at the start of the game.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func init() {
+    a = ShadowSize.MEDIUM as u8;
+    entities.SoA.shadowSize[0] = a as ShadowSize;
+
+    xPos.px = a = 128;
+    yPos.px = a = 112;
+
+    SoA.tileHitbox_halfWidth[0] = a = 6;
+    SoA.tileHitbox_halfHeight[0] = a = 3;
+
+
+    mem16();
+    #[mem16] {
+        entities.SoA.xVelocity[0] = 0;
+        entities.SoA.yVelocity[0] = 0;
+    }
+    mem8();
+}
+
+
 // Entity process routine.
 //
 // Called once per frame.
@@ -29,7 +56,7 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func process(entityId : u8 in x) : u8 in x {
+func process(entityId : u8 in x) {
 
     // ::TODO add proper controller support::
     let joy1_l = snes.joy.pad1_l;
@@ -64,8 +91,6 @@ func process(entityId : u8 in x) : u8 in x {
     idx8();
 
     x = metatiles.move_entity_and_collision_test(x);
-
-    return x;
 }
 
 

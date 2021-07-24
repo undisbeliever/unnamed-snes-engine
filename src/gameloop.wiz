@@ -1,0 +1,89 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "memmap";
+import "../wiz/common/snes/snes";
+
+import "entities/_variables";
+import "entities/player";
+
+
+namespace gameloop {
+
+in zeropage {
+
+}
+
+in wram7e {
+
+}
+
+
+in code {
+
+// Initialize the game loop
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func init() {
+    // ::TODO setup screen (if necessary)::
+
+    mem16();
+    #[mem16] {
+        // ::TODO clear entity variables::
+
+        // Set player's process function
+        aa = entities.player.process as u16;
+        entities.SoA.process_function[0] = aa as func(u8 in x);
+
+
+        // Set all process_functions to blank (except player)
+        aa = _blank_entity_process_function as u16;
+
+        x = entities.SoA.LAST_INDEX;
+        do {
+            entities.SoA.process_function[unaligned x] = aa as func(u8 in x);
+
+            // Clear player shadow and velocity
+            (&entities.SoA._shadowAndBlank as *u16)[unaligned x] = 0;
+            entities.SoA.xVelocity[unaligned x] = 0;
+            entities.SoA.yVelocity[unaligned x] = 0;
+
+            x--;
+            x--;
+        } while !zero;
+    }
+    mem8();
+
+
+    entities.player.init();
+}
+
+
+
+// Process the game loop
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process() {
+
+    inline for let entityId in 0 .. entities.SoA.LAST_INDEX by 2 {
+        // ::ANNOY there is no `jsr (addr)` instruction on the 65816::
+        x = entityId;
+        entities.SoA.process_function[unaligned x](x);
+    }
+
+}
+
+
+
+// DB = 0x7e
+func _blank_entity_process_function(entityId : u8 in x) {
+}
+
+
+
+}
+
+}
+

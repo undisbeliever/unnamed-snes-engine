@@ -5,12 +5,15 @@ import "memmap";
 import "../wiz/common/snes/snes";
 
 import "entities/_variables";
-import "entities/player";
 
+import "gameloop";
 import "metatiles";
 import "metasprites";
 import "resources";
 import "common/dma";
+
+import "entities/player";
+import "entities/bouncing-off-walls";
 
 
 in code {
@@ -59,9 +62,6 @@ func main() {
 // DB = 0x7e
 
 
-    create_dummy_entities();
-
-
     metatiles.load_map(0);
 
     idx8();
@@ -69,15 +69,19 @@ func main() {
         metatiles.draw_map__forceblank();
 
         metatiles.populate_map_tile_properties();
+
+        gameloop.init();
     }
+    idx16();
+
+
+    create_dummy_entities();
 
 
     ^while true {
         idx8();
         #[idx8] {
-            entities.player.process(0);
-
-            move_dummy_entities();
+            gameloop.process();
         }
         idx16();
 
@@ -110,9 +114,6 @@ func main() {
 // DB = 0x7e
 #[mem8, idx16]
 func create_dummy_entities() {
-    entities.SoA.xPos[0].px = a = 128;
-    entities.SoA.yPos[0].px = a = 112;
-
     entities.SoA.xPos[1].px = a = 64;
     entities.SoA.yPos[1].px = a = 64;
 
@@ -157,7 +158,6 @@ func create_dummy_entities() {
     entities.SoA._shadowAndBlank[11].shadowSize = a as entities.ShadowSize;
 
     a = entities.ShadowSize.MEDIUM as u8;
-    entities.SoA._shadowAndBlank[0].shadowSize = a as entities.ShadowSize;
     entities.SoA._shadowAndBlank[1].shadowSize = a as entities.ShadowSize;
     entities.SoA._shadowAndBlank[3].shadowSize = a as entities.ShadowSize;
     entities.SoA._shadowAndBlank[8].shadowSize = a as entities.ShadowSize;
@@ -172,6 +172,9 @@ func create_dummy_entities() {
     do {
         mem16();
         #[mem16] {
+            aa = entities.bouncing_off_walls.process as u16;
+            entities.SoA.process_function[unaligned xx] = aa as func(u8 in x);
+
             entities.SoA.xVelocity[unaligned xx] = aa =  0x0120;
             entities.SoA.yVelocity[unaligned xx] = aa = -0x0120 as u16;
         }
@@ -195,41 +198,7 @@ func create_dummy_entities() {
         xx--;
         xx--;
     }
-    while !negative;
-}
-
-
-
-// Create some dummy entities
-// DB = 0x7e
-#[mem8, idx8]
-func move_dummy_entities() {
-    x = entities.SoA.LAST_INDEX;
-
-    do {
-        metatiles.move_entity_and_collision_test(x);
-
-        a = entities.SoA.movementState[x];
-        if a & entities.MovementState.X_AXIS_COLLISION != 0 {
-            mem16();
-            #[mem16] {
-                entities.SoA.xVelocity[unaligned x] = aa = 0 - entities.SoA.xVelocity[unaligned x];
-            }
-            mem8();
-        }
-
-        a = entities.SoA.movementState[x];
-        if a & entities.MovementState.Y_AXIS_COLLISION != 0 {
-            mem16();
-            #[mem16] {
-                entities.SoA.yVelocity[unaligned x] = aa = 0 - entities.SoA.yVelocity[unaligned x];
-            }
-            mem8();
-        }
-
-        x--;
-        x--;
-    } while !zero;
+    while !zero;
 }
 
 }
