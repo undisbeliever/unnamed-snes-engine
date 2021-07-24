@@ -342,7 +342,7 @@ let _right  = <:dpTmp1;
         else {
             // Check if the hitbox touches the tile below this one
             a = (_top & 0xf) + entities.SoA.tileHitbox_halfHeight[x] + entities.SoA.tileHitbox_halfHeight[x];
-            if a >= METATILE_SIZE {
+            if a >= METATILE_SIZE + 1 {
                 a = (&mapTileProperties[MAP_WIDTH])[y];
                 if negative {
                     entities.SoA.xPos_px[x] = a = (~_left & 0xf) + 1 + entities.SoA.xPos_px[x];
@@ -371,20 +371,18 @@ let _right  = <:dpTmp1;
             // solid collision
             a = (_right & 0xf0) - entities.SoA.tileHitbox_halfWidth[x];
             if !carry { a = 1; }
-            a--;
             entities.SoA.xPos_px[x] = a;
             entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.RIGHT_COLLISION;
         }
         else {
             // Check if the hitbox touches the tile below this one
             a = (_top & 0xf) + entities.SoA.tileHitbox_halfHeight[x] + entities.SoA.tileHitbox_halfHeight[x];
-            if a >= METATILE_SIZE {
+            if a >= METATILE_SIZE + 1 {
                 a = (&mapTileProperties[MAP_WIDTH])[y];
                 if negative {
                     // solid collision
                     a = (_right & 0xf0) - entities.SoA.tileHitbox_halfWidth[x];
                     if !carry { a = 1; }
-                    a--;
                     entities.SoA.xPos_px[x] = a;
                     entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.RIGHT_COLLISION;
                 }
@@ -439,7 +437,7 @@ let _bottom = <:dpTmp1;
         else {
             // Check if the hitbox touches the tile to the right of this one
             a = (_left & 0xf) + entities.SoA.tileHitbox_halfWidth[x] + entities.SoA.tileHitbox_halfWidth[x];
-            if a >= METATILE_SIZE {
+            if a >= METATILE_SIZE + 1 {
                 a = (&mapTileProperties[1])[y];
                 if negative {
                     entities.SoA.yPos_px[x] = a = (~_top & 0xf) + 1 + entities.SoA.yPos_px[x];
@@ -468,19 +466,17 @@ let _bottom = <:dpTmp1;
             // solid collision
             a = (_bottom & 0xf0) - entities.SoA.tileHitbox_halfHeight[x];
             if !carry { a = 1; }
-            a--;
             entities.SoA.yPos_px[x] = a;
             entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.DOWN_COLLISION;
         }
         else {
             // Check if the hitbox touches the tile to the right of this one
             a = (_left & 0xf) + entities.SoA.tileHitbox_halfWidth[x] + entities.SoA.tileHitbox_halfWidth[x];
-            if a >= METATILE_SIZE {
+            if a >= METATILE_SIZE + 1 {
                 a = (&mapTileProperties[1])[y];
                 if negative {
                     a = (_bottom & 0xf0) - entities.SoA.tileHitbox_halfHeight[x];
                     if !carry { a = 1; }
-                    a--;
                     entities.SoA.yPos_px[x] = a;
                     entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.DOWN_COLLISION;
                 }
