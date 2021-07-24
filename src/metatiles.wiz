@@ -303,7 +303,7 @@ func move_entity_and_collision_test(entityId : u8 in x) : u8 in x {
 // OUTPUT: entities.SoA.movementState bits will be set if there is a collision, otherwise cleared.
 // KEEP: X
 #[mem8, idx8]
-func _move_entity_and_collision_test_x_axis(entityId : u8 in x) : u8 in x {
+inline func _move_entity_and_collision_test_x_axis(entityId : u8 in x) : u8 in x {
 let _tmp    = <:dpTmp0;
 let _top    = >:dpTmp0;
 let _left   = <:dpTmp1;
@@ -403,7 +403,7 @@ let _right  = <:dpTmp1;
 // KEEP: X
 // DB = 0x7e
 #[mem8, idx8]
-func _move_entity_and_collision_test_y_axis(entityId : u8 in x) : u8 in x {
+inline func _move_entity_and_collision_test_y_axis(entityId : u8 in x) : u8 in x {
 let _tmp    = <:dpTmp0;
 let _left   = >:dpTmp0;
 let _top    = <:dpTmp1;
