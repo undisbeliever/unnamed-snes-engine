@@ -26,8 +26,8 @@ RESOURCES  += $(patsubst resources/%.png,gen/%.pal, $(4BPP_TILES_SRC))
 RESOURCES  += $(patsubst resources/%.png,gen/%.pal, $(2BPP_TILES_SRC))
 
 
-MAP_SRC    := $(wildcard resources/maps/*.tmx)
-RESOURCES  += $(patsubst resources/maps/%.tmx,gen/maps/%.bin, $(MAP_SRC))
+MAP_SRC    := $(wildcard resources/rooms/*.tmx)
+RESOURCES  += $(patsubst resources/rooms/%.tmx,gen/rooms/%.bin, $(MAP_SRC))
 
 
 METATILE_TILESETS = dungeon
@@ -75,8 +75,8 @@ gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palet
 	python3 tools/convert-tileset.py -o "$@" "resources/metatiles/$*-tiles.png" "resources/metatiles/$*-palette.png" "resources/metatiles/$*.tsx"
 
 
-gen/maps/%.bin:	resources/maps/%.tmx resources/mappings.json tools/convert-map.py
-	python3 tools/convert-map.py -o "$@" "resources/maps/$*.tmx" "resources/mappings.json"
+gen/rooms/%.bin: resources/rooms/%.tmx resources/mappings.json tools/convert-room.py
+	python3 tools/convert-room.py -o "$@" "resources/rooms/$*.tmx" "resources/mappings.json"
 
 
 gen/resource-lists.wiz: resources/mappings.json tools/generate-resource-lists.py

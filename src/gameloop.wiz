@@ -96,15 +96,13 @@ func _load_room(room_id : u8 in x) {
 let _tmp = <:dpTmp0;
 let _roomPtr = dpTmp_farPtr;
 
-    // ::TODO rename maps to rooms::
-
-    if x >= sizeof(typeof(resources.maps.map_list_l)) {
+    if x >= sizeof(typeof(resources.rooms.room_list_l)) {
         x = 0;
     }
 
-    <:_roomPtr = a = resources.maps.map_list_l[x];
-    >:_roomPtr = a = resources.maps.map_list_h[x];
-    #:_roomPtr = a = resources.maps.map_list_b[x];
+    <:_roomPtr = a = resources.rooms.room_list_l[x];
+    >:_roomPtr = a = resources.rooms.room_list_h[x];
+    #:_roomPtr = a = resources.rooms.room_list_b[x];
 
 
     y = sizeof(typeof(room));

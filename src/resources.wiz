@@ -30,25 +30,25 @@ in rodata0 {
 }
 
 
-namespace maps {
+namespace rooms {
 
 in rodata0 {
-    const dungeon = embed "../gen/maps/dungeon.bin";
+    const dungeon = embed "../gen/rooms/dungeon.bin";
 
-    // Have to split up the map list into separate low/high/bank arrays
+    // Have to split up the room list into separate low/high/bank arrays
     // As my attempts to create a `[far *u8]` array fail with a
     // "fatal: constant initializer could not be resolved at link-time" error.
 
-    let _maps = [dungeon];
+    let _rooms = [dungeon];
 
     // ::KUDOS eggboycolor for this pattern ::
-    const _map_list_l : [u8] = [<:&i for let i in _maps];
-    const _map_list_h : [u8] = [>:&i for let i in _maps];
-    const _map_list_b : [u8] = [#:far &i for let i in _maps];
+    const _room_list_l : [u8] = [<:&i for let i in _rooms];
+    const _room_list_h : [u8] = [>:&i for let i in _rooms];
+    const _room_list_b : [u8] = [#:far &i for let i in _rooms];
 
-    let map_list_l = far &_map_list_l as far *const u8;
-    let map_list_h = far &_map_list_h as far *const u8;
-    let map_list_b = far &_map_list_b as far *const u8;
+    let room_list_l = far &_room_list_l as far *const u8;
+    let room_list_h = far &_room_list_h as far *const u8;
+    let room_list_b = far &_room_list_b as far *const u8;
 }
 
 }
