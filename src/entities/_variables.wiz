@@ -93,6 +93,19 @@ namespace entities {
             // Updated by `metatiles.move_entity_and_collision_test`
             // (bitfield of `entities.MovementState`)
             let movementState = &<:_movementStateAndBlank[0] as *u8;
+
+
+            // Variables used to store the entity's state between `process_function` calls
+            //
+            // NOTE: if I add more states here then I need to clear them in `spawn_entity`
+            var state_0 : [ u16 ; N_ENTITIES ];
+            var state_1 : [ u16 ; N_ENTITIES ];
+            var state_2 : [ u16 ; N_ENTITIES ];
+            var state_3 : [ u16 ; N_ENTITIES ];
+            var state_4 : [ u16 ; N_ENTITIES ];
+            var state_5 : [ u16 ; N_ENTITIES ];
+            var state_6 : [ u16 ; N_ENTITIES ];
+            var state_7 : [ u16 ; N_ENTITIES ];
         }
     }
 }
