@@ -4,17 +4,38 @@
 import "memmap";
 import "../wiz/common/snes/snes";
 
+import "metatiles";
+import "resources";
 import "entities/_variables";
 import "entities/player";
 
 
 namespace gameloop {
 
+
+let STARTING_ROOM = 0;
+
+
+// Map data format
+struct RoomData {
+    map         : [u8 ; metatiles.MAP_WIDTH * metatiles.MAP_HEIGHT],
+
+    tileset     : u8,
+};
+
+
+
 in zeropage {
 
 }
 
 in wram7e {
+
+
+    // This hack is required to access room via addr addressing.
+    #[align(256)]
+    var __far_room : RoomData;
+    let room = *(&__far_room as *RoomData);
 
 }
 
@@ -23,9 +44,11 @@ in code {
 
 // Initialize the game loop
 //
+// REQUIRES: Force Blank
+//
 // DB = 0x7e
 #[mem8, idx8]
-inline func init() {
+inline func init__forceblank() {
     // ::TODO setup screen (if necessary)::
 
     mem16();
@@ -55,8 +78,64 @@ inline func init() {
     }
     mem8();
 
+    _load_room(STARTING_ROOM);
+    _load_resources__forceblank();
 
     entities.player.init();
+    metatiles.populate_map_tile_properties();
+    metatiles.draw_map__forceblank();
+}
+
+
+
+// Load a room into memory
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _load_room(room_id : u8 in x) {
+let _tmp = <:dpTmp0;
+let _roomPtr = dpTmp_farPtr;
+
+    // ::TODO rename maps to rooms::
+
+    if x >= sizeof(typeof(resources.maps.map_list_l)) {
+        x = 0;
+    }
+
+    <:_roomPtr = a = resources.maps.map_list_l[x];
+    >:_roomPtr = a = resources.maps.map_list_h[x];
+    #:_roomPtr = a = resources.maps.map_list_b[x];
+
+
+    y = sizeof(typeof(room));
+    do {
+        (&room as *u8)[y] = a = _roomPtr[y];
+        y--;
+    } while !zero;
+
+    (&room as *u8)[y] = a = _roomPtr[y];
+}
+
+
+
+// Load resources into memory and PPU.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _load_resources__forceblank() {
+    idx16();
+    #[idx16] {
+        push8(data_bank);
+        push8(program_bank);
+        data_bank = pop8();
+    // DB = 0x80
+
+        metatiles.load_tileset__forceblank(room.tileset);
+
+        data_bank = pop8();
+    // DB = 0x7e
+    }
+    idx8();
 }
 
 

@@ -3,6 +3,7 @@
 
 import "memmap";
 import "resources";
+import "gameloop";
 import "../wiz/common/snes/snes";
 
 import "entities/_variables";
@@ -53,12 +54,13 @@ in zeropage {
 
 }
 
+
 in wram7e {
     // The map for the current room.
     //
     // NOTE: Whenever the map is updated the corresponding `mapTileProperties` cells must be changed.
-    #[align(256)]
-    var map : [u8 ; 256];
+    let map = gameloop.room.map;
+
 
     // The MetaTile tileset tile properties for each map tile.
     //
@@ -79,37 +81,6 @@ in wram7e {
 in code {
 
 
-// Load a map into memory
-//
-// DB = 0x7e
-#[mem8, idx16]
-func load_map(map_id : u8 in a) {
-let _tmp = <:dpTmp0;
-let _mapPtr = dpTmp_farPtr;
-
-    if a >= sizeof(typeof(resources.maps.map_list_l)) {
-        a = 0;
-    }
-
-    idx8();
-    #[idx8] {
-        x = a;
-
-        <:_mapPtr = a = resources.maps.map_list_l[x];
-        >:_mapPtr = a = resources.maps.map_list_h[x];
-        #:_mapPtr = a = resources.maps.map_list_b[x];
-    }
-    idx16();
-
-
-    yy = sizeof(typeof(map));
-    do {
-        map[yy] = a = _mapPtr[yy];
-        yy--;
-    } while !negative;
-}
-
-
 // Load a tileset into memory and the PPU
 //
 // REQUIRES: Force-Blank
@@ -119,19 +90,31 @@ let _mapPtr = dpTmp_farPtr;
 //
 // DB = 0x80
 #[mem8, idx16]
-func load_tileset__forceblank(tileset_bank : u8 in a, tileset_addr : u16 in xx) {
+func load_tileset__forceblank(tileset_id : u8 in a) {
 let _tilesetPtr = dpTmp_farPtr;
 
-    // Save pointer so we can retrieve `_DataFormat.tile_data_size` later
-    #:_tilesetPtr = a;
-    *(&_tilesetPtr as *u16) = xx;
+    snes.dma.hdma_enable = 0;
+
+    idx8();
+    #[idx8] {
+        x = a;
+        if x >= sizeof(typeof(*resources.metatile_tilesets.tileset_list_l)) {
+            x = 0;
+        }
+
+        <:_tilesetPtr = a = resources.metatile_tilesets.tileset_list_l[x];
+        >:_tilesetPtr = a = resources.metatile_tilesets.tileset_list_h[x];
+        #:_tilesetPtr = a = resources.metatile_tilesets.tileset_list_b[x];
+    }
+    idx16();
+
+
+    // A = _tilesetPtr bank
+    xx = *(&_tilesetPtr as *u16);
 
     // Skip _DataFormat.tile_data_size in DMA's below
     xx++;
     xx++;
-
-
-    snes.dma.hdma_enable = 0;
 
     snes.dma0.src_address_bank = a;
     snes.dma0.src_address_hl = xx;

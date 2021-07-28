@@ -43,10 +43,6 @@ func main() {
         snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_BG1 | snes.ppu.SCREEN_ENABLE_OBJ;
 
 
-
-        metatiles.load_tileset__forceblank(#:far& resources.metatile_tilesets.dungeon,
-                                           &resources.metatile_tilesets.dungeon as u16);
-
         // Transfer common sprite tiles to VRAM
         snes.ppu.vram_address_hl = xx = VRAM_OBJ_WADDR;
         dma.transfer_to_vram__forceblank(#:far& resources.obj_base_tiles, &resources.obj_base_tiles as u16, sizeof(typeof(resources.obj_base_tiles)));
@@ -62,15 +58,9 @@ func main() {
 // DB = 0x7e
 
 
-    metatiles.load_map(0);
-
     idx8();
     #[idx8] {
-        metatiles.draw_map__forceblank();
-
-        metatiles.populate_map_tile_properties();
-
-        gameloop.init();
+        gameloop.init__forceblank();
     }
     idx16();
 

@@ -15,6 +15,16 @@ const obj_base_palette = embed "../gen/obj/base-4bpp-tiles.pal";
 namespace metatile_tilesets {
 in rodata0 {
     const dungeon = embed "../gen/metatiles/dungeon.bin";
+
+
+    // ::KUDOS eggboycolor for this pattern ::
+    const _tileset_list_l : [u8] = [<:&i for let i in _tilesets];
+    const _tileset_list_h : [u8] = [>:&i for let i in _tilesets];
+    const _tileset_list_b : [u8] = [#:far &i for let i in _tilesets];
+
+    let tileset_list_l = far &_tileset_list_l as far *const u8;
+    let tileset_list_h = far &_tileset_list_h as far *const u8;
+    let tileset_list_b = far &_tileset_list_b as far *const u8;
 }
 
 }
@@ -45,4 +55,6 @@ in rodata0 {
 
 }
 
+
+import "../gen/resource-lists";
 

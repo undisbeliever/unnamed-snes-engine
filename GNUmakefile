@@ -33,6 +33,8 @@ RESOURCES  += $(patsubst resources/maps/%.tmx,gen/maps/%.bin, $(MAP_SRC))
 METATILE_TILESETS = dungeon
 RESOURCES  += $(patsubst %,gen/metatiles/%.bin, $(METATILE_TILESETS))
 
+RESOURCES  += gen/resource-lists.wiz
+
 
 
 .PHONY: all
@@ -73,9 +75,12 @@ gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palet
 	python3 tools/convert-tileset.py -o "$@" "resources/metatiles/$*-tiles.png" "resources/metatiles/$*-palette.png" "resources/metatiles/$*.tsx"
 
 
-gen/maps/%.bin:	resources/maps/%.tmx tools/convert-map.py
-	python3 tools/convert-map.py -o "$@" "resources/maps/$*.tmx"
+gen/maps/%.bin:	resources/maps/%.tmx resources/mappings.json tools/convert-map.py
+	python3 tools/convert-map.py -o "$@" "resources/maps/$*.tmx" "resources/mappings.json"
 
+
+gen/resource-lists.wiz: resources/mappings.json tools/generate-resource-lists.py
+	python3 tools/generate-resource-lists.py -o "$@" "resources/mappings.json"
 
 
 .PHONY: resources

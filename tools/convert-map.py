@@ -3,8 +3,8 @@
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
 
-import xml
 import gzip
+import json
 import base64
 import struct
 import argparse
@@ -95,12 +95,31 @@ def parse_tmx_map(et):
 
 
 
+def create_map_data(tmx_map, mapping):
+    data = bytearray()
+
+    try:
+        data += bytes([ i - tmx_map.tileset.firstgid for i in tmx_map.map ])
+    except ValueError:
+        raise ValueError("Unknown tile in map.  There must be a maximum of 256 tiles in the tileset and no transparent or flipped tiles in the map.")
+
+
+    # Tileset byte
+    data.append(mapping['tilesets'].index(tmx_map.tileset.name))
+
+
+    return data
+
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output', required=True,
                         help='map output file')
-    parser.add_argument('filename', action='store',
+    parser.add_argument('tmx_filename', action='store',
                         help='tmx file input')
+    parser.add_argument('mapping_filename', action='store',
+                        help='mapping json file input')
 
     args = parser.parse_args()
 
@@ -108,29 +127,18 @@ def parse_arguments():
 
 
 
-def create_map_data(tmx_map):
-    data = bytearray()
-
-    # ::TODO add tileset byte to map::
-
-    try:
-        data += bytes([ i - tmx_map.tileset.firstgid for i in tmx_map.map ])
-    except ValueError:
-        raise ValueError("Unknown tile in map.  There must be a maximum of 256 tiles in the tileset and no transparent or flipped tiles in the map.")
-
-    return data
-
-
-
 def main():
     args = parse_arguments()
 
-    with open(args.filename, 'r') as fp:
-        et = xml.etree.ElementTree.parse(fp)
+    with open(args.tmx_filename, 'r') as fp:
+        tmx_et = xml.etree.ElementTree.parse(fp)
 
-    tmx_map = parse_tmx_map(et)
+    with open(args.mapping_filename, 'r') as fp:
+        mapping = json.load(fp)
 
-    map_data = create_map_data(tmx_map)
+    tmx_map = parse_tmx_map(tmx_et)
+
+    map_data = create_map_data(tmx_map, mapping)
 
     with open(args.output, 'wb') as fp:
         fp.write(map_data)
