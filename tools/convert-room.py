@@ -16,11 +16,15 @@ from collections import namedtuple
 MAP_WIDTH = 16
 MAP_HEIGHT = 14
 
+ENTITIES_IN_MAP = 8
+
 TILE_SIZE = 16
 
 
+
 # A limited subset of the TMX data format (only supporting one map layer and tileset)::
-TmxMap = namedtuple('MapData', ('tileset', 'map'))
+TmxMap = namedtuple('MapData', ('tileset', 'map', 'entities'))
+Entity = namedtuple('Entity', ('x', 'y', 'type'))
 TilesetData = namedtuple('TilesetData', ('name', 'firstgid'))
 
 
@@ -62,6 +66,20 @@ def parse_layer_tag(tag):
 
 
 
+def parse_objectgroup_tag(tag):
+    objects = list()
+
+    for child in tag:
+        if child.tag == 'object':
+            objects.append(Entity(int(child.attrib['x']), int(child.attrib['y']), child.attrib['type']))
+
+            if len(child) != 1 or child[0].tag != 'point':
+                raise ValueError('Object must be a point')
+
+    return objects
+
+
+
 def parse_tmx_map(et):
     root = et.getroot()
 
@@ -78,6 +96,7 @@ def parse_tmx_map(et):
 
     tileset = None
     tiles = None
+    entities = None
 
     for child in root:
         if child.tag == 'tileset':
@@ -90,8 +109,37 @@ def parse_tmx_map(et):
                 raise ValueError('Expected only one <layer> tag')
             tiles = parse_layer_tag(child)
 
+        elif child.tag == 'objectgroup':
+            if entities is not None:
+                raise ValueError('Expected only one <objectgroup> tag')
+            entities = parse_objectgroup_tag(child)
 
-    return TmxMap(tileset, tiles)
+
+    return TmxMap(tileset, tiles, entities)
+
+
+
+def create_entities_soa(entities, mapping):
+    if len(entities) > ENTITIES_IN_MAP:
+        raise ValueError(f"Too many entities in room ({ len(entities) }, max: { ENTITIES_IN_MAP }");
+
+    padding = bytes([ 0xff ] * (ENTITIES_IN_MAP - len(entities)))
+
+    data = bytearray()
+
+    for e in entities:
+        data.append(e.x)
+    data += padding
+
+    for e in entities:
+        data.append(e.y)
+    data += padding
+
+    for e in entities:
+        data.append(mapping['entities'].index(e.type))
+    data += padding
+
+    return data
 
 
 
@@ -106,6 +154,8 @@ def create_map_data(tmx_map, mapping):
 
     # Tileset byte
     data.append(mapping['tilesets'].index(tmx_map.tileset.name))
+
+    data += create_entities_soa(tmx_map.entities, mapping)
 
 
     return data

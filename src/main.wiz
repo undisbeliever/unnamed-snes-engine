@@ -10,8 +10,6 @@ import "metasprites";
 import "resources";
 import "common/dma";
 
-import "entities/_common";
-
 
 in code {
 
@@ -58,8 +56,6 @@ func main() {
     idx8();
     #[idx8] {
         gameloop.init__forceblank();
-
-        create_dummy_entities();
     }
     idx16();
 
@@ -92,21 +88,6 @@ func main() {
         // DB = 0x7e
         }
     }
-}
-
-
-
-// Create some dummy entities
-// DB = 0x7e
-#[mem8, idx8]
-func create_dummy_entities() {
-    entities.spawn_entity(a = 72,  a = 72,  0);
-    entities.spawn_entity(a = 72,  a = 150, 0);
-    entities.spawn_entity(a = 184, a = 72,  0);
-    entities.spawn_entity(a = 184, a = 150, 0);
-
-    entities.spawn_entity(a = 128, a = 64,  1);
-    entities.spawn_entity(a = 128, a = 160, 1);
 }
 
 }

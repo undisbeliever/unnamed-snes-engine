@@ -17,11 +17,21 @@ namespace gameloop {
 let STARTING_ROOM = 0;
 
 
+
+let ENTITIES_IN_MAP = 8;
+
 // Map data format
 struct RoomData {
     map         : [u8 ; metatiles.MAP_WIDTH * metatiles.MAP_HEIGHT],
 
     tileset     : u8,
+
+    // Entities in the map
+    // (Structure of Arrays)
+    // If the entity does not spawn then the array elements MUST be 0xff;
+    entity_xPos : [u8 ; ENTITIES_IN_MAP ],
+    entity_yPos : [u8 ; ENTITIES_IN_MAP ],
+    entity_type : [u8 ; ENTITIES_IN_MAP ],
 };
 
 
@@ -52,7 +62,6 @@ in code {
 inline func init__forceblank() {
     // ::TODO setup screen (if necessary)::
 
-    entities.init();
     entities.player.init();
 
 
@@ -61,6 +70,8 @@ inline func init__forceblank() {
 
     metatiles.populate_map_tile_properties();
     metatiles.draw_map__forceblank();
+
+    _spawn_room_entities();
 }
 
 
@@ -88,7 +99,7 @@ let _roomPtr = dpTmp_farPtr;
         y--;
     } while !zero;
 
-    (&room as *u8)[y] = a = _roomPtr[y];
+    (&room as *u8)[0] = a = *_roomPtr;
 }
 
 
@@ -111,6 +122,30 @@ func _load_resources__forceblank() {
     // DB = 0x7e
     }
     idx8();
+}
+
+
+// Spawn entity in the room
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _spawn_room_entities() {
+    entities.init();
+
+
+    x = ENTITIES_IN_MAP - 1;
+    do {
+        push8(x);
+
+        entities.spawn_entity(a = room.entity_xPos[x],
+                              a = room.entity_yPos[x],
+                              a = room.entity_type[x]);
+
+        x = pop8();
+
+        x--;
+    } while !negative;
+
 }
 
 
