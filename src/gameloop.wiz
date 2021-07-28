@@ -7,6 +7,7 @@ import "../wiz/common/snes/snes";
 import "metatiles";
 import "resources";
 import "entities/_variables";
+import "entities/_common";
 import "entities/player";
 
 
@@ -51,37 +52,13 @@ in code {
 inline func init__forceblank() {
     // ::TODO setup screen (if necessary)::
 
-    mem16();
-    #[mem16] {
-        // ::TODO clear entity variables::
+    entities.init();
+    entities.player.init();
 
-        // Set player's process function
-        aa = entities.player.process as u16;
-        entities.SoA.process_function[0] = aa as func(u8 in x);
-
-
-        // Set all process_functions to blank (except player)
-        aa = _blank_entity_process_function as u16;
-
-        x = entities.SoA.LAST_INDEX;
-        do {
-            entities.SoA.process_function[unaligned x] = aa as func(u8 in x);
-
-            // Clear player shadow and velocity
-            (&entities.SoA._shadowAndBlank as *u16)[unaligned x] = 0;
-            entities.SoA.xVelocity[unaligned x] = 0;
-            entities.SoA.yVelocity[unaligned x] = 0;
-
-            x--;
-            x--;
-        } while !zero;
-    }
-    mem8();
 
     _load_room(STARTING_ROOM);
     _load_resources__forceblank();
 
-    entities.player.init();
     metatiles.populate_map_tile_properties();
     metatiles.draw_map__forceblank();
 }
@@ -150,12 +127,6 @@ func process() {
         entities.SoA.process_function[unaligned x](x);
     }
 
-}
-
-
-
-// DB = 0x7e
-func _blank_entity_process_function(entityId : u8 in x) {
 }
 
 

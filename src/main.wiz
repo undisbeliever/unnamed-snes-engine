@@ -4,16 +4,13 @@
 import "memmap";
 import "../wiz/common/snes/snes";
 
-import "entities/_variables";
-
 import "gameloop";
 import "metatiles";
 import "metasprites";
 import "resources";
 import "common/dma";
 
-import "entities/player";
-import "entities/bouncing-off-walls";
+import "entities/_common";
 
 
 in code {
@@ -61,11 +58,10 @@ func main() {
     idx8();
     #[idx8] {
         gameloop.init__forceblank();
+
+        create_dummy_entities();
     }
     idx16();
-
-
-    create_dummy_entities();
 
 
     ^while true {
@@ -102,93 +98,15 @@ func main() {
 
 // Create some dummy entities
 // DB = 0x7e
-#[mem8, idx16]
+#[mem8, idx8]
 func create_dummy_entities() {
-    entities.SoA.xPos[1].px = a = 64;
-    entities.SoA.yPos[1].px = a = 64;
+    entities.spawn_entity(a = 72,  a = 72,  0);
+    entities.spawn_entity(a = 72,  a = 150, 0);
+    entities.spawn_entity(a = 184, a = 72,  0);
+    entities.spawn_entity(a = 184, a = 150, 0);
 
-    entities.SoA.xPos[2].px = a = 128;
-    entities.SoA.yPos[2].px = a = 64;
-
-    entities.SoA.xPos[3].px = a = 192;
-    entities.SoA.yPos[3].px = a = 64;
-
-    entities.SoA.xPos[4].px = a = 224;
-    entities.SoA.yPos[4].px = a = 64;
-
-
-    entities.SoA.xPos[5].px = a = 64;
-    entities.SoA.yPos[5].px = a = 112;
-
-    entities.SoA.xPos[6].px = a = 192;
-    entities.SoA.yPos[6].px = a = 112;
-
-
-    entities.SoA.xPos[7].px = a = 32;
-    entities.SoA.yPos[7].px = a = 160;
-
-    entities.SoA.xPos[8].px = a = 64;
-    entities.SoA.yPos[8].px = a = 160;
-
-    entities.SoA.xPos[9].px = a = 128;
-    entities.SoA.yPos[9].px = a = 160;
-
-    entities.SoA.xPos[10].px = a = 192;
-    entities.SoA.yPos[10].px = a = 160;
-
-    entities.SoA.xPos[11].px = a = 224;
-    entities.SoA.yPos[11].px = a = 160;
-
-
-    a = entities.ShadowSize.SMALL as u8;
-    entities.SoA._shadowAndBlank[4].shadowSize = a as entities.ShadowSize;
-    entities.SoA._shadowAndBlank[5].shadowSize = a as entities.ShadowSize;
-    entities.SoA._shadowAndBlank[6].shadowSize = a as entities.ShadowSize;
-    entities.SoA._shadowAndBlank[7].shadowSize = a as entities.ShadowSize;
-    entities.SoA._shadowAndBlank[11].shadowSize = a as entities.ShadowSize;
-
-    a = entities.ShadowSize.MEDIUM as u8;
-    entities.SoA._shadowAndBlank[1].shadowSize = a as entities.ShadowSize;
-    entities.SoA._shadowAndBlank[3].shadowSize = a as entities.ShadowSize;
-    entities.SoA._shadowAndBlank[8].shadowSize = a as entities.ShadowSize;
-    entities.SoA._shadowAndBlank[10].shadowSize = a as entities.ShadowSize;
-
-    a = entities.ShadowSize.LARGE as u8;
-    entities.SoA._shadowAndBlank[2].shadowSize = a as entities.ShadowSize;
-    entities.SoA._shadowAndBlank[9].shadowSize = a as entities.ShadowSize;
-
-
-    xx = entities.SoA.LAST_INDEX;
-    do {
-        mem16();
-        #[mem16] {
-            aa = entities.bouncing_off_walls.process as u16;
-            entities.SoA.process_function[unaligned xx] = aa as func(u8 in x);
-
-            entities.SoA.xVelocity[unaligned xx] = aa =  0x0120;
-            entities.SoA.yVelocity[unaligned xx] = aa = -0x0120 as u16;
-        }
-        mem8();
-
-        a = entities.SoA.shadowSize[xx] as u8;
-        if a == entities.ShadowSize.SMALL as u8 {
-            entities.SoA.tileHitbox_halfWidth[xx] = a = 3;
-            entities.SoA.tileHitbox_halfHeight[xx] = a = 2;
-        }
-        else if a == entities.ShadowSize.MEDIUM as u8 {
-            entities.SoA.tileHitbox_halfWidth[xx] = a = 6;
-            entities.SoA.tileHitbox_halfHeight[xx] = a = 3;
-        }
-        else {
-            entities.SoA.tileHitbox_halfWidth[xx] = a = 8;
-            entities.SoA.tileHitbox_halfHeight[xx] = a = 4;
-        }
-
-
-        xx--;
-        xx--;
-    }
-    while !zero;
+    entities.spawn_entity(a = 128, a = 64,  1);
+    entities.spawn_entity(a = 128, a = 160, 1);
 }
 
 }

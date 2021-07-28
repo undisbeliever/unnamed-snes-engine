@@ -34,6 +34,7 @@ METATILE_TILESETS = dungeon
 RESOURCES  += $(patsubst %,gen/metatiles/%.bin, $(METATILE_TILESETS))
 
 RESOURCES  += gen/resource-lists.wiz
+RESOURCES  += gen/entity-data.wiz
 
 
 
@@ -81,6 +82,10 @@ gen/rooms/%.bin: resources/rooms/%.tmx resources/mappings.json tools/convert-roo
 
 gen/resource-lists.wiz: resources/mappings.json tools/generate-resource-lists.py
 	python3 tools/generate-resource-lists.py -o "$@" "resources/mappings.json"
+
+gen/entity-data.wiz: resources/entities.json resources/mappings.json tools/generate-entity-data.py
+	python3 tools/generate-entity-data.py -o "$@" "resources/entities.json" "resources/mappings.json"
+
 
 
 .PHONY: resources

@@ -1,5 +1,9 @@
 {
-    "tilesets": [
-        "dungeon"
-    ]
+ "tilesets": [
+   "dungeon"
+ ],
+ "entities": [
+   "bouncing_small",
+   "bouncing_large"
+ ]
 }

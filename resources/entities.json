@@ -1,0 +1,11 @@
+{
+ "bouncing_small": {
+  "code": "bouncing_off_walls",
+  "shadowSize": "SMALL"
+ },
+ "bouncing_large": {
+  "code": "bouncing_off_walls",
+  "shadowSize": "LARGE"
+ }
+}
+

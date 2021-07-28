@@ -19,6 +19,7 @@ def validate_mapping_json(mapping):
                 raise ValueError(f"Invalid name: {i}")
 
     test_list(mapping['tilesets'])
+    test_list(mapping['entities'])
 
 
 

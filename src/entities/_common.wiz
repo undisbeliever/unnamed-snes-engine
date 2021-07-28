@@ -1,0 +1,140 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "../../gen/entity-data";
+
+import "player";
+
+
+namespace entities {
+
+let N_ENTITY_TYPES = sizeof(typeof(entities.entity_data.process_function_l));
+
+
+in code {
+
+
+// Initialize the entity subsystem
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func init() {
+    mem16();
+    #[mem16] {
+        // Set player's process function
+        aa = entities.player.process as u16;
+        entities.SoA.process_function[0] = aa as func(u8 in x);
+
+
+        // Set all process_functions to blank (except player)
+        aa = _blank_entity_process_function as u16;
+
+        x = entities.SoA.LAST_INDEX;
+        do {
+            // Reset process function
+            entities.SoA.process_function[unaligned x] = aa as func(u8 in x);
+
+            // Clear entity shadow
+            (&entities.SoA._shadowAndBlank as *u16)[unaligned x] = 0;
+
+            x--;
+            x--;
+        } while !zero;
+    }
+    mem8();
+}
+
+
+
+// Get the next free entity
+//
+// Returns 0 (and zero flag set) if there is no free entity
+//
+// KEEP: X
+//
+// DB = 0x7e
+#[mem8, idx8]
+func __next_free_entity() : u8 in y {
+    // ::TODO replace with something that runs in constant time::
+
+    a = <:&_blank_entity_process_function;
+    y = >:&_blank_entity_process_function;
+
+    inline for let entityId in 0 .. entities.SoA.LAST_INDEX by 2 {
+        if a == <:entities.SoA.process_function[unaligned entityId] as u8 &&
+           y == >:entities.SoA.process_function[unaligned entityId] as u8 {
+            return entityId;
+        }
+    }
+
+    return 0;
+}
+
+
+
+// Spawn entity
+//
+// NOTE: This function may fail
+//
+// DB = 0x7e
+#[mem8, idx8]
+func spawn_entity(xPos : u8 in <:dpTmp0, yPos : u8 in >:dpTmp0, entityType : u8 in a) {
+let _init_function_u16 = dpTmp1;
+let _init_function_ptr = _init_function_u16 as func(u8 in x);
+
+    if a < N_ENTITY_TYPES {
+        x = a;
+
+        y = __next_free_entity();
+        if !zero {
+            (&<:entities.SoA.process_function[0] as *u8)[y] = a = (far &entities.entity_data.process_function_l as far *u8)[x];
+            (&>:entities.SoA.process_function[0] as *u8)[y] = a = (far &entities.entity_data.process_function_h as far *u8)[x];
+
+            a = (far &entities.entity_data.shadow_size as far *u8)[x];
+            entities.SoA.shadowSize[y] = a as entities.ShadowSize;
+
+            entities.SoA.tileHitbox_halfWidth[y] = a = (far &entities.entity_data.tile_hitbox_half_width as far *u8)[x];
+            entities.SoA.tileHitbox_halfHeight[y] = a = (far &entities.entity_data.tile_hitbox_half_height as far *u8)[x];
+
+            <:_init_function_u16 = a = (far &entities.entity_data.init_function_l as far *u8)[x];
+            >:_init_function_u16 = a = (far &entities.entity_data.init_function_h as far *u8)[x];
+
+
+            // Clear unused data
+            x = y;
+
+            entities.SoA.xPos_sx[x] = 0;
+            entities.SoA.xPos_px[x] = a = xPos;
+            entities.SoA.yPos_sx[x] = 0;
+            entities.SoA.yPos_px[x] = a = yPos;
+
+            mem16();
+            #[mem16] {
+                entities.SoA.xVelocity[unaligned x] = 0;
+                entities.SoA.yVelocity[unaligned x] = 0;
+
+                entities.SoA._movementStateAndBlank[unaligned x] = 0;
+
+                // ::TODO add and clear more entity variables::
+            }
+            mem8();
+
+
+            // Call spawn function
+            return _init_function_ptr(x);
+        }
+    }
+}
+
+
+
+// DB = 0x7e
+func _blank_entity_process_function(entityId : u8 in x) {
+}
+
+}
+
+}
+
