@@ -91,6 +91,9 @@ func reset_registers() {
         // Force screen blank
         snes.ppu.brightness = a = snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK;
 
+        // SlowROM
+        snes.rom.speed = a = snes.rom.SPEED_SLOW;
+
         // Enable NMI and autoJoy
         snes.ppu.irq_enable = a = snes.ppu.IRQ_ENABLE_NMI | snes.ppu.IRQ_ENABLE_AUTOJOY;
 
