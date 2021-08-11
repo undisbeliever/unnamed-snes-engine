@@ -5,5 +5,8 @@
  "entities": [
    "bouncing_small",
    "bouncing_large"
+ ],
+ "metasprite_spritesheets": [
+   "dungeon"
  ]
 }

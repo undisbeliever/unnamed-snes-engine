@@ -3,14 +3,11 @@
 
 import "memmap";
 
+import "gen/metasprites/common";
+import "gen/metasprites/dungeon";
+
+
 namespace resources {
-
-in rodata0 {
-
-const obj_base_tiles = embed "../gen/obj/base-4bpp-tiles.tiles";
-const obj_base_palette = embed "../gen/obj/base-4bpp-tiles.pal";
-
-}
 
 namespace metatile_tilesets {
 in rodata0 {
@@ -26,7 +23,20 @@ in rodata0 {
     let tileset_list_h = far &_tileset_list_h as far *const u8;
     let tileset_list_b = far &_tileset_list_b as far *const u8;
 }
+}
 
+
+namespace metasprites {
+in rodata0 {
+    // ::KUDOS eggboycolor for this pattern ::
+    const _spritesheet_list_l : [u8] = [<:&i for let i in _ms_spritesheets];
+    const _spritesheet_list_h : [u8] = [>:&i for let i in _ms_spritesheets];
+    const _spritesheet_list_b : [u8] = [#:far &i for let i in _ms_spritesheets];
+
+    let spritesheet_list_l = far &_spritesheet_list_l as far *const u8;
+    let spritesheet_list_h = far &_spritesheet_list_h as far *const u8;
+    let spritesheet_list_b = far &_spritesheet_list_b as far *const u8;
+}
 }
 
 

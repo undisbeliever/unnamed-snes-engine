@@ -1,0 +1,224 @@
+[
+{
+  "name": "Skeleton",
+  "order": 2,
+  "pattern": "rect_16x24_three",
+  "xoffset": 8,
+  "yoffset": 20,
+
+  "frames": [
+  {
+    "name": "south0",
+    "starting_tile": "0x00"
+  },
+  {
+    "name": "south1",
+    "starting_tile": "0x02"
+  },
+  {
+    "name": "south2",
+    "clone": { "source": "south0" }
+  },
+  {
+    "name": "south3",
+    "clone": { "source": "south1", "flip": "hflip" }
+  },
+  {
+    "name": "north0",
+    "starting_tile": "0x04"
+  },
+  {
+    "name": "north1",
+    "starting_tile": "0x06"
+  },
+  {
+    "name": "north2",
+    "clone": { "source": "north0" }
+  },
+  {
+    "name": "north3",
+    "clone": { "source": "north1", "flip": "hflip" }
+  },
+  {
+    "name": "east0",
+    "starting_tile": "0x08"
+  },
+  {
+    "name": "east1",
+    "starting_tile": "0x0a"
+  },
+  {
+    "name": "east2",
+    "clone": { "source": "east0" }
+  },
+  {
+    "name": "east3",
+    "starting_tile": "0x0c"
+  },
+  {
+    "name": "west0",
+    "clone": { "source": "east0", "flip": "hflip" }
+  },
+  {
+    "name": "west1",
+    "clone": { "source": "east1", "flip": "hflip" }
+  },
+  {
+    "name": "west2",
+    "clone": { "source": "west0" }
+  },
+  {
+    "name": "west3",
+    "clone": { "source": "east3", "flip": "hflip" }
+  }
+  ]
+},
+{
+  "name": "CrossbowMan",
+  "order": 2,
+  "pattern": "rect_16x24_and_extra",
+  "xoffset": 8,
+  "yoffset": 19,
+  "frames": [
+  {
+    "name": "south0",
+    "starting_tile": "0x30",
+    "extra_tile": "0x42"
+  },
+  {
+    "name": "south1",
+    "starting_tile": "0x33",
+    "extra_tile": "0x45"
+  },
+  {
+    "name": "south2",
+    "clone": { "source": "south0" }
+  },
+  {
+    "name": "south3",
+    "starting_tile": "0x36",
+    "extra_tile": "0x48"
+  },
+  {
+    "name": "north0",
+    "starting_tile": "0x39",
+    "extra_tile": "0x4b"
+  },
+  {
+    "name": "north1",
+    "starting_tile": "0x3c",
+    "extra_tile": "0x4e"
+  },
+  {
+    "name": "north2",
+    "clone": { "source": "north0" }
+  },
+  {
+    "name": "north3",
+    "starting_tile": "0x60",
+    "extra_tile": "0x72"
+  },
+  {
+    "name": "east0",
+    "starting_tile": "0x63",
+    "extra_tile": "0x82"
+  },
+  {
+    "name": "east1",
+    "starting_tile": "0x65",
+    "extra_tile": "0x82"
+  },
+  {
+    "name": "east2",
+    "clone": { "source": "east0" }
+  },
+  {
+    "name": "east3",
+    "starting_tile": "0x67",
+    "extra_tile": "0x82"
+  },
+  {
+    "name": "west0",
+    "starting_tile": "0x69",
+    "extra_tile": "0x62"
+  },
+  {
+    "name": "west1",
+    "starting_tile": "0x6b",
+    "extra_tile": "0x62"
+  },
+  {
+    "name": "west2",
+    "clone": { "source": "west0" }
+  },
+  {
+    "name": "west3",
+    "starting_tile": "0x6d",
+    "extra_tile": "0x62"
+  }
+  ]
+},
+{
+  "name": "Skull",
+  "order": 2,
+  "pattern": "square_single16",
+  "xoffset": 8,
+  "yoffset": 11,
+  "frames": [
+  {
+    "name": "frame0",
+    "objects": [{ "tile": "0x90" }]
+  },
+  {
+    "name": "frame1",
+    "objects": [{ "tile": "0x92" }]
+  },
+  {
+    "name": "frame2",
+    "objects": [{ "tile": "0x94" }]
+  },
+  {
+    "name": "frame3",
+    "objects": [{ "tile": "0x96" }]
+  },
+  {
+    "name": "frame4",
+    "objects": [{ "tile": "0x98" }]
+  },
+  {
+    "name": "frame5",
+    "objects": [{ "tile": "0x9a" }]
+  },
+  {
+    "name": "frame6",
+    "objects": [{ "tile": "0x9c" }]
+  },
+  {
+    "name": "frame7",
+    "objects": [{ "tile": "0x9e" }]
+  }
+  ]
+},
+{
+  "name": "Rook",
+  "order": 2,
+  "pattern": "rect_16x32_two",
+  "xoffset": 8,
+  "yoffset": 29,
+  "frames": [
+  {
+    "name": "standing",
+    "starting_tile": "0xb0"
+  },
+  {
+    "name": "landing0",
+    "starting_tile": "0xb2"
+  },
+  {
+    "name": "landing1",
+    "starting_tile": "0xb4"
+  }
+  ]
+}
+]
+

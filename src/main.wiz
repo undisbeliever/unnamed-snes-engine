@@ -36,15 +36,6 @@ func main() {
 
 
         snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_BG1 | snes.ppu.SCREEN_ENABLE_OBJ;
-
-
-        // Transfer common sprite tiles to VRAM
-        snes.ppu.vram_address_hl = xx = VRAM_OBJ_WADDR;
-        dma.transfer_to_vram__forceblank(#:far& resources.obj_base_tiles, &resources.obj_base_tiles as u16, sizeof(typeof(resources.obj_base_tiles)));
-
-        // Transfer common sprite palette
-        snes.ppu.cgram_address = a = 128;
-        dma.transfer_to_cgram__forceblank(#:far& resources.obj_base_palette, &resources.obj_base_palette as u16, sizeof(typeof(resources.obj_base_palette)));
     }
 
 
@@ -68,6 +59,8 @@ func main() {
         idx16();
 
         metasprites.draw_shadows();
+
+        gameloop.draw_entities();
 
         metasprites.finalize_buffer();
 

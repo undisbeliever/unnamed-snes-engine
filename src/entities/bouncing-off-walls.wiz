@@ -6,12 +6,17 @@ import "../memmap";
 import "_variables";
 
 import "../metatiles";
+import "../metasprites";
+
+import "gen/metasprites/dungeon";
 
 
 namespace entities {
 namespace bouncing_off_walls {
 
 in code {
+
+let ms_draw_function = ms.dungeon.Skull.pattern;
 
 
 // Entity process routine.
@@ -25,6 +30,8 @@ func init(entityId : u8 in x) {
     #[mem16] {
         SoA.xVelocity[unaligned x] = aa =  0x0120;
         SoA.yVelocity[unaligned x] = aa = -0x0120 as u16;
+
+        SoA.metaSpriteFrame[unaligned x] = aa = &ms.dungeon.Skull.frames[0] as u16;
     }
     mem8();
 }

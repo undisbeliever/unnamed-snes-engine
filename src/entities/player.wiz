@@ -21,6 +21,12 @@ let yVelocity = entities.SoA.yVelocity[0];
 
 in code {
 
+#[mem8, idx16]
+func ms_draw_function(entityId : u16 in yy) {
+    // ::TODO implement::
+}
+
+
 
 // Initialize player.
 //
@@ -29,6 +35,8 @@ in code {
 // DB = 0x7e
 #[mem8, idx8]
 inline func init() {
+    // ::TODO set ms frame::
+
     a = ShadowSize.MEDIUM as u8;
     entities.SoA.shadowSize[0] = a as ShadowSize;
 

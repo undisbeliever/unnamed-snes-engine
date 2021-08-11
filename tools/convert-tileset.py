@@ -11,7 +11,7 @@ from collections import namedtuple
 
 TILE_DATA_BPP = 4
 
-DEFAULT_ORDER_BIT = 1
+DEFAULT_ORDER_BIT = 0
 
 
 TILE_PROPERTY_SOLID_BIT = 7

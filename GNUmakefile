@@ -37,6 +37,11 @@ RESOURCES  += gen/resource-lists.wiz
 RESOURCES  += gen/entity-data.wiz
 
 
+METASPRITE_SPRITESETS = common dungeon
+RESOURCES  += $(patsubst %,gen/metasprites/%.bin, $(METASPRITE_SPRITESETS))
+RESOURCES  += $(patsubst %,gen/metasprites/%.wiz, $(METASPRITE_SPRITESETS))
+
+
 
 .PHONY: all
 all: $(BINARY)
@@ -85,6 +90,10 @@ gen/resource-lists.wiz: resources/mappings.json tools/generate-resource-lists.py
 
 gen/entity-data.wiz: resources/entities.json resources/mappings.json tools/generate-entity-data.py
 	python3 tools/generate-entity-data.py -o "$@" "resources/entities.json" "resources/mappings.json"
+
+
+gen/metasprites/%.wiz gen/metasprites/%.bin: resources/metasprites/%.png resources/metasprites/%-palette.png resources/metasprites/%.json tools/convert-metasprite.py
+	python3 tools/convert-metasprite.py --ppu-output "gen/metasprites/$*.bin" --wiz-output "gen/metasprites/$*.wiz" "resources/metasprites/$*.png" "resources/metasprites/$*-palette.png" "resources/metasprites/$*.json"
 
 
 

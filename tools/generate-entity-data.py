@@ -69,6 +69,9 @@ in rodata0 {
         write_list('process_function_l', [ f"<:&{ e['code'] }.process" for e in entities ])
         write_list('process_function_h', [ f">:&{ e['code'] }.process" for e in entities ])
 
+        write_list('ms_draw_function_l', [ f"<:&{ e['code'] }.ms_draw_function" for e in entities ])
+        write_list('ms_draw_function_h', [ f">:&{ e['code'] }.ms_draw_function" for e in entities ])
+
         write_list('shadow_size', [ f"ShadowSize.{ e['shadowSize'] } as u8" for e in entities ])
 
         write_list('tile_hitbox_half_width', [ f"{ int(e.get('halfWidth', DEFAULT_HALF_WIDTH[e['shadowSize']])) }" for e in entities ])

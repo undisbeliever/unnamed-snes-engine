@@ -20,26 +20,41 @@ def validate_mapping_json(mapping):
 
     test_list(mapping['tilesets'])
     test_list(mapping['entities'])
+    test_list(mapping['metasprite_spritesheets'])
 
 
 
 def generate_wiz_code(mapping):
+    ms_spritesheet_ppu_data = [ f"ms.{ ss }.ppu_data" for ss in mapping['metasprite_spritesheets'] ]
+
+
     with StringIO() as out:
         out.write("""
 import "../src/memmap";
 import "../src/resources";
+""")
+        for ss in mapping['metasprite_spritesheets']:
+            out.write(f"import \"metasprites/{ ss }\";\n")
+
+        out.write("""
+in rodata0 {
 
 namespace resources {
-
-namespace metatile_tilesets {
-in rodata0 {
+  namespace metatile_tilesets {
 """)
 
-        out.write(f"let _tilesets = [ { ', '.join(mapping['tilesets']) } ];")
+        out.write(f"    let _tilesets = [ { ', '.join(mapping['tilesets']) } ];")
+
+        out.write("""
+  }
+
+""")
+
+        out.write(f"  let _ms_spritesheets = [ { ', '.join(ms_spritesheet_ppu_data) } ];")
 
         out.write("""
 }
-}
+
 }
 """)
 

@@ -5,6 +5,7 @@ import "memmap";
 import "../wiz/common/snes/snes";
 
 import "metatiles";
+import "metasprites";
 import "resources";
 import "entities/_variables";
 import "entities/_common";
@@ -118,6 +119,10 @@ func _load_resources__forceblank() {
 
         metatiles.load_tileset__forceblank(room.tileset);
 
+        // ::TODO get spritesheet_id from somewhere::
+        metasprites.load_ppu_data__fblank(0);
+
+
         data_bank = pop8();
     // DB = 0x7e
     }
@@ -162,6 +167,21 @@ func process() {
         entities.SoA.process_function[unaligned x](x);
     }
 
+}
+
+
+
+// Process the game loop
+//
+// DB = 0x7e
+#[mem8, idx16]
+func draw_entities() {
+
+    inline for let entityId in 0 .. entities.SoA.LAST_INDEX by 2 {
+        // ::ANNOY there is no `jsr (addr)` instruction on the 65816::
+        xx = entityId;
+        entities.SoA.ms_draw_function[unaligned xx](xx);
+    }
 }
 
 

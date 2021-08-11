@@ -54,6 +54,15 @@ namespace entities {
             // DB = 0x7e
             #[mem8, idx8]
             var process_function : [func(entityId : u8 in x) ; N_ENTITIES];
+
+
+            // Metasprite draw function.
+            //
+            // INPUT: Y = entityId: index into `entities.SoA` Structure-of-Arrays.
+            //
+            // DB = 0x7e
+            #[mem8, idx8]
+            var ms_draw_function : [func(entityId : u16 in yy) ; N_ENTITIES];
         }
 
         in wram7e {
@@ -70,6 +79,11 @@ namespace entities {
 
             var _shadowAndBlank : [_ShadowAndBlank ; N_ENTITIES];
             let shadowSize = &_shadowAndBlank[0].shadowSize as *ShadowSize;
+
+
+            // Current MetaSprite frame.
+            // Points to a `metasprites.MsDataFormat` data structure
+            var metaSpriteFrame : [u16 ; N_ENTITIES];
 
 
             // Signed 16 bit X velocity

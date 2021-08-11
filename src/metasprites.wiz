@@ -2,7 +2,11 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "memmap";
+import "resources";
+import "common/dma";
 import "../wiz/common/snes/snes";
+
+import "gen/metasprites/common";
 
 import "entities/_variables";
 
@@ -10,6 +14,31 @@ import "entities/_variables";
 namespace metasprites {
 
 let N_OBJECTS = 128;
+
+let DISPLAY_HEIGHT = 224;
+
+
+// MetaSprite Data in ROM
+namespace MsDataFormat {
+    let xOffset = 0xc10000 as far *u8;
+    let yOffset = 0xc10001 as far *u8;
+
+    // NOTE: Not all `charAttr*` fields will be filled.
+    // Most MetaSprite patterns use less then 4 charAttr words.
+    let charAttr0 = 0xc10002 as far *u16;
+    let charAttr1 = 0xc10004 as far *u16;
+    let charAttr2 = 0xc10006 as far *u16;
+    let charAttr3 = 0xc10008 as far *u16;
+}
+
+// MetaSprie PPU data format in ROM.
+struct _PpuDataFormat {
+    tile_data_size : u16,
+
+    palette_data : [u16 ; 128],
+
+    tile_data : u8,
+}
 
 
 
@@ -75,8 +104,6 @@ in code {
 // DB = 0x80
 #[mem8, idx16]
 inline func setup__fblank() {
-    snes.ppu.obj_control = a = (VRAM_OBJ_WADDR / 8192) | (snes.ppu.OBJ_CONTROL_8x8_16x16 << 4);
-
     {
         push8(data_bank);
 
@@ -90,6 +117,79 @@ inline func setup__fblank() {
     }
 
     update_oam__vblank();
+}
+
+
+
+// REQUIRES: Force-Blank
+// DB = 0x80
+#[mem8, idx16]
+inline func load_ppu_data__fblank(spritesheet_id : u8 in a) {
+let _ptr = dpTmp_farPtr;
+
+    snes.dma.hdma_enable = 0;
+
+    snes.ppu.obj_control = a = (VRAM_OBJ_WADDR / 8192) | (snes.ppu.OBJ_CONTROL_8x8_16x16 << 4);
+
+
+    idx8();
+    #[idx8] {
+        x = a;
+        if x >= sizeof(typeof(*resources.metasprites.spritesheet_list_l)) {
+            x = 0;
+        }
+
+        <:_ptr = a = resources.metasprites.spritesheet_list_l[x];
+        >:_ptr = a = resources.metasprites.spritesheet_list_h[x];
+        #:_ptr = a = resources.metasprites.spritesheet_list_b[x];
+    }
+    idx16();
+
+
+    // A = _ptr bank
+    xx = *(&_ptr as *u16);
+
+    // Skip _PpuDataFormat.tile_data_size in DMA's below
+    xx++;
+    xx++;
+
+    snes.dma0.src_address_bank = a;
+    snes.dma0.src_address_hl = xx;
+
+
+    // Transfer Palette data to CGRAM
+    snes.ppu.cgram_address = a = 128;
+
+    snes.dma0.control = a = snes.dma.CONTROL_MODE_A;
+    snes.dma0.mdma_dest = a = <:&snes.ppu.cgram_write_data;
+    snes.dma0.mdma_size_hl = yy = 128 * 2;
+
+    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+
+
+    // Calculate location to store Sprite tiles
+    // (Tiles are stored at the end of the OBJ tile block)
+    mem16();
+    #[mem16] {
+        snes.ppu.vram_address_hl = aa = (((VRAM_OBJ_WADDR * 2 + 512 * 32) & 0xffff) - **(&_ptr as *far *u16)) >>> 1;
+        snes.dma0.mdma_size_hl = aa = **(&_ptr as *far *u16);
+    }
+    mem8();
+
+    snes.dma0.control = a = snes.dma.CONTROL_MODE_AB;
+    snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
+
+    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+
+
+    // Transfer common sprite tiles to VRAM
+    {
+        let tile_data = (far &ms.common.ppu_data as u24 + sizeof(_PpuDataFormat) - 1) as far *u8;
+        let tile_data_size = sizeof(typeof(ms.common.ppu_data)) - sizeof(_PpuDataFormat) + 1;
+
+        snes.ppu.vram_address_hl = xx = VRAM_OBJ_WADDR;
+        dma.transfer_to_vram__forceblank(#:tile_data, tile_data as u16, tile_data_size);
+    }
 }
 
 
@@ -330,8 +430,474 @@ inline func finalize_buffer() {
     }
 }
 
+
+
+// MetaSprite Patterns
+// ===================
+
+namespace drawing_functions {
+
+in zeropage {
+    // Temporary variables to store the metasprite's position on screen
+    var xPos : u16;
+    var yPos : u16;
 }
 
+
+
+// KEEP: X and Y
+// DB = 0x7e
+#[mem8, idx16]
+inline func _populate_xPos_and_yPos(msFrame : u16 in xx, entityId : u16 in yy) {
+
+    <:xPos = a = entities.SoA.xPos_px[unaligned yy] - MsDataFormat.xOffset[unaligned xx];
+    a = 0;
+    >:xPos = a = a -# 0;
+
+    <:yPos = a = entities.SoA.yPos_px[unaligned yy] - MsDataFormat.yOffset[unaligned xx];
+    a = 0;
+    >:yPos = a = a -# 0;
+}
+
+
+
+// KEEP: X and Y
+// DB = 0x7e
+#[mem8, idx16]
+inline func _update_hi_table_size_small() {
+    hiTableQueue <<= 1;
+}
+
+
+
+// KEEP: X and Y
+// DB = 0x7e
+#[mem8, idx16]
+inline func _update_hi_table_size_large() {
+    carry = true;
+    hiTableQueue <<<<#= 1;
+}
+
+
+
+// KEEP: X and Y
+// DB = 0x7e
+#[mem8, idx16]
+inline func _update_hi_table_x8(x8 : bool in carry) {
+    hiTableQueue <<<<#= 1;
+    if carry {
+        _hiTableQueue_full();
+    }
+}
+
+// KEEP: X and Y
+#[mem8, idx16]
+inline func _update_hi_table_x8_invert(x8 : bool in carry) {
+    // Invert carry flag
+    a = 0;
+    a +#= 0xff;
+    a >>>= 1;
+
+    _update_hi_table_x8(carry);
+}
+
+
+
+// KEEP: X and Y
+// DB = 0x7e
+#[mem8, idx16]
+inline func _update_hi_table_x8_xPos() {
+    a = >:xPos >>> 1;
+    _update_hi_table_x8(carry);
+}
+
+
+
+// KEEP: X and Y
+// DB = 0x7e
+#[mem8, idx16]
+inline func _update_hi_table_x8_0() {
+    hiTableQueue <<= 1;
+    if carry {
+        _hiTableQueue_full();
+    }
+}
+
+
+
+// One sprite:
+//  * 1st sprite (Large)
+//
+// ┌─┐
+// │ │
+// └─┘
+//
+// DB = 0x7e
+#[mem8, idx16]
+func square_single16(entityId : u16 in yy) {
+
+    xx = entities.SoA.metaSpriteFrame[unaligned yy];
+
+    <:xPos = a = entities.SoA.xPos_px[unaligned yy];
+    <:yPos = a = entities.SoA.yPos_px[unaligned yy];
+
+    yy = bufferPos;
+    if !negative {
+        // size
+        _update_hi_table_size_large();
+
+        (&buffer[0].xPos)[unaligned yy] = a = <:xPos - MsDataFormat.xOffset[unaligned xx];
+        _update_hi_table_x8_invert(carry);
+
+
+        a = <:yPos - MsDataFormat.yOffset[unaligned xx];
+        if carry {
+            if a >= (256 - 16 - 1) {
+                a = 256 - 16;
+            }
+        }
+        else {
+            if a < (256 - 16) {
+                a = 256 - 16;
+            }
+        }
+        (&buffer[0].yPos)[unaligned yy] = a;
+
+        mem16();
+        #[mem16] {
+            (&buffer[ 0].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr0[unaligned xx];
+        }
+        mem8();
+
+        yy--;
+        yy--;
+        yy--;
+        yy--;
+        bufferPos = yy;
+    }
+}
+
+
+
+// Two sprites, 16x8 px rectangle:
+//  * 1st Sprite (small)
+//  * 2nd Sprite (small)
+//
+// ┌┬┐
+// └┴┘
+//
+// DB = 0x7e
+#[mem8, idx16]
+func rect_16x8_two(entityId : u16 in yy) {
+    xx = entities.SoA.metaSpriteFrame[unaligned yy];
+
+    _populate_xPos_and_yPos(xx, yy);
+
+    yy = bufferPos;
+    return if negative || yy < (2 - 1) * sizeof(OamEntry);
+
+
+    a = <:xPos;
+    (&buffer[ 0].xPos)[unaligned yy] = a;
+
+    _update_hi_table_size_small();
+    _update_hi_table_x8_xPos();
+
+    _update_hi_table_size_small();
+    (&buffer[-1].xPos)[unaligned yy] = a = <:xPos + 8;
+    a = (>:xPos +# 0) >>> 1;
+    _update_hi_table_x8(carry);
+
+
+    mem16();
+    #[mem16] {
+        aa = yPos;
+        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+            aa = -16 as u16;
+        }
+        (&buffer[ 0].yPos as *u16)[unaligned yy] = aa;
+        (&buffer[-1].yPos as *u16)[unaligned yy] = aa;
+
+
+        (&buffer[ 0].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr0[unaligned xx];
+        (&buffer[-1].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr1[unaligned xx];
+
+        yy = aa = yy - 2 * sizeof(OamEntry);
+    }
+    mem8();
+
+    bufferPos = yy;
+}
+
+
+
+// Two sprites, 8x16 rectangle:
+//  * 1st Sprite: small
+//  * 2nd Sprite: small
+//
+// ┌┐
+// ├┤
+// └┘
+//
+// DB = 0x7e
+#[mem8, idx16]
+func rect_8x16_two(entityId : u16 in yy) {
+    xx = entities.SoA.metaSpriteFrame[unaligned yy];
+
+    _populate_xPos_and_yPos(xx, yy);
+
+    yy = bufferPos;
+    return if negative || yy < (2 - 1) * sizeof(OamEntry);
+
+
+    a = <:xPos;
+    (&buffer[ 0].xPos)[unaligned yy] = a;
+    (&buffer[-1].xPos)[unaligned yy] = a;
+
+    _update_hi_table_size_small();
+    _update_hi_table_x8_xPos();
+
+    _update_hi_table_size_small();
+    _update_hi_table_x8_xPos();
+
+
+    mem16();
+    #[mem16] {
+        aa = yPos;
+        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+            aa = -16 as u16;
+        }
+        (&buffer[ 0].yPos as *u16)[unaligned yy] = aa;
+
+        aa = yPos + 8;
+        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+            aa = -16 as u16;
+        }
+        (&buffer[-1].yPos as *u16)[unaligned yy] = aa;
+
+
+        (&buffer[ 0].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr0[unaligned xx];
+        (&buffer[-1].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr1[unaligned xx];
+
+        yy = aa = yy - 2 * sizeof(OamEntry);
+    }
+    mem8();
+
+    bufferPos = yy;
+}
+
+
+
+// Two sprites, 16x32 rectangle:
+//  * 1st Sprite: Large
+//  * 2nd Sprite: Large
+//
+// ┌─┐
+// │ │
+// ├─┤
+// │ │
+// └─┘
+//
+// DB = 0x7e
+#[mem8, idx16]
+func rect_16x32_two(entityId : u16 in yy) {
+    xx = entities.SoA.metaSpriteFrame[unaligned yy];
+
+    _populate_xPos_and_yPos(xx, yy);
+
+    yy = bufferPos;
+    return if negative || yy < (2 - 1) * sizeof(OamEntry);
+
+
+    a = <:xPos;
+    (&buffer[ 0].xPos)[unaligned yy] = a;
+    (&buffer[-1].xPos)[unaligned yy] = a;
+
+    _update_hi_table_size_large();
+    _update_hi_table_x8_xPos();
+
+    _update_hi_table_size_large();
+    _update_hi_table_x8_xPos();
+
+
+    mem16();
+    #[mem16] {
+        aa = yPos;
+        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+            aa = -16 as u16;
+        }
+        (&buffer[ 0].yPos as *u16)[unaligned yy] = aa;
+
+        aa = yPos + 16;
+        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+            aa = -16 as u16;
+        }
+        (&buffer[-1].yPos as *u16)[unaligned yy] = aa;
+
+
+        (&buffer[ 0].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr0[unaligned xx];
+        (&buffer[-1].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr1[unaligned xx];
+
+        yy = aa = yy - 2 * sizeof(OamEntry);
+    }
+    mem8();
+
+    bufferPos = yy;
+}
+
+
+
+// Three sprites, 16x24 px rectangle:
+//  * 1st Sprite (large)
+//  * 2nd Sprite (small)
+//  * 3rd Sprite (small)
+//
+// ┌─┐
+// │ │
+// ├┬┤
+// └┴┘
+//
+// DB = 0x7e
+#[mem8, idx16]
+func rect_16x24_three(entityId : u16 in yy) {
+    xx = entities.SoA.metaSpriteFrame[unaligned yy];
+
+    _populate_xPos_and_yPos(xx, yy);
+
+    yy = bufferPos;
+    return if negative || yy < (3 - 1) * sizeof(OamEntry);
+
+
+    a = <:xPos;
+    (&buffer[ 0].xPos)[unaligned yy] = a;
+    (&buffer[-1].xPos)[unaligned yy] = a;
+
+    _update_hi_table_size_large();
+    _update_hi_table_x8_xPos();
+
+    _update_hi_table_size_small();
+    _update_hi_table_x8_xPos();
+
+
+    _update_hi_table_size_small();
+
+    (&buffer[-2].xPos)[unaligned yy] = a = (&buffer[ 0].xPos)[unaligned yy] + 8;
+    a = (>:xPos +# 0) >>> 1;
+    _update_hi_table_x8(carry);
+
+
+    mem16();
+    #[mem16] {
+        aa = yPos;
+        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+            aa = -16 as u16;
+        }
+        (&buffer[ 0].yPos as *u16)[unaligned yy] = aa;
+
+        aa = yPos + 16;
+        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+            aa = -16 as u16;
+        }
+        (&buffer[-1].yPos as *u16)[unaligned yy] = aa;
+        (&buffer[-2].yPos as *u16)[unaligned yy] = aa;
+
+
+        (&buffer[ 0].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr0[unaligned xx];
+        (&buffer[-1].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr1[unaligned xx];
+        (&buffer[-2].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr2[unaligned xx];
+
+        yy = aa = yy - 3 * sizeof(OamEntry);
+    }
+    mem8();
+
+    bufferPos = yy;
+}
+
+
+
+// Four sprites, 16x24 rect + an extra small sprite on the side:
+//  * 1st Sprite (large)
+//  * 2nd Sprite (small)
+//  * 3rd Sprite (small)
+//  * 4th Sprite (small - onto side)
+//
+// ┌─┐
+// │ ├┐
+// ├┬┼┘
+// └┴┘
+//
+// DB = 0x7e
+#[mem8, idx16]
+func rect_16x24_and_extra(entityId : u16 in yy) {
+    xx = entities.SoA.metaSpriteFrame[unaligned yy];
+
+    _populate_xPos_and_yPos(xx, yy);
+
+    yy = bufferPos;
+    return if negative || yy < (4 - 1) * sizeof(OamEntry);
+
+
+    a = <:xPos;
+    (&buffer[ 0].xPos)[unaligned yy] = a;
+    (&buffer[-1].xPos)[unaligned yy] = a;
+
+    _update_hi_table_size_large();
+    _update_hi_table_x8_xPos();
+
+    _update_hi_table_size_small();
+    _update_hi_table_x8_xPos();
+
+
+    _update_hi_table_size_small();
+
+    (&buffer[-2].xPos)[unaligned yy] = a = <:xPos + 8;
+    a = (>:xPos +# 0) >>> 1;
+    _update_hi_table_x8(carry);
+
+    _update_hi_table_size_small();
+
+    (&buffer[-3].xPos)[unaligned yy] = a = <:xPos + 16;
+    a = (>:xPos +# 0) >>> 1;
+    _update_hi_table_x8(carry);
+
+
+    mem16();
+    #[mem16] {
+        aa = yPos;
+        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+            aa = -16 as u16;
+        }
+        (&buffer[ 0].yPos as *u16)[unaligned yy] = aa;
+
+        aa = yPos + 16;
+        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+            aa = -16 as u16;
+        }
+        (&buffer[-1].yPos as *u16)[unaligned yy] = aa;
+        (&buffer[-2].yPos as *u16)[unaligned yy] = aa;
+
+        aa = yPos + 8;
+        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+            aa = -16 as u16;
+        }
+        (&buffer[-3].yPos as *u16)[unaligned yy] = aa;
+
+
+        (&buffer[ 0].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr0[unaligned xx];
+        (&buffer[-1].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr1[unaligned xx];
+        (&buffer[-2].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr2[unaligned xx];
+        (&buffer[-3].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr3[unaligned xx];
+
+        yy = aa = yy - 4 * sizeof(OamEntry);
+    }
+    mem8();
+
+    bufferPos = yy;
+}
+
+}
+
+}
 }
 
 

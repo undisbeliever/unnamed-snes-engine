@@ -27,14 +27,19 @@ inline func init() {
         aa = entities.player.process as u16;
         entities.SoA.process_function[0] = aa as func(u8 in x);
 
+        // Set player's ms_draw function
+        aa = entities.player.ms_draw_function as u16;
+        entities.SoA.ms_draw_function[0] = aa as func(u16 in yy);
+
 
         // Set all process_functions to blank (except player)
-        aa = _blank_entity_process_function as u16;
+        aa = _blank_entity_function as u16;
 
         x = entities.SoA.LAST_INDEX;
         do {
             // Reset process function
             entities.SoA.process_function[unaligned x] = aa as func(u8 in x);
+            entities.SoA.ms_draw_function[unaligned x] = aa as func(u16 in yy);
 
             // Clear entity shadow
             (&entities.SoA._shadowAndBlank as *u16)[unaligned x] = 0;
@@ -59,8 +64,8 @@ inline func init() {
 func __next_free_entity() : u8 in y {
     // ::TODO replace with something that runs in constant time::
 
-    a = <:&_blank_entity_process_function;
-    y = >:&_blank_entity_process_function;
+    a = <:&_blank_entity_function;
+    y = >:&_blank_entity_function;
 
     inline for let entityId in 0 .. entities.SoA.LAST_INDEX by 2 {
         if a == <:entities.SoA.process_function[unaligned entityId] as u8 &&
@@ -91,6 +96,9 @@ let _init_function_ptr = _init_function_u16 as func(u8 in x);
         if !zero {
             (&<:entities.SoA.process_function[0] as *u8)[y] = a = (far &entities.entity_data.process_function_l as far *u8)[x];
             (&>:entities.SoA.process_function[0] as *u8)[y] = a = (far &entities.entity_data.process_function_h as far *u8)[x];
+
+            (&<:entities.SoA.ms_draw_function[0] as *u8)[y] = a = (far &entities.entity_data.ms_draw_function_l as far *u8)[x];
+            (&>:entities.SoA.ms_draw_function[0] as *u8)[y] = a = (far &entities.entity_data.ms_draw_function_h as far *u8)[x];
 
             a = (far &entities.entity_data.shadow_size as far *u8)[x];
             entities.SoA.shadowSize[y] = a as entities.ShadowSize;
@@ -138,7 +146,7 @@ let _init_function_ptr = _init_function_u16 as func(u8 in x);
 
 
 // DB = 0x7e
-func _blank_entity_process_function(entityId : u8 in x) {
+func _blank_entity_function() {
 }
 
 }
