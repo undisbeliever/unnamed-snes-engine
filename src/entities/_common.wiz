@@ -5,6 +5,7 @@ import "../memmap";
 
 import "../../gen/entity-data";
 
+import "_variables";
 import "player";
 
 
@@ -49,39 +50,32 @@ inline func init() {
         } while !zero;
     }
     mem8();
-}
 
 
+    // Populate `activeEntitiesTable`
+    {
+        activeEntitiesTablePos = 0;
 
-// Get the next free entity
-//
-// Returns 0 (and zero flag set) if there is no free entity
-//
-// KEEP: X
-//
-// DB = 0x7e
-#[mem8, idx8]
-func __next_free_entity() : u8 in y {
-    // ::TODO replace with something that runs in constant time::
+        a = SoA.LAST_INDEX;
+        x = ACTIVE_ENTITIES_TABLE__LAST_POS;
 
-    a = <:&_blank_entity_function;
-    y = >:&_blank_entity_function;
+        do {
+            activeEntitiesTable[x] = a;
 
-    inline for let entityId in 0 .. entities.SoA.LAST_INDEX by 2 {
-        if a == <:entities.SoA.process_function[unaligned entityId] as u8 &&
-           y == >:entities.SoA.process_function[unaligned entityId] as u8 {
-            return entityId;
+            a--;
+            a--;
+
+            x--;
         }
+        while !negative;
     }
-
-    return 0;
 }
 
 
 
 // Spawn entity
 //
-// NOTE: This function may fail
+// NOTE: This function may fail if `entityType` is invalid or there are no more unused entityIds.
 //
 // DB = 0x7e
 #[mem8, idx8]
@@ -89,11 +83,21 @@ func spawn_entity(xPos : u8 in <:dpTmp0, yPos : u8 in >:dpTmp0, entityType : u8 
 let _init_function_u16 = dpTmp1;
 let _init_function_ptr = _init_function_u16 as func(u8 in x);
 
-    if a < N_ENTITY_TYPES {
-        x = a;
+    ^if a < N_ENTITY_TYPES {
 
-        y = __next_free_entity();
-        if !zero {
+        // Retrieve the next unused entity from the `activeEntitiesTable` (if one is available)
+        x = activeEntitiesTablePos;
+        ^if x < sizeof(typeof(activeEntitiesTable)) {
+            y = activeEntitiesTable[x];
+            // mark entity active
+            activeEntitiesTablePos = ++x;
+
+
+            x = a;
+
+            // Y = entityId
+            // X = entity Data Index
+
             (&<:entities.SoA.process_function[0] as *u8)[y] = a = (far &entities.entity_data.process_function_l as far *u8)[x];
             (&>:entities.SoA.process_function[0] as *u8)[y] = a = (far &entities.entity_data.process_function_h as far *u8)[x];
 

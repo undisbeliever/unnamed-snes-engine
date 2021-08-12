@@ -122,6 +122,29 @@ namespace entities {
             var state_7 : [ u16 ; N_ENTITIES ];
         }
     }
+
+
+    in wram7e {
+        // Mapping of active and unused entities (excluding player).
+        //
+        // indexes 0 to `activeEntitiesTablePos - 1` (inclusive) are active entityIds.
+        // indexes `activeEntitiesTablePos` to `ACTIVE_ENTITIES_TABLE__LAST_POS` (inclusive) are unused entities.
+        //
+        // This table will never include the player entity (entityId 0)
+        //
+        // (list of SoA indexes)
+        var activeEntitiesTable : [u8 ; N_ENTITIES - 1];
+
+        // The mid-point separating active and unused entities in `activeEntitiesTable`.
+        //
+        // This value is set to 0 if no entities are active.
+        // This value is set to `ACTIVE_ENTITIES_TABLE__LAST_POS` when no more entities can be created.
+        //
+        // (index into activeEntitiesTable)
+        var activeEntitiesTablePos : u8;
+
+        let ACTIVE_ENTITIES_TABLE__LAST_POS = sizeof(typeof(activeEntitiesTable)) - 1;
+    }
 }
 
 
