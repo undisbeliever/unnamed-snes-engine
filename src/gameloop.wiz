@@ -161,11 +161,12 @@ func _spawn_room_entities() {
 #[mem8, idx8]
 func process() {
 
-    inline for let entityId in 0 .. entities.SoA.LAST_INDEX by 2 {
-        // ::ANNOY there is no `jsr (addr)` instruction on the 65816::
-        x = entityId;
-        entities.SoA.process_function[unaligned x](x);
-    }
+    // Always process player entity first
+    x = 0;
+    entities.SoA.process_function[unaligned x](x);
+
+
+    entities.process_active_entities();
 
 }
 
@@ -174,14 +175,9 @@ func process() {
 // Process the game loop
 //
 // DB = 0x7e
-#[mem8, idx16]
+#[mem8, idx8]
 func draw_entities() {
-
-    inline for let entityId in 0 .. entities.SoA.LAST_INDEX by 2 {
-        // ::ANNOY there is no `jsr (addr)` instruction on the 65816::
-        xx = entityId;
-        entities.SoA.ms_draw_function[unaligned xx](xx);
-    }
+    entities.draw_active_entities();
 }
 
 

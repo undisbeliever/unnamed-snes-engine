@@ -6,6 +6,10 @@
  "bouncing_large": {
   "code": "bouncing_off_walls",
   "shadowSize": "LARGE"
+ },
+ "spawn_test_entity": {
+  "code": "spawn_test_entity",
+  "shadowSize": "SMALL"
  }
 }
 

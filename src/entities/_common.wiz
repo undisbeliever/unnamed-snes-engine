@@ -14,6 +14,11 @@ namespace entities {
 let N_ENTITY_TYPES = sizeof(typeof(entities.entity_data.process_function_l));
 
 
+in zeropage {
+    var __currentEntityTablePos : u8;
+}
+
+
 in code {
 
 
@@ -26,7 +31,7 @@ inline func init() {
     #[mem16] {
         // Set player's process function
         aa = entities.player.process as u16;
-        entities.SoA.process_function[0] = aa as func(u8 in x);
+        entities.SoA.process_function[0] = aa as func(u8 in x) : bool in carry;
 
         // Set player's ms_draw function
         aa = entities.player.ms_draw_function as u16;
@@ -39,7 +44,7 @@ inline func init() {
         x = entities.SoA.LAST_INDEX;
         do {
             // Reset process function
-            entities.SoA.process_function[unaligned x] = aa as func(u8 in x);
+            entities.SoA.process_function[unaligned x] = aa as func(u8 in x) : bool in carry;
             entities.SoA.ms_draw_function[unaligned x] = aa as func(u16 in yy);
 
             // Clear entity shadow
@@ -144,6 +149,86 @@ let _init_function_ptr = _init_function_u16 as func(u8 in x);
             // Call spawn function
             return _init_function_ptr(x);
         }
+    }
+}
+
+
+
+// Execute the process routine in all active entities (excluding player)
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func process_active_entities()
+{
+let _tmp = <:dpTmp0;
+
+    y = activeEntitiesTablePos;
+    if !zero {
+        do {
+            y--;
+            __currentEntityTablePos = y;
+
+            x = activeEntitiesTable[y];
+            carry = entities.SoA.process_function[unaligned x](x);
+            if !carry {
+                x = activeEntitiesTablePos;
+                x--;
+                activeEntitiesTablePos = x;
+                if !zero {
+                    // Remove entity from active pool
+                    y = __currentEntityTablePos;
+
+                    _tmp = a = activeEntitiesTable[y];
+                    activeEntitiesTable[y] = a = activeEntitiesTable[x];
+                    activeEntitiesTable[x] = a = _tmp;
+
+                    x = a;
+                }
+                else {
+                    x = activeEntitiesTable[0];
+                }
+
+                // X = entityId of the recently deactivated entity
+                SoA.shadowSize[unaligned x] = 0 as ShadowSize;
+
+                // Set process_function and ms_draw_function to a blank function (just in case they are accidentally called)
+                mem16();
+                #[mem16] {
+                    aa = _blank_entity_function as u16;
+                    entities.SoA.process_function[unaligned x] = aa as func(u8 in x) : bool in carry;
+                    entities.SoA.ms_draw_function[unaligned x] = aa as func(u16 in yy);
+                }
+                mem8();
+            }
+
+            y = __currentEntityTablePos;
+        } while !zero;
+    }
+}
+
+
+
+// Execute the ms_draw_function for all active entities (excluding player)
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func draw_active_entities()
+{
+    y = activeEntitiesTablePos;
+    if !zero {
+        do {
+            y--;
+            __currentEntityTablePos = y;
+
+            x = activeEntitiesTable[y];
+            idx16();
+            #[idx16] {
+                entities.SoA.ms_draw_function[unaligned xx](xx);
+            }
+            idx8();
+
+            y = __currentEntityTablePos;
+        } while !zero;
     }
 }
 

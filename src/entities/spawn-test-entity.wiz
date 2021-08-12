@@ -4,6 +4,7 @@
 import "../memmap";
 
 import "_variables";
+import "_common";
 
 import "../metatiles";
 import "../metasprites";
@@ -11,8 +12,19 @@ import "../metasprites";
 import "gen/metasprites/dungeon";
 
 
+// Entity that constantly spawns and removes itself in a (hopefully) random manner.
+
 namespace entities {
-namespace bouncing_off_walls {
+namespace spawn_test_entity {
+
+
+in wram7e {
+    var globalCounter : u8;
+}
+
+
+let SoA_counter = SoA.state_0;
+
 
 in code {
 
@@ -32,6 +44,8 @@ func init(entityId : u8 in x) {
         SoA.yVelocity[unaligned x] = aa = -0x0120 as u16;
 
         SoA.metaSpriteFrame[unaligned x] = aa = &ms.dungeon.Skull.frames[0] as u16;
+
+        SoA_counter[unaligned x] = aa = 10 * 60;
     }
     mem8();
 }
@@ -62,6 +76,35 @@ func process(entityId : u8 in x) : bool in carry {
             SoA.yVelocity[unaligned x] = aa = 0 - SoA.yVelocity[unaligned x];
         }
         mem8();
+    }
+
+
+    globalCounter++;
+    a = globalCounter;
+
+    // 3 random primes, should make the spawning/deleting more unpredictable
+    if a == 79 || a == 149 || a == 211 {
+        push8(x);
+        entities.spawn_entity(a = 128, a = 112, a = 0);
+        x = pop8();
+    }
+    else if a == 251 {
+        globalCounter = 0;
+
+        return false;
+    }
+
+    // Remove entity when `SoA_counter` is zero.
+    {
+        mem16();
+        #[mem16] {
+            SoA_counter[unaligned x]--;
+        }
+        mem8();
+
+        if zero {
+            return false;
+        }
     }
 
     return true;

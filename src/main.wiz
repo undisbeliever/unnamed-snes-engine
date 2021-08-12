@@ -60,7 +60,11 @@ func main() {
 
         metasprites.draw_shadows();
 
-        gameloop.draw_entities();
+        idx8();
+        #[idx8] {
+            gameloop.draw_entities();
+        }
+        idx16();
 
         metasprites.finalize_buffer();
 

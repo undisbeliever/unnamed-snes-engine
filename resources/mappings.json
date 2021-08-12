@@ -3,6 +3,7 @@
    "dungeon"
  ],
  "entities": [
+   "spawn_test_entity",
    "bouncing_small",
    "bouncing_large"
  ],

@@ -50,10 +50,11 @@ namespace entities {
             // Process function for the entity.  Called once per frame by the undo loop.
             //
             // INPUT: X = entityId: index into `entities.SoA` Structure-of-Arrays.
+            // RETURN: carry set if entity is still active in the next frame.
             //
             // DB = 0x7e
             #[mem8, idx8]
-            var process_function : [func(entityId : u8 in x) ; N_ENTITIES];
+            var process_function : [func(entityId : u8 in x) : bool in carry ; N_ENTITIES];
 
 
             // Metasprite draw function.
