@@ -5,6 +5,7 @@
 
 import PIL.Image
 import argparse
+import itertools
 import xml.etree.ElementTree
 from collections import namedtuple
 
@@ -17,7 +18,7 @@ DEFAULT_ORDER_BIT = 0
 TILE_PROPERTY_SOLID_BIT = 7
 
 
-TileMapEntry = namedtuple('TileMapEntry', ('tile_id', 'palette_id'))
+TileMapEntry = namedtuple('TileMapEntry', ('tile_id', 'palette_id', 'hflip', 'vflip'))
 
 
 def convert_rgb_color(c):
@@ -110,6 +111,17 @@ def get_palette_id(tile, palettes):
 
 
 
+H_FLIP_ORDER = [ (y * 8 + x) for y, x in itertools.product(range(8), reversed(range(8))) ]
+V_FLIP_ORDER = [ (y * 8 + x) for y, x in itertools.product(reversed(range(8)), range(8)) ]
+
+def hflip_tile(tile):
+    return bytes([ tile[i] for i in H_FLIP_ORDER ])
+
+def vflip_tile(tile):
+    return bytes([ tile[i] for i in V_FLIP_ORDER ])
+
+
+
 def convert_tilemap_and_tileset(tiles, palettes):
     # Returns a tuple(tilemap, tileset)
 
@@ -127,15 +139,23 @@ def convert_tilemap_and_tileset(tiles, palettes):
             # Must be bytes() here as a dict() key must be immutable
             tile_data = bytes([palette_map[c] for c in tile])
 
-            tile_id = tileset_map.get(tile_data, None)
-            if tile_id is None:
+            tile_match = tileset_map.get(tile_data, None)
+            if tile_match is None:
                 tile_id = len(tileset)
-                tileset_map[tile_data] = tile_id
+                tile_match = tile_id, False, False
+
                 tileset.append(tile_data)
 
-                # ::TODO add flipped tiles to tileset_map::
+                h_tile_data = hflip_tile(tile_data)
+                v_tile_data = vflip_tile(tile_data)
+                hv_tile_data = vflip_tile(h_tile_data)
 
-            tilemap.append(TileMapEntry(tile_id=tile_id, palette_id=palette_id))
+                tileset_map[tile_data] = tile_match
+                tileset_map.setdefault(h_tile_data, (tile_id, True, False))
+                tileset_map.setdefault(v_tile_data, (tile_id, False, True))
+                tileset_map.setdefault(hv_tile_data, (tile_id, True, True))
+
+            tilemap.append(TileMapEntry(tile_id=tile_match[0], palette_id=palette_id, hflip=tile_match[1], vflip=tile_match[2]))
         else:
             invalid_tiles.append(tile_index)
 
@@ -162,7 +182,8 @@ def create_metatile_map(tilemap):
                 # This should never happen
                 assert(tm.tile_id <= 0x3ff)
                 assert(tm.palette_id <= 7)
-                data.append((tm.tile_id >> 8) | (tm.palette_id << 2) | (bool(DEFAULT_ORDER_BIT) << 5))
+                data.append((tm.tile_id >> 8) | (tm.palette_id << 2) | (bool(DEFAULT_ORDER_BIT) << 5)
+                            | (bool(tm.hflip) << 6) | (bool(tm.vflip) << 7))
 
     return data
 
