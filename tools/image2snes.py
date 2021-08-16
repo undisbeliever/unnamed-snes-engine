@@ -49,27 +49,26 @@ def convert_rgb_color(c):
 
 
 
-def create_palette_maps(image, bpp):
+def convert_palette(image, bpp, pad_palette_data=None):
+    # Returns tuple (palette_data, palettes_map)
+
     if image.mode != 'RGB':
         image = image.convert('RGB')
 
 
     colors_per_palette = 1 << bpp
+    max_colors = min(colors_per_palette * 8, 256)
 
     if image.width != 16:
         raise ValueError('Palette Image MUST BE 16 px in width')
 
-    if image.width * image.height > 256:
-        raise ValueError('Palette Image has too many colours (max 256)')
-
-    if image.width * image.height > colors_per_palette * 8:
-        raise ValueError(f'Palette Image has too many colours (max { colors_per_palette * 8 })')
+    if image.width * image.height > max_colors:
+        raise ValueError(f"Palette Image has too many colours (max { max_colors })")
 
     image_data = image.getdata()
 
 
-    palettes = list()
-
+    palettes_map = list()
 
     for p in range(len(image_data) // colors_per_palette):
         pal_map = dict()
@@ -79,28 +78,21 @@ def create_palette_maps(image, bpp):
             if c not in pal_map:
                 pal_map[c] = x
 
-        palettes.append(pal_map)
-
-    return palettes
+        palettes_map.append(pal_map)
 
 
-
-def convert_palette(image, max_colors=256):
-    # Assumes image is valid
-
-    if image.mode != 'RGB':
-        image = image.convert('RGB')
-
-    out = bytearray()
+    palette_data = bytearray()
 
     for c in image.getdata():
         u16 = convert_rgb_color(c)
 
-        out.append(u16 & 0xff)
-        out.append(u16 >> 8)
+        palette_data.append(u16 & 0xff)
+        palette_data.append(u16 >> 8)
 
+    if pad_palette_data:
+        palette_data += bytearray(max_colors * 2 - len(palette_data))
 
-    return out
+    return palette_data, palettes_map
 
 
 
@@ -150,7 +142,7 @@ def get_palette_id(tile, palettes):
 
 
 
-def convert_tilemap_and_tileset(image, palettes):
+def convert_tilemap_and_tileset(tiles, palettes):
     # Returns a tuple(tilemap, tileset)
 
     invalid_tiles = list()
@@ -160,7 +152,7 @@ def convert_tilemap_and_tileset(image, palettes):
 
     tileset_map = dict()
 
-    for tile_index, tile in enumerate(extract_tiles(image)):
+    for tile_index, tile in enumerate(tiles):
         palette_id, palette_map = get_palette_id(tile, palettes)
 
         if palette_map:
@@ -232,12 +224,11 @@ def main():
     image = PIL.Image.open(args.image_filename)
     palette_image = PIL.Image.open(args.palette_image)
 
-    palettes_map = create_palette_maps(palette_image, bpp)
-    tilemap, tileset = convert_tilemap_and_tileset(image, palettes_map)
+    palette_data, palettes_map = convert_palette(palette_image, bpp)
+    tilemap, tileset = convert_tilemap_and_tileset(extract_tiles(image), palettes_map)
 
     tileset_data = convert_snes_tileset(tileset, bpp)
     tilemap_data = create_tilemap_data(tilemap, args.order)
-    palette_data = convert_palette(palette_image)
 
     with open(args.tileset_output, 'wb') as fp:
         fp.write(tileset_data)
