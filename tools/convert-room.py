@@ -114,6 +114,8 @@ def parse_tmx_map(et):
                 raise ValueError('Expected only one <objectgroup> tag')
             entities = parse_objectgroup_tag(child)
 
+    if entities is None:
+        entities = list()
 
     return TmxMap(tileset, tiles, entities)
 
