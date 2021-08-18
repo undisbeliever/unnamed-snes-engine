@@ -15,8 +15,8 @@ import "entities/player";
 namespace gameloop {
 
 
-let STARTING_ROOM = 0;
-
+let DISPLAY_WIDTH = 256;
+let DISPLAY_HEIGHT = 224;
 
 
 let ENTITIES_IN_MAP = 8;
@@ -43,11 +43,14 @@ in zeropage {
 
 in wram7e {
 
-
     // This hack is required to access room via addr addressing.
     #[align(256)]
     var __far_room : RoomData;
     let room = *(&__far_room as *RoomData);
+
+
+    // The location of the current room
+    var currentRoom : u8;
 
 }
 
@@ -65,8 +68,9 @@ inline func init__forceblank() {
 
     entities.player.init();
 
+    currentRoom = a = resources.rooms.STARTING_ROOM;
 
-    _load_room(STARTING_ROOM);
+    _load_room();
     _load_resources__forceblank();
 
     metatiles.populate_map_tile_properties();
@@ -81,20 +85,25 @@ inline func init__forceblank() {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _load_room(room_id : u8 in x) {
+func _load_room() {
 let _tmp = <:dpTmp0;
 let _roomPtr = dpTmp_farPtr;
 
-    if x >= sizeof(typeof(resources.rooms.room_list_l)) {
-        x = 0;
+    x = currentRoom;
+    a = resources.rooms.room_table[x];
+
+    a--;
+    if a >= resources.rooms.N_ROOMS {
+        a = 0;
     }
+    x = a;
 
     <:_roomPtr = a = resources.rooms.room_list_l[x];
     >:_roomPtr = a = resources.rooms.room_list_h[x];
-    #:_roomPtr = a = resources.rooms.room_list_b[x];
+    #:_roomPtr = a = resources.rooms.room_list_bank;
 
 
-    y = sizeof(typeof(room));
+    y = sizeof(typeof(room)) - 1;
     do {
         (&room as *u8)[y] = a = _roomPtr[y];
         y--;
@@ -155,6 +164,22 @@ func _spawn_room_entities() {
 
 
 
+// Change the brightness of the display.
+//
+// NOTE: Will also wait until the end of the current frame
+//
+// DB = 0x7e
+#[mem8, idx8]
+func wait_frame_and_change_brightness(brightness : u8 in a) {
+
+    // ::TODO WaitFrame::
+    wait_until_interrupt();
+
+    *(far &snes.ppu.brightness) = a;
+}
+
+
+
 // Process the game loop
 //
 // DB = 0x7e
@@ -168,6 +193,24 @@ func process() {
 
     entities.process_active_entities();
 
+
+
+    // Check for a room transition
+    a = entities.player.yPos.px;
+    if zero {
+        _change_room_north();
+    }
+    else if a >= DISPLAY_HEIGHT - 1 {
+        _change_room_south();
+    }
+
+    a = entities.player.xPos.px;
+    if zero {
+        _change_room_west();
+    }
+    else if a >= DISPLAY_WIDTH - 1 {
+        _change_room_east();
+    }
 }
 
 
@@ -179,6 +222,106 @@ func process() {
 func draw_entities() {
     entities.draw_active_entities();
 }
+
+
+
+// The player has reached the top of the screen and wants to enter the room above the `currentRoom`.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _change_room_north() {
+
+    a = currentRoom - 0x10;
+    if carry {
+        currentRoom = a;
+
+        entities.player.yPos.px = a = DISPLAY_HEIGHT - 2;
+        entities.player.yPos.sx = 0;
+
+        _room_transition__blank();
+    }
+}
+
+
+
+// The player has reached the bottom of the screen and wants to enter the room below the `currentRoom`.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _change_room_south() {
+
+    a = currentRoom + 0x10;
+    if !carry {
+        currentRoom = a;
+
+        entities.player.yPos.px = a = 1;
+        entities.player.yPos.sx = 0;
+
+        _room_transition__blank();
+    }
+}
+
+
+
+// The player has reached the right edge of the screen and wants to enter the room right of `currentRoom`.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _change_room_east() {
+
+    a = (currentRoom & 0x0f) + 1;
+    if !carry {
+        // Can move eastward
+        currentRoom++;
+
+        entities.player.xPos.px = a = 1;
+        entities.player.xPos.sx = 0;
+
+        _room_transition__blank();
+    }
+}
+
+
+
+// The player has reached the left edge of the screen and wants to enter the room left of `currentRoom`.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _change_room_west() {
+
+    a = (currentRoom & 0x0f) - 1;
+    if carry {
+        // Can move westward
+        currentRoom--;
+
+        entities.player.xPos.px = a = DISPLAY_WIDTH - 2;
+        entities.player.xPos.sx = 0;
+
+        _room_transition__blank();
+    }
+}
+
+
+
+// Blank the screen, then load the next room and resources.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _room_transition__blank() {
+
+    wait_frame_and_change_brightness(0x08);
+
+    _load_room();
+    metatiles.populate_map_tile_properties();
+    _spawn_room_entities();
+
+
+    wait_frame_and_change_brightness(snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK);
+
+    _load_resources__forceblank();
+    metatiles.draw_map__forceblank();
+}
+
 
 
 

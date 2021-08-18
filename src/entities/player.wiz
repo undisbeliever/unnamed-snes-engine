@@ -18,6 +18,8 @@ let yPos = entities.SoA.yPos[0];
 let xVelocity = entities.SoA.xVelocity[0];
 let yVelocity = entities.SoA.yVelocity[0];
 
+let movementState = entities.SoA.movementState[0];
+
 
 in code {
 

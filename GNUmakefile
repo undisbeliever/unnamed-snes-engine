@@ -26,8 +26,9 @@ RESOURCES  += $(patsubst resources/%.png,gen/%.pal, $(4BPP_TILES_SRC))
 RESOURCES  += $(patsubst resources/%.png,gen/%.pal, $(2BPP_TILES_SRC))
 
 
-MAP_SRC    := $(wildcard resources/rooms/*.tmx)
-RESOURCES  += $(patsubst resources/rooms/%.tmx,gen/rooms/%.bin, $(MAP_SRC))
+ROOM_SRC   := $(wildcard resources/rooms/*.tmx)
+ROOM_BINS  := $(sort $(patsubst resources/rooms/%.tmx,gen/rooms/%.bin, $(ROOM_SRC)))
+RESOURCES  += $(ROOM_BINS)
 
 
 METATILE_TILESETS = dungeon
@@ -35,6 +36,7 @@ RESOURCES  += $(patsubst %,gen/metatiles/%.bin, $(METATILE_TILESETS))
 
 RESOURCES  += gen/resource-lists.wiz
 RESOURCES  += gen/entity-data.wiz
+RESOURCES  += gen/rooms.wiz
 
 
 METASPRITE_SPRITESETS = common dungeon
@@ -90,6 +92,10 @@ gen/resource-lists.wiz: resources/mappings.json tools/generate-resource-lists.py
 
 gen/entity-data.wiz: resources/entities.json resources/mappings.json tools/generate-entity-data.py
 	python3 tools/generate-entity-data.py -o "$@" "resources/entities.json" "resources/mappings.json"
+
+
+gen/rooms.wiz: resources/mappings.json $(ROOM_BINS) tools/generate-rooms-table.py
+	python3 tools/generate-rooms-table.py -o "$@" "resources/mappings.json" $(ROOM_BINS)
 
 
 gen/metasprites/%.wiz gen/metasprites/%.bin: resources/metasprites/%.png resources/metasprites/%-palette.png resources/metasprites/%.json tools/convert-metasprite.py

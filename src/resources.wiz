@@ -6,6 +6,8 @@ import "memmap";
 import "gen/metasprites/common";
 import "gen/metasprites/dungeon";
 
+import "gen/rooms";
+
 
 namespace resources {
 
@@ -41,26 +43,21 @@ in rodata0 {
 
 
 namespace rooms {
+    let N_ROOMS = sizeof(typeof(_rooms)) / sizeof(typeof(_rooms[0]));
 
 in rodata0 {
-    const dungeon = embed "../gen/rooms/dungeon.bin";
-
-    // Have to split up the room list into separate low/high/bank arrays
-    // As my attempts to create a `[far *u8]` array fail with a
-    // "fatal: constant initializer could not be resolved at link-time" error.
-
-    let _rooms = [dungeon];
-
-    // ::KUDOS eggboycolor for this pattern ::
-    const _room_list_l : [u8] = [<:&i for let i in _rooms];
-    const _room_list_h : [u8] = [>:&i for let i in _rooms];
-    const _room_list_b : [u8] = [#:far &i for let i in _rooms];
+    const _room_list_l : [u8] = [<:&_rooms[i] for let i in 0..N_ROOMS];
+    const _room_list_h : [u8] = [>:&_rooms[i] for let i in 0..N_ROOMS];
+}
 
     let room_list_l = far &_room_list_l as far *const u8;
     let room_list_h = far &_room_list_h as far *const u8;
-    let room_list_b = far &_room_list_b as far *const u8;
-}
+    let room_list_bank = #:far &_rooms;
 
+
+    let room_table = far &_room_table as far *const u8;
+
+    let STARTING_ROOM = _STARTING_ROOM;
 }
 
 }

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.5" tiledversion="1.7.2" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="2" nextobjectid="1">
+ <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
+ <layer id="1" name="Tile Layer 1" width="16" height="14">
+  <data encoding="base64" compression="gzip">
+   H4sIAAAAAAAAA+NhYGDgBWI+NMwPxAJAzAjEPFjUwORlgFgWiOXQsDwQK0D1Y1MDk9cBYl2oOmSsD8QGUDY2NTD5oa4fXR+99QtCsR0ahokTq98PDROrH5f7kfFw1g8AoW/EAIADAAA=
+  </data>
+ </layer>
+</map>

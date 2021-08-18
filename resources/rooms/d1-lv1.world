@@ -1,0 +1,13 @@
+{
+    "patterns": [
+        {
+            "regexp": "d1-lv1-0*(\\d+)-0*(\\d+).tmx",
+            "multiplierX": 256,
+            "multiplierY": 224,
+            "offsetX": 0,
+            "offsetY": 0
+        }
+    ],
+    "onlyShowAdjacentMaps": false,
+    "type": "world"
+}
