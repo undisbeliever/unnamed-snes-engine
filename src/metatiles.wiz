@@ -421,10 +421,14 @@ let _bottom = <:dpTmp1;
             // Check if the hitbox touches the tile to the right of this one
             a = (_left & 0xf) + entities.SoA.tileHitbox_halfWidth[x] + entities.SoA.tileHitbox_halfWidth[x];
             if a >= METATILE_SIZE + 1 {
-                a = (&mapTileProperties[1])[y];
-                if negative {
-                    entities.SoA.yPos_px[x] = a = (~_top & 0xf) + 1 + entities.SoA.yPos_px[x];
-                    entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.UP_COLLISION;
+                // Test Y index to prevent an out-of-bounds read past the rightmost tile.
+                a = y & 0xf;
+                if a != 0x0f {
+                    a = (&mapTileProperties[1])[y];
+                    if negative {
+                        entities.SoA.yPos_px[x] = a = (~_top & 0xf) + 1 + entities.SoA.yPos_px[x];
+                        entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.UP_COLLISION;
+                    }
                 }
             }
         }
@@ -456,12 +460,16 @@ let _bottom = <:dpTmp1;
             // Check if the hitbox touches the tile to the right of this one
             a = (_left & 0xf) + entities.SoA.tileHitbox_halfWidth[x] + entities.SoA.tileHitbox_halfWidth[x];
             if a >= METATILE_SIZE + 1 {
-                a = (&mapTileProperties[1])[y];
-                if negative {
-                    a = (_bottom & 0xf0) - entities.SoA.tileHitbox_halfHeight[x];
-                    if !carry { a = 1; }
-                    entities.SoA.yPos_px[x] = a;
-                    entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.DOWN_COLLISION;
+                // Test Y index to prevent an out-of-bounds read past the rightmost tile.
+                a = y & 0xf;
+                if a != 0x0f {
+                    a = (&mapTileProperties[1])[y];
+                    if negative {
+                        a = (_bottom & 0xf0) - entities.SoA.tileHitbox_halfHeight[x];
+                        if !carry { a = 1; }
+                        entities.SoA.yPos_px[x] = a;
+                        entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.DOWN_COLLISION;
+                    }
                 }
             }
         }
