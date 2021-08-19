@@ -52,6 +52,8 @@ struct OamEntry {
 let OAM_V_FLIP = 0x80;
 let OAM_H_FLIP = 0x40;
 
+let SHADOW_ATTR = 0x20;
+
 
 
 let OFFSCREEN_YPOS = 255 - 16;
@@ -329,6 +331,8 @@ inline func draw_shadows() {
     ^do {
         a = entities.SoA.shadowSize[unaligned yy] as u8;
         if !zero {
+            _update_hi_table_size_small();
+
             if a == entities.ShadowSize.SMALL as u8 {
                 // ::ANNOY cannot do `buffer[xx].xPos = a`::
                 // ::ANNOY cannot do `u8_array[xx + 4] = a`::
@@ -338,12 +342,10 @@ inline func draw_shadows() {
                 // char
                 (&buffer[0].char as *u8)[xx] = SHADOW_SMALL_CHAR;
                 // attr
-                (&buffer[0].attr as *u8)[xx] = 0;
+                (&buffer[0].attr as *u8)[xx] = a = SHADOW_ATTR;
 
                 // xPos
-                _update_hi_table_size_small();
-                // carry clear from shift in _update_hi_table_size_small()
-                (&buffer[0].xPos as *u8)[xx] = a = entities.SoA.xPos_px[unaligned yy] +# (-4 as u8);
+                (&buffer[0].xPos as *u8)[xx] = a = entities.SoA.xPos_px[unaligned yy] + (-4 as u8);
                 _update_hi_table_x9(carry);
             }
             else {
@@ -363,11 +365,10 @@ inline func draw_shadows() {
                 (&buffer[-1].yPos as *u8)[xx] = a;
 
                 // attr
-                (&buffer[ 0].attr as *u8)[xx] = a = OAM_H_FLIP;
-                (&buffer[-1].attr as *u8)[xx] = 0;
+                (&buffer[ 0].attr as *u8)[xx] = a = SHADOW_ATTR | OAM_H_FLIP;
+                (&buffer[-1].attr as *u8)[xx] = a = SHADOW_ATTR;
 
                 // xPos
-                _update_hi_table_size_small();
                 (&buffer[ 0].xPos as *u8)[xx] = a = entities.SoA.xPos_px[unaligned yy];
                 _update_hi_table_x9_0();
 
