@@ -1,0 +1,71 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "memmap";
+import "metasprites";
+import "../wiz/common/snes/snes";
+
+
+in shadow {
+    // A shadow of the INIDISP register
+    var _brightness_buffer : u8;
+}
+
+
+in code {
+
+
+// Wait until the end of the current frame, process VBlank routines.
+//
+// REQUIRES: NMI enabled, IRQs disabled
+//
+// DB access shadow RAM
+func wait_frame() {
+
+    push8(p);
+    push8(data_bank);
+
+    push8(program_bank);
+    data_bank = pop8();
+// DB = 0x80
+
+    mem8();
+    idx16();
+    #[mem8, idx16] {
+        a = _brightness_buffer | snes.ppu.BRIGHTNESS_FORCE_BLANK;
+
+        wait_until_interrupt();
+
+        // Force-blank screen to prevent corrupt graphics on VBlank overrun
+        snes.ppu.brightness = a;
+
+
+        metasprites.update_oam__vblank();
+
+
+        snes.ppu.brightness = a = _brightness_buffer;
+    }
+
+    data_bank = pop8();
+    p = pop8();
+
+// DB = unknown
+}
+
+
+
+// Change the brightness of the display.
+//
+// NOTE: Will also wait until the end of the current frame
+//
+// DB access shadow RAM
+#[mem8]
+func wait_frame_and_change_brightness(new_brightness : u8 in a) {
+    _brightness_buffer = a;
+
+    return wait_frame();
+}
+
+
+}
+

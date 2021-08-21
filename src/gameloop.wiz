@@ -7,6 +7,8 @@ import "../wiz/common/snes/snes";
 import "metatiles";
 import "metasprites";
 import "resources";
+import "wait-frame";
+import "common/reset";
 import "entities/_variables";
 import "entities/_common";
 import "entities/player";
@@ -55,26 +57,23 @@ in wram7e {
 }
 
 
+
 in code {
 
 // Initialize the game loop
 //
-// REQUIRES: Force Blank
-//
 // DB = 0x7e
 #[mem8, idx8]
-inline func init__forceblank() {
-    // ::TODO setup screen (if necessary)::
+inline func init() {
 
     entities.player.init();
 
     currentRoom = a = resources.rooms.STARTING_ROOM;
 
+
     _load_room();
-    _load_resources__forceblank();
 
     metatiles.populate_map_tile_properties();
-    metatiles.draw_map__forceblank();
 
     _spawn_room_entities();
 }
@@ -114,31 +113,6 @@ let _roomPtr = dpTmp_farPtr;
 
 
 
-// Load resources into memory and PPU.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func _load_resources__forceblank() {
-    idx16();
-    #[idx16] {
-        push8(data_bank);
-        push8(program_bank);
-        data_bank = pop8();
-    // DB = 0x80
-
-        metatiles.load_tileset__forceblank(room.tileset);
-
-        // ::TODO get spritesheet_id from somewhere::
-        metasprites.load_ppu_data__fblank(0);
-
-
-        data_bank = pop8();
-    // DB = 0x7e
-    }
-    idx8();
-}
-
-
 // Spawn entity in the room
 //
 // DB = 0x7e
@@ -164,18 +138,68 @@ func _spawn_room_entities() {
 
 
 
-// Change the brightness of the display.
+// Setup PPU, reset graphics subsystems and draw graphics to the screen.
 //
-// NOTE: Will also wait until the end of the current frame
+// This function will restore the following subsystems to a known good state:
+//  * PPU
+//  * MetaTiles
+//  * MetaSprite
+//
+// ASSUMES: room and entities are loaded into memory
+//
+// NOTE: Enables Force-Blank
 //
 // DB = 0x7e
 #[mem8, idx8]
-func wait_frame_and_change_brightness(brightness : u8 in a) {
+func setup_ppu_and_reset_graphics_subsystems() {
 
-    // ::TODO WaitFrame::
-    wait_until_interrupt();
+    wait_frame_and_change_brightness(snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK);
 
-    *(far &snes.ppu.brightness) = a;
+
+    push8(program_bank);
+    data_bank = pop8();
+// DB = 0x80
+    {
+        // Setup PPU registers
+
+        reset_registers();
+
+        snes.ppu.bg_mode = a = 1 | snes.ppu.BG_MODE_MODE1_BG3_PRIORITY;
+        snes.ppu.bg1_tilemap = a = (VRAM_BG1_MAP_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT) | snes.ppu.BG_TILEMAP_MIRROR_X;
+
+        snes.ppu.bg12_tileset = a = (VRAM_BG1_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG1_SHIFT);
+
+
+        snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_BG1 | snes.ppu.SCREEN_ENABLE_OBJ;
+
+
+
+        // Load Graphics to PPU
+
+        idx16();
+        #[idx16] {
+            metatiles.load_tileset__forceblank(room.tileset);
+
+            metasprites.setup__fblank();
+
+            // ::TODO get spritesheet_id from somewhere::
+            metasprites.load_ppu_data__fblank(0);
+        }
+        idx8();
+    }
+    push8(a = 0x7e);
+    data_bank = pop8();
+// DB = 0x7e
+
+
+    metatiles.draw_map__forceblank();
+
+    draw_entities();
+
+
+    // ::TODO fadein::
+
+    wait_frame_and_change_brightness(0xf);
 }
 
 
@@ -184,32 +208,41 @@ func wait_frame_and_change_brightness(brightness : u8 in a) {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func process() {
+func run_game() {
 
-    // Always process player entity first
-    x = 0;
-    entities.SoA.process_function[unaligned x](x);
+    setup_ppu_and_reset_graphics_subsystems();
 
 
-    entities.process_active_entities();
+    ^while true {
+        // Always process player entity first
+        x = 0;
+        entities.SoA.process_function[unaligned x](x);
+
+
+        entities.process_active_entities();
+
+        draw_entities();
 
 
 
-    // Check for a room transition
-    a = entities.player.yPos.px;
-    if zero {
-        _change_room_north();
-    }
-    else if a >= DISPLAY_HEIGHT - 1 {
-        _change_room_south();
-    }
+        // Check for a room transition
+        a = entities.player.yPos.px;
+        if zero {
+            _change_room_north();
+        }
+        else if a >= DISPLAY_HEIGHT - 1 {
+            _change_room_south();
+        }
 
-    a = entities.player.xPos.px;
-    if zero {
-        _change_room_west();
-    }
-    else if a >= DISPLAY_WIDTH - 1 {
-        _change_room_east();
+        a = entities.player.xPos.px;
+        if zero {
+            _change_room_west();
+        }
+        else if a >= DISPLAY_WIDTH - 1 {
+            _change_room_east();
+        }
+
+        wait_frame();
     }
 }
 
@@ -220,7 +253,19 @@ func process() {
 // DB = 0x7e
 #[mem8, idx8]
 func draw_entities() {
+    idx16();
+    #[idx16] {
+        metasprites.draw_shadows();
+    }
+    idx8();
+
     entities.draw_active_entities();
+
+    idx16();
+    #[idx16] {
+        metasprites.finalize_buffer();
+    }
+    idx8();
 }
 
 
@@ -316,10 +361,7 @@ func _room_transition__blank() {
     _spawn_room_entities();
 
 
-    wait_frame_and_change_brightness(snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK);
-
-    _load_resources__forceblank();
-    metatiles.draw_map__forceblank();
+    setup_ppu_and_reset_graphics_subsystems();
 }
 
 

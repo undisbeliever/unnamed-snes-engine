@@ -17,73 +17,24 @@ in code {
 // DB = 0x80
 #[fallthrough, mem8, idx16]
 func main() {
+    snes.ppu.brightness = a = snes.ppu.BRIGHTNESS_FORCE_BLANK;
+
+
     metasprites.setup__fblank();
 
     snes.ppu.irq_enable = a = snes.ppu.IRQ_ENABLE_AUTOJOY | snes.ppu.IRQ_ENABLE_NMI;
-
-
-    // Setup screen
-    {
-        wait_until_interrupt();
-
-        snes.ppu.brightness = a = snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK;
-
-
-        snes.ppu.bg_mode = a = 1 | snes.ppu.BG_MODE_MODE1_BG3_PRIORITY;
-        snes.ppu.bg1_tilemap = a = (VRAM_BG1_MAP_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT) | snes.ppu.BG_TILEMAP_MIRROR_X;
-
-        snes.ppu.bg12_tileset = a = (VRAM_BG1_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG1_SHIFT);
-
-
-        snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_BG1 | snes.ppu.SCREEN_ENABLE_OBJ;
-    }
 
 
     push8(a = 0x7e);
     data_bank = pop8();
 // DB = 0x7e
 
-
     idx8();
     #[idx8] {
-        gameloop.init__forceblank();
-    }
-    idx16();
+        gameloop.init();
 
 
-    ^while true {
-        idx8();
-        #[idx8] {
-            gameloop.process();
-        }
-        idx16();
-
-        metasprites.draw_shadows();
-
-        idx8();
-        #[idx8] {
-            gameloop.draw_entities();
-        }
-        idx16();
-
-        metasprites.finalize_buffer();
-
-        // VBlank
-        {
-            push8(program_bank);
-            data_bank = pop8();
-        // DB = 0x80
-
-            wait_until_interrupt();
-
-            metasprites.update_oam__vblank();
-
-            snes.ppu.brightness = a = 0xf;
-
-            push8(a = 0x7e);
-            data_bank = pop8();
-        // DB = 0x7e
-        }
+        gameloop.run_game();
     }
 }
 
