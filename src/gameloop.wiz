@@ -197,9 +197,17 @@ func setup_ppu_and_reset_graphics_subsystems() {
     draw_entities();
 
 
-    // ::TODO fadein::
+    // Fade in
+    {
+        a = 0 as u8;
+        do {
+            push8(a);
+            wait_frame_and_change_brightness(a);
 
-    wait_frame_and_change_brightness(0xf);
+            a = pop8();
+            a++;
+        } while a != 16;
+    }
 }
 
 
@@ -283,7 +291,7 @@ inline func _change_room_north() {
         entities.player.yPos.px = a = DISPLAY_HEIGHT - 2;
         entities.player.yPos.sx = 0;
 
-        _room_transition__blank();
+        _room_transition__fadeout();
     }
 }
 
@@ -302,7 +310,7 @@ inline func _change_room_south() {
         entities.player.yPos.px = a = 1;
         entities.player.yPos.sx = 0;
 
-        _room_transition__blank();
+        _room_transition__fadeout();
     }
 }
 
@@ -322,7 +330,7 @@ inline func _change_room_east() {
         entities.player.xPos.px = a = 1;
         entities.player.xPos.sx = 0;
 
-        _room_transition__blank();
+        _room_transition__fadeout();
     }
 }
 
@@ -342,7 +350,7 @@ inline func _change_room_west() {
         entities.player.xPos.px = a = DISPLAY_WIDTH - 2;
         entities.player.xPos.sx = 0;
 
-        _room_transition__blank();
+        _room_transition__fadeout();
     }
 }
 
@@ -352,13 +360,28 @@ inline func _change_room_west() {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _room_transition__blank() {
+func _room_transition__fadeout() {
 
-    wait_frame_and_change_brightness(0x08);
+    // Fadeout while loading next room
 
+    wait_frame_and_change_brightness(14);
     _load_room();
+
+    wait_frame_and_change_brightness(13);
     metatiles.populate_map_tile_properties();
+
+    wait_frame_and_change_brightness(12);
     _spawn_room_entities();
+
+    // Continue Fadeout
+    a = 11;
+    do {
+        push8(a);
+        wait_frame_and_change_brightness(a);
+
+        a = pop8();
+        a--;
+    } while !negative;
 
 
     setup_ppu_and_reset_graphics_subsystems();
