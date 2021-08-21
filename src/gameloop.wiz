@@ -232,23 +232,8 @@ func run_game() {
         draw_entities();
 
 
+        _check_for_room_transition();
 
-        // Check for a room transition
-        a = entities.player.yPos.px;
-        if zero {
-            _change_room_north();
-        }
-        else if a >= DISPLAY_HEIGHT - 1 {
-            _change_room_south();
-        }
-
-        a = entities.player.xPos.px;
-        if zero {
-            _change_room_west();
-        }
-        else if a >= DISPLAY_WIDTH - 1 {
-            _change_room_east();
-        }
 
         wait_frame();
     }
@@ -274,6 +259,37 @@ func draw_entities() {
         metasprites.finalize_buffer();
     }
     idx8();
+}
+
+
+
+// Check for a room transition and preform them as required.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _check_for_room_transition() {
+
+    a = entities.player.yPos.px;
+    if zero {
+        _change_room_north();
+
+        // Do not check x axis after loading next room
+        return;
+    }
+    else if a >= DISPLAY_HEIGHT - 1 {
+        _change_room_south();
+
+        // Do not check x axis after loading next room
+        return;
+    }
+
+    a = entities.player.xPos.px;
+    if zero {
+        _change_room_west();
+    }
+    else if a >= DISPLAY_WIDTH - 1 {
+        _change_room_east();
+    }
 }
 
 
