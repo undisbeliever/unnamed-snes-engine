@@ -7,10 +7,8 @@ BINARY := game.sfc
 MAKEFLAGS += --no-builtin-rules
 
 
-rwildcard_all = $(foreach d,$(wildcard $(addsuffix /*,$(1))),$d $(call rwildcard_all, $d))
 
-
-SOURCES	  := $(call rwildcard_all, src)
+SOURCES	  := $(wildcard src/*.wiz src/*/*.wiz)
 RESOURCES :=
 
 8BPP_TILES_SRC	 := $(wildcard resources/*/*8bpp-tiles.png)
