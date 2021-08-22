@@ -4,6 +4,7 @@
 import "memmap";
 import "resources";
 import "gameloop";
+import "wait-frame";
 import "../wiz/common/snes/snes";
 
 import "entities/_variables";
@@ -162,7 +163,7 @@ let _tilesetPtr = dpTmp_farPtr;
 //
 // REQUIRES: Force-Blank, Tileset loaded into memory.
 //
-// DB = unknown
+// DB = 0x7e
 #[mem8, idx8]
 func draw_map__forceblank() {
 let _rowsLeft    = <:dpTmp0;
@@ -179,15 +180,6 @@ let _columnsLeft = >:dpTmp0;
     snes.ppu.vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
     snes.ppu.vram_address_l = <:VRAM_BG1_MAP_WADDR;
     snes.ppu.vram_address_h = >:VRAM_BG1_MAP_WADDR;
-
-
-    // Reset BG1 scroll
-    snes.ppu.bg1_scroll_x = 0;
-    snes.ppu.bg1_scroll_x = 0;
-
-    a = 0xff;
-    snes.ppu.bg1_scroll_y = a;
-    snes.ppu.bg1_scroll_y = a;
 
 
 
@@ -240,6 +232,10 @@ let _columnsLeft = >:dpTmp0;
 
 
     data_bank = pop8();
+// DB = 0x7e
+
+
+    transitions._reset_state();
 }
 
 
@@ -480,6 +476,544 @@ let _bottom = <:dpTmp1;
 
 }
 
+
+// Transitions
+// ===========
+
+namespace transitions {
+
+let TRANSITION_SPEED = 8;
+
+
+in wram7e {
+    // Map position within the current transition
+    // (byte index)
+    var mapPos : u8;
+
+
+    // Variable to determine which of the two tilemaps the current map is drawn to.
+    //
+    //  * zero value = VRAM_BG1_MAP_WADDR
+    //  * non-zero value = VRAM_BG1_MAP_WADDR + 0x400
+    //
+    //
+    // This flag MUST only be changed by `_reset_state()` and `swap_currentTilemap()`.
+    //
+    // (byte flag)
+    var currentTilemap : u8;
+
+
+    // The tilemap row (within VRAM) that matches the top row of the room map.
+    //
+    // This value should be masked by `topmostRowInVram_MASK` whenever it is used to calculate a VRAM address.
+    //
+    // (byte)
+    var topmostRowInVram : u8;
+
+    let topmostRowInVram_MASK = 0x1f;
+
+
+    // A buffer containing a single row/column to transfer to VRAM.
+    var buffer : [u8 ; 32 * 2];
+}
+
+
+in shadow {
+    // `VMAIN` register to use when transferring the buffer to VRAM.
+    //
+    // NOTE: If this value is 0 then no buffer will be transferred.
+    //
+    // (byte)
+    var buffer_vram_control : u8;
+
+
+    // VRAM word position to store the buffer to.
+    //
+    // NOTE: This variable is handled differently in horizontal and vertical transitions.
+    //
+    // (word)
+    var buffer_vramWordPos : u16;
+
+    // ::ANNOY why do I have to do this?::
+    // ::: Used to work around a "could not generate code for assignment `=` (got: `a = *(8269313 as *u8)` (mem8, idx8))" error::
+    let buffer_vramWordPos_l = *(&<:buffer_vramWordPos as *u8);
+    let buffer_vramWordPos_h = *(&>:buffer_vramWordPos as *u8);
+}
+
+
+in code {
+
+
+
+// Transfer the buffer to VRAM if required.
+//
+// REQUIRES: V-Blank
+//
+// Uses DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+func transfer_buffer__vblank() {
+    a = buffer_vram_control;
+    if !zero {
+        snes.ppu.vram_control = a;
+
+        snes.ppu.vram_address_hl = xx = buffer_vramWordPos;
+
+        snes.dma0.control = a = snes.dma.CONTROL_MODE_AB;
+        snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
+
+        snes.dma0.src_address_hl = xx = &buffer as u16;
+        snes.dma0.src_address_bank = a = #:far &buffer;
+
+        snes.dma0.mdma_size_hl = xx = sizeof(typeof(buffer));
+
+        snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+
+
+        // Do not transfer buffer on the next frame
+        buffer_vram_control = 0;
+    }
+}
+
+
+
+// Reset internal state and scroll positions.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _reset_state() {
+    transitions.currentTilemap = 0;
+    transitions.topmostRowInVram = 0;
+
+    // Reset BG1 scroll
+    *(&<:bg1_scrollX as *u8) = 0;
+    *(&>:bg1_scrollX as *u8) = 0;
+
+    a = 0xff;
+    *(&<:bg1_scrollY as *u8) = a;
+    *(&>:bg1_scrollY as *u8) = a;
+}
+
+
+
+// Horizontal Transitions
+// ----------------------
+
+
+// Invert the `currentTilemap` flag.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func swap_currentTilemap() {
+    currentTilemap = a = currentTilemap ^ 0xff;
+}
+
+
+
+// Fill the buffer with the right half of a MetaTile column and queue a transfer during VBlank.
+//
+// REQUIRES: buffer_vramWordPos set.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _draw_left_column() {
+let _tmp = <:dpTmp0;
+
+    y = a = (topmostRowInVram & topmostRowInVram_MASK) << 1;
+
+    a = mapPos;
+
+    do {
+        _tmp = a;
+
+        x = a = map[x = a];
+
+        buffer[y++] = a = tileset.topLeft_low[x];
+        buffer[y++] = a = tileset.topLeft_high[x];
+        buffer[y++] = a = tileset.bottomLeft_low[x];
+        buffer[y++] = a = tileset.bottomLeft_high[x];
+
+        if y == sizeof(typeof(buffer)) {
+            y = 0;
+        }
+
+        a = _tmp + 0x10;
+    }
+    while a < MAP_HEIGHT * MAP_WIDTH;
+
+
+    buffer_vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_32 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
+}
+
+
+
+// Fill the buffer with the right half of a MetaTile column and queue a transfer during VBlank.
+//
+// REQUIRES: buffer_vramWordPos set.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _draw_right_column() {
+let _tmp = <:dpTmp0;
+
+    y = a = (topmostRowInVram & topmostRowInVram_MASK) << 1;
+
+    a = mapPos;
+
+    do {
+        _tmp = a;
+
+        x = a = map[x = a];
+
+        buffer[y++] = a = tileset.topRight_low[x];
+        buffer[y++] = a = tileset.topRight_high[x];
+        buffer[y++] = a = tileset.bottomRight_low[x];
+        buffer[y++] = a = tileset.bottomRight_high[x];
+
+        if y == sizeof(typeof(buffer)) {
+            y = 0;
+        }
+
+        a = _tmp + 0x10;
+    }
+    while a < MAP_HEIGHT * MAP_WIDTH;
+
+
+    buffer_vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_32 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
+}
+
+
+
+// Initialize a scroll right transition.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_right__setup() {
+
+    mapPos = 0;
+
+
+    // Determine the next VRAM position
+    let VRAM_OFFSET = 0;
+
+    // Subtract one to counter the +1 at the start of `right__process()`
+    *(&<:buffer_vramWordPos as *u8) = a = <:(VRAM_BG1_MAP_WADDR + VRAM_OFFSET - 1);
+
+    a = currentTilemap;
+    if !zero {
+        a = >:(VRAM_BG1_MAP_WADDR + VRAM_OFFSET);
+    }
+    else {
+        a = >:(VRAM_BG1_MAP_WADDR + VRAM_OFFSET + 0x400);
+    }
+    *(&>:buffer_vramWordPos as *u8) = a;
+}
+
+
+
+// Process a scroll right transition.
+//
+// This function is to be called once per frame until the transition has completed.
+//
+// Returns true if transition is complete.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_right__process() : bool in carry {
+
+    *(&<:bg1_scrollX as *u8) = a = *(&<:bg1_scrollX as *u8) + TRANSITION_SPEED;
+    if carry {
+        (*(&>:bg1_scrollX as *u8))++;
+    }
+
+
+    a = buffer_vramWordPos_l;
+    a++;
+    buffer_vramWordPos_l = a;
+
+    if a & 1 == 0 {
+        _draw_left_column();
+    }
+    else {
+        _draw_right_column();
+
+        mapPos++;
+    }
+
+
+    a = mapPos;
+    if a == MAP_WIDTH {
+        swap_currentTilemap();
+
+        return true;
+    }
+
+    return false;
+}
+
+
+
+// Initialize a scroll left transition.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_left__setup() {
+
+    mapPos = a = 0xf;
+
+    // Determine the next VRAM position
+    let VRAM_OFFSET = 31;
+
+    // Add one to counter the -1 at the start of `left__process()`
+    *(&<:buffer_vramWordPos as *u8) = a = <:(VRAM_BG1_MAP_WADDR + VRAM_OFFSET + 1);
+
+    a = currentTilemap;
+    if !zero {
+        a = >:(VRAM_BG1_MAP_WADDR + VRAM_OFFSET);
+    }
+    else {
+        a = >:(VRAM_BG1_MAP_WADDR + VRAM_OFFSET + 0x400);
+    }
+    *(&>:buffer_vramWordPos as *u8) = a;
+}
+
+
+
+// Process a scroll left transition.
+//
+// This function is to be called once per frame until the transition has completed.
+//
+// Returns true if transition is complete.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_left__process() : bool in carry {
+
+    *(&<:bg1_scrollX as *u8) = a = *(&<:bg1_scrollX as *u8) - TRANSITION_SPEED;
+    if !carry {
+        (*(&>:bg1_scrollX as *u8))--;
+    }
+
+
+    a = buffer_vramWordPos_l;
+    a--;
+    buffer_vramWordPos_l = a;
+
+    if a & 1 != 0 {
+        _draw_right_column();
+    }
+    else {
+        _draw_left_column();
+
+        mapPos--;
+    }
+
+
+    a = mapPos;
+    if negative {
+        swap_currentTilemap();
+
+        return true;
+    }
+
+    return false;
+}
+
+
+
+// Vertical Transitions
+// --------------------
+
+
+
+// Calculate the `buffer_vramWordPos` value to use for a vertical scroll transition.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _calculate_vram_position_for_row(tilemapRow : u8 in a) {
+    mem16();
+    #[mem16] {
+        aa = (aa & topmostRowInVram_MASK) << 5;
+
+        #[compile_if(VRAM_BG1_MAP_WADDR != 0)] {
+            aa += VRAM_BG1_MAP_WADDR;
+        }
+
+        x = currentTilemap;
+        if !zero {
+            aa += 0x400;
+        }
+
+        buffer_vramWordPos = aa;
+    }
+    mem8();
+}
+
+
+
+// Fill the buffer with the top half of a MetaTile row and queue a transfer during VBlank.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _draw_top_row(tilemapRow : u8 in a) {
+let _tmp = <:dpTmp0;
+
+    _calculate_vram_position_for_row(a);
+
+
+    y = 0;
+    a = mapPos;
+
+    do {
+        _tmp = a;
+
+        x = a = map[x = a];
+
+        buffer[y++] = a = tileset.topLeft_low[x];
+        buffer[y++] = a = tileset.topLeft_high[x];
+        buffer[y++] = a = tileset.topRight_low[x];
+        buffer[y++] = a = tileset.topRight_high[x];
+
+        a = _tmp;
+        a++;
+    }
+    while y < sizeof(typeof(buffer));
+
+
+    buffer_vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
+}
+
+
+
+// Fill the buffer with the bottom half of a MetaTile row and queue a transfer during VBlank.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _draw_bottom_row(tilemapRow : u8 in a) {
+let _tmp = <:dpTmp0;
+
+    _calculate_vram_position_for_row(a);
+
+
+    y = 0;
+    a = mapPos;
+
+    do {
+        _tmp = a;
+
+        x = a = map[x = a];
+
+        buffer[y++] = a = tileset.bottomLeft_low[x];
+        buffer[y++] = a = tileset.bottomLeft_high[x];
+        buffer[y++] = a = tileset.bottomRight_low[x];
+        buffer[y++] = a = tileset.bottomRight_high[x];
+
+        a = _tmp;
+        a++;
+    }
+    while y < sizeof(typeof(buffer));
+
+
+    buffer_vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
+}
+
+
+
+// Initialize a scroll down transition.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_down__setup() {
+
+    mapPos = 0;
+}
+
+
+
+// Process a scroll down transition.
+//
+// This function is to be called once per frame until the transition has completed.
+//
+// Returns true if transition is complete.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_down__process() : bool in carry {
+
+    *(&<:bg1_scrollY as *u8) = a = *(&<:bg1_scrollY as *u8) + TRANSITION_SPEED;
+
+
+    a = topmostRowInVram;
+    a++;
+    topmostRowInVram = a;
+
+    if a & 1 != 0 {
+        _draw_top_row(a + MAP_HEIGHT * 2 - 1);
+    }
+    else {
+        _draw_bottom_row(a + MAP_HEIGHT * 2 - 1);
+
+        mapPos = a = mapPos + MAP_WIDTH;
+
+        if a >= MAP_WIDTH * MAP_HEIGHT {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+
+
+// Initialize a scroll up transition.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_up__setup() {
+
+    mapPos = a = MAP_WIDTH * (MAP_HEIGHT - 1);
+}
+
+
+
+// Process a scroll up transition.
+//
+// This function is to be called once per frame until the transition has completed.
+//
+// Returns true if transition is complete.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_up__process() : bool in carry {
+
+    *(&<:bg1_scrollY as *u8) = a = *(&<:bg1_scrollY as *u8) - TRANSITION_SPEED;
+
+
+    a = topmostRowInVram;
+    a--;
+    topmostRowInVram = a;
+
+    if a & 1 != 0 {
+        _draw_bottom_row(a);
+    }
+    else {
+        _draw_top_row(a);
+
+        mapPos = a = mapPos - 0x10;
+
+        if a >= MAP_WIDTH * MAP_HEIGHT{
+            return true;
+        }
+    }
+
+    return false;
+}
+
+}
+
+}
 }
 
 

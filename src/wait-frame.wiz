@@ -3,12 +3,20 @@
 
 import "memmap";
 import "metasprites";
+import "metatiles";
 import "../wiz/common/snes/snes";
 
 
 in shadow {
     // A shadow of the INIDISP register
     var _brightness_buffer : u8;
+
+
+    // A shadow of the BG1 scroll registers.
+    //
+    // (2x u16 words)
+    var bg1_scrollX : u16;
+    var bg1_scrollY : u16;
 }
 
 
@@ -41,6 +49,16 @@ func wait_frame() {
 
 
         metasprites.update_oam__vblank();
+
+        metatiles.transitions.transfer_buffer__vblank();
+
+
+        // Update scroll registers
+
+        snes.ppu.bg1_scroll_x = a = *(&<:bg1_scrollX as *u8);
+        snes.ppu.bg1_scroll_x = a = *(&>:bg1_scrollX as *u8);
+        snes.ppu.bg1_scroll_y = a = *(&<:bg1_scrollY as *u8);
+        snes.ppu.bg1_scroll_y = a = *(&>:bg1_scrollY as *u8);
 
 
         snes.ppu.brightness = a = _brightness_buffer;

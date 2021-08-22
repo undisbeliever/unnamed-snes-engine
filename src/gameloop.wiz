@@ -21,6 +21,9 @@ let DISPLAY_WIDTH = 256;
 let DISPLAY_HEIGHT = 224;
 
 
+let PLAYER_MAP_TRANSITION_END_POS = 3;
+
+
 let ENTITIES_IN_MAP = 8;
 
 // Map data format
@@ -71,20 +74,16 @@ inline func init() {
     currentRoom = a = resources.rooms.STARTING_ROOM;
 
 
-    _load_room();
-
-    metatiles.populate_map_tile_properties();
-
-    _spawn_room_entities();
+    _load_room_and_check_if_ok_to_scroll();
 }
 
 
 
-// Load a room into memory
+// Load the room into memory
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _load_room() {
+func __copy_room_into_memory() {
 let _tmp = <:dpTmp0;
 let _roomPtr = dpTmp_farPtr;
 
@@ -109,6 +108,29 @@ let _roomPtr = dpTmp_farPtr;
     } while !zero;
 
     (&room as *u8)[0] = a = *_roomPtr;
+}
+
+
+
+// Load the room into memory and check if the MetaTile tileset has changed.
+//
+// Returns zero set if it is OK to preform a scroll transition into the next room without glitches.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _load_room_and_check_if_ok_to_scroll() : bool in zero {
+
+    push8(a = room.tileset);
+    {
+        __copy_room_into_memory();
+
+        metatiles.populate_map_tile_properties();
+        _spawn_room_entities();
+    }
+    a = pop8();
+
+    cmp(a, room.tileset);
+    return zero;
 }
 
 
@@ -274,13 +296,13 @@ inline func _check_for_room_transition() {
         _change_room_north();
 
         // Do not check x axis after loading next room
-        return;
+        ^return;
     }
     else if a >= DISPLAY_HEIGHT - 1 {
         _change_room_south();
 
         // Do not check x axis after loading next room
-        return;
+        ^return;
     }
 
     a = entities.player.xPos.px;
@@ -304,10 +326,16 @@ inline func _change_room_north() {
     if carry {
         currentRoom = a;
 
-        entities.player.yPos.px = a = DISPLAY_HEIGHT - 2;
-        entities.player.yPos.sx = 0;
+        zero = _load_room_and_check_if_ok_to_scroll();
+        if zero {
+            _room_transition__scroll_up();
+        }
+        else {
+            entities.player.yPos.px = a = DISPLAY_HEIGHT - 1 - PLAYER_MAP_TRANSITION_END_POS;
+            entities.player.yPos.sx = 0;
 
-        _room_transition__fadeout();
+            _room_transition__fadeout();
+        }
     }
 }
 
@@ -323,10 +351,16 @@ inline func _change_room_south() {
     if !carry {
         currentRoom = a;
 
-        entities.player.yPos.px = a = 1;
-        entities.player.yPos.sx = 0;
+        zero = _load_room_and_check_if_ok_to_scroll();
+        if zero {
+            _room_transition__scroll_down();
+        }
+        else {
+            entities.player.yPos.px = a = PLAYER_MAP_TRANSITION_END_POS;
+            entities.player.yPos.sx = 0;
 
-        _room_transition__fadeout();
+            _room_transition__fadeout();
+        }
     }
 }
 
@@ -343,10 +377,16 @@ inline func _change_room_east() {
         // Can move eastward
         currentRoom++;
 
-        entities.player.xPos.px = a = 1;
-        entities.player.xPos.sx = 0;
+        zero = _load_room_and_check_if_ok_to_scroll();
+        if zero {
+            _room_transition__scroll_right();
+        }
+        else {
+            entities.player.xPos.px = a = PLAYER_MAP_TRANSITION_END_POS;
+            entities.player.xPos.sx = 0;
 
-        _room_transition__fadeout();
+            _room_transition__fadeout();
+        }
     }
 }
 
@@ -363,10 +403,16 @@ inline func _change_room_west() {
         // Can move westward
         currentRoom--;
 
-        entities.player.xPos.px = a = DISPLAY_WIDTH - 2;
-        entities.player.xPos.sx = 0;
+        zero = _load_room_and_check_if_ok_to_scroll();
+        if zero {
+            _room_transition__scroll_left();
+        }
+        else {
+            entities.player.xPos.px = a = DISPLAY_WIDTH - 1 - PLAYER_MAP_TRANSITION_END_POS;
+            entities.player.xPos.sx = 0;
 
-        _room_transition__fadeout();
+            _room_transition__fadeout();
+        }
     }
 }
 
@@ -374,23 +420,16 @@ inline func _change_room_west() {
 
 // Blank the screen, then load the next room and resources.
 //
+// ASSUMES: next room is loaded in memory
+//
 // DB = 0x7e
 #[mem8, idx8]
 func _room_transition__fadeout() {
 
-    // Fadeout while loading next room
+    _load_room_and_check_if_ok_to_scroll();
 
-    wait_frame_and_change_brightness(14);
-    _load_room();
-
-    wait_frame_and_change_brightness(13);
-    metatiles.populate_map_tile_properties();
-
-    wait_frame_and_change_brightness(12);
-    _spawn_room_entities();
-
-    // Continue Fadeout
-    a = 11;
+    // Fadeout
+    a = 15;
     do {
         push8(a);
         wait_frame_and_change_brightness(a);
@@ -400,9 +439,151 @@ func _room_transition__fadeout() {
     } while !negative;
 
 
+    // ::TODO check if player is on a non-solid tile::
+
+
     setup_ppu_and_reset_graphics_subsystems();
 }
 
+
+
+// Scroll right room transition.
+//
+// ASSUMES: next room is loaded in memory
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _room_transition__scroll_right() {
+
+    entities.player.xPos.sx = 0;
+
+
+    metatiles.transitions.scroll_right__setup();
+
+
+    do {
+        wait_frame();
+
+        a = entities.player.xPos.px - metatiles.transitions.TRANSITION_SPEED;
+        if !carry { a = PLAYER_MAP_TRANSITION_END_POS; }
+        entities.player.xPos.px = a;
+
+        // ::TODO check if player is on a non-solid tile::
+
+
+        draw_entities();
+
+
+        carry = metatiles.transitions.scroll_right__process();
+    }
+    while !carry;
+}
+
+
+
+// Scroll left room transition.
+//
+// ASSUMES: next room is loaded in memory
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _room_transition__scroll_left() {
+
+    entities.player.xPos.sx = 0;
+
+
+    metatiles.transitions.scroll_left__setup();
+
+
+    do {
+        wait_frame();
+
+        a = entities.player.xPos.px + metatiles.transitions.TRANSITION_SPEED;
+        if carry { a = DISPLAY_WIDTH - 1 - PLAYER_MAP_TRANSITION_END_POS; }
+        entities.player.xPos.px = a;
+
+        // ::TODO check if player is on a non-solid tile::
+
+
+        draw_entities();
+
+
+        carry = metatiles.transitions.scroll_left__process();
+    }
+    while !carry;
+}
+
+
+
+// Scroll down room transition.
+//
+// ASSUMES: next room is loaded in memory
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _room_transition__scroll_down() {
+
+
+    entities.player.xPos.sx = 0;
+
+
+    metatiles.transitions.scroll_down__setup();
+
+
+    do {
+        wait_frame();
+
+        a = entities.player.yPos.px - metatiles.transitions.TRANSITION_SPEED;
+        if !carry { a = PLAYER_MAP_TRANSITION_END_POS; }
+        entities.player.yPos.px = a;
+
+        // ::TODO check if player is on a non-solid tile::
+
+
+        draw_entities();
+
+
+        carry = metatiles.transitions.scroll_down__process();
+    }
+    while !carry;
+}
+
+
+
+// Scroll up room transition.
+//
+// ASSUMES: next room is loaded in memory
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _room_transition__scroll_up() {
+
+let MAX_PLAYER_YPOS = DISPLAY_HEIGHT - 1 - PLAYER_MAP_TRANSITION_END_POS;
+
+
+    entities.player.xPos.sx = 0;
+
+
+    metatiles.transitions.scroll_up__setup();
+
+
+    do {
+        wait_frame();
+
+        a = entities.player.yPos.px + metatiles.transitions.TRANSITION_SPEED;
+        if a >= MAX_PLAYER_YPOS + 1 { a = MAX_PLAYER_YPOS; }
+        entities.player.yPos.px = a;
+
+        // ::TODO check if player is on a non-solid tile::
+
+
+        draw_entities();
+
+
+        carry = metatiles.transitions.scroll_up__process();
+    }
+    while !carry;
+}
 
 
 
