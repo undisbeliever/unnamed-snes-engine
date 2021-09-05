@@ -258,6 +258,22 @@ func populate_map_tile_properties() {
 
 
 
+// Check if a tile at a given position is solid
+//
+// DB = 0x7e
+#[mem8, idx8]
+func check_tile_solid(xPos : u8 in x, yPos : u8 in y) : bool in negative {
+let _tmp    = <:dpTmp0;
+
+    _tmp = a = x >>> 4;
+    x = a = (y & 0xf0) + _tmp;
+
+    bit(mapTileProperties[x]);
+    return negative;
+}
+
+
+
 // Add velocity to the entity's position and preform a collision test.
 //
 // OUTPUT: entities.SoA.movementState bits will be set if there is a collision, otherwise cleared.
@@ -754,6 +770,29 @@ func scroll_right__process() : bool in carry {
 
 
 
+// Rollback a scroll right transition.
+//
+// This function is to be called once per frame until it returns true.
+//
+// Returns true if transition is complete.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func scroll_right__rollback() : bool in zero {
+
+    // no need to draw tiles, only need to change scroll.
+
+    *(&<:bg1_scrollX as *u8) = a = *(&<:bg1_scrollX as *u8) - TRANSITION_SPEED;
+    if !carry {
+        (*(&>:bg1_scrollX as *u8))--;
+    }
+
+    x = a;
+    return zero;
+}
+
+
+
 // Initialize a scroll left transition.
 //
 // DB = 0x7e
@@ -818,6 +857,29 @@ func scroll_left__process() : bool in carry {
     }
 
     return false;
+}
+
+
+
+// Rollback a scroll left transition.
+//
+// This function is to be called once per frame until it returns true.
+//
+// Returns true if transition is complete.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func scroll_left__rollback() : bool in zero {
+
+    // no need to draw tiles, only need to change scroll.
+
+    *(&<:bg1_scrollX as *u8) = a = *(&<:bg1_scrollX as *u8) + TRANSITION_SPEED;
+    if carry {
+        (*(&>:bg1_scrollX as *u8))++;
+    }
+
+    x = a;
+    return zero;
 }
 
 

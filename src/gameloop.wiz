@@ -21,7 +21,15 @@ let DISPLAY_WIDTH = 256;
 let DISPLAY_HEIGHT = 224;
 
 
+let FRAMES_PER_SECOND = 60;
+
+
 let PLAYER_MAP_TRANSITION_END_POS = 3;
+
+// Value MUST BE odd
+let H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK = 13;
+let V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK = 11;
+
 
 
 let ENTITIES_IN_MAP = 8;
@@ -316,6 +324,26 @@ inline func _check_for_room_transition() {
 
 
 
+// Pause the game for a second
+//
+// DB = 0x7e
+#[mem8, idx8]
+func wait_one_second() {
+
+    a = FRAMES_PER_SECOND;
+
+    do {
+        push8(a);
+
+        wait_frame();
+
+        a = pop8();
+        a--;
+    } while !zero;
+}
+
+
+
 // The player has reached the top of the screen and wants to enter the room above the `currentRoom`.
 //
 // DB = 0x7e
@@ -456,6 +484,7 @@ func _room_transition__fadeout() {
 inline func _room_transition__scroll_right() {
 
     entities.player.xPos.sx = 0;
+    entities.player.xPos.px = a = DISPLAY_WIDTH - 1;
 
 
     metatiles.transitions.scroll_right__setup();
@@ -464,11 +493,27 @@ inline func _room_transition__scroll_right() {
     do {
         wait_frame();
 
+        a = entities.player.xPos.px;
+        if a == DISPLAY_WIDTH - 1 - H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED {
+            negative = metatiles.check_tile_solid(0, entities.player.yPos.px);
+            if negative {
+                // Tile is solid - cannot place player here
+                wait_one_second();
+
+                // Move left one room
+                currentRoom--;
+
+                // Rewind room transition
+                _load_room_and_check_if_ok_to_scroll();
+                _rollback_room_transition__scroll_right();
+
+                return;
+            }
+        }
+
         a = entities.player.xPos.px - metatiles.transitions.TRANSITION_SPEED;
         if !carry { a = PLAYER_MAP_TRANSITION_END_POS; }
         entities.player.xPos.px = a;
-
-        // ::TODO check if player is on a non-solid tile::
 
 
         draw_entities();
@@ -477,6 +522,32 @@ inline func _room_transition__scroll_right() {
         carry = metatiles.transitions.scroll_right__process();
     }
     while !carry;
+}
+
+
+
+// Rollback a partially completed scroll right room transition.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _rollback_room_transition__scroll_right() {
+
+    do {
+        wait_frame();
+
+        a = entities.player.xPos.px + metatiles.transitions.TRANSITION_SPEED;
+        if carry { a = DISPLAY_WIDTH - 1 - PLAYER_MAP_TRANSITION_END_POS; }
+        entities.player.xPos.px = a;
+
+
+        draw_entities();
+
+
+        zero = metatiles.transitions.scroll_right__rollback();
+    } while !zero;
+
+
+    entities.player.xPos.px = a = DISPLAY_WIDTH - 1 - PLAYER_MAP_TRANSITION_END_POS;
 }
 
 
@@ -490,6 +561,7 @@ inline func _room_transition__scroll_right() {
 inline func _room_transition__scroll_left() {
 
     entities.player.xPos.sx = 0;
+    entities.player.xPos.px = 0;
 
 
     metatiles.transitions.scroll_left__setup();
@@ -498,11 +570,30 @@ inline func _room_transition__scroll_left() {
     do {
         wait_frame();
 
+
+        a = entities.player.xPos.px;
+        if a == H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED {
+            negative = metatiles.check_tile_solid(0xff, entities.player.yPos.px);
+            if negative {
+                // Tile is solid - cannot place player here
+                wait_one_second();
+
+                // Move right one room
+                currentRoom++;
+
+                // Rewind room transition
+                _load_room_and_check_if_ok_to_scroll();
+                _rollback_room_transition__scroll_left();
+
+                return;
+            }
+        }
+
+
+
         a = entities.player.xPos.px + metatiles.transitions.TRANSITION_SPEED;
         if carry { a = DISPLAY_WIDTH - 1 - PLAYER_MAP_TRANSITION_END_POS; }
         entities.player.xPos.px = a;
-
-        // ::TODO check if player is on a non-solid tile::
 
 
         draw_entities();
@@ -515,6 +606,32 @@ inline func _room_transition__scroll_left() {
 
 
 
+// Rollback a partially completed scroll left room transition.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _rollback_room_transition__scroll_left() {
+
+    do {
+        wait_frame();
+
+        a = entities.player.xPos.px - metatiles.transitions.TRANSITION_SPEED;
+        if !carry { a = PLAYER_MAP_TRANSITION_END_POS; }
+        entities.player.xPos.px = a;
+
+
+        draw_entities();
+
+
+        zero = metatiles.transitions.scroll_left__rollback();
+    } while !zero;
+
+
+    entities.player.xPos.px = a = PLAYER_MAP_TRANSITION_END_POS;
+}
+
+
+
 // Scroll down room transition.
 //
 // ASSUMES: next room is loaded in memory
@@ -523,21 +640,46 @@ inline func _room_transition__scroll_left() {
 #[mem8, idx8]
 inline func _room_transition__scroll_down() {
 
-
-    entities.player.xPos.sx = 0;
+    entities.player.yPos.sx = 0;
+    entities.player.yPos.px = a = DISPLAY_HEIGHT - 1;
 
 
     metatiles.transitions.scroll_down__setup();
 
+    _room_transition__scroll_down__loop();
+}
 
+
+
+// Process a scroll down room transition (or rollback a scroll up room transition)
+//
+// ASSUMES: `metatiles.transitions.scroll_down__setup()` or `metatiles.transitions.scroll_up__setup()` has been called.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _room_transition__scroll_down__loop() {
     do {
         wait_frame();
+
+        a = entities.player.yPos.px;
+        if a == DISPLAY_HEIGHT - 1 - V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED {
+            negative = metatiles.check_tile_solid(entities.player.xPos.px, 0);
+            if negative {
+                // Tile is solid - cannot place player here
+                wait_one_second();
+
+                // Move up one room
+                currentRoom = a = currentRoom - 0x10;
+
+                // Rewind down transition
+                _load_room_and_check_if_ok_to_scroll();
+                return _room_transition__scroll_up__loop();
+            }
+        }
 
         a = entities.player.yPos.px - metatiles.transitions.TRANSITION_SPEED;
         if !carry { a = PLAYER_MAP_TRANSITION_END_POS; }
         entities.player.yPos.px = a;
-
-        // ::TODO check if player is on a non-solid tile::
 
 
         draw_entities();
@@ -546,6 +688,9 @@ inline func _room_transition__scroll_down() {
         carry = metatiles.transitions.scroll_down__process();
     }
     while !carry;
+
+
+    entities.player.yPos.px = a = PLAYER_MAP_TRANSITION_END_POS;
 }
 
 
@@ -558,24 +703,50 @@ inline func _room_transition__scroll_down() {
 #[mem8, idx8]
 inline func _room_transition__scroll_up() {
 
-let MAX_PLAYER_YPOS = DISPLAY_HEIGHT - 1 - PLAYER_MAP_TRANSITION_END_POS;
-
-
-    entities.player.xPos.sx = 0;
+    entities.player.yPos.sx = 0;
+    entities.player.yPos.px = 0;
 
 
     metatiles.transitions.scroll_up__setup();
 
+    _room_transition__scroll_up__loop();
+}
+
+
+
+// Process a scroll up room transition (or rollback a scroll down room transition)
+//
+// ASSUMES: `metatiles.transitions.scroll_down__setup()` or `metatiles.transitions.scroll_up__setup()` has been called.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _room_transition__scroll_up__loop() {
+
+let MAX_PLAYER_YPOS = DISPLAY_HEIGHT - 1 - PLAYER_MAP_TRANSITION_END_POS;
 
     do {
         wait_frame();
 
+        a = entities.player.yPos.px;
+        if a == V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED {
+            negative = metatiles.check_tile_solid(entities.player.xPos.px, DISPLAY_HEIGHT - 1);
+            if negative {
+                // Tile is solid - cannot place player here
+                wait_one_second();
+
+                // Move down one room
+                currentRoom = a = currentRoom + 0x10;
+
+                // Rewind up transition
+                _load_room_and_check_if_ok_to_scroll();
+                return _room_transition__scroll_down__loop();
+            }
+        }
+
+
         a = entities.player.yPos.px + metatiles.transitions.TRANSITION_SPEED;
         if a >= MAX_PLAYER_YPOS + 1 { a = MAX_PLAYER_YPOS; }
         entities.player.yPos.px = a;
-
-        // ::TODO check if player is on a non-solid tile::
-
 
         draw_entities();
 
@@ -583,8 +754,10 @@ let MAX_PLAYER_YPOS = DISPLAY_HEIGHT - 1 - PLAYER_MAP_TRANSITION_END_POS;
         carry = metatiles.transitions.scroll_up__process();
     }
     while !carry;
-}
 
+
+    entities.player.yPos.px = a = MAX_PLAYER_YPOS;
+}
 
 
 }
