@@ -1,0 +1,58 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "memmap";
+
+
+import "gameloop";
+
+
+enum GameModes : u8 {
+    RUN_GAME,
+
+    // Fadeout the screen, load a room, fadein the screen and start the gameloop.
+    // `currentRoom` contains room to load.
+    // To be used if the screen is blank.
+    LOAD_ROOM_FADEIN,
+
+    // Fadeout the screen, load a room, fadein the screen and start the gameloop.
+    //`currentRoom` contains room to load.
+    // To be used if the screen is active.
+    ROOM_TRANSITION_FADEOUT,
+
+    // Scroll transition to next room
+    // Will do a fadeout room transition if the room graphics are different to the current room.
+    ROOM_TRANSITION_SCROLL_LEFT,
+    ROOM_TRANSITION_SCROLL_RIGHT,
+    ROOM_TRANSITION_SCROLL_UP,
+    ROOM_TRANSITION_SCROLL_DOWN,
+};
+
+
+
+in shadow {
+    var     gameMode : GameModes;
+}
+
+
+
+in code {
+
+
+// MUST MATCH GameModes enum
+#[mem8, idx8]
+const gamemode_function_table : [func()] = [
+    gameloop.run_game,
+    gameloop.load_room__fadein,
+    gameloop.room_transition__fadeout,
+    gameloop.room_transition__scroll_left,
+    gameloop.room_transition__scroll_right,
+    gameloop.room_transition__scroll_up,
+    gameloop.room_transition__scroll_down,
+];
+
+let N_GAME_MODES = sizeof(typeof(gamemode_function_table)) / 2;
+
+
+}
+

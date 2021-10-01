@@ -4,6 +4,7 @@
 import "memmap";
 import "../wiz/common/snes/snes";
 
+import "gamemodes";
 import "metatiles";
 import "metasprites";
 import "resources";
@@ -82,7 +83,8 @@ inline func init() {
     currentRoom = a = resources.rooms.STARTING_ROOM;
 
 
-    _load_room_and_check_if_ok_to_scroll();
+    a = GameModes.LOAD_ROOM_FADEIN as u8;
+    gameMode = a as GameModes;
 }
 
 
@@ -177,11 +179,12 @@ func _spawn_room_entities() {
 //
 // ASSUMES: room and entities are loaded into memory
 //
-// NOTE: Enables Force-Blank
+// NOTE: Enables Force-Blank.
+// NOTE: MUST ONLY BE CALLED ONCE IN THE CODE
 //
 // DB = 0x7e
 #[mem8, idx8]
-func setup_ppu_and_reset_graphics_subsystems() {
+inline func _setup_ppu_and_reset_graphics_subsystems() {
 
     wait_frame_and_change_brightness(snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK);
 
@@ -222,36 +225,25 @@ func setup_ppu_and_reset_graphics_subsystems() {
 // DB = 0x7e
 
 
+    // Need to repopulate map_tile properties
+    metatiles.populate_map_tile_properties();
+
     metatiles.draw_map__forceblank();
 
     draw_entities();
-
-
-    // Fade in
-    {
-        a = 0 as u8;
-        do {
-            push8(a);
-            wait_frame_and_change_brightness(a);
-
-            a = pop8();
-            a++;
-        } while a != 16;
-    }
 }
 
 
 
 // Process the game loop
 //
+// ASSUMES: PPU setup and screen enabled
+//
 // DB = 0x7e
 #[mem8, idx8]
-func run_game() {
+func run_game {
 
-    setup_ppu_and_reset_graphics_subsystems();
-
-
-    ^while true {
+    ^do {
         // Always process player entity first
         x = 0;
         entities.SoA.process_function[unaligned x](x);
@@ -266,7 +258,13 @@ func run_game() {
 
 
         wait_frame();
-    }
+
+
+        // loop until gameMode changes
+
+        // ASSERT: GameModes.RUN_GAME == 0
+        a = gameMode as u8;
+    } while zero;
 }
 
 
@@ -301,24 +299,44 @@ inline func _check_for_room_transition() {
 
     a = entities.player.yPos.px;
     if zero {
-        _change_room_north();
+        // Check if there is a room above this one
+        a = currentRoom - 0x10;
+        if carry {
+            a = GameModes.ROOM_TRANSITION_SCROLL_UP as u8;
+            gameMode = a as GameModes;
+        }
 
         // Do not check x axis after loading next room
-        ^return;
+        return;
     }
     else if a >= DISPLAY_HEIGHT - 1 {
-        _change_room_south();
+        // Check if there is a room below this one
+        a = currentRoom + 0x10;
+        if !carry {
+            a = GameModes.ROOM_TRANSITION_SCROLL_DOWN as u8;
+            gameMode = a as GameModes;
+        }
 
         // Do not check x axis after loading next room
-        ^return;
+        return;
     }
 
     a = entities.player.xPos.px;
     if zero {
-        _change_room_west();
+        // Check if there is a room to the left of this one
+        a = currentRoom & 0x0f;
+        if !zero {
+            a = GameModes.ROOM_TRANSITION_SCROLL_LEFT as u8;
+            gameMode = a as GameModes;
+        }
     }
     else if a >= DISPLAY_WIDTH - 1 {
-        _change_room_east();
+        // Check if there is a room to the right of this one
+        a = currentRoom & 0x0f;
+        if a != 0x0f {
+            a = GameModes.ROOM_TRANSITION_SCROLL_RIGHT as u8;
+            gameMode = a as GameModes;
+        }
     }
 }
 
@@ -344,104 +362,60 @@ func wait_one_second() {
 
 
 
-// The player has reached the top of the screen and wants to enter the room above the `currentRoom`.
+// Load the room, fade in the screen
+//
+// ASSUMES: in Force-Blank
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func _change_room_north() {
+func load_room__fadein() {
 
-    a = currentRoom - 0x10;
-    if carry {
-        currentRoom = a;
+    _load_room_and_check_if_ok_to_scroll();
 
-        zero = _load_room_and_check_if_ok_to_scroll();
-        if zero {
-            _room_transition__scroll_up();
-        }
-        else {
-            entities.player.yPos.px = a = DISPLAY_HEIGHT - 1 - PLAYER_MAP_TRANSITION_END_POS;
-            entities.player.yPos.sx = 0;
-
-            _room_transition__fadeout();
-        }
-    }
+    return _room_transition__fadein__room_in_memory();
 }
 
 
 
-// The player has reached the bottom of the screen and wants to enter the room below the `currentRoom`.
+// Blank the screen, load graphics to PPU, fade in the screen, set gameMode to RUN_GAME.
+//
+// ASSUMES: room is loaded in memory
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func _change_room_south() {
+func _room_transition__fadein__room_in_memory() {
 
-    a = currentRoom + 0x10;
-    if !carry {
-        currentRoom = a;
+    _setup_ppu_and_reset_graphics_subsystems();
 
-        zero = _load_room_and_check_if_ok_to_scroll();
-        if zero {
-            _room_transition__scroll_down();
-        }
-        else {
-            entities.player.yPos.px = a = PLAYER_MAP_TRANSITION_END_POS;
-            entities.player.yPos.sx = 0;
 
-            _room_transition__fadeout();
-        }
+    // Fade in
+    {
+        a = 0 as u8;
+        do {
+            push8(a);
+            wait_frame_and_change_brightness(a);
+
+            a = pop8();
+            a++;
+        } while a != 16;
     }
+
+
+    gameMode = GameModes.RUN_GAME;
 }
 
 
 
-// The player has reached the right edge of the screen and wants to enter the room right of `currentRoom`.
+// Blank the screen, then load the next room and resources.
+//
+// INPUT: currentRoom is set to room to load
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func _change_room_east() {
+func room_transition__fadeout() {
+    _load_room_and_check_if_ok_to_scroll();
 
-    a = (currentRoom & 0x0f) + 1;
-    if !carry {
-        // Can move eastward
-        currentRoom++;
-
-        zero = _load_room_and_check_if_ok_to_scroll();
-        if zero {
-            _room_transition__scroll_right();
-        }
-        else {
-            entities.player.xPos.px = a = PLAYER_MAP_TRANSITION_END_POS;
-            entities.player.xPos.sx = 0;
-
-            _room_transition__fadeout();
-        }
-    }
-}
-
-
-
-// The player has reached the left edge of the screen and wants to enter the room left of `currentRoom`.
-//
-// DB = 0x7e
-#[mem8, idx8]
-inline func _change_room_west() {
-
-    a = (currentRoom & 0x0f) - 1;
-    if carry {
-        // Can move westward
-        currentRoom--;
-
-        zero = _load_room_and_check_if_ok_to_scroll();
-        if zero {
-            _room_transition__scroll_left();
-        }
-        else {
-            entities.player.xPos.px = a = DISPLAY_WIDTH - 1 - PLAYER_MAP_TRANSITION_END_POS;
-            entities.player.xPos.sx = 0;
-
-            _room_transition__fadeout();
-        }
-    }
+    return _room_transition__fadeout__room_in_memory();
 }
 
 
@@ -452,9 +426,7 @@ inline func _change_room_west() {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _room_transition__fadeout() {
-
-    _load_room_and_check_if_ok_to_scroll();
+func _room_transition__fadeout__room_in_memory() {
 
     // Fadeout
     a = 15;
@@ -467,28 +439,38 @@ func _room_transition__fadeout() {
     } while !negative;
 
 
+    _room_transition__fadein__room_in_memory();
+
+
     // ::TODO check if player is on a non-solid tile::
-
-
-    setup_ppu_and_reset_graphics_subsystems();
+    // ::: must be done AFTER tileset is loaded into memory::
 }
 
 
 
 // Scroll right room transition.
 //
-// ASSUMES: next room is loaded in memory
+// ASSUMES: There is a room to the right of this one.
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func _room_transition__scroll_right() {
+func room_transition__scroll_right() {
 
     entities.player.xPos.sx = 0;
     entities.player.xPos.px = a = DISPLAY_WIDTH - 1;
 
 
-    metatiles.transitions.scroll_right__setup();
+    currentRoom++;
 
+    zero = _load_room_and_check_if_ok_to_scroll();
+    if !zero {
+        entities.player.xPos.px = a = PLAYER_MAP_TRANSITION_END_POS;
+
+        return _room_transition__fadeout__room_in_memory();
+    }
+
+
+    metatiles.transitions.scroll_right__setup();
 
     do {
         wait_frame();
@@ -505,9 +487,7 @@ inline func _room_transition__scroll_right() {
 
                 // Rewind room transition
                 _load_room_and_check_if_ok_to_scroll();
-                _rollback_room_transition__scroll_right();
-
-                return;
+                return _rollback_room_transition__scroll_right();
             }
         }
 
@@ -522,6 +502,9 @@ inline func _room_transition__scroll_right() {
         carry = metatiles.transitions.scroll_right__process();
     }
     while !carry;
+
+
+    gameMode = GameModes.RUN_GAME;
 }
 
 
@@ -548,24 +531,36 @@ func _rollback_room_transition__scroll_right() {
 
 
     entities.player.xPos.px = a = DISPLAY_WIDTH - 1 - PLAYER_MAP_TRANSITION_END_POS;
+
+
+    gameMode = GameModes.RUN_GAME;
 }
 
 
 
 // Scroll left room transition.
 //
-// ASSUMES: next room is loaded in memory
+// ASSUMES: There is a room to the left of this one.
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func _room_transition__scroll_left() {
+func room_transition__scroll_left() {
 
     entities.player.xPos.sx = 0;
     entities.player.xPos.px = 0;
 
 
-    metatiles.transitions.scroll_left__setup();
+    currentRoom--;
 
+    zero = _load_room_and_check_if_ok_to_scroll();
+    if !zero {
+        entities.player.xPos.px = a = DISPLAY_WIDTH - 1 - PLAYER_MAP_TRANSITION_END_POS;
+
+        ^return _room_transition__fadeout__room_in_memory();
+    }
+
+
+    metatiles.transitions.scroll_left__setup();
 
     do {
         wait_frame();
@@ -583,9 +578,7 @@ inline func _room_transition__scroll_left() {
 
                 // Rewind room transition
                 _load_room_and_check_if_ok_to_scroll();
-                _rollback_room_transition__scroll_left();
-
-                return;
+                return _rollback_room_transition__scroll_left();
             }
         }
 
@@ -602,6 +595,9 @@ inline func _room_transition__scroll_left() {
         carry = metatiles.transitions.scroll_left__process();
     }
     while !carry;
+
+
+    gameMode = GameModes.RUN_GAME;
 }
 
 
@@ -628,25 +624,41 @@ func _rollback_room_transition__scroll_left() {
 
 
     entities.player.xPos.px = a = PLAYER_MAP_TRANSITION_END_POS;
+
+
+    gameMode = GameModes.RUN_GAME;
 }
 
 
 
 // Scroll down room transition.
 //
-// ASSUMES: next room is loaded in memory
+// ASSUMES: There is a room below this one.
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func _room_transition__scroll_down() {
+func room_transition__scroll_down() {
 
     entities.player.yPos.sx = 0;
     entities.player.yPos.px = a = DISPLAY_HEIGHT - 1;
 
 
+    currentRoom = a = currentRoom + 0x10;
+
+    zero = _load_room_and_check_if_ok_to_scroll();
+    if !zero {
+        entities.player.yPos.px = a = PLAYER_MAP_TRANSITION_END_POS;
+
+        ^return _room_transition__fadeout__room_in_memory();
+    }
+
+
     metatiles.transitions.scroll_down__setup();
 
     _room_transition__scroll_down__loop();
+
+
+    gameMode = GameModes.RUN_GAME;
 }
 
 
@@ -697,19 +709,32 @@ func _room_transition__scroll_down__loop() {
 
 // Scroll up room transition.
 //
-// ASSUMES: next room is loaded in memory
+// ASSUMES: There is a room above this one.
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func _room_transition__scroll_up() {
+func room_transition__scroll_up() {
 
     entities.player.yPos.sx = 0;
     entities.player.yPos.px = 0;
 
 
+    currentRoom = a = currentRoom - 0x10;
+
+    zero = _load_room_and_check_if_ok_to_scroll();
+    if !zero {
+        entities.player.yPos.px = a = DISPLAY_HEIGHT - 1 - PLAYER_MAP_TRANSITION_END_POS;
+
+        ^return _room_transition__fadeout__room_in_memory();
+    }
+
+
     metatiles.transitions.scroll_up__setup();
 
     _room_transition__scroll_up__loop();
+
+
+    gameMode = GameModes.RUN_GAME;
 }
 
 
@@ -739,7 +764,7 @@ let MAX_PLAYER_YPOS = DISPLAY_HEIGHT - 1 - PLAYER_MAP_TRANSITION_END_POS;
 
                 // Rewind up transition
                 _load_room_and_check_if_ok_to_scroll();
-                return _room_transition__scroll_down__loop();
+                ^return _room_transition__scroll_down__loop();
             }
         }
 

@@ -4,11 +4,14 @@
 import "memmap";
 import "../wiz/common/snes/snes";
 
+import "common/reset";
+import "common/dma";
+
 import "gameloop";
+import "gamemodes";
 import "metatiles";
 import "metasprites";
 import "resources";
-import "common/dma";
 
 
 in code {
@@ -34,7 +37,16 @@ func main() {
         gameloop.init();
 
 
-        gameloop.run_game();
+        while true {
+            a = gameMode as u8;
+            if a >= N_GAME_MODES {
+                // Break
+                irqcall(0);
+            }
+
+            x = a = a << 1;
+            gamemode_function_table[unaligned x]();
+        }
     }
 }
 
