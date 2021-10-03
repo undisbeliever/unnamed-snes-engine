@@ -91,20 +91,16 @@ inline func init() {
 
 // Load the room into memory
 //
+// ASSUMES: roomListIndex is valid
+//
 // DB = 0x7e
 #[mem8, idx8]
-func __copy_room_into_memory() {
-let _tmp = <:dpTmp0;
+func __copy_room_into_memory(roomListIndex : u8 in x) {
 let _roomPtr = dpTmp_farPtr;
 
-    x = currentRoom;
-    a = resources.rooms.room_table[x];
-
-    a--;
-    if a >= resources.rooms.N_ROOMS {
-        a = 0;
+    if x >= resources.rooms.N_ROOMS {
+        x = 0;
     }
-    x = a;
 
     <:_roomPtr = a = resources.rooms.room_list_l[x];
     >:_roomPtr = a = resources.rooms.room_list_h[x];
@@ -122,6 +118,38 @@ let _roomPtr = dpTmp_farPtr;
 
 
 
+// Clear room memory
+//
+// DB = 0x7e
+#[mem8, idx8]
+func __clear_room_memory() {
+
+    // This loop is safe - stz does not change zero flag.
+    x = sizeof(typeof(room));
+    do {
+        x--;
+        (&room as *u8)[x] = 0;
+    } while !zero;
+}
+
+
+
+// Return true if the currentRoom points to a valid room.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _check_room_exists() : bool in carry {
+    x = currentRoom;
+    a = resources.rooms.room_table[x];
+    if !zero && a < resources.rooms.N_ROOMS + 1 {
+        return true;
+    }
+
+    return false;
+}
+
+
+
 // Load the room into memory and check if the MetaTile tileset has changed.
 //
 // Returns zero set if it is OK to preform a scroll transition into the next room without glitches.
@@ -130,17 +158,44 @@ let _roomPtr = dpTmp_farPtr;
 #[mem8, idx8]
 func _load_room_and_check_if_ok_to_scroll() : bool in zero {
 
-    push8(a = room.tileset);
-    {
-        __copy_room_into_memory();
+    x = currentRoom;
+    x = a = resources.rooms.room_table[x];
+    if !zero && x < resources.rooms.N_ROOMS + 1 {
+        // room is valid
+
+        x--;
+
+        push8(a = room.tileset);
+        {
+            __copy_room_into_memory(x);
+
+            metatiles.populate_map_tile_properties();
+            _spawn_room_entities();
+        }
+        a = pop8();
+
+        cmp(a, room.tileset);
+        return zero;
+    }
+    else {
+        // room is missing from map - create an empty dummy map
+        //
+        // `metatiles.populate_map_tile_properties()` will fill the dummy
+        // room's `mapTileProperties` with solid tiles.  This ensures any
+        // scrolling room transition into a missing room will always be rolled
+        // back.
+
+        __clear_room_memory();
+
+        // Reset entity subsystem
+        entities.init();
 
         metatiles.populate_map_tile_properties();
-        _spawn_room_entities();
-    }
-    a = pop8();
 
-    cmp(a, room.tileset);
-    return zero;
+        // return true
+        a = 0;
+        return zero;
+    }
 }
 
 
@@ -225,7 +280,7 @@ inline func _setup_ppu_and_reset_graphics_subsystems() {
 // DB = 0x7e
 
 
-    // Need to repopulate map_tile properties
+    // Tileset may have changed - Need to repopulate map_tile properties
     metatiles.populate_map_tile_properties();
 
     metatiles.draw_map__forceblank();
@@ -401,6 +456,15 @@ func _room_transition__fadein__room_in_memory() {
     }
 
 
+    // ::TODO how do I handle a fadein to an invalid room::
+
+
+    // ::TODO check if player is on a non-solid tile::
+    // ::: must be done AFTER tileset is loaded into memory::
+    // ::: ::
+    // ::: How do I handle this case? ::
+
+
     gameMode = GameModes.RUN_GAME;
 }
 
@@ -442,8 +506,13 @@ func _room_transition__fadeout__room_in_memory() {
     _room_transition__fadein__room_in_memory();
 
 
+    // ::TODO how do I handle a fadein to an invalid room::
+
+
     // ::TODO check if player is on a non-solid tile::
     // ::: must be done AFTER tileset is loaded into memory::
+    // ::: ::
+    // ::: How do I handle this case? ::
 }
 
 

@@ -242,18 +242,38 @@ let _columnsLeft = >:dpTmp0;
 
 // Populate the `mapTileProperties` array.
 //
-// This function MUST be called when the map is loaded
+// This function MUST be called when the map or MetaTile tileset is loaded.
+//
+// If the room does not exist, all cells in `mapTileProperties` will be solid.
 //
 // DB = 0x7e
 #[mem8, idx8]
 func populate_map_tile_properties() {
-    x = 0;
-    do {
-        y = map[x];
-        mapTileProperties[x] = a = tileset.properties[y];
+    carry = gameloop._check_room_exists();
+    if carry {
+        // The room is valid.
 
-        x++;
-    } while !zero;
+        x = 0;
+        do {
+            y = map[x];
+            mapTileProperties[x] = a = tileset.properties[y];
+
+            x++;
+        } while !zero;
+    }
+    else {
+        // The room does not exist
+        // Fill the `mapTileProperties` array with solid tiles.
+
+        a = 1 << TILE_PROPERTY_SOLID_BIT;
+
+        x = 0;
+        do {
+            mapTileProperties[x] = a;
+
+            x++;
+        } while !zero;
+    }
 }
 
 

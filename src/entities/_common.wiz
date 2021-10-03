@@ -26,7 +26,7 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func init() {
+func init() {
     mem16();
     #[mem16] {
         // Set player's process function
