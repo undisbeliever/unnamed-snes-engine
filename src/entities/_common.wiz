@@ -109,6 +109,9 @@ let _init_function_ptr = _init_function_u16 as func(u8 in x);
             (&<:entities.SoA.ms_draw_function[0] as *u8)[y] = a = (far &entities.entity_data.ms_draw_function_l as far *u8)[x];
             (&>:entities.SoA.ms_draw_function[0] as *u8)[y] = a = (far &entities.entity_data.ms_draw_function_h as far *u8)[x];
 
+            (&<:entities.SoA.metaSpriteFrameTable[0] as *u8)[y] = a = (far &entities.entity_data.ms_frame_table_l as far *u8)[x];
+            (&>:entities.SoA.metaSpriteFrameTable[0] as *u8)[y] = a = (far &entities.entity_data.ms_frame_table_h as far *u8)[x];
+
             a = (far &entities.entity_data.shadow_size as far *u8)[x];
             entities.SoA.shadowSize[y] = a as entities.ShadowSize;
 

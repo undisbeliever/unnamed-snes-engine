@@ -20,7 +20,7 @@ enum GameModes : u8 {
     // To be used if the screen is active.
     ROOM_TRANSITION_FADEOUT,
 
-    // Scroll transition to next room
+    // Scroll transition to next room.
     // Will do a fadeout room transition if the room graphics are different to the current room.
     ROOM_TRANSITION_SCROLL_LEFT,
     ROOM_TRANSITION_SCROLL_RIGHT,

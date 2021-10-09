@@ -11,7 +11,7 @@ from io import StringIO
 
 
 def validate_mapping_json(mapping):
-    regex = re.compile('[a-zA-Z0-9_]+')
+    regex = re.compile('[a-zA-Z0-9_]+$')
 
     def test_list(l):
         for i in l:

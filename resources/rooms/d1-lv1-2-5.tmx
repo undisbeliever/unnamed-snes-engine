@@ -1,9 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.5" tiledversion="1.7.2" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="2" nextobjectid="1">
+<map version="1.5" tiledversion="1.7.2" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="4" nextobjectid="6">
  <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
  <layer id="1" name="Tile Layer 1" width="16" height="14">
   <data encoding="base64" compression="gzip">
-   H4sIAAAAAAAAA+3LsRGCQBQA0SsAFXMQCkCgAFAKELQBlQYAG1BpQKRkNrjgz83NEJASvGzXUUptsNW+6BEb3viIbgcXHnwctD9Gy//DILoAISIcLf2cBOn6r//CP0OOk/BEjb12x8NozihwQYlK6PASf4PWaK64YQKpQGhxgAMAAA==
+   H4sIAAAAAAAAA+3SuxGCUBRF0VsAouYIFoBCAQgUgEIDfhpAaYBPAyAluwNmuPPGGQNTgpXtkx1LRFawJy06bA01GtWtsYGDHdzJGyOOhh6D6jzs4ePwpf8lQLjsl/2f+wgnxModD5m/f8XNaBKkyHDGRXmhUvsST6PJUeADYGnLtoADAAA=
   </data>
  </layer>
+ <objectgroup id="2" name="Enemies" offsetx="16" offsety="0">
+  <object id="5" type="skull__diagonal" x="176" y="144">
+   <point/>
+  </object>
+  <object id="4" type="skull__diagonal" x="80" y="144">
+   <point/>
+  </object>
+  <object id="1" type="skull__diagonal" x="80" y="80">
+   <point/>
+  </object>
+  <object id="3" type="skull__diagonal" x="176" y="80">
+   <point/>
+  </object>
+ </objectgroup>
 </map>

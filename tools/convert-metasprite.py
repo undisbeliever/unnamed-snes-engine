@@ -141,12 +141,10 @@ def convert_tileset(tiles, palettes):
 # =========================
 #
 
-SpriteSheet = namedtuple('SpriteSheet', ('name', 'pattern', 'frames'))
+SpriteSheet = namedtuple('SpriteSheet', ('name', 'pattern', 'ms_export_order', 'frames'))
 
-SpriteFrame = namedtuple('SpriteFrame', ('name', 'xoffset', 'yoffset', 'objects'))
+SpriteFrame = namedtuple('SpriteFrame', ('xoffset', 'yoffset', 'objects'))
 ObjectEntry = namedtuple('ObjectEntry', ('tile_id', 'palette_id', 'order', 'hflip', 'vflip'))
-
-SpriteFrameData = namedtuple('SpriteFrameData', ('name', 'data'))
 
 
 def hflip_object_entry(o):
@@ -154,15 +152,6 @@ def hflip_object_entry(o):
 
 def vflip_object_entry(o):
     return ObjectEntry(o.tile_id, o.palette_id, o.order, o.hflip, not o.vflip)
-
-
-
-def find_named_item(items, name_to_find):
-    for i in items:
-        if i and i.name == name_to_find:
-            return i;
-
-    raise KeyError(f"Cannot find element with name '{ name_to_find }'.")
 
 
 
@@ -366,19 +355,18 @@ def expand_spritesheet(spritesheet):
 
     pattern = PATTERN_CLASSES[spritesheet['pattern']]
 
-    def expand_sprite_frame(f, objects):
+    def expand_sprite_frame(name, f, objects):
         return SpriteFrame(
-            f['name'],
             to_int(f.get('xoffset', default_xoffset)),
             to_int(f.get('yoffset', default_yoffset)),
             objects
         )
 
 
-    frames = [None] * len(spritesheet['frames'])
+    frames = dict()
 
 
-    for i, f in enumerate(spritesheet['frames']):
+    for name, f in spritesheet['frames'].items():
         if 'objects' in f:
             objects = list()
 
@@ -394,22 +382,22 @@ def expand_spritesheet(spritesheet):
             if len(objects) != pattern.n_objects:
                 raise ValueError(f"Expected exactly { pattern.n_objects } objects in frame '{ spritesheet['name'] }.{ f['name'] }'")
 
-            frames[i] = expand_sprite_frame(f, objects)
+            frames[name] = expand_sprite_frame(name, f, objects)
 
         elif 'starting_tile' in f:
-            frames[i] = expand_sprite_frame(f, pattern.starting_tile(f, to_int(f['starting_tile']), default_order))
+            frames[name] = expand_sprite_frame(name, f, pattern.starting_tile(f, to_int(f['starting_tile']), default_order))
 
 
-    for i, f in enumerate(spritesheet['frames']):
+    for name, f in spritesheet['frames'].items():
         if 'objects' not in f:
             if 'clone' in f:
-                source = find_named_item(frames, f['clone']['source']);
+                source = frames[f['clone']['source']];
 
                 flip = f['clone'].get('flip')
                 if flip:
-                    frames[i] = expand_sprite_frame(f, pattern.flip(source.objects, flip))
+                    frames[name] = expand_sprite_frame(name, f, pattern.flip(source.objects, flip))
                 else:
-                    frames[i] = expand_sprite_frame(f, source.objects)
+                    frames[name] = expand_sprite_frame(name, f, source.objects)
 
 
     if None in frames:
@@ -423,6 +411,7 @@ def expand_spritesheet(spritesheet):
 
     return SpriteSheet(spritesheet['name'],
                        spritesheet['pattern'],
+                       spritesheet['ms-export-order'],
                        frames)
 
 
@@ -445,19 +434,21 @@ def build_frame(frame, tile_offset, tile_palette_map):
                     | (bool(o.vflip) << 7)
         )
 
-    return SpriteFrameData(frame.name, data)
+    return data
 
 
 
-def build_metasprites(input_data, tile_offset, tile_palette_map):
+def build_metasprites(input_data, ms_export_orders, tile_offset, tile_palette_map):
     out = list()
 
     for ss_input in input_data:
         ss = expand_spritesheet(ss_input)
 
-        frames = [ build_frame(f, tile_offset, tile_palette_map) for f in ss.frames ]
+        ss_export_order = ms_export_orders[ss.ms_export_order]
 
-        out.append(SpriteSheet(ss.name, ss.pattern, frames))
+        frames = [ build_frame(ss.frames[f], tile_offset, tile_palette_map) for f in ss_export_order['frames'] ]
+
+        out.append(SpriteSheet(ss.name, ss.pattern, ss.ms_export_order, frames))
 
     return out
 
@@ -469,37 +460,36 @@ def generate_wiz_data(metasprites, spritesheet_name, binary_data_path):
 import "../../src/memmap";
 import "../../src/metasprites";
 """)
-        out.write(f"in { ROM_BANK } " + '{')
+        out.write(f"in { ROM_BANK } {{")
         out.write("""
 
 namespace ms {
 """)
-        out.write(f"namespace { spritesheet_name } " + '{\n')
+        out.write(f"namespace { spritesheet_name } {{\n")
 
         out.write(f"\n  const ppu_data = embed \"{ binary_data_path }\";\n")
 
         for ss in metasprites:
-            frame_size = len(ss.frames[0].data)
+            frame_size = len(ss.frames[0])
             n_frames = len(ss.frames)
 
+            frame_type = f"[u8 ; { frame_size }]"
+
             out.write('\n')
-            out.write(f"  namespace { ss.name } " + '{\n')
+            out.write(f"  namespace { ss.name } {{\n")
 
-            out.write(f"    let pattern = metasprites.drawing_functions.{ ss.pattern };\n\n")
-
-            out.write(f"    let n_frames = { n_frames };\n\n")
+            out.write(f"    // ms_export_order = { ss.ms_export_order }\n")
+            out.write(f"    let draw_function = metasprites.drawing_functions.{ ss.pattern };\n\n")
 
             out.write(f"    const frames : [[u8 ; { frame_size }] ; { n_frames }] = [\n")
 
-            for f in ss.frames:
-                out.write(f"      [ { ', '.join(map(str, f.data)) } ],\n")
+            for frame_data in ss.frames:
+                assert len(frame_data) == frame_size
+                out.write(f"      [ { ', '.join(map(str, frame_data)) } ],\n")
 
             out.write( '    ];\n\n')
 
-            out.write(f"    const frames_table : [*const [u8 ; { frame_size }] ; { n_frames }] = [ &frames[i] for let i in 0..{ n_frames - 1 } ];\n\n")
-
-            for i, f in enumerate(ss.frames):
-                out.write(f"    let { f.name } = { i };\n");
+            out.write(f"    const frame_table : [*const [u8 ; { frame_size }] ; { n_frames }] = [ &frames[i] for let i in 0..{ n_frames - 1 } ];\n\n")
 
             out.write( '  }\n')
 
@@ -556,6 +546,8 @@ def parse_arguments():
                         help='palette PNG image')
     parser.add_argument('json_filename', action='store',
                         help='Sprite map JSON file')
+    parser.add_argument('ms_export_order_json_file', action='store',
+                        help='metasprite export order map JSON file')
 
     args = parser.parse_args()
 
@@ -575,6 +567,9 @@ def main():
     with open(args.json_filename, 'r') as json_fp:
         input_data = json.load(json_fp)
 
+    with open(args.ms_export_order_json_file, 'r') as json_fp:
+        ms_export_orders = json.load(json_fp)
+
 
     if os.path.basename(args.json_filename) == 'common.json':
         tile_offset = 0
@@ -582,7 +577,7 @@ def main():
         tile_offset = 512 - len(tileset)
 
 
-    metasprites = build_metasprites(input_data, tile_offset, tile_palette_map)
+    metasprites = build_metasprites(input_data, ms_export_orders, tile_offset, tile_palette_map)
 
     ppu_data = generate_ppu_data(palette, tileset)
     wiz_data = generate_wiz_data(metasprites,

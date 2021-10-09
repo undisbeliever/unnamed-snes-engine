@@ -1,0 +1,80 @@
+{
+  "skeleton": {
+    "frames": [
+      "south0",
+      "south1",
+      "south2",
+      "south3",
+      "north0",
+      "north1",
+      "north2",
+      "north3",
+      "east0",
+      "east1",
+      "east2",
+      "east3",
+      "west0",
+      "west1",
+      "west2",
+      "west3"
+    ]
+  },
+  "crossbow_man": {
+    "frames": [
+      "south0",
+      "south1",
+      "south2",
+      "south3",
+      "north0",
+      "north1",
+      "north2",
+      "north3",
+      "east0",
+      "east1",
+      "east2",
+      "east3",
+      "west0",
+      "west1",
+      "west2",
+      "west3"
+    ]
+  },
+  "eight_direction_spinner": {
+    "frames": [
+      "frame0",
+      "frame1",
+      "frame2",
+      "frame3",
+      "frame4",
+      "frame5",
+      "frame6",
+      "frame7"
+    ]
+  },
+  "rook": {
+    "frames": [
+      "standing",
+      "landing0",
+      "landing1"
+    ]
+  },
+  "bomb": {
+    "frames": [
+      "frame0",
+      "frame1"
+    ]
+  },
+  "projectile_ns": {
+    "frames": [
+      "north",
+      "south"
+    ]
+  },
+  "projectile_ew": {
+    "frames": [
+      "east",
+      "west"
+    ]
+  }
+}
+

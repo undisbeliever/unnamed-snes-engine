@@ -6,16 +6,12 @@
   "xoffset": 8,
   "yoffset": 8,
 
-  "frames": [
-  {
-    "name": "frame0",
-    "starting_tile": "0x06"
-  },
-  {
-    "name": "frame1",
-    "starting_tile": "0x08"
+  "ms-export-order": "bomb",
+
+  "frames": {
+    "frame0": { "starting_tile": "0x06" },
+    "frame1": { "starting_tile": "0x08" }
   }
-  ]
 },
 {
   "name": "Arrow_NS",
@@ -24,22 +20,22 @@
   "xoffset": 3,
   "yoffset": 8,
 
-  "frames": [
-  {
-    "name": "north",
-    "objects": [
-      { "tile": "0x04" },
-      { "tile": "0x14" }
-    ]
-  },
-  {
-    "name": "south",
-    "objects": [
-      { "tile": "0x14", "flip": "hflip" },
-      { "tile": "0x04", "flip": "hflip" }
-    ]
+  "ms-export-order": "projectile_ns",
+
+  "frames": {
+    "north": {
+      "objects": [
+        { "tile": "0x04" },
+        { "tile": "0x14" }
+      ]
+    },
+    "south": {
+      "objects": [
+        { "tile": "0x14", "flip": "hflip" },
+        { "tile": "0x04", "flip": "hflip" }
+      ]
+    }
   }
-  ]
 },
 {
   "name": "Arrow_EW",
@@ -48,22 +44,22 @@
   "xoffset": 8,
   "yoffset": 3,
 
-  "frames": [
-  {
-    "name": "east",
-    "objects": [
-      { "tile": "0x10" },
-      { "tile": "0x11" }
-    ]
-  },
-  {
-    "name": "west",
-    "objects": [
-      { "tile": "0x11", "flip": "hflip" },
-      { "tile": "0x10", "flip": "hflip" }
-    ]
+  "ms-export-order": "projectile_ew",
+
+  "frames": {
+    "east": {
+      "objects": [
+        { "tile": "0x10" },
+        { "tile": "0x11" }
+      ]
+    },
+    "west": {
+      "objects": [
+        { "tile": "0x11", "flip": "hflip" },
+        { "tile": "0x10", "flip": "hflip" }
+      ]
+    }
   }
-  ]
 },
 {
   "name": "Fireball_NS",
@@ -72,19 +68,19 @@
   "xoffset": 4,
   "yoffset": 8,
 
-  "frames": [
-  {
-    "name": "north",
-    "objects": [
-      { "tile": "0x05" },
-      { "tile": "0x15" }
-    ]
-  },
-  {
-    "name": "south",
-    "clone": { "source": "north", "flip": "hflip" }
+  "ms-export-order": "projectile_ns",
+
+  "frames": {
+    "north": {
+      "objects": [
+        { "tile": "0x05" },
+        { "tile": "0x15" }
+      ]
+    },
+    "south": {
+      "clone": { "source": "north", "flip": "hflip" }
+    }
   }
-  ]
 },
 {
   "name": "Fireball_EW",
@@ -93,18 +89,19 @@
   "xoffset": 8,
   "yoffset": 4,
 
-  "frames": [
-  {
-    "name": "east",
-    "objects": [
-      { "tile": "0x12" },
-      { "tile": "0x13" }
-    ]
-  },
-  {
-    "name": "west",
-    "clone": { "source": "east", "flip": "vflip" }
+  "ms-export-order": "projectile_ew",
+
+  "frames": {
+    "east": {
+      "objects": [
+        { "tile": "0x12" },
+        { "tile": "0x13" }
+      ]
+    },
+    "west": {
+      "clone": { "source": "east", "flip": "vflip" }
+    }
   }
-  ]
 }
 ]
+

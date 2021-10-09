@@ -4,19 +4,31 @@
 import "../memmap";
 
 import "_variables";
+import "_common";
+
 
 import "../metatiles";
 import "../metasprites";
 
-import "gen/metasprites/dungeon";
+import "../../gen/entity-data";
 
 
 namespace entities {
 namespace bouncing_off_walls {
 
-in code {
 
-let ms_draw_function = ms.dungeon.Skull.pattern;
+let SoA_animationFrame   = SoA.state_0_l;
+let SoA_animationCounter = SoA.state_0_h;
+
+
+let STARTING_VELOCITY = 0x0120;
+
+
+let ANIMATION_DELAY = 4;
+let ANIMATION_FRAME_MASK = 0x7;
+
+
+in code {
 
 
 // Entity process routine.
@@ -28,12 +40,34 @@ let ms_draw_function = ms.dungeon.Skull.pattern;
 func init(entityId : u8 in x) {
     mem16();
     #[mem16] {
-        SoA.xVelocity[unaligned x] = aa =  0x0120;
-        SoA.yVelocity[unaligned x] = aa = -0x0120 as u16;
+        // Set starting velocity depending on entity position
 
-        SoA.metaSpriteFrame[unaligned x] = aa = &ms.dungeon.Skull.frames[0] as u16;
+        // ::TODO add a custom parameter that sets the entity's starting direction::
+
+        y = SoA.xPos_px[unaligned x];
+        if negative {
+            aa = STARTING_VELOCITY;
+        }
+        else {
+            aa = -STARTING_VELOCITY as u16;
+        }
+        SoA.xVelocity[unaligned x] = aa;
+
+
+        y = SoA.yPos_px[unaligned x];
+        if negative {
+            aa = STARTING_VELOCITY;
+        }
+        else {
+            aa = -STARTING_VELOCITY as u16;
+        }
+        SoA.yVelocity[unaligned x] = aa;
     }
     mem8();
+
+    // ::TODO break the circular dependency in my imports::
+    // ::: I want to write `_set_ms_frame(ms_frames.frame0, x);` ::
+    _set_ms_frame(entities.bouncing_off_walls.ms_frames.frame0, x);
 }
 
 
@@ -64,9 +98,56 @@ func process(entityId : u8 in x) : bool in carry {
         mem8();
     }
 
+
+    // Process animation
+    SoA_animationCounter[x]--;
+    if negative {
+        SoA_animationCounter[x] = a = ANIMATION_DELAY - 1;
+
+        // Increment animation Frame
+        a = SoA_animationFrame[x];
+        a++;
+        a &= ANIMATION_FRAME_MASK;
+        SoA_animationFrame[x] = a;
+
+        _set_ms_frame(a, x);
+    }
+
+
     return true;
 }
 
+
+
+// Set the address of the MetaSprite frame.
+//
+// ::TODO find a good way to do this and make it part of the MetaSprite subsystem::
+//
+// KEEP: X
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _set_ms_frame(frameId : u8 in a, entityId : u8 in x) : u8 in x
+{
+    // MetaSprite FrameSet table Data offset in ROM
+    let MetaSpriteFrameTableBank = 0xc10000 as far *u16;
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        yy = xx;
+
+        aa = ((aa & 0xff) << 1) + SoA.metaSpriteFrameTable[unaligned xx];
+
+        xx = aa;
+        aa = MetaSpriteFrameTableBank[unaligned xx];
+
+        xx = yy;
+        SoA.metaSpriteFrame[unaligned xx] = aa;
+    }
+    mem8_idx8();
+
+    return x;
+}
 
 
 }

@@ -82,6 +82,10 @@ namespace entities {
             let shadowSize = &_shadowAndBlank[0].shadowSize as *ShadowSize;
 
 
+            // MetaSprite frame table address.
+            // Points to a addr table of `metasprites.MsDataFormat` data structure
+            var metaSpriteFrameTable : [u16 ; N_ENTITIES];
+
             // Current MetaSprite frame.
             // Points to a `metasprites.MsDataFormat` data structure
             var metaSpriteFrame : [u16 ; N_ENTITIES];
@@ -121,6 +125,20 @@ namespace entities {
             var state_5 : [ u16 ; N_ENTITIES ];
             var state_6 : [ u16 ; N_ENTITIES ];
             var state_7 : [ u16 ; N_ENTITIES ];
+
+
+            // Split state variables into low/high pairs (to easily allocate a byte variable)
+            let state_0_l = &<:state_0[0] as *u8;
+            let state_0_h = &>:state_0[0] as *u8;
+
+            let state_1_l = &<:state_1[0] as *u8;
+            let state_1_h = &>:state_1[0] as *u8;
+
+            let state_2_l = &<:state_2[0] as *u8;
+            let state_2_h = &>:state_2[0] as *u8;
+
+            let state_3_l = &<:state_3[0] as *u8;
+            let state_3_h = &>:state_3[0] as *u8;
         }
     }
 

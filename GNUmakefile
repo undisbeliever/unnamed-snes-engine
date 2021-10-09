@@ -88,16 +88,16 @@ gen/rooms/%.bin: resources/rooms/%.tmx resources/mappings.json tools/convert-roo
 gen/resource-lists.wiz: resources/mappings.json tools/generate-resource-lists.py
 	python3 tools/generate-resource-lists.py -o "$@" "resources/mappings.json"
 
-gen/entity-data.wiz: resources/entities.json resources/mappings.json tools/generate-entity-data.py
-	python3 tools/generate-entity-data.py -o "$@" "resources/entities.json" "resources/mappings.json"
+gen/entity-data.wiz: resources/entities.json resources/ms-export-order.json resources/mappings.json tools/generate-entity-data.py
+	python3 tools/generate-entity-data.py -o "$@" "resources/entities.json" "resources/ms-export-order.json" "resources/mappings.json"
 
 
 gen/rooms.wiz: resources/mappings.json $(ROOM_BINS) tools/generate-rooms-table.py
 	python3 tools/generate-rooms-table.py -o "$@" "resources/mappings.json" $(ROOM_BINS)
 
 
-gen/metasprites/%.wiz gen/metasprites/%.bin: resources/metasprites/%.png resources/metasprites/%-palette.png resources/metasprites/%.json tools/convert-metasprite.py
-	python3 tools/convert-metasprite.py --ppu-output "gen/metasprites/$*.bin" --wiz-output "gen/metasprites/$*.wiz" "resources/metasprites/$*.png" "resources/metasprites/$*-palette.png" "resources/metasprites/$*.json"
+gen/metasprites/%.wiz gen/metasprites/%.bin: resources/metasprites/%.png resources/metasprites/%-palette.png resources/metasprites/%.json resources/ms-export-order.json tools/convert-metasprite.py
+	python3 tools/convert-metasprite.py --ppu-output "gen/metasprites/$*.bin" --wiz-output "gen/metasprites/$*.wiz" "resources/metasprites/$*.png" "resources/metasprites/$*-palette.png" "resources/metasprites/$*.json" "resources/ms-export-order.json"
 
 
 

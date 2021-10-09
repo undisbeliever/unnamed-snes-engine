@@ -1,15 +1,16 @@
 {
- "bouncing_small": {
-  "code": "bouncing_off_walls",
-  "shadowSize": "SMALL"
- },
- "bouncing_large": {
-  "code": "bouncing_off_walls",
-  "shadowSize": "LARGE"
- },
- "spawn_test_entity": {
-  "code": "spawn_test_entity",
-  "shadowSize": "SMALL"
- }
+  "entity_functions": [
+    {
+      "name": "bouncing_off_walls",
+      "ms-export-order": "eight_direction_spinner"
+    }
+  ],
+  "entities": {
+    "skull__diagonal": {
+      "code": "bouncing_off_walls",
+      "metasprites": "dungeon.Skull",
+      "shadowSize": "SMALL"
+    }
+  }
 }
 
