@@ -25,7 +25,7 @@ def validate_mapping_json(mapping):
 
 
 def generate_wiz_code(mapping):
-    ms_spritesheet_ppu_data = [ f"ms.{ ss }.ppu_data" for ss in mapping['metasprite_spritesheets'] ]
+    ms_spritesheet_ppu_data = [ f"resources.ms_ppu_data.{ ss }" for ss in mapping['metasprite_spritesheets'] ]
 
 
     with StringIO() as out:
@@ -33,8 +33,6 @@ def generate_wiz_code(mapping):
 import "../src/memmap";
 import "../src/resources";
 """)
-        for ss in mapping['metasprite_spritesheets']:
-            out.write(f"import \"metasprites/{ ss }\";\n")
 
         out.write("""
 in rodata0 {

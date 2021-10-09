@@ -3,28 +3,45 @@
 
 import "memmap";
 
-import "gen/metasprites/common";
-import "gen/metasprites/dungeon";
-
 import "gen/rooms";
 
 
 namespace resources {
 
+
+// Resource Data
+// =============
+
 namespace metatile_tilesets {
 in rodata0 {
     const dungeon = embed "../gen/metatiles/dungeon.bin";
+}
+}
 
 
+namespace ms_ppu_data {
+in rodata0 {
+    const common = embed "gen/metasprites/common.bin";
+    const dungeon = embed "gen/metasprites/dungeon.bin";
+}
+}
+
+
+
+// Resource Lists
+// ==============
+
+namespace metatile_tilesets {
+in rodata0 {
     // ::KUDOS eggboycolor for this pattern ::
     const _tileset_list_l : [u8] = [<:&i for let i in _tilesets];
     const _tileset_list_h : [u8] = [>:&i for let i in _tilesets];
     const _tileset_list_b : [u8] = [#:far &i for let i in _tilesets];
+}
 
     let tileset_list_l = far &_tileset_list_l as far *const u8;
     let tileset_list_h = far &_tileset_list_h as far *const u8;
     let tileset_list_b = far &_tileset_list_b as far *const u8;
-}
 }
 
 
@@ -34,11 +51,11 @@ in rodata0 {
     const _spritesheet_list_l : [u8] = [<:&i for let i in _ms_spritesheets];
     const _spritesheet_list_h : [u8] = [>:&i for let i in _ms_spritesheets];
     const _spritesheet_list_b : [u8] = [#:far &i for let i in _ms_spritesheets];
+}
 
     let spritesheet_list_l = far &_spritesheet_list_l as far *const u8;
     let spritesheet_list_h = far &_spritesheet_list_h as far *const u8;
     let spritesheet_list_b = far &_spritesheet_list_b as far *const u8;
-}
 }
 
 

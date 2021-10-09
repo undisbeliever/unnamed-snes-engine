@@ -186,8 +186,8 @@ let _ptr = dpTmp_farPtr;
 
     // Transfer common sprite tiles to VRAM
     {
-        let tile_data = (far &ms.common.ppu_data as u24 + sizeof(_PpuDataFormat) - 1) as far *u8;
-        let tile_data_size = sizeof(typeof(ms.common.ppu_data)) - sizeof(_PpuDataFormat) + 1;
+        let tile_data = (far &resources.ms_ppu_data.common as u24 + sizeof(_PpuDataFormat) - 1) as far *u8;
+        let tile_data_size = sizeof(typeof(resources.ms_ppu_data.common)) - sizeof(_PpuDataFormat) + 1;
 
         snes.ppu.vram_address_hl = xx = VRAM_OBJ_WADDR;
         dma.transfer_to_vram__forceblank(#:tile_data, tile_data as u16, tile_data_size);

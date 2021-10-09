@@ -467,8 +467,6 @@ namespace ms {
 """)
         out.write(f"namespace { spritesheet_name } {{\n")
 
-        out.write(f"\n  const ppu_data = embed \"{ binary_data_path }\";\n")
-
         for ss in metasprites:
             frame_size = len(ss.frames[0])
             n_frames = len(ss.frames)
