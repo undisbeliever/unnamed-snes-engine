@@ -17,7 +17,6 @@ namespace entities {
 namespace bouncing_off_walls {
 
 
-let SoA_animationFrame   = SoA.state_0_l;
 let SoA_animationCounter = SoA.state_0_h;
 
 
@@ -66,9 +65,10 @@ func init(entityId : u8 in x) {
     mem8();
 
     // ::TODO break the circular dependency in my imports::
-    // ::: I want to write `_set_ms_frame(ms_frames.frame0, x);` ::
-    _set_ms_frame(entities.bouncing_off_walls.ms_frames.frame0, x);
+    // ::: I want to write `metasprites.set_entity_frame(x, ms_frames.frame0, x);`
+    metasprites.set_entity_frame(x, entities.bouncing_off_walls.ms_frames.frame0);
 }
+
 
 
 // Entity process routine.
@@ -105,50 +105,15 @@ func process(entityId : u8 in x) : bool in carry {
         SoA_animationCounter[x] = a = ANIMATION_DELAY - 1;
 
         // Increment animation Frame
-        a = SoA_animationFrame[x];
+        a = SoA.metaSpriteFrame[x];
         a++;
         a &= ANIMATION_FRAME_MASK;
-        SoA_animationFrame[x] = a;
-
-        _set_ms_frame(a, x);
+        metasprites.set_entity_frame(x, a);
     }
 
 
     return true;
 }
-
-
-
-// Set the address of the MetaSprite frame.
-//
-// ::TODO find a good way to do this and make it part of the MetaSprite subsystem::
-//
-// KEEP: X
-//
-// DB = 0x7e
-#[mem8, idx8]
-func _set_ms_frame(frameId : u8 in a, entityId : u8 in x) : u8 in x
-{
-    // MetaSprite FrameSet table Data offset in ROM
-    let MetaSpriteFrameTableBank = 0xc10000 as far *u16;
-
-    mem16_idx16();
-    #[mem16, idx16] {
-        yy = xx;
-
-        aa = ((aa & 0xff) << 1) + SoA.metaSpriteFrameTable[unaligned xx];
-
-        xx = aa;
-        aa = MetaSpriteFrameTableBank[unaligned xx];
-
-        xx = yy;
-        SoA.metaSpriteFrame[unaligned xx] = aa;
-    }
-    mem8_idx8();
-
-    return x;
-}
-
 
 }
 

@@ -86,9 +86,28 @@ namespace entities {
             // Points to a addr table of `metasprites.MsDataFormat` data structure
             var metaSpriteFrameTable : [u16 ; N_ENTITIES];
 
+
+            var __msFrameAndBlank : [ _u8pair ; N_ENTITIES];
+
             // Current MetaSprite frame.
+            //
+            // You SHOULD NOT be writing to this variable.
+            // Instead you SHOULD call `metasprites.set_entity_frame()` to change
+            // the entity's MetaSprite frame.
+            //
+            // This value is safe to read.
+            //
+            // (byte)
+            let metaSpriteFrame = &__msFrameAndBlank[0].first as *u8;
+
+
+            // MetaSprite frame address.
+            //
+            // You SHOULD NOT be reading or writing this variable.
+            // To change the MetaSprite frame you SHOULD call `metasprites.set_entity_frame()`.
+            //
             // Points to a `metasprites.MsDataFormat` data structure
-            var metaSpriteFrame : [u16 ; N_ENTITIES];
+            var _metaSpriteFrameAddr : [u16 ; N_ENTITIES];
 
 
             // Signed 16 bit X velocity
