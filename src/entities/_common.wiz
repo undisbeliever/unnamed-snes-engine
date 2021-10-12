@@ -5,6 +5,7 @@ import "../memmap";
 
 import "../../gen/entity-data";
 
+import "../metasprites";
 import "_variables";
 import "player";
 
@@ -35,7 +36,7 @@ func init() {
 
         // Set player's ms_draw function
         aa = entities.player.ms_draw_function as u16;
-        entities.SoA.ms_draw_function[0] = aa as func(u16 in yy);
+        entities.SoA.ms_draw_function[0] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
 
 
         // Set all process_functions to blank (except player)
@@ -45,7 +46,7 @@ func init() {
         do {
             // Reset process function
             entities.SoA.process_function[unaligned x] = aa as func(u8 in x) : bool in carry;
-            entities.SoA.ms_draw_function[unaligned x] = aa as func(u16 in yy);
+            entities.SoA.ms_draw_function[unaligned x] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
 
             // Clear entity shadow
             (&entities.SoA._shadowAndBlank as *u16)[unaligned x] = 0;
@@ -199,7 +200,7 @@ let _tmp = <:dpTmp0;
                 #[mem16] {
                     aa = _blank_entity_function as u16;
                     entities.SoA.process_function[unaligned x] = aa as func(u8 in x) : bool in carry;
-                    entities.SoA.ms_draw_function[unaligned x] = aa as func(u16 in yy);
+                    entities.SoA.ms_draw_function[unaligned x] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
                 }
                 mem8();
             }
@@ -224,11 +225,7 @@ inline func draw_active_entities()
             __currentEntityTablePos = y;
 
             x = activeEntitiesTable[y];
-            idx16();
-            #[idx16] {
-                entities.SoA.ms_draw_function[unaligned xx](xx);
-            }
-            idx8();
+            metasprites._draw_entity__inline(x);
 
             y = __currentEntityTablePos;
         } while !zero;

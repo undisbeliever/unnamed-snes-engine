@@ -2,6 +2,8 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "../memmap";
+import "../metasprites";
+
 
 namespace entities {
     let N_ENTITIES = 12;
@@ -42,6 +44,7 @@ namespace entities {
         second : u8,
     }
 
+
     // Entity 0 is always the player
     namespace SoA {
         let LAST_INDEX = (N_ENTITIES - 1) * 2;
@@ -63,7 +66,7 @@ namespace entities {
             //
             // DB = 0x7e
             #[mem8, idx8]
-            var ms_draw_function : [func(entityId : u16 in yy) ; N_ENTITIES];
+            var ms_draw_function : [func(msFrame : u16 in yy, xPos : u16 in metasprites.xPos, yPos : u16 in metasprites.yPos) ; N_ENTITIES];
         }
 
         in wram7e {

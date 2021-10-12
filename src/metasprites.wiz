@@ -3,13 +3,8 @@
 
 import "memmap";
 import "resources";
-import "entities/_variables";
 import "common/dma";
 import "../wiz/common/snes/snes";
-
-import "gen/metasprites/common";
-
-import "entities/_variables";
 
 
 namespace metasprites {
@@ -92,6 +87,11 @@ in zeropage {
     let HI_TABLE_QUEUE_INIT_VALUE = 1;
 
     let INITIAL_BUFFER_POS = (N_OBJECTS - 1) * sizeof(OamEntry);
+
+
+    // Temporary variables to store the metasprite's position on screen
+    var xPos : u16;
+    var yPos : u16;
 }
 
 
@@ -471,31 +471,55 @@ func set_entity_frame(entityId : u8 in x, frameId : u8 in a) : u8 in x {
 
 
 
+// Draw the entity's MetaSprite frame
+//
+// CLOBBERS: X
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _draw_entity__inline(entityId : u8 in x) {
+
+    <:xPos = a = entities.SoA.xPos_px[unaligned x];
+    >:xPos = 0;
+
+    <:yPos = a = entities.SoA.yPos_px[unaligned x];
+    >:yPos = 0;
+
+
+    idx16();
+    #[idx16] {
+        yy = entities.SoA._metaSpriteFrameAddr[unaligned xx];
+        entities.SoA.ms_draw_function[unaligned xx](yy, xPos, yPos);
+    }
+    idx8();
+}
+
+
+
 // MetaSprite Patterns
 // ===================
 
 namespace drawing_functions {
 
-in zeropage {
-    // Temporary variables to store the metasprite's position on screen
-    var xPos : u16;
-    var yPos : u16;
-}
+// ::TODO do a thorough test of the drawing functions and confirm partially off-screen sprites works correctly::
 
 
-
+// Subtract the MsDataFormat offset from the MetaSprite position.
+//
 // KEEP: X and Y
 // DB = 0x7e
 #[mem8, idx16]
-inline func _populate_xPos_and_yPos(msFrame : u16 in xx, entityId : u16 in yy) {
+inline func _subtract_ms_offset_from_position(msFrame : u16 in xx, xPos : u16 in xPos, yPos : u16 in yPos) {
 
-    <:xPos = a = entities.SoA.xPos_px[unaligned yy] - MsDataFormat.xOffset[unaligned xx];
-    a = 0;
-    >:xPos = a = a -# 0;
+    <:xPos = a = <:xPos - MsDataFormat.xOffset[unaligned xx];
+    if !carry {
+        (>:xPos)--;
+    }
 
-    <:yPos = a = entities.SoA.yPos_px[unaligned yy] - MsDataFormat.yOffset[unaligned xx];
-    a = 0;
-    >:yPos = a = a -# 0;
+    <:yPos = a = <:yPos - MsDataFormat.yOffset[unaligned xx];
+    if !carry {
+        (>:yPos)--;
+    }
 }
 
 
@@ -573,12 +597,8 @@ inline func _update_hi_table_x8_0() {
 //
 // DB = 0x7e
 #[mem8, idx16]
-func square_single16(entityId : u16 in yy) {
-
-    xx = entities.SoA._metaSpriteFrameAddr[unaligned yy];
-
-    <:xPos = a = entities.SoA.xPos_px[unaligned yy];
-    <:yPos = a = entities.SoA.yPos_px[unaligned yy];
+func square_single16(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
+    xx = yy;
 
     yy = bufferPos;
     if !negative {
@@ -586,7 +606,9 @@ func square_single16(entityId : u16 in yy) {
         _update_hi_table_size_large();
 
         (&buffer[0].xPos)[unaligned yy] = a = <:xPos - MsDataFormat.xOffset[unaligned xx];
-        _update_hi_table_x8_invert(carry);
+        a = >:xPos -# 0;
+        cmp(a, 1);
+        _update_hi_table_x8(carry);
 
 
         a = <:yPos - MsDataFormat.yOffset[unaligned xx];
@@ -627,10 +649,10 @@ func square_single16(entityId : u16 in yy) {
 //
 // DB = 0x7e
 #[mem8, idx16]
-func rect_16x8_two(entityId : u16 in yy) {
-    xx = entities.SoA._metaSpriteFrameAddr[unaligned yy];
+func rect_16x8_two(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
+    xx = yy;
 
-    _populate_xPos_and_yPos(xx, yy);
+    _subtract_ms_offset_from_position(xx, xPos, yPos);
 
     yy = bufferPos;
     return if negative || yy < (2 - 1) * sizeof(OamEntry);
@@ -680,10 +702,10 @@ func rect_16x8_two(entityId : u16 in yy) {
 //
 // DB = 0x7e
 #[mem8, idx16]
-func rect_8x16_two(entityId : u16 in yy) {
-    xx = entities.SoA._metaSpriteFrameAddr[unaligned yy];
+func rect_8x16_two(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
+    xx = yy;
 
-    _populate_xPos_and_yPos(xx, yy);
+    _subtract_ms_offset_from_position(xx, xPos, yPos);
 
     yy = bufferPos;
     return if negative || yy < (2 - 1) * sizeof(OamEntry);
@@ -739,10 +761,10 @@ func rect_8x16_two(entityId : u16 in yy) {
 //
 // DB = 0x7e
 #[mem8, idx16]
-func rect_16x32_two(entityId : u16 in yy) {
-    xx = entities.SoA._metaSpriteFrameAddr[unaligned yy];
+func rect_16x32_two(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
+    xx = yy;
 
-    _populate_xPos_and_yPos(xx, yy);
+    _subtract_ms_offset_from_position(xx, xPos, yPos);
 
     yy = bufferPos;
     return if negative || yy < (2 - 1) * sizeof(OamEntry);
@@ -798,10 +820,10 @@ func rect_16x32_two(entityId : u16 in yy) {
 //
 // DB = 0x7e
 #[mem8, idx16]
-func rect_16x24_three(entityId : u16 in yy) {
-    xx = entities.SoA._metaSpriteFrameAddr[unaligned yy];
+func rect_16x24_three(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
+    xx = yy;
 
-    _populate_xPos_and_yPos(xx, yy);
+    _subtract_ms_offset_from_position(xx, xPos, yPos);
 
     yy = bufferPos;
     return if negative || yy < (3 - 1) * sizeof(OamEntry);
@@ -867,10 +889,10 @@ func rect_16x24_three(entityId : u16 in yy) {
 //
 // DB = 0x7e
 #[mem8, idx16]
-func rect_16x24_and_extra(entityId : u16 in yy) {
-    xx = entities.SoA._metaSpriteFrameAddr[unaligned yy];
+func rect_16x24_and_extra(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
+    xx = yy;
 
-    _populate_xPos_and_yPos(xx, yy);
+    _subtract_ms_offset_from_position(xx, xPos, yPos);
 
     yy = bufferPos;
     return if negative || yy < (4 - 1) * sizeof(OamEntry);
@@ -939,4 +961,9 @@ func rect_16x24_and_extra(entityId : u16 in yy) {
 }
 }
 
+
+
+// Moving this here prevents an
+// "encountered a reference to `var metasprites.xPos` before its type was known" error.
+import "entities/_variables";
 
