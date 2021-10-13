@@ -10,7 +10,7 @@ import "_common";
 import "../metatiles";
 import "../metasprites";
 
-import "../../gen/entity-data";
+import "../../gen/entities";
 
 
 namespace entities {
@@ -64,9 +64,7 @@ func init(entityId : u8 in x) {
     }
     mem8();
 
-    // ::TODO break the circular dependency in my imports::
-    // ::: I want to write `metasprites.set_entity_frame(x, ms_frames.frame0, x);`
-    metasprites.set_entity_frame(x, entities.bouncing_off_walls.ms_frames.frame0);
+    metasprites.set_entity_frame(x, ms_frames.frame0);
 }
 
 

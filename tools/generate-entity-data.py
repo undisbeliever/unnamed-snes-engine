@@ -42,11 +42,15 @@ def get_metasprite_spritesheets(entities):
 
 
 
-def generate_wiz_code(entities_json, ms_export_orders_json, mapping_json):
-    entities = [entities_json["entities"][entity_name] for entity_name in mapping_json['entities']]
-
-    if len(entities) > 254:
+def generate_wiz_code(entities_json, mapping_json):
+    if len(mapping_json['entities']) > 254:
         raise ValueError("Too many entities")
+
+    for e in mapping_json['entities']:
+        validate_name(e)
+
+
+    entities = [entities_json["entities"][entity_name] for entity_name in mapping_json['entities']]
 
 
     with StringIO() as out:
@@ -61,6 +65,7 @@ import "../src/entities/_variables";
 
 
         for ef in entities_json["entity_functions"]:
+            validate_name(ef['name'])
             out.write(f"""import "../src/entities/{ ef['name'].replace('_', '-') }";\n""")
 
         out.write('\n')
@@ -72,27 +77,6 @@ import "../src/entities/_variables";
         out.write("""
 
 namespace entities {
-
-""")
-
-        for ef in entities_json["entity_functions"]:
-            validate_name(ef['name'])
-
-            ef_ms_export_order = ef['ms-export-order']
-            if ef_ms_export_order:
-                out.write(f"namespace { ef['name'] } {{\n")
-                out.write("namespace ms_frames {\n")
-
-                for i, ms_frame in enumerate(ms_export_orders_json[ef_ms_export_order]['frames']):
-                    validate_name(ms_frame)
-                    out.write(f"  let { ms_frame } = { i };\n")
-
-                out.write("}\n")
-                out.write("}\n")
-
-
-        out.write("""
-
 namespace entity_data {
 in rodata0 {
 
@@ -119,6 +103,7 @@ in rodata0 {
 }
 }
 }
+
 """)
 
         return out.getvalue()
@@ -131,8 +116,6 @@ def parse_arguments():
                         help='wiz output file')
     parser.add_argument('entities_json_file', action='store',
                         help='entities  JSON  file input')
-    parser.add_argument('ms_export_order_json_file', action='store',
-                        help='metasprite export order  JSON  file input')
     parser.add_argument('mappings_json_file', action='store',
                         help='mappings  JSON  file input')
 
@@ -148,13 +131,10 @@ def main():
     with open(args.entities_json_file, 'r') as fp:
         entities = json.load(fp)
 
-    with open(args.ms_export_order_json_file, 'r') as fp:
-        ms_export_orders = json.load(fp)
-
     with open(args.mappings_json_file, 'r') as fp:
         mapping = json.load(fp)
 
-    out = generate_wiz_code(entities, ms_export_orders, mapping)
+    out = generate_wiz_code(entities, mapping)
 
     with open(args.output, 'w') as fp:
         fp.write(out)
