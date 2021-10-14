@@ -95,6 +95,8 @@ in rodata0 {
 
         write_list('shadow_size', [ f"ShadowSize.{ e['shadowSize'] } as u8" for e in entities ])
 
+        write_list('initial_zpos', [ f"{ int(e['zpos']) } as u8" for e in entities ])
+
         write_list('tile_hitbox_half_width', [ f"{ int(e.get('halfWidth', DEFAULT_HALF_WIDTH[e['shadowSize']])) }" for e in entities ])
         write_list('tile_hitbox_half_height', [ f"{ int(e.get('halfHeight', DEFAULT_HALF_HEIGHT[e['shadowSize']])) }" for e in entities ])
 

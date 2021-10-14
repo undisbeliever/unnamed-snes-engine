@@ -14,7 +14,8 @@
       "name": "skull__diagonal",
       "code": "bouncing_off_walls",
       "metasprites": "dungeon.Skull",
-      "shadowSize": "SMALL"
+      "shadowSize": "SMALL",
+      "zpos": "4"
     }
   ]
 }

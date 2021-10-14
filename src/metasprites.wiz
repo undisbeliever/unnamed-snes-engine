@@ -482,8 +482,9 @@ inline func _draw_entity__inline(entityId : u8 in x) {
     <:xPos = a = entities.SoA.xPos_px[unaligned x];
     >:xPos = 0;
 
-    <:yPos = a = entities.SoA.yPos_px[unaligned x];
-    >:yPos = 0;
+    <:yPos = a = entities.SoA.yPos_px[unaligned x] - entities.SoA.zPos[unaligned x];
+    a = 0;
+    >:yPos = a = a -# 0;
 
 
     idx16();

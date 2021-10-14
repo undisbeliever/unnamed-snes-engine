@@ -32,12 +32,6 @@ namespace entities {
         let Y_AXIS_COLLISION = UP_COLLISION | DOWN_COLLISION;
     };
 
-    struct _ShadowAndBlank {
-        shadowSize : ShadowSize,
-
-        // ::TODO use this variable for something::
-        _blank : u8
-    };
 
     struct _u8pair {
         first : u8,
@@ -94,8 +88,15 @@ namespace entities {
             let yPos_px = &yPos[0].px as *u8;
 
 
-            var _shadowAndBlank : [_ShadowAndBlank ; N_ENTITIES];
-            let shadowSize = &_shadowAndBlank[0].shadowSize as *ShadowSize;
+            var _zPosAndShadow : [_u8pair ; N_ENTITIES];
+
+            // Z position of the entity
+            // (byte)
+            let zPos = &_zPosAndShadow[0].first as *u8;
+
+
+            // The size of the shadow underneath the entity
+            let shadowSize = &_zPosAndShadow[0].second as *ShadowSize;
 
 
             // MetaSprite frame table address.
