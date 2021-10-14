@@ -44,9 +44,10 @@ struct RoomData {
     // Entities in the map
     // (Structure of Arrays)
     // If the entity does not spawn then the array elements MUST be 0xff;
-    entity_xPos : [u8 ; ENTITIES_IN_MAP ],
-    entity_yPos : [u8 ; ENTITIES_IN_MAP ],
-    entity_type : [u8 ; ENTITIES_IN_MAP ],
+    entity_xPos      : [u8 ; ENTITIES_IN_MAP],
+    entity_yPos      : [u8 ; ENTITIES_IN_MAP],
+    entity_type      : [u8 ; ENTITIES_IN_MAP],
+    entity_parameter : [u8 ; ENTITIES_IN_MAP],
 };
 
 
@@ -107,13 +108,15 @@ let _roomPtr = dpTmp_farPtr;
     #:_roomPtr = a = resources.rooms.room_list_bank;
 
 
-    y = sizeof(typeof(room)) - 1;
-    do {
-        (&room as *u8)[y] = a = _roomPtr[y];
-        y--;
-    } while !zero;
-
-    (&room as *u8)[0] = a = *_roomPtr;
+    idx16();
+    #[idx16] {
+        yy = sizeof(typeof(room)) - 1;
+        do {
+            (&room as *u8)[yy] = a = _roomPtr[yy];
+            yy--;
+        } while !negative;
+    }
+    mem8_idx8();
 }
 
 
@@ -124,12 +127,15 @@ let _roomPtr = dpTmp_farPtr;
 #[mem8, idx8]
 func __clear_room_memory() {
 
-    // This loop is safe - stz does not change zero flag.
-    x = sizeof(typeof(room));
-    do {
-        x--;
-        (&room as *u8)[x] = 0;
-    } while !zero;
+    idx16();
+    #[idx16] {
+        xx = sizeof(typeof(room)) - 1;
+        do {
+            (&room as *u8)[xx] = 0;
+            xx--;
+        } while !negative;
+    }
+    idx8();
 }
 
 
@@ -214,7 +220,8 @@ func _spawn_room_entities() {
 
         entities.spawn_entity(a = room.entity_xPos[x],
                               a = room.entity_yPos[x],
-                              a = room.entity_type[x]);
+                              a = room.entity_type[x],
+                              y = room.entity_parameter[x]);
 
         x = pop8();
 

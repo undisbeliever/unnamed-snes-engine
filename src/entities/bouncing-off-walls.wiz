@@ -20,7 +20,7 @@ namespace bouncing_off_walls {
 let SoA_animationCounter = SoA.state_0_h;
 
 
-let STARTING_VELOCITY = 0x0120;
+let SPEED = 0x0120;
 
 
 let ANIMATION_DELAY = 4;
@@ -36,29 +36,26 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func init(entityId : u8 in x) {
+func init(entityId : u8 in x, parameter : u8 in y) {
     mem16();
     #[mem16] {
-        // Set starting velocity depending on entity position
+        // Set starting velocity depending on `parameter`
 
-        // ::TODO add a custom parameter that sets the entity's starting direction::
-
-        y = SoA.xPos_px[unaligned x];
-        if negative {
-            aa = STARTING_VELOCITY;
+        aa = 0;
+        if y < init_parameter.up as u8 || y == init_parameter.down_right as u8 {
+            aa = SPEED;
         }
-        else {
-            aa = -STARTING_VELOCITY as u16;
+        else if y >= init_parameter.up_left as u8 && y < init_parameter.down as u8 {
+            aa = -SPEED as u16;
         }
         SoA.xVelocity[unaligned x] = aa;
 
-
-        y = SoA.yPos_px[unaligned x];
-        if negative {
-            aa = STARTING_VELOCITY;
+        aa = 0;
+        if y >= init_parameter.down_left as u8 {
+            aa = SPEED;
         }
-        else {
-            aa = -STARTING_VELOCITY as u16;
+        else if y >= init_parameter.up_right as u8 && y < init_parameter.left as u8 {
+            aa = -SPEED as u16;
         }
         SoA.yVelocity[unaligned x] = aa;
     }

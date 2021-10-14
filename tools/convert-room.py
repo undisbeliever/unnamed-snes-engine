@@ -24,7 +24,7 @@ TILE_SIZE = 16
 
 # A limited subset of the TMX data format (only supporting one map layer and tileset)::
 TmxMap = namedtuple('MapData', ('tileset', 'map', 'entities'))
-Entity = namedtuple('Entity', ('x', 'y', 'type'))
+Entity = namedtuple('Entity', ('x', 'y', 'type', 'parameter'))
 TilesetData = namedtuple('TilesetData', ('name', 'firstgid'))
 
 
@@ -71,10 +71,25 @@ def parse_objectgroup_tag(tag):
 
     for child in tag:
         if child.tag == 'object':
-            objects.append(Entity(int(child.attrib['x']), int(child.attrib['y']), child.attrib['type']))
+            parameter = None
 
-            if len(child) != 1 or child[0].tag != 'point':
+            if not any([c.tag == 'point' for c in child]):
                 raise ValueError('Object must be a point')
+
+            for c in child:
+                if c.tag == 'properties':
+                    for p in c:
+                        if p.tag == 'property':
+                            if parameter is None:
+                                if p.attrib['name'] == 'parameter':
+                                    parameter = p.attrib['value']
+                                else:
+                                    raise ValueError(f"Unknown property: { p.attrib['name'] }")
+                            else:
+                                raise ValueError('Only one parameter is allowed per entity')
+
+            objects.append(Entity(int(child.attrib['x']), int(child.attrib['y']), child.attrib['type'], parameter))
+
 
     return objects
 
@@ -130,6 +145,37 @@ def get_entity_index(name, entities_json):
 
 
 
+def get_entity_function(entity_name, entities_json):
+    e = entities_json['entities'][get_entity_index(entity_name, entities_json)]
+
+    ef_name = e['code']
+
+    for i, ef in enumerate(entities_json['entity_functions']):
+        if ef['name'] == ef_name:
+            return ef
+
+    raise ValueError(f"Unknown entity function: { ef_name }")
+
+
+
+def get_entity_parameter(e, entities_json):
+    ef = get_entity_function(e.type, entities_json)
+
+    p = ef.get('parameter')
+    if p:
+        if p['type'] == 'enum':
+            return p['values'].index(e.parameter)
+        else:
+            raise ValueError(f"Unknown parameter type: { p['type'] }")
+    else:
+        # no parameter
+        if e.parameter is not None:
+            raise ValueError(f"Invalid parameter for { e.type } entity: { e.parameter }")
+
+        return 0
+
+
+
 def create_room_entities_soa(room_entities, entities_json):
     if len(room_entities) > ENTITIES_IN_MAP:
         raise ValueError(f"Too many entities in room ({ len(room_entities) }, max: { ENTITIES_IN_MAP }");
@@ -138,16 +184,24 @@ def create_room_entities_soa(room_entities, entities_json):
 
     data = bytearray()
 
+    # entity_xPos
     for e in room_entities:
         data.append(e.x)
     data += padding
 
+    # entity_yPos
     for e in room_entities:
         data.append(e.y)
     data += padding
 
+    # entity_type
     for e in room_entities:
         data.append(get_entity_index(e.type, entities_json))
+    data += padding
+
+    # entity_parameter
+    for e in room_entities:
+        data.append(get_entity_parameter(e, entities_json))
     data += padding
 
     return data

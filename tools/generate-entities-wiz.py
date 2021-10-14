@@ -36,6 +36,17 @@ def generate_wiz_code(entities_json, ms_export_orders_json):
                 out.write("}\n")
                 out.write("}\n")
 
+            p = ef.get('parameter')
+            if p:
+                if p['type'] == 'enum':
+                    out.write('\nenum init_parameter : u8 {\n')
+                    for v in p['values']:
+                        validate_name(v)
+                        out.write(f"  { v },\n")
+                    out.write('};\n\n')
+                else:
+                    ValueError(f"Unknown entity_function parameter type: { p['type'] }")
+
         out.write("}\n\n")
 
 

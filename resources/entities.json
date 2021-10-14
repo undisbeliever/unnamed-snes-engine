@@ -2,7 +2,11 @@
   "entity_functions": [
     {
       "name": "bouncing_off_walls",
-      "ms-export-order": "eight_direction_spinner"
+      "ms-export-order": "eight_direction_spinner",
+      "parameter": {
+        "type": "enum",
+        "values": ["right", "up_right", "up", "up_left", "left", "down_left", "down", "down_right" ]
+      }
     }
   ],
   "entities": [
