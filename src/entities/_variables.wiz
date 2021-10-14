@@ -45,6 +45,16 @@ namespace entities {
     }
 
 
+    in zeropage {
+        // The entityId of the current entity
+        //
+        // This variable is only valid during an entity's process function.
+        //
+        // (byte index)
+        var currentEntityId : u8;
+    }
+
+
     // Entity 0 is always the player
     namespace SoA {
         let LAST_INDEX = (N_ENTITIES - 1) * 2;
@@ -54,6 +64,9 @@ namespace entities {
             //
             // INPUT: X = entityId: index into `entities.SoA` Structure-of-Arrays.
             // RETURN: carry set if entity is still active in the next frame.
+            //
+            // NOTE: `currentEntityId` will contain a copy of `entityId` to provide an easy
+            //       way to restore the X register if it gets overwritten.
             //
             // DB = 0x7e
             #[mem8, idx8]

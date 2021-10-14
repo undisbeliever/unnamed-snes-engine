@@ -177,6 +177,7 @@ let _tmp = <:dpTmp0;
             __currentEntityTablePos = y;
 
             x = activeEntitiesTable[y];
+            currentEntityId = x;
             carry = entities.SoA.process_function[unaligned x](x);
             if !carry {
                 x = activeEntitiesTablePos;
@@ -192,12 +193,9 @@ let _tmp = <:dpTmp0;
 
                     x = a;
                 }
-                else {
-                    x = activeEntitiesTable[0];
-                }
 
-                // X = entityId of the recently deactivated entity
-                SoA.shadowSize[unaligned x] = 0 as ShadowSize;
+                x = currentEntityId;
+                SoA.shadowSize[unaligned x] = ShadowSize.NONE;
 
                 // Set process_function and ms_draw_function to a blank function (just in case they are accidentally called)
                 mem16();
