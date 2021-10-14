@@ -34,7 +34,7 @@ def get_metasprite_spritesheets(entities):
     # Python does not have an OrderedSet and I want this function to return a list of consistent order
     ss = OrderedDict()
 
-    for e in entities.values():
+    for e in entities:
         ms_ss = e['metasprites'].split('.')[0]
         ss[ms_ss] = None
 
@@ -42,15 +42,14 @@ def get_metasprite_spritesheets(entities):
 
 
 
-def generate_wiz_code(entities_json, mapping_json):
-    if len(mapping_json['entities']) > 254:
+def generate_wiz_code(entities_json):
+    entities = entities_json['entities']
+
+    if len(entities) > 254:
         raise ValueError("Too many entities")
 
-    for e in mapping_json['entities']:
-        validate_name(e)
-
-
-    entities = [entities_json["entities"][entity_name] for entity_name in mapping_json['entities']]
+    for e in entities:
+        validate_name(e['name'])
 
 
     with StringIO() as out:
@@ -70,7 +69,7 @@ import "../src/entities/_variables";
 
         out.write('\n')
 
-        for ss in get_metasprite_spritesheets(entities_json["entities"]):
+        for ss in get_metasprite_spritesheets(entities):
             out.write(f"""import "metasprites/{ ss }";\n""")
 
 
@@ -115,9 +114,7 @@ def parse_arguments():
     parser.add_argument('-o', '--output', required=True,
                         help='wiz output file')
     parser.add_argument('entities_json_file', action='store',
-                        help='entities  JSON  file input')
-    parser.add_argument('mappings_json_file', action='store',
-                        help='mappings  JSON  file input')
+                        help='entities JSON file input')
 
     args = parser.parse_args()
 
@@ -131,10 +128,7 @@ def main():
     with open(args.entities_json_file, 'r') as fp:
         entities = json.load(fp)
 
-    with open(args.mappings_json_file, 'r') as fp:
-        mapping = json.load(fp)
-
-    out = generate_wiz_code(entities, mapping)
+    out = generate_wiz_code(entities)
 
     with open(args.output, 'w') as fp:
         fp.write(out)

@@ -2,9 +2,6 @@
  "tilesets": [
    "dungeon"
  ],
- "entities": [
-   "skull__diagonal"
- ],
  "metasprite_spritesheets": [
    "dungeon"
  ],

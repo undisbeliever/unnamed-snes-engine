@@ -121,31 +121,40 @@ def parse_tmx_map(et):
 
 
 
-def create_entities_soa(entities, mapping):
-    if len(entities) > ENTITIES_IN_MAP:
-        raise ValueError(f"Too many entities in room ({ len(entities) }, max: { ENTITIES_IN_MAP }");
+def get_entity_index(name, entities_json):
+    for i, e in enumerate(entities_json['entities']):
+        if e['name'] == name:
+            return i
 
-    padding = bytes([ 0xff ] * (ENTITIES_IN_MAP - len(entities)))
+    raise ValueError(f"Unknown entity: { name }")
+
+
+
+def create_room_entities_soa(room_entities, entities_json):
+    if len(room_entities) > ENTITIES_IN_MAP:
+        raise ValueError(f"Too many entities in room ({ len(room_entities) }, max: { ENTITIES_IN_MAP }");
+
+    padding = bytes([ 0xff ] * (ENTITIES_IN_MAP - len(room_entities)))
 
     data = bytearray()
 
-    for e in entities:
+    for e in room_entities:
         data.append(e.x)
     data += padding
 
-    for e in entities:
+    for e in room_entities:
         data.append(e.y)
     data += padding
 
-    for e in entities:
-        data.append(mapping['entities'].index(e.type))
+    for e in room_entities:
+        data.append(get_entity_index(e.type, entities_json))
     data += padding
 
     return data
 
 
 
-def create_map_data(tmx_map, mapping):
+def create_map_data(tmx_map, mapping, entities_json):
     data = bytearray()
 
     try:
@@ -157,7 +166,7 @@ def create_map_data(tmx_map, mapping):
     # Tileset byte
     data.append(mapping['tilesets'].index(tmx_map.tileset.name))
 
-    data += create_entities_soa(tmx_map.entities, mapping)
+    data += create_room_entities_soa(tmx_map.entities, entities_json)
 
 
     return data
@@ -172,6 +181,8 @@ def parse_arguments():
                         help='tmx file input')
     parser.add_argument('mapping_filename', action='store',
                         help='mapping json file input')
+    parser.add_argument('entities_json_file', action='store',
+                        help='entities JSON file input')
 
     args = parser.parse_args()
 
@@ -188,9 +199,13 @@ def main():
     with open(args.mapping_filename, 'r') as fp:
         mapping = json.load(fp)
 
+    with open(args.entities_json_file, 'r') as fp:
+        entities = json.load(fp)
+
+
     tmx_map = parse_tmx_map(tmx_et)
 
-    map_data = create_map_data(tmx_map, mapping)
+    map_data = create_map_data(tmx_map, mapping, entities)
 
     with open(args.output, 'wb') as fp:
         fp.write(map_data)

@@ -82,18 +82,18 @@ gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palet
 	python3 tools/convert-tileset.py -o "$@" "resources/metatiles/$*-tiles.png" "resources/metatiles/$*-palette.png" "resources/metatiles/$*.tsx"
 
 
-gen/rooms/%.bin: resources/rooms/%.tmx resources/mappings.json tools/convert-room.py
-	python3 tools/convert-room.py -o "$@" "resources/rooms/$*.tmx" "resources/mappings.json"
+gen/rooms/%.bin: resources/rooms/%.tmx resources/mappings.json resources/entities.json tools/convert-room.py
+	python3 tools/convert-room.py -o "$@" "resources/rooms/$*.tmx" "resources/mappings.json" "resources/entities.json"
 
 
 gen/resource-lists.wiz: resources/mappings.json tools/generate-resource-lists.py
 	python3 tools/generate-resource-lists.py -o "$@" "resources/mappings.json"
 
-gen/entity-data.wiz: resources/entities.json resources/mappings.json tools/generate-entity-data.py
-	python3 tools/generate-entity-data.py -o "$@" "resources/entities.json" "resources/mappings.json"
-
 gen/rooms.wiz: resources/mappings.json $(ROOM_BINS) tools/generate-rooms-table.py
 	python3 tools/generate-rooms-table.py -o "$@" "resources/mappings.json" $(ROOM_BINS)
+
+gen/entity-data.wiz: resources/entities.json tools/generate-entity-data.py
+	python3 tools/generate-entity-data.py -o "$@" "resources/entities.json"
 
 gen/entities.wiz: resources/entities.json resources/ms-export-order.json tools/generate-entities-wiz.py
 	python3 tools/generate-entities-wiz.py -o "$@" "resources/entities.json" "resources/ms-export-order.json"

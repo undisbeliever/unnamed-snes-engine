@@ -5,12 +5,13 @@
       "ms-export-order": "eight_direction_spinner"
     }
   ],
-  "entities": {
-    "skull__diagonal": {
+  "entities": [
+    {
+      "name": "skull__diagonal",
       "code": "bouncing_off_walls",
       "metasprites": "dungeon.Skull",
       "shadowSize": "SMALL"
     }
-  }
+  ]
 }
 
