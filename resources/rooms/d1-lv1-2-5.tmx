@@ -6,7 +6,7 @@
    H4sIAAAAAAAAA+3SuRGCUBhF4VcAiuYsFoBCAYAUAEIDLg0ANoDQAEvJnIAZ/nlj4pgSfNk92TWUUjvsFy06HDUNPmJn4gALNpzFiOlL32MQOxcneDjj8iMfwdZv/Z99iAix8MRLrd+946FtrkiQIsNNqPEWfYlK2+QoMAOcPfrXgAMAAA==
   </data>
  </layer>
- <objectgroup id="2" name="Enemies" offsetx="16" offsety="0">
+ <objectgroup id="2" name="Enemies">
   <object id="6" type="skull__diagonal" x="176" y="112">
    <properties>
     <property name="parameter" value="right"/>

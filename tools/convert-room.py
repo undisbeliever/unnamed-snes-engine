@@ -69,6 +69,10 @@ def parse_layer_tag(tag):
 def parse_objectgroup_tag(tag):
     objects = list()
 
+    if 'offsetx' in tag.attrib or 'offsety' in tag.attrib:
+        raise ValueError('<objectgroup> tag must not have an offset')
+
+
     for child in tag:
         if child.tag == 'object':
             parameter = None
