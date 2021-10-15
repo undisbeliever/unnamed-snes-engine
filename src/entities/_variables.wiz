@@ -118,15 +118,6 @@ namespace entities {
             let metaSpriteFrame = &__msFrameAndBlank[0].first as *u8;
 
 
-            // MetaSprite frame address.
-            //
-            // You SHOULD NOT be reading or writing this variable.
-            // To change the MetaSprite frame you SHOULD call `metasprites.set_entity_frame()`.
-            //
-            // Points to a `metasprites.MsDataFormat` data structure
-            var _metaSpriteFrameAddr : [u16 ; N_ENTITIES];
-
-
             // Signed 16 bit X velocity
             var xVelocity : [ u16 ; N_ENTITIES ];
             let xVelocity_sx = &<:xVelocity[0] as *u8;

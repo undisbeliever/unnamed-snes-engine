@@ -221,16 +221,15 @@ let _tmp = <:dpTmp0;
 #[mem8, idx8]
 inline func draw_active_entities()
 {
-    y = activeEntitiesTablePos;
+    x = activeEntitiesTablePos;
     if !zero {
         do {
-            y--;
-            __currentEntityTablePos = y;
+            x--;
+            __currentEntityTablePos = x;
 
-            x = activeEntitiesTable[y];
-            metasprites._draw_entity__inline(x);
+            metasprites._draw_entity__inline(y = activeEntitiesTable[x]);
 
-            y = __currentEntityTablePos;
+            x = __currentEntityTablePos;
         } while !zero;
     }
 }

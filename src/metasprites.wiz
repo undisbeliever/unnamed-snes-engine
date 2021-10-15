@@ -442,57 +442,44 @@ inline func finalize_buffer() {
 // ================
 
 
-// Set the MetaSprite frame for a given entity
-//
-// KEEP: X
-//
-// DB = 0x7e
-#[mem8, idx8]
-func set_entity_frame(entityId : u8 in x, frameId : u8 in a) : u8 in x {
-
-    entities.SoA.metaSpriteFrame[unaligned x] = a;
-
-    mem16_idx16();
-    #[mem16, idx16] {
-        yy = xx;
-
-        aa = ((aa & 0xff) << 1) + entities.SoA.metaSpriteFrameTable[unaligned xx];
-
-        xx = aa;
-        aa = MetaSpriteFrameTableOffset[unaligned xx];
-
-        xx = yy;
-        entities.SoA._metaSpriteFrameAddr[unaligned xx] = aa;
-    }
-    mem8_idx8();
-
-    return x;
-}
-
-
-
 // Draw the entity's MetaSprite frame
 //
-// CLOBBERS: X
-//
 // DB = 0x7e
 #[mem8, idx8]
-inline func _draw_entity__inline(entityId : u8 in x) {
+inline func _draw_entity__inline(entityId : u8 in y) {
 
-    <:xPos = a = entities.SoA.xPos_px[unaligned x];
+    // Calculate MetaSprite position
+
+    <:xPos = a = entities.SoA.xPos_px[unaligned y];
     >:xPos = 0;
 
-    <:yPos = a = entities.SoA.yPos_px[unaligned x] - entities.SoA.zPos[unaligned x];
+    <:yPos = a = entities.SoA.yPos_px[unaligned y] - entities.SoA.zPos[unaligned y];
     a = 0;
     >:yPos = a = a -# 0;
 
 
-    idx16();
-    #[idx16] {
-        yy = entities.SoA._metaSpriteFrameAddr[unaligned xx];
-        entities.SoA.ms_draw_function[unaligned xx](yy, xPos, yPos);
+    a = entities.SoA.metaSpriteFrame[unaligned y];
+
+    mem16_idx16();
+    #[mem16, idx16] {
+
+        // Calculate MetaSprite Frame Address
+        aa = aa & 0xff;
+
+        // Safe: (aa << 1) will never set carry
+        xx = aa = (aa << 1) +# entities.SoA.metaSpriteFrameTable[unaligned yy];
+        aa = MetaSpriteFrameTableOffset[unaligned xx];
+
+        xx = yy;
+        yy = aa;
+
+
+        mem8();
+        #[mem8, idx16] {
+            entities.SoA.ms_draw_function[unaligned xx](yy, xPos, yPos);
+        }
     }
-    idx8();
+    mem8_idx8();
 }
 
 

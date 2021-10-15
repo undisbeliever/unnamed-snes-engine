@@ -61,7 +61,7 @@ func init(entityId : u8 in x, parameter : u8 in y) {
     }
     mem8();
 
-    metasprites.set_entity_frame(x, ms_frames.frame0);
+    SoA.metaSpriteFrame[unaligned x] = ms_frames.frame0;
 }
 
 
@@ -102,8 +102,7 @@ func process(entityId : u8 in x) : bool in carry {
         // Increment animation Frame
         a = SoA.metaSpriteFrame[x];
         a++;
-        a &= ANIMATION_FRAME_MASK;
-        metasprites.set_entity_frame(x, a);
+        SoA.metaSpriteFrame[x] = a = a & ANIMATION_FRAME_MASK;
     }
 
 
