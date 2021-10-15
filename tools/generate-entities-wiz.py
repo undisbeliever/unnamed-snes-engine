@@ -23,9 +23,10 @@ def generate_wiz_code(entities_json, ms_export_orders_json):
         for ef in entities_json["entity_functions"]:
             validate_name(ef['name'])
 
+            out.write(f"namespace { ef['name'] } {{\n")
+
             ef_ms_export_order = ef['ms-export-order']
             if ef_ms_export_order:
-                out.write(f"namespace { ef['name'] } {{\n")
                 out.write(f"// ms-export-order = { ef_ms_export_order }\n")
                 out.write("namespace ms_frames {\n")
 
@@ -34,18 +35,20 @@ def generate_wiz_code(entities_json, ms_export_orders_json):
                     out.write(f"  let { ms_frame } = { i };\n")
 
                 out.write("}\n")
-                out.write("}\n")
 
             p = ef.get('parameter')
             if p:
                 if p['type'] == 'enum':
-                    out.write('\nenum init_parameter : u8 {\n')
+                    out.write('enum init_parameter : u8 {\n')
                     for v in p['values']:
                         validate_name(v)
                         out.write(f"  { v },\n")
-                    out.write('};\n\n')
+                    out.write('};\n')
                 else:
                     ValueError(f"Unknown entity_function parameter type: { p['type'] }")
+
+            out.write("}\n\n")
+
 
         out.write("}\n\n")
 
