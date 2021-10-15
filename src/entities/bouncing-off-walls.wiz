@@ -75,6 +75,8 @@ func init(entityId : u8 in x, parameter : u8 in y) {
 func process(entityId : u8 in x) : bool in carry {
     metatiles.move_entity_and_collision_test(x);
 
+    // ::TODO player collision::
+
     a = SoA.movementState[x];
     if a & MovementState.X_AXIS_COLLISION != 0 {
         mem16();

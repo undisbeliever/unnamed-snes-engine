@@ -1,0 +1,315 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "_variables";
+import "_common";
+
+
+import "../metatiles";
+import "../metasprites";
+
+import "../../gen/entities";
+
+
+namespace entities {
+namespace crossbow_man {
+
+
+let SPEED = 0x00aa;
+
+let ANIMATION_DELAY = 15;
+let ANIMATION_FRAME_MASK = 0x3;
+
+
+// State must be in the same order as the MetaSprite frames
+enum State : u8 {
+    WALK_SOUTH = 0,
+    WALK_NORTH = 2,
+    WALK_EAST = 4,
+    WALK_WEST = 6,
+};
+
+
+let SoA_state            = SoA.state_0_l as *State;
+let SoA_animationCounter = SoA.state_0_h;
+
+
+
+in code {
+
+
+// Entity process routine.
+//
+// Called when the entity is spawned
+//
+// DB = 0x7e
+#[mem8, idx8]
+func init(entityId : u8 in x, parameter : u8 in y) {
+
+    if y == init_parameter.left as u8 {
+        set_direction_east(x);
+    }
+    else if y == init_parameter.right as u8 {
+        set_direction_west(x);
+    }
+    else if y == init_parameter.up as u8 {
+        set_direction_north(x);
+    }
+    else {
+        set_direction_south(x);
+    }
+}
+
+
+
+// Entity process routine.
+//
+// Called once per frame.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process(entityId : u8 in x) : bool in carry {
+
+    metatiles.move_entity_and_collision_test(x);
+
+
+    // ::TODO player collision ::
+
+
+    y = x;
+    x = SoA_state[y] as u8;
+
+    return process__walk_functions[unaligned x]();
+}
+
+
+const process__walk_functions = [
+    process__walk_south,
+    process__walk_north,
+    process__walk_east,
+    process__walk_west
+];
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__walk_south() : bool in carry {
+    x = currentEntityId;
+
+
+    // Check for a tile collision in the previous frame
+    a = SoA.movementState[x];
+    if a & MovementState.X_AXIS_COLLISION != 0 {
+        ^return set_direction_east(x);
+    }
+    else if a & MovementState.Y_AXIS_COLLISION != 0 {
+        ^return set_direction_north(x);
+    }
+
+
+    // ::TODO check for solid tile 2 tiles below the entity ::
+    // ::TODO lean left or right if player to the left/right ::
+    // ::TODO check for player and change state to FIRING_BOLT_SOUTH ::
+
+
+    return _update_walk_animation(x);
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__walk_north() : bool in carry {
+    x = currentEntityId;
+
+
+    // Check for a tile collision in the previous frame
+    a = SoA.movementState[x];
+    if a & MovementState.X_AXIS_COLLISION != 0 {
+        ^return set_direction_west(x);
+    }
+    else if a & MovementState.Y_AXIS_COLLISION != 0 {
+        ^return set_direction_south(x);
+    }
+
+
+    // ::TODO check for solid tile 2 tiles above the entity ::
+    // ::TODO lean left or right if player to the left/right ::
+    // ::TODO check for player and change state to FIRING_BOLT_NORTH ::
+
+
+    return _update_walk_animation(x);
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__walk_east() : bool in carry {
+    x = currentEntityId;
+
+
+    // Check for a tile collision in the previous frame
+    a = SoA.movementState[x];
+    if a & MovementState.X_AXIS_COLLISION != 0 {
+        ^return set_direction_west(x);
+    }
+    else if a & MovementState.Y_AXIS_COLLISION != 0 {
+        ^return set_direction_north(x);
+    }
+
+
+    // ::TODO check for solid tile 2 tiles to the right of the entity ::
+    // ::TODO lean up or down if player to the up/down ::
+    // ::TODO check for player and change state to FIRING_BOLT_EAST ::
+
+
+    return _update_walk_animation(x);
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__walk_west() : bool in carry {
+    x = currentEntityId;
+
+
+    // Check for a tile collision in the previous frame
+    a = SoA.movementState[x];
+    if a & MovementState.X_AXIS_COLLISION != 0 {
+        ^return set_direction_east(x);
+    }
+    else if a & MovementState.Y_AXIS_COLLISION != 0 {
+        ^return set_direction_south(x);
+    }
+
+
+    // ::TODO check for solid tile 2 tiles to the left of the entity ::
+    // ::TODO lean up or down if player to the up/down ::
+    // ::TODO check for player and change state to FIRING_BOLT_WEST ::
+
+
+    return _update_walk_animation(x);
+}
+
+
+
+
+
+// returns true
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _update_walk_animation(entityId : u8 in x) : bool in carry {
+let _tmp = <:dpTmp0;
+
+    SoA_animationCounter[x]--;
+    if negative {
+        SoA_animationCounter[x] = a = ANIMATION_DELAY - 1;
+
+        // Increment animation Frame
+        a = SoA.metaSpriteFrame[x];
+        a++;
+        _tmp = a = a & ANIMATION_FRAME_MASK;
+
+        SoA.metaSpriteFrame[x] = a = (SoA.metaSpriteFrame[x] & (ANIMATION_FRAME_MASK ^ 0xff)) | _tmp;
+    }
+
+    return true;
+}
+
+
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_direction_south(entityId : u8 in x) : bool in carry {
+    SoA_state[x] = State.WALK_SOUTH;
+
+    SoA.metaSpriteFrame[x] = ms_frames.south0;
+    SoA_animationCounter[x] = 0;
+
+    mem16();
+    #[mem16] {
+        SoA.xVelocity[unaligned x] = 0;
+        SoA.yVelocity[unaligned x] = aa = SPEED as u16;
+    }
+    mem8();
+
+    return true;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_direction_north(entityId : u8 in x) : bool in carry {
+    a = State.WALK_NORTH as u8;
+    SoA_state[x] = a as State;
+
+    SoA.metaSpriteFrame[x] = a = ms_frames.north0;
+    SoA_animationCounter[x] = 0;
+
+    mem16();
+    #[mem16] {
+        SoA.xVelocity[unaligned x] = 0;
+        SoA.yVelocity[unaligned x] = aa = -SPEED as u16;
+    }
+    mem8();
+
+    return true;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_direction_east(entityId : u8 in x) : bool in carry {
+    a = State.WALK_EAST as u8;
+    SoA_state[x] = a as State;
+
+    SoA.metaSpriteFrame[x] = a = ms_frames.east0;
+    SoA_animationCounter[x] = 0;
+
+    mem16();
+    #[mem16] {
+        SoA.xVelocity[unaligned x] = aa = SPEED;
+        SoA.yVelocity[unaligned x] = 0;
+    }
+    mem8();
+
+    return true;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_direction_west(entityId : u8 in x) : bool in carry {
+    a = State.WALK_WEST as u8;
+    SoA_state[x] = a as State;
+
+    SoA.metaSpriteFrame[x] = a = ms_frames.west0;
+    SoA_animationCounter[x] = 0;
+
+    mem16();
+    #[mem16] {
+        SoA.xVelocity[unaligned x] = aa = -SPEED as u16;
+        SoA.yVelocity[unaligned x] = 0;
+    }
+    mem8();
+
+    return true;
+}
+
+
+}
+
+}
+}
+

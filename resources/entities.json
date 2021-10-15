@@ -5,13 +5,43 @@
       "ms-export-order": "eight_direction_spinner",
       "parameter": {
         "type": "enum",
-        "values": ["right", "up_right", "up", "up_left", "left", "down_left", "down", "down_right" ]
+        "values": [ "right", "up_right", "up", "up_left", "left", "down_left", "down", "down_right" ]
+      }
+    },
+    {
+      "name": "crossbow_man",
+      "ms-export-order": "crossbow_man",
+      "parameter": {
+        "type": "enum",
+        "values": [ "down", "up", "left", "right" ]
+      }
+    },
+    {
+      "name": "skeleton",
+      "ms-export-order": "skeleton",
+      "parameter": {
+        "type": "enum",
+        "values": [ "down", "up", "left", "right" ]
       }
     }
   ],
   "entities": [
     {
-      "name": "skull__diagonal",
+      "name": "crossbow_man",
+      "code": "crossbow_man",
+      "metasprites": "dungeon.CrossbowMan",
+      "shadowSize": "MEDIUM",
+      "zpos": "0"
+    },
+    {
+      "name": "skeleton",
+      "code": "skeleton",
+      "metasprites": "dungeon.Skeleton",
+      "shadowSize": "MEDIUM",
+      "zpos": "0"
+    },
+    {
+      "name": "skull",
       "code": "bouncing_off_walls",
       "metasprites": "dungeon.Skull",
       "shadowSize": "SMALL",
