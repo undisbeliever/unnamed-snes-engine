@@ -221,16 +221,82 @@ let _tmp = <:dpTmp0;
 #[mem8, idx8]
 inline func draw_active_entities()
 {
-    x = numberOfActiveEntities;
-    if !zero {
+    x = 0;
+    if x < numberOfActiveEntities {
         do {
-            x--;
             __currentEntityTablePos = x;
 
             metasprites._draw_entity__inline(y = activeEntitiesTable[x]);
 
             x = __currentEntityTablePos;
-        } while !zero;
+            x++;
+        } while x < numberOfActiveEntities;
+    }
+}
+
+
+
+// Sort the active entities by their Y position.
+//
+// This function is not inline so I can measure its CPU usage with Mesen-S.
+//
+// Insertion sort.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func sort_active_entities()
+{
+    // Thanks Wikipedia for the Insertion sort algorithm.
+    //
+    // "Insertion sort."  Wikipedia, The Free Encyclopedia.
+    // https://en.wikipedia.org/wiki/Insertion_sort#Algorithm
+    // (accessed October 16, 2021).
+
+
+let _entityId = >:dpTmp0;
+let _yPosToCompare = <:dpTmp0;
+
+
+    // A = yPos to compare
+    // X = index into activeEntitiesTable
+    // Y = index into entities SoA
+
+
+    x = 1;
+    if x < numberOfActiveEntities {
+        do {
+            y = activeEntitiesTable[x];
+            a = entities.SoA.yPos_px[y];
+
+            _entityId = y;
+
+            y = (&activeEntitiesTable[-1])[x];
+            if a < entities.SoA.yPos_px[y] {
+                __currentEntityTablePos = x;
+
+                _yPosToCompare = a;
+
+                do {
+                    // ::ANNOY no `sty addr,x` instruction on the 65816::
+                    // If I could use `sty addr,x` then I could remove `_yPosToCompare` and store it in A.
+                    activeEntitiesTable[x] = a = y;
+
+                    x--;
+                    break if zero;
+
+                    a = _yPosToCompare;
+
+                    y = (&activeEntitiesTable[-1])[x];
+                } while a < entities.SoA.yPos_px[y];
+
+
+                activeEntitiesTable[x] = a = _entityId;
+
+                x = __currentEntityTablePos;
+            }
+
+            x++;
+        } while x < numberOfActiveEntities;
     }
 }
 

@@ -314,6 +314,8 @@ func run_game {
 
         entities.process_active_entities();
 
+        entities.sort_active_entities();
+
         draw_entities();
 
 
