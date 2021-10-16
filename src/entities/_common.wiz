@@ -60,7 +60,7 @@ func init() {
 
     // Populate `activeEntitiesTable`
     {
-        activeEntitiesTablePos = 0;
+        numberOfActiveEntities = 0;
 
         a = SoA.LAST_INDEX;
         x = ACTIVE_ENTITIES_TABLE__LAST_POS;
@@ -92,14 +92,14 @@ let _init_function_ptr = _init_function_u16 as func(u8 in x, u8 in y);
     ^if a < N_ENTITY_TYPES {
 
         // Retrieve the next unused entity from the `activeEntitiesTable` (if one is available)
-        x = activeEntitiesTablePos;
+        x = numberOfActiveEntities;
         ^if x < sizeof(typeof(activeEntitiesTable)) {
             // This code path MUST spawn an entity
             push8(y);
 
             y = activeEntitiesTable[x];
             // mark entity active
-            activeEntitiesTablePos = ++x;
+            numberOfActiveEntities = ++x;
 
 
             x = a;
@@ -171,7 +171,7 @@ inline func process_active_entities()
 {
 let _tmp = <:dpTmp0;
 
-    y = activeEntitiesTablePos;
+    y = numberOfActiveEntities;
     if !zero {
         do {
             y--;
@@ -181,9 +181,9 @@ let _tmp = <:dpTmp0;
             currentEntityId = x;
             carry = entities.SoA.process_function[unaligned x](x);
             if !carry {
-                x = activeEntitiesTablePos;
+                x = numberOfActiveEntities;
                 x--;
-                activeEntitiesTablePos = x;
+                numberOfActiveEntities = x;
                 if !zero {
                     // Remove entity from active pool
                     y = __currentEntityTablePos;
@@ -221,7 +221,7 @@ let _tmp = <:dpTmp0;
 #[mem8, idx8]
 inline func draw_active_entities()
 {
-    x = activeEntitiesTablePos;
+    x = numberOfActiveEntities;
     if !zero {
         do {
             x--;
