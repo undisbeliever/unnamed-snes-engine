@@ -181,31 +181,45 @@ let _tmp = <:dpTmp0;
             currentEntityId = x;
             carry = entities.SoA.process_function[unaligned x](x);
             if !carry {
-                x = numberOfActiveEntities;
-                x--;
-                numberOfActiveEntities = x;
-                if !zero {
-                    // Remove entity from active pool
-                    y = __currentEntityTablePos;
+                // Entity no longer active
 
-                    _tmp = a = activeEntitiesTable[y];
-                    activeEntitiesTable[y] = a = activeEntitiesTable[x];
-                    activeEntitiesTable[x] = a = _tmp;
 
-                    x = a;
-                }
+                // Remove entity from active entities list, preserving active entity order.
+                //
+                // Preserving entity order should be friendlier to `sort_active_entities()`.
+                numberOfActiveEntities--;
 
-                x = currentEntityId;
-                SoA.shadowSize[unaligned x] = ShadowSize.NONE;
-
-                // Set process_function and ms_draw_function to a blank function (just in case they are accidentally called)
                 mem16();
                 #[mem16] {
+                    // ASSUMES numberOfActiveEntities <= ACTIVE_ENTITIES_TABLE__LAST_POS
+                    // ASSUMES numberOfActiveEntities < sizeof(activeEntitiesTable)
+
+                    x = __currentEntityTablePos;
+                    if x < numberOfActiveEntities {
+                        do {
+                            // Swap activeEntitiesTable[x] and activeEntitiesTable[x + 1]
+                            aa = (&activeEntitiesTable as *u16)[unaligned x];
+                            swap_bytes(aa);
+                            (&activeEntitiesTable as *u16)[unaligned x] = aa;
+
+                            x++;
+                        } while x < numberOfActiveEntities;
+                    }
+
+
+                    // Set process_function and ms_draw_function to a blank function (just in case they are accidentally called)
+                    x = currentEntityId;
                     aa = _blank_entity_function as u16;
                     entities.SoA.process_function[unaligned x] = aa as func(u8 in x) : bool in carry;
                     entities.SoA.ms_draw_function[unaligned x] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
                 }
                 mem8();
+
+
+                // Do not draw a shadow on unused entities.
+                //
+                // X is currentEntityId;
+                SoA.shadowSize[unaligned x] = ShadowSize.NONE;
             }
 
             y = __currentEntityTablePos;
