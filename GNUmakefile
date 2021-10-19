@@ -64,13 +64,13 @@ endif
 
 
 
-gen/%-2bpp-tiles.tiles gen/%-2bpp-tiles.pal &: resources/%-2bpp-tiles.png
+gen/%-2bpp-tiles.tiles gen/%-2bpp-tiles.pal &: resources/%-2bpp-tiles.png tools/png2snes.py tools/_snes.py
 	python3 tools/png2snes.py -f 2bpp -t gen/$*-2bpp-tiles.tiles -p gen/$*-2bpp-tiles.pal $<
 
-gen/%-4bpp-tiles.tiles gen/%-4bpp-tiles.pal &: resources/%-4bpp-tiles.png
+gen/%-4bpp-tiles.tiles gen/%-4bpp-tiles.pal &: resources/%-4bpp-tiles.png tools/png2snes.py tools/_snes.py
 	python3 tools/png2snes.py -f 4bpp -t gen/$*-4bpp-tiles.tiles -p gen/$*-4bpp-tiles.pal $<
 
-gen/%-8bpp-tiles.tiles gen/%-8bpp-tiles.pal &: resources/%-8bpp-tiles.png
+gen/%-8bpp-tiles.tiles gen/%-8bpp-tiles.pal &: resources/%-8bpp-tiles.png tools/png2snes.py tools/_snes.py
 	python3 tools/png2snes.py -f 8bpp -t gen/$*-8bpp-tiles.tiles -p gen/$*-8bpp-tiles.pal $<
 
 RESOURCES += $(2BPP_TILES) $(2BPP_PALETTES)
@@ -78,7 +78,7 @@ RESOURCES += $(4BPP_TILES) $(4BPP_PALETTES)
 RESOURCES += $(8BPP_TILES) $(8BPP_PALETTES)
 
 
-gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palette.png resources/metatiles/%.tsx tools/convert-tileset.py
+gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palette.png resources/metatiles/%.tsx tools/convert-tileset.py tools/_snes.py
 	python3 tools/convert-tileset.py -o "$@" "resources/metatiles/$*-tiles.png" "resources/metatiles/$*-palette.png" "resources/metatiles/$*.tsx"
 
 
@@ -98,7 +98,7 @@ gen/entity-data.wiz: resources/entities.json tools/generate-entity-data.py
 gen/entities.wiz: resources/entities.json resources/ms-export-order.json tools/generate-entities-wiz.py
 	python3 tools/generate-entities-wiz.py -o "$@" "resources/entities.json" "resources/ms-export-order.json"
 
-gen/metasprites/%.wiz gen/metasprites/%.bin: resources/metasprites/%.png resources/metasprites/%-palette.png resources/metasprites/%.json resources/ms-export-order.json tools/convert-metasprite.py
+gen/metasprites/%.wiz gen/metasprites/%.bin: resources/metasprites/%.png resources/metasprites/%-palette.png resources/metasprites/%.json resources/ms-export-order.json tools/convert-metasprite.py tools/_snes.py
 	python3 tools/convert-metasprite.py --ppu-output "gen/metasprites/$*.bin" --wiz-output "gen/metasprites/$*.wiz" "resources/metasprites/$*.png" "resources/metasprites/$*-palette.png" "resources/metasprites/$*.json" "resources/ms-export-order.json"
 
 

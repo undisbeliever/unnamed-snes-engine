@@ -5,9 +5,10 @@
 
 import PIL.Image
 import argparse
-import itertools
 import xml.etree.ElementTree
-from collections import namedtuple
+
+
+from _snes import image_to_snes
 
 
 TILE_DATA_BPP = 4
@@ -16,153 +17,6 @@ DEFAULT_ORDER_BIT = 0
 
 
 TILE_PROPERTY_SOLID_BIT = 7
-
-
-TileMapEntry = namedtuple('TileMapEntry', ('tile_id', 'palette_id', 'hflip', 'vflip'))
-
-
-def convert_rgb_color(c):
-    r, g, b = c
-
-    b = (b >> 3) & 31;
-    g = (g >> 3) & 31;
-    r = (r >> 3) & 31;
-
-    return (b << 10) | (g << 5) | r;
-
-
-def convert_snes_tileset_4bpp(tiles):
-    out = bytearray()
-
-    for tile in tiles:
-        for b in range(0, TILE_DATA_BPP, 2):
-            for y in range(0, 8):
-                for bi in range(b, min(b+2, TILE_DATA_BPP)):
-                    byte = 0
-                    mask = 1 << bi
-                    for x in range(0, 8):
-                        byte <<= 1
-                        if tile[x + y * 8] & mask:
-                            byte |= 1
-                    out.append(byte)
-    return out
-
-
-
-def extract_tiles(image):
-    """ Extracts 8x8px tiles from the image. """
-
-    if image.mode != 'RGB':
-        image = image.convert('RGB')
-
-
-    if image.width != 256 or image.height != 256:
-        raise ValueError('Tileset Image MUST BE 256x256 px in size')
-
-    for ty in range(0, 256, 8):
-        for tx in range(0, 256, 8):
-
-            tile_data = list()
-
-            for y in range(ty, ty + 8):
-                for x in range(tx, tx + 8):
-                    tile_data.append(convert_rgb_color(image.getpixel((x, y))))
-
-            yield tile_data
-
-
-
-def convert_palette(image):
-    if image.mode != 'RGB':
-        image = image.convert('RGB')
-
-    if image.width != 16 or image.height != 8:
-        raise Value('Palette Image MUST BE 16x8 px in size')
-
-    palette = list()
-
-    for y in range(0, image.height):
-
-        pal_line = list()
-        pal_map = dict()
-
-        for x in range(16):
-            c = convert_rgb_color(image.getpixel((x, y)))
-
-            pal_line.append(c)
-            if c not in pal_map:
-                pal_map[c] = x
-
-        palette.append((pal_line, pal_map))
-
-    return palette
-
-
-
-def get_palette_id(tile, palettes):
-    # Returns a tuple of (palette_id, palette_map)
-    for palette_id, _pal in enumerate(palettes):
-        pal_map = _pal[1]
-
-        if all([c in pal_map for c in tile]):
-            return palette_id, pal_map
-
-    return None, None
-
-
-
-H_FLIP_ORDER = [ (y * 8 + x) for y, x in itertools.product(range(8), reversed(range(8))) ]
-V_FLIP_ORDER = [ (y * 8 + x) for y, x in itertools.product(reversed(range(8)), range(8)) ]
-
-def hflip_tile(tile):
-    return bytes([ tile[i] for i in H_FLIP_ORDER ])
-
-def vflip_tile(tile):
-    return bytes([ tile[i] for i in V_FLIP_ORDER ])
-
-
-
-def convert_tilemap_and_tileset(tiles, palettes):
-    # Returns a tuple(tilemap, tileset)
-
-    invalid_tiles = list()
-
-    tilemap = list()
-    tileset = list()
-
-    tileset_map = dict()
-
-    for tile_index, tile in enumerate(tiles):
-        palette_id, palette_map = get_palette_id(tile, palettes)
-
-        if palette_map:
-            # Must be bytes() here as a dict() key must be immutable
-            tile_data = bytes([palette_map[c] for c in tile])
-
-            tile_match = tileset_map.get(tile_data, None)
-            if tile_match is None:
-                tile_id = len(tileset)
-                tile_match = tile_id, False, False
-
-                tileset.append(tile_data)
-
-                h_tile_data = hflip_tile(tile_data)
-                v_tile_data = vflip_tile(tile_data)
-                hv_tile_data = vflip_tile(h_tile_data)
-
-                tileset_map[tile_data] = tile_match
-                tileset_map.setdefault(h_tile_data, (tile_id, True, False))
-                tileset_map.setdefault(v_tile_data, (tile_id, False, True))
-                tileset_map.setdefault(hv_tile_data, (tile_id, True, True))
-
-            tilemap.append(TileMapEntry(tile_id=tile_match[0], palette_id=palette_id, hflip=tile_match[1], vflip=tile_match[2]))
-        else:
-            invalid_tiles.append(tile_index)
-
-    if invalid_tiles:
-        raise ValueError(f"Cannot find palette for tiles {invalid_tiles}")
-
-    return tilemap, tileset
 
 
 
@@ -238,7 +92,7 @@ def create_properties_array(tsx_et):
 
 
 
-def create_tileset_data(palette, tile_data, metatile_map, properties):
+def create_tileset_data(palette_data, tile_data, metatile_map, properties):
     data = bytearray()
 
     # First Word: tile data size
@@ -255,10 +109,9 @@ def create_tileset_data(palette, tile_data, metatile_map, properties):
     data += properties
 
     # Next 256 bytes = palette data
-    for pal, p_map in palette:
-        for c in pal:
-            data.append(c & 0xff)
-            data.append(c >> 8)
+    data += palette_data
+    data += bytes(0) * (256 - len(palette_data))
+
     assert(len(data) == 2 + 2048 + 256 * 2)
 
     # Next data: tile data
@@ -288,20 +141,20 @@ def parse_arguments():
 def main():
     args = parse_arguments()
 
-    with PIL.Image.open(args.palette_filename) as palImage:
-        palette = convert_palette(palImage)
-
+    with PIL.Image.open(args.palette_filename) as palette_image:
         with PIL.Image.open(args.image_filename) as image:
-            tilemap, tileset = convert_tilemap_and_tileset(extract_tiles(image), palette)
+            if image.width != 256 or image.height != 256:
+                raise ValueError('Tileset Image MUST BE 256x256 px in size')
+
+            tilemap, tile_data, palette_data = image_to_snes(image, palette_image, TILE_DATA_BPP)
 
     with open(args.tsx_filename, 'r') as tsx_fp:
         tsx_et = xml.etree.ElementTree.parse(tsx_fp)
 
     metatile_map = create_metatile_map(tilemap)
-    tile_data = convert_snes_tileset_4bpp(tileset)
     properties = create_properties_array(tsx_et)
 
-    tileset_data = create_tileset_data(palette, tile_data, metatile_map, properties)
+    tileset_data = create_tileset_data(palette_data, tile_data, metatile_map, properties)
 
     with open(args.output, 'wb') as fp:
         fp.write(tileset_data)

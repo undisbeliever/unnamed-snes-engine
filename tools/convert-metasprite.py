@@ -11,107 +11,16 @@ from collections import namedtuple
 from io import StringIO
 
 
+from _snes import convert_rgb_color, extract_tileset_tiles, convert_snes_tileset, create_palettes_map, get_palette_id, convert_palette_image
+
+
 TILE_DATA_BPP = 4
 
 ROM_BANK = 'rodata0'
 
 
-def convert_rgb_color(c):
-    r, g, b = c
 
-    b = (b >> 3) & 31;
-    g = (g >> 3) & 31;
-    r = (r >> 3) & 31;
-
-    return (b << 10) | (g << 5) | r;
-
-
-
-def convert_snes_tileset_4bpp(tiles):
-    out = bytearray()
-
-    for tile in tiles:
-        for b in range(0, TILE_DATA_BPP, 2):
-            for y in range(0, 8):
-                for bi in range(b, min(b+2, TILE_DATA_BPP)):
-                    byte = 0
-                    mask = 1 << bi
-                    for x in range(0, 8):
-                        byte <<= 1
-                        if tile[x + y * 8] & mask:
-                            byte |= 1
-                    out.append(byte)
-    return out
-
-
-
-def extract_tiles(image):
-    """ Extracts 8x8px tiles from the image. """
-
-    if image.mode != 'RGB':
-        image = image.convert('RGB')
-
-
-    if image.width != 128:
-        raise ValueError('MetaSprite Tileset Image MUST BE 128 px in width')
-
-    if image.height % 8 != 0:
-        raise ValueError('MetaSprite Tileset Image height MUST BE multiple of 8')
-
-
-    for ty in range(0, image.height, 8):
-        for tx in range(0, image.width, 8):
-
-            tile_data = list()
-
-            for y in range(ty, ty + 8):
-                for x in range(tx, tx + 8):
-                    tile_data.append(convert_rgb_color(image.getpixel((x, y))))
-
-            yield tile_data
-
-
-
-def convert_palette(image):
-    if image.mode != 'RGB':
-        image = image.convert('RGB')
-
-    if image.width != 16 or image.height != 8:
-        raise Value('Palette Image MUST BE 16x8 px in size')
-
-    palette = list()
-
-    for y in range(0, image.height):
-
-        pal_line = list()
-        pal_map = dict()
-
-        for x in range(16):
-            c = convert_rgb_color(image.getpixel((x, y)))
-
-            pal_line.append(c)
-            if c not in pal_map:
-                pal_map[c] = x
-
-        palette.append((pal_line, pal_map))
-
-    return palette
-
-
-
-def get_palette_id(tile, palettes):
-    # Returns a tuple of (palette_id, palette_map)
-    for palette_id, _pal in enumerate(palettes):
-        pal_map = _pal[1]
-
-        if all([c in pal_map for c in tile]):
-            return palette_id, pal_map
-
-    return None, None
-
-
-
-def convert_tileset(tiles, palettes):
+def convert_tileset(tiles, palettes_map):
     # Returns a tuple(tileset, tile_palette_map)
 
     invalid_tiles = list()
@@ -120,10 +29,10 @@ def convert_tileset(tiles, palettes):
     tile_palette_map = list()
 
     for tile_index, tile in enumerate(tiles):
-        palette_id, palette_map = get_palette_id(tile, palettes)
+        palette_id, pal_map = get_palette_id(tile, palettes_map)
 
-        if palette_map:
-            tile_data = bytes([palette_map[c] for c in tile])
+        if pal_map:
+            tile_data = bytes([pal_map[c] for c in tile])
 
             tileset.append(tile_data)
             tile_palette_map.append(palette_id)
@@ -509,8 +418,8 @@ namespace ms {
 
 
 
-def generate_ppu_data(palette, tileset):
-    tile_data = convert_snes_tileset_4bpp(tileset)
+def generate_ppu_data(palette_data, tileset):
+    tile_data = convert_snes_tileset(tileset, TILE_DATA_BPP)
 
 
     data = bytearray()
@@ -520,10 +429,7 @@ def generate_ppu_data(palette, tileset):
     data.append(len(tile_data) >> 8)
 
     # Next 256 bytes = palette data
-    for pal, p_map in palette:
-        for c in pal:
-            data.append(c & 0xff)
-            data.append(c >> 8)
+    data += palette_data
     assert(len(data) == 128 * 2 + 2)
 
     data += tile_data
@@ -556,11 +462,18 @@ def parse_arguments():
 def main():
     args = parse_arguments()
 
-    with PIL.Image.open(args.palette_filename) as palImage:
-        palette = convert_palette(palImage)
+    with PIL.Image.open(args.palette_filename) as palette_image:
+        if palette_image.width != 16 or palette_image.height != 8:
+            raise ValueError('Palette Image MUST BE 16x8 px in size')
+
+        palettes_map = create_palettes_map(palette_image, TILE_DATA_BPP)
+        palette_data = convert_palette_image(palette_image)
 
         with PIL.Image.open(args.image_filename) as image:
-            tileset, tile_palette_map = convert_tileset(extract_tiles(image), palette)
+            if image.width != 128:
+                raise ValueError('MetaSprite Tileset Image MUST BE 128 px in width')
+
+            tileset, tile_palette_map = convert_tileset(extract_tileset_tiles(image), palettes_map)
 
     with open(args.json_filename, 'r') as json_fp:
         input_data = json.load(json_fp)
@@ -577,7 +490,7 @@ def main():
 
     metasprites = build_metasprites(input_data, ms_export_orders, tile_offset, tile_palette_map)
 
-    ppu_data = generate_ppu_data(palette, tileset)
+    ppu_data = generate_ppu_data(palette_data, tileset)
     wiz_data = generate_wiz_data(metasprites,
                                  os.path.splitext(os.path.basename(args.wiz_output))[0],
                                  os.path.relpath(args.ppu_output, os.path.dirname(args.wiz_output)))
