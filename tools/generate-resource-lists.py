@@ -3,28 +3,15 @@
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
 
-import re
-import json
 import argparse
 from io import StringIO
 
-
-
-def validate_mapping_json(mapping):
-    regex = re.compile('[a-zA-Z0-9_]+$')
-
-    def test_list(l):
-        for i in l:
-            if not regex.match(i):
-                raise ValueError(f"Invalid name: {i}")
-
-    test_list(mapping['tilesets'])
-    test_list(mapping['metasprite_spritesheets'])
+from _json_formats import load_mappings_json
 
 
 
-def generate_wiz_code(mapping):
-    ms_spritesheet_ppu_data = [ f"resources.ms_ppu_data.{ ss }" for ss in mapping['metasprite_spritesheets'] ]
+def generate_wiz_code(mappings):
+    ms_spritesheet_ppu_data = [ f"resources.ms_ppu_data.{ ss }" for ss in mappings.metasprite_spritesheets ]
 
 
     with StringIO() as out:
@@ -40,7 +27,7 @@ namespace resources {
   namespace metatile_tilesets {
 """)
 
-        out.write(f"    let _tilesets = [ { ', '.join(mapping['tilesets']) } ];")
+        out.write(f"    let _tilesets = [ { ', '.join(mappings.tilesets) } ];")
 
         out.write("""
   }
@@ -75,12 +62,9 @@ def parse_arguments():
 def main():
     args = parse_arguments()
 
-    with open(args.mappings_json_file, 'r') as fp:
-        mapping = json.load(fp)
+    mappings = load_mappings_json(args.mappings_json_file)
 
-    validate_mapping_json(mapping)
-
-    out = generate_wiz_code(mapping)
+    out = generate_wiz_code(mappings)
 
     with open(args.output, 'w') as fp:
         fp.write(out)

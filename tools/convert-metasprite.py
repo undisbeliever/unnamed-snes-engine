@@ -13,6 +13,8 @@ from io import StringIO
 
 from _snes import convert_rgb_color, extract_tileset_tiles, convert_snes_tileset, create_palettes_map, get_palette_id, convert_palette_image
 
+from _json_formats import load_ms_export_order_json
+
 
 TILE_DATA_BPP = 4
 
@@ -355,7 +357,7 @@ def build_metasprites(input_data, ms_export_orders, tile_offset, tile_palette_ma
 
         ss_export_order = ms_export_orders[ss.ms_export_order]
 
-        frames = [ build_frame(ss.frames[f], tile_offset, tile_palette_map) for f in ss_export_order['frames'] ]
+        frames = [ build_frame(ss.frames[f], tile_offset, tile_palette_map) for f in ss_export_order.frames ]
 
         out.append(SpriteSheet(ss.name, ss.pattern, ss.ms_export_order, frames))
 
@@ -478,8 +480,7 @@ def main():
     with open(args.json_filename, 'r') as json_fp:
         input_data = json.load(json_fp)
 
-    with open(args.ms_export_order_json_file, 'r') as json_fp:
-        ms_export_orders = json.load(json_fp)
+    ms_export_orders = load_ms_export_order_json(args.ms_export_order_json_file)
 
 
     if os.path.basename(args.json_filename) == 'common.json':

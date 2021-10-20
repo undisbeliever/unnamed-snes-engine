@@ -4,12 +4,13 @@
 
 
 import re
-import json
 import os.path
 import argparse
 
 from io import StringIO
 from collections import OrderedDict
+
+from _json_formats import load_mappings_json
 
 
 
@@ -24,19 +25,17 @@ def extract_locations(room_filenames):
 
 
 
-def build_room_table(room_filenames, mapping_json):
-    dungeon_positions = mapping_json['dungeons']
-
+def build_room_table(room_filenames, mappings):
     table = list()
     for y in range(16):
         table.append([ None ] * 16 )
 
 
     for name, d, x, y in extract_locations(room_filenames):
-        dp = dungeon_positions[d]
+        dp = mappings.dungeons[d]
 
-        x += int(dp['x_offset'])
-        y += int(dp['y_offset'])
+        x += int(dp.x_offset)
+        y += int(dp.y_offset)
 
         if table[y][x] is not None:
             raise RuntimeError(f"Overlapping room: cannot place { name } at position ({ x }, { y }), it is occupied by { table[y][x] }")
@@ -73,8 +72,9 @@ def convert_room_table(rooms, table):
     return out
 
 
-def find_starting_room(rooms, table, mapping_json):
-    return table.index(rooms[mapping_json['starting_room']])
+
+def find_starting_room(rooms, table, mappings):
+    return table.index(rooms[mappings.starting_room])
 
 
 
@@ -131,15 +131,14 @@ def parse_arguments():
 def main():
     args = parse_arguments()
 
-    with open(args.mapping_filename, 'r') as fp:
-        mapping_json = json.load(fp)
+    mappings = load_mappings_json(args.mapping_filename)
 
     rooms = build_room_mapping(args.rooms)
-    table_str = build_room_table(args.rooms, mapping_json)
+    table_str = build_room_table(args.rooms, mappings)
 
     table = convert_room_table(rooms, table_str)
 
-    starting_room = find_starting_room(rooms, table, mapping_json)
+    starting_room = find_starting_room(rooms, table, mappings)
 
     out = generate_wiz_code(rooms, table, starting_room)
 

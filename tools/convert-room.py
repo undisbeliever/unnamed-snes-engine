@@ -4,13 +4,14 @@
 
 
 import gzip
-import json
 import base64
 import struct
 import argparse
 import xml.etree.ElementTree
 import posixpath
 from collections import namedtuple
+
+from _json_formats import load_entities_json, load_mappings_json
 
 
 MAP_WIDTH = 16
@@ -140,37 +141,14 @@ def parse_tmx_map(et):
 
 
 
-def get_entity_index(name, entities_json):
-    for i, e in enumerate(entities_json['entities']):
-        if e['name'] == name:
-            return i
+def get_entity_parameter(e, entities):
+    p = entities[e.type].code.parameter
 
-    raise ValueError(f"Unknown entity: { name }")
-
-
-
-def get_entity_function(entity_name, entities_json):
-    e = entities_json['entities'][get_entity_index(entity_name, entities_json)]
-
-    ef_name = e['code']
-
-    for i, ef in enumerate(entities_json['entity_functions']):
-        if ef['name'] == ef_name:
-            return ef
-
-    raise ValueError(f"Unknown entity function: { ef_name }")
-
-
-
-def get_entity_parameter(e, entities_json):
-    ef = get_entity_function(e.type, entities_json)
-
-    p = ef.get('parameter')
     if p:
-        if p['type'] == 'enum':
-            return p['values'].index(e.parameter)
+        if p.type == 'enum':
+            return p.values.index(e.parameter)
         else:
-            raise ValueError(f"Unknown parameter type: { p['type'] }")
+            raise ValueError(f"Unknown parameter type: { p.type }")
     else:
         # no parameter
         if e.parameter is not None:
@@ -180,7 +158,7 @@ def get_entity_parameter(e, entities_json):
 
 
 
-def create_room_entities_soa(room_entities, entities_json):
+def create_room_entities_soa(room_entities, entities):
     if len(room_entities) > ENTITIES_IN_MAP:
         raise ValueError(f"Too many entities in room ({ len(room_entities) }, max: { ENTITIES_IN_MAP }");
 
@@ -200,19 +178,19 @@ def create_room_entities_soa(room_entities, entities_json):
 
     # entity_type
     for e in room_entities:
-        data.append(get_entity_index(e.type, entities_json))
+        data.append(entities[e.type].id)
     data += padding
 
     # entity_parameter
     for e in room_entities:
-        data.append(get_entity_parameter(e, entities_json))
+        data.append(get_entity_parameter(e, entities))
     data += padding
 
     return data
 
 
 
-def create_map_data(tmx_map, mapping, entities_json):
+def create_map_data(tmx_map, mapping, entities):
     data = bytearray()
 
     try:
@@ -222,9 +200,9 @@ def create_map_data(tmx_map, mapping, entities_json):
 
 
     # Tileset byte
-    data.append(mapping['tilesets'].index(tmx_map.tileset.name))
+    data.append(mapping.tilesets.index(tmx_map.tileset.name))
 
-    data += create_room_entities_soa(tmx_map.entities, entities_json)
+    data += create_room_entities_soa(tmx_map.entities, entities)
 
 
     return data
@@ -254,16 +232,12 @@ def main():
     with open(args.tmx_filename, 'r') as fp:
         tmx_et = xml.etree.ElementTree.parse(fp)
 
-    with open(args.mapping_filename, 'r') as fp:
-        mapping = json.load(fp)
-
-    with open(args.entities_json_file, 'r') as fp:
-        entities = json.load(fp)
-
+    entities = load_entities_json(args.entities_json_file)
+    mapping = load_mappings_json(args.mapping_filename)
 
     tmx_map = parse_tmx_map(tmx_et)
 
-    map_data = create_map_data(tmx_map, mapping, entities)
+    map_data = create_map_data(tmx_map, mapping, entities.entities)
 
     with open(args.output, 'wb') as fp:
         fp.write(map_data)

@@ -43,6 +43,8 @@ RESOURCES  += $(patsubst %,gen/metasprites/%.bin, $(METASPRITE_SPRITESETS))
 RESOURCES  += $(patsubst %,gen/metasprites/%.wiz, $(METASPRITE_SPRITESETS))
 
 
+COMMON_PYTHON_SCRIPTS = tools/_json_formats.py tools/_snes.py
+
 
 .PHONY: all
 all: $(BINARY)
@@ -78,27 +80,27 @@ RESOURCES += $(4BPP_TILES) $(4BPP_PALETTES)
 RESOURCES += $(8BPP_TILES) $(8BPP_PALETTES)
 
 
-gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palette.png resources/metatiles/%.tsx tools/convert-tileset.py tools/_snes.py
+gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palette.png resources/metatiles/%.tsx tools/convert-tileset.py $(COMMON_PYTHON_SCRIPTS)
 	python3 tools/convert-tileset.py -o "$@" "resources/metatiles/$*-tiles.png" "resources/metatiles/$*-palette.png" "resources/metatiles/$*.tsx"
 
 
-gen/rooms/%.bin: resources/rooms/%.tmx resources/mappings.json resources/entities.json tools/convert-room.py
+gen/rooms/%.bin: resources/rooms/%.tmx resources/mappings.json resources/entities.json tools/convert-room.py $(COMMON_PYTHON_SCRIPTS)
 	python3 tools/convert-room.py -o "$@" "resources/rooms/$*.tmx" "resources/mappings.json" "resources/entities.json"
 
 
-gen/resource-lists.wiz: resources/mappings.json tools/generate-resource-lists.py
+gen/resource-lists.wiz: resources/mappings.json tools/generate-resource-lists.py $(COMMON_PYTHON_SCRIPTS)
 	python3 tools/generate-resource-lists.py -o "$@" "resources/mappings.json"
 
-gen/rooms.wiz: resources/mappings.json $(ROOM_BINS) tools/generate-rooms-table.py
+gen/rooms.wiz: resources/mappings.json $(ROOM_BINS) tools/generate-rooms-table.py $(COMMON_PYTHON_SCRIPTS)
 	python3 tools/generate-rooms-table.py -o "$@" "resources/mappings.json" $(ROOM_BINS)
 
-gen/entity-data.wiz: resources/entities.json tools/generate-entity-data.py
+gen/entity-data.wiz: resources/entities.json tools/generate-entity-data.py $(COMMON_PYTHON_SCRIPTS)
 	python3 tools/generate-entity-data.py -o "$@" "resources/entities.json"
 
-gen/entities.wiz: resources/entities.json resources/ms-export-order.json tools/generate-entities-wiz.py
+gen/entities.wiz: resources/entities.json resources/ms-export-order.json tools/generate-entities-wiz.py $(COMMON_PYTHON_SCRIPTS)
 	python3 tools/generate-entities-wiz.py -o "$@" "resources/entities.json" "resources/ms-export-order.json"
 
-gen/metasprites/%.wiz gen/metasprites/%.bin: resources/metasprites/%.png resources/metasprites/%-palette.png resources/metasprites/%.json resources/ms-export-order.json tools/convert-metasprite.py tools/_snes.py
+gen/metasprites/%.wiz gen/metasprites/%.bin: resources/metasprites/%.png resources/metasprites/%-palette.png resources/metasprites/%.json resources/ms-export-order.json tools/convert-metasprite.py $(COMMON_PYTHON_SCRIPTS)
 	python3 tools/convert-metasprite.py --ppu-output "gen/metasprites/$*.bin" --wiz-output "gen/metasprites/$*.wiz" "resources/metasprites/$*.png" "resources/metasprites/$*-palette.png" "resources/metasprites/$*.json" "resources/ms-export-order.json"
 
 
