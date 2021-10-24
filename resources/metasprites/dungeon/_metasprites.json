@@ -1,0 +1,132 @@
+{
+  "name": "dungeon",
+  "palette": "_palette.png",
+  "firstTile": 96,
+  "endTile": 512,
+  "framesets": [
+  {
+    "name": "Skeleton",
+    "source": "skeleton.png",
+    "frameWidth": "32",
+    "frameHeight": "32",
+
+    "pattern": "rect_16x24_three",
+    "ms-export-order": "skeleton",
+
+    "order": 2,
+
+    "blocks": [
+      {
+        "start": 0,
+
+        "x": 7,
+        "y": 0,
+
+        "xoffset":  8,
+        "yoffset": 23,
+
+        "frames": [
+          "south0", "south1", "south2", "south3",
+          "north0", "north1", "north2", "north3",
+          "east0",  "east1",  "east2",  "east3",
+          "west0",  "west1",  "west2",  "west3"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "CrossbowMan",
+    "source": "crossbow-man.png",
+    "frameWidth": "32",
+    "frameHeight": "32",
+
+    "pattern": "rect_16x24_and_extra",
+    "ms-export-order": "crossbow_man",
+
+    "order": 2,
+
+    "blocks": [
+      {
+        "start": 0,
+
+        "x": 6,
+        "y": 2,
+
+        "xoffset": 10,
+        "yoffset": 21,
+
+        "frames": [
+          "south0", "south1", "south2", "south3"
+        ]
+      },
+      {
+        "start": 4,
+
+        "x": 8,
+        "y": 2,
+
+        "xoffset": 8,
+        "yoffset": 21,
+
+        "frames": [
+          "north0", "north1", "north2", "north3",
+          "east0",  "east1",  "east2",  "east3",
+          "west0",  "west1",  "west2",  "west3"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Skull",
+    "source": "skull.png",
+    "frameWidth": "16",
+    "frameHeight": "16",
+
+    "pattern": "square_single16",
+    "ms-export-order": "eight_direction_spinner",
+
+    "order": 2,
+
+    "blocks": [
+      {
+        "start": 0,
+
+        "x": 0,
+        "y": 0,
+
+        "xoffset":  8,
+        "yoffset": 11,
+
+        "frames": [ "frame0", "frame1", "frame2", "frame3",
+                    "frame4", "frame5", "frame6", "frame7" ]
+      }
+    ]
+  },
+  {
+    "name": "Rook",
+    "source": "rook.png",
+    "frameWidth": "32",
+    "frameHeight": "48",
+
+    "pattern": "rect_16x32_two",
+    "ms-export-order": "rook",
+
+    "order": 2,
+
+    "blocks": [
+      {
+        "start": 0,
+
+        "x": 8,
+        "y": 8,
+
+        "xoffset":  8,
+        "yoffset": 29,
+
+        "frames": [ "standing", "landing0", "landing1" ]
+      }
+    ]
+  }
+]
+}
+

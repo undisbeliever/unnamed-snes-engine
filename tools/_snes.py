@@ -66,6 +66,24 @@ def extract_tileset_tiles(image):
 
 
 
+def extract_small_tile(image, xpos, ypos):
+    if xpos + 8 > image.width or ypos + 8 > image.height:
+        raise ValueError(f"position out of bounds: { xpos }, { ypos }")
+
+    return [ convert_rgb_color(image.getpixel((x, y)))
+             for y in range(ypos, ypos + 8) for x in range(xpos, xpos + 8) ]
+
+
+
+def extract_large_tile(image, xpos, ypos):
+    if xpos + 16 > image.width or ypos + 16 > image.height:
+        raise ValueError(f"position out of bounds: { xpos }, { ypos }")
+
+    return [ convert_rgb_color(image.getpixel((x, y)))
+             for y in range(ypos, ypos + 16) for x in range(xpos, xpos + 16) ]
+
+
+
 def extract_tilemap_tiles(image):
     """ Extracts 8x8px tiles from the image, in the same order as a SNES tilemap. """
 
@@ -162,14 +180,33 @@ def get_palette_id(tile, palette_map):
 
 
 
-H_FLIP_ORDER = [ (y * 8 + x) for y, x in itertools.product(range(8), reversed(range(8))) ]
-V_FLIP_ORDER = [ (y * 8 + x) for y, x in itertools.product(reversed(range(8)), range(8)) ]
+_H_FLIP_ORDER_SMALL = [ (y * 8 + x) for y, x in itertools.product(range(8), reversed(range(8))) ]
+_V_FLIP_ORDER_SMALL = [ (y * 8 + x) for y, x in itertools.product(reversed(range(8)), range(8)) ]
 
 def hflip_tile(tile):
-    return bytes([ tile[i] for i in H_FLIP_ORDER ])
+    return bytes([ tile[i] for i in _H_FLIP_ORDER_SMALL ])
 
 def vflip_tile(tile):
-    return bytes([ tile[i] for i in V_FLIP_ORDER ])
+    return bytes([ tile[i] for i in _V_FLIP_ORDER_SMALL ])
+
+
+_H_FLIP_ORDER_LARGE = [ (y * 16 + x) for y, x in itertools.product(range(16), reversed(range(16))) ]
+_V_FLIP_ORDER_LARGE = [ (y * 16 + x) for y, x in itertools.product(reversed(range(16)), range(16)) ]
+
+def hflip_large_tile(tile):
+    return bytes([ tile[i] for i in _H_FLIP_ORDER_LARGE ])
+
+def vflip_large_tile(tile):
+    return bytes([ tile[i] for i in _V_FLIP_ORDER_LARGE ])
+
+
+def split_large_tile(tile):
+    return (
+        [ tile[y * 16 + x] for y in range(0, 8 ) for x in range(0, 8 ) ],
+        [ tile[y * 16 + x] for y in range(0, 8 ) for x in range(8, 16) ],
+        [ tile[y * 16 + x] for y in range(8, 16) for x in range(0, 8 ) ],
+        [ tile[y * 16 + x] for y in range(8, 16) for x in range(8, 16) ],
+    )
 
 
 

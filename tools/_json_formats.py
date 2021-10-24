@@ -184,3 +184,68 @@ def load_mappings_json(filename):
     )
 
 
+
+# metasprites.json
+# ================
+
+
+MsSpritesheet = namedtuple('MsSpritesheet', ('name', 'palette', 'first_tile', 'end_tile', 'framesets'))
+MsFrameset = namedtuple('MsFrameset', ('name', 'source', 'frame_width', 'frame_height', 'pattern', 'ms_export_order', 'order', 'blocks'))
+MsBlock = namedtuple('MsBlock', ('start', 'x', 'y', 'x_offset', 'y_offset', 'frames'))
+
+
+def __load_ms_blocks(json_input):
+    blocks = list()
+
+    for j in json_input:
+        blocks.append(
+            MsBlock(
+                start = int(j['start']),
+                x = int(j['x']),
+                y = int(j['y']),
+                x_offset = int(j['xoffset']),
+                y_offset = int(j['yoffset']),
+                frames = check_name_list(j['frames'])
+            )
+        )
+
+    return blocks
+
+
+
+def __load_ms_framesets(json_input):
+    framesets = OrderedDict()
+
+    for f in json_input:
+        fs = MsFrameset(
+                name = check_name(f['name']),
+                source = str(f['source']),
+                frame_width = int(f['frameWidth']),
+                frame_height = int(f['frameHeight']),
+                pattern = check_name(f['pattern']),
+                ms_export_order = check_name(f['ms-export-order']),
+                order = int(f['order']),
+                blocks = __load_ms_blocks(f['blocks'])
+        )
+
+        if fs.name in framesets:
+            raise ValueError(f"Duplicate MetaSprite Frameset: { fs.name }")
+        framesets[fs.name] = fs
+
+    return framesets
+
+
+
+def load_metasprites_json(filename):
+    with open(filename, 'r') as fp:
+        json_input = json.load(fp)
+
+    return MsSpritesheet(
+            name = check_name(json_input['name']),
+            palette = str(json_input['palette']),
+            first_tile = int(json_input['firstTile']),
+            end_tile = int(json_input['endTile']),
+            framesets = __load_ms_framesets(json_input['framesets'])
+    )
+
+

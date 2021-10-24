@@ -1,0 +1,134 @@
+{
+  "name": "common",
+  "palette": "_palette.png",
+  "firstTile": 16,
+  "endTile": 96,
+  "framesets": [
+  {
+    "name": "Bomb",
+    "source": "bomb.png",
+    "frameWidth": "16",
+    "frameHeight": "16",
+
+    "pattern": "square_single16",
+    "ms-export-order": "bomb",
+
+    "order": 2,
+
+    "blocks": [
+      {
+        "start": 0,
+
+        "x": 0,
+        "y": 0,
+
+        "xoffset":  8,
+        "yoffset":  8,
+
+        "frames": [ "frame0", "frame1" ]
+      }
+    ]
+  },
+  {
+    "name": "Bolt_NS",
+    "source": "bolt.png",
+    "frameWidth": "16",
+    "frameHeight": "16",
+
+    "pattern": "rect_8x16_two",
+    "ms-export-order": "projectile_ns",
+
+    "order": 2,
+
+    "blocks": [
+      {
+        "start": 0,
+
+        "x": 0,
+        "y": 0,
+
+        "xoffset":  3,
+        "yoffset":  8,
+
+        "frames": [ "north", "south" ]
+      }
+    ]
+  },
+  {
+    "name": "Bolt_EW",
+    "source": "bolt.png",
+    "frameWidth": "16",
+    "frameHeight": "16",
+
+    "pattern": "rect_16x8_two",
+    "ms-export-order": "projectile_ew",
+
+    "order": 2,
+
+    "blocks": [
+      {
+        "start": 2,
+
+        "x": 0,
+        "y": 0,
+
+        "xoffset":  8,
+        "yoffset":  3,
+
+        "frames": [ "east", "west" ]
+      }
+    ]
+  },
+  {
+    "name": "Fireball_NS",
+    "source": "fireball.png",
+    "frameWidth": "16",
+    "frameHeight": "16",
+
+    "pattern": "rect_8x16_two",
+    "ms-export-order": "projectile_ns",
+
+    "order": 2,
+
+    "blocks": [
+      {
+        "start": 0,
+
+        "x": 0,
+        "y": 0,
+
+        "xoffset":  3,
+        "yoffset":  8,
+
+        "frames": [ "north", "south" ]
+      }
+    ]
+  },
+  {
+    "name": "Fireball_EW",
+    "source": "fireball.png",
+    "frameWidth": "16",
+    "frameHeight": "16",
+
+    "pattern": "rect_16x8_two",
+    "ms-export-order": "projectile_ew",
+
+    "order": 2,
+
+    "blocks": [
+      {
+        "start": 2,
+
+        "x": 0,
+        "y": 0,
+
+        "xoffset":  8,
+        "yoffset":  3,
+
+        "frames": [ "east", "west" ]
+      }
+    ]
+  }
+]
+}
+

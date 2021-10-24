@@ -21,6 +21,8 @@ in rodata0 {
 
 namespace ms_ppu_data {
 in rodata0 {
+    const shadow_tiles = embed "gen/metasprites/shadows-4bpp-tiles.tiles";
+
     const common = embed "gen/metasprites/common.bin";
     const dungeon = embed "gen/metasprites/dungeon.bin";
 }

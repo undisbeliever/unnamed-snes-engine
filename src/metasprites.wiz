@@ -34,11 +34,12 @@ namespace MsDataFormat {
 
 // MetaSprie PPU data format in ROM.
 struct _PpuDataFormat {
+    first_tile : u16,
     tile_data_size : u16,
 
-    palette_data : [u16 ; 128],
+    // tile_data
 
-    tile_data : u8,
+    // palette_data (256 bytes)
 }
 
 
@@ -130,9 +131,29 @@ inline func setup__fblank() {
 
 
 // REQUIRES: Force-Blank
+// Uses DMA Channel 0
 // DB = 0x80
 #[mem8, idx16]
 inline func load_ppu_data__fblank(spritesheet_id : u8 in a) {
+    __load_ppu_data_vram__fblank(a);
+    __load_ppu_data_cgram__fblank();
+
+    // Load common spritesheet
+    __load_ppu_data_vram__fblank(0);
+
+    __load_fixed_ppu_tiles__fblank();
+}
+
+
+
+// REQUIRES: Force-Blank
+// Uses DMA Channel 0
+//
+// OUTPUT: DMA Channel 0 src_address contains the address of the palette data
+//
+// DB = 0x80
+#[mem8, idx16]
+func __load_ppu_data_vram__fblank(spritesheet_id : u8 in a) {
 let _ptr = dpTmp_farPtr;
 
     snes.dma.hdma_enable = 0;
@@ -151,47 +172,68 @@ let _ptr = dpTmp_farPtr;
     }
     idx16();
 
-
     // A = _ptr bank
-    xx = *(&_ptr as *u16);
-
-    // Skip _PpuDataFormat.tile_data_size in DMA's below
-    xx++;
-    xx++;
-
     snes.dma0.src_address_bank = a;
-    snes.dma0.src_address_hl = xx;
 
-
-    // Transfer Palette data to CGRAM
-    snes.ppu.cgram_address = a = 128;
-
-    snes.dma0.control = a = snes.dma.CONTROL_MODE_A;
-    snes.dma0.mdma_dest = a = <:&snes.ppu.cgram_write_data;
-    snes.dma0.mdma_size_hl = yy = 128 * 2;
-
-    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
-
-
-    // Calculate location to store Sprite tiles
-    // (Tiles are stored at the end of the OBJ tile block)
     mem16();
     #[mem16] {
-        snes.ppu.vram_address_hl = aa = (((VRAM_OBJ_WADDR * 2 + 512 * 32) & 0xffff) - **(&_ptr as *far *u16)) >>> 1;
-        snes.dma0.mdma_size_hl = aa = **(&_ptr as *far *u16);
+        snes.dma0.src_address_hl = aa = *(&_ptr as *u16) + sizeof(_PpuDataFormat);
+
+
+        // _PpuDataFormat.first_tile;
+        aa = **(&_ptr as *far *u16);
+
+        // +# safe, carry will never be set
+        snes.ppu.vram_address_hl = aa = ((aa & 0x1ff) << 4) +# VRAM_OBJ_WADDR;
+
+
+        // _PpuDataFormat.tile_data_size;
+        snes.dma0.mdma_size_hl = aa = (*(&_ptr as *far *u16))[unaligned yy = 2];
     }
     mem8();
+
 
     snes.dma0.control = a = snes.dma.CONTROL_MODE_AB;
     snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
 
     snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+}
 
 
-    // Transfer common sprite tiles to VRAM
+
+// This function MUST BE called DIRECTLY AFTER `__load_ppu_data_vram__fblank`
+//
+// INPUT: Address of palette data in DMA Channel 0 src_address
+//
+// REQUIRES: Force-Blank
+// Uses DMA Channel 0
+// DB = 0x80
+#[mem8, idx16]
+func __load_ppu_data_cgram__fblank() {
+
+    // Transfer Palette data to CGRAM
+    snes.ppu.cgram_address = a = 128;
+
+    // snes.dma0.src_address already set
+    snes.dma0.control = a = snes.dma.CONTROL_MODE_A;
+    snes.dma0.mdma_dest = a = <:&snes.ppu.cgram_write_data;
+    snes.dma0.mdma_size_hl = yy = 128 * 2;
+
+    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+}
+
+
+
+// DB = 0x80
+// REQUIRES: Force-Blank
+// Uses DMA Channel 0
+#[mem8, idx16]
+func __load_fixed_ppu_tiles__fblank() {
+
+    // Transfer shadow data to VRAM
     {
-        let tile_data = (far &resources.ms_ppu_data.common as u24 + sizeof(_PpuDataFormat) - 1) as far *u8;
-        let tile_data_size = sizeof(typeof(resources.ms_ppu_data.common)) - sizeof(_PpuDataFormat) + 1;
+        let tile_data = far &resources.ms_ppu_data.shadow_tiles as far *u8;
+        let tile_data_size = sizeof(typeof(resources.ms_ppu_data.shadow_tiles));
 
         snes.ppu.vram_address_hl = xx = VRAM_OBJ_WADDR;
         dma.transfer_to_vram__forceblank(#:tile_data, tile_data as u16, tile_data_size);

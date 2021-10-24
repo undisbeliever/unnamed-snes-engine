@@ -11,9 +11,12 @@ from collections import namedtuple
 from io import StringIO
 
 
-from _snes import convert_rgb_color, extract_tileset_tiles, convert_snes_tileset, create_palettes_map, get_palette_id, convert_palette_image
+from _snes import extract_small_tile, extract_large_tile, split_large_tile, \
+            hflip_tile, vflip_tile, hflip_large_tile, vflip_large_tile, \
+            create_palettes_map, get_palette_id, convert_palette_image, \
+            convert_snes_tileset
 
-from _json_formats import load_ms_export_order_json
+from _json_formats import load_ms_export_order_json, load_metasprites_json
 
 
 TILE_DATA_BPP = 4
@@ -22,350 +25,273 @@ ROM_BANK = 'rodata0'
 
 
 
-def convert_tileset(tiles, palettes_map):
-    # Returns a tuple(tileset, tile_palette_map)
+PatternObject = namedtuple('PatternObject', ('xpos', 'ypos', 'size'))
 
-    invalid_tiles = list()
+# ::TODO move into a json file::
+PATTERNS = {
+    'square_single16': [
+        PatternObject( 0,  0, 16)
+    ],
+    'rect_16x8_two': [
+        PatternObject( 0,  0,  8),
+        PatternObject( 8,  0,  8),
+    ],
+    'rect_8x16_two': [
+        PatternObject( 0,  0,  8),
+        PatternObject( 0,  8,  8),
+    ],
+    'rect_16x32_two': [
+        PatternObject( 0,  0, 16),
+        PatternObject( 0, 16, 16),
+    ],
+    'rect_16x24_three': [
+        PatternObject( 0,  0, 16),
+        PatternObject( 0, 16,  8),
+        PatternObject( 8, 16,  8),
+    ],
+    'rect_16x24_and_extra': [
+        PatternObject( 0,  0, 16),
+        PatternObject( 0, 16,  8),
+        PatternObject( 8, 16,  8),
+        PatternObject(16,  8,  8),
+    ],
+}
 
-    tileset = list()
-    tile_palette_map = list()
 
-    for tile_index, tile in enumerate(tiles):
-        palette_id, pal_map = get_palette_id(tile, palettes_map)
 
-        if pal_map:
-            tile_data = bytes([pal_map[c] for c in tile])
 
-            tileset.append(tile_data)
-            tile_palette_map.append(palette_id)
-        else:
-            invalid_tiles.append(tile_index)
+FrameSet = namedtuple('FrameSet', ('name', 'pattern', 'ms_export_order', 'frames'))
 
-    if invalid_tiles:
-        raise ValueError(f"Cannot find palette for tiles {invalid_tiles}")
 
-    return tileset, tile_palette_map
 
+class Tileset:
+    def __init__(self, starting_tile, end_tile):
+        assert(starting_tile < 512)
+        assert(end_tile <= 512)
+        assert(starting_tile < end_tile)
 
+        # starting_tile must start on a VRAM row
+        assert(starting_tile % 0x10 == 0)
 
-#
-# =========================
-#
+        self.starting_tile = starting_tile
+        self.max_tiles = end_tile - starting_tile
 
-SpriteSheet = namedtuple('SpriteSheet', ('name', 'pattern', 'ms_export_order', 'frames'))
+        self.tiles = [ None ] * 0x20
+        self.large_tile_pos = 0
+        self.small_tile_pos = 4
+        self.small_tile_offset = 0
 
-SpriteFrame = namedtuple('SpriteFrame', ('xoffset', 'yoffset', 'objects'))
-ObjectEntry = namedtuple('ObjectEntry', ('tile_id', 'palette_id', 'order', 'hflip', 'vflip'))
+        self.small_tiles_map = dict()
+        self.large_tiles_map = dict()
 
 
-def hflip_object_entry(o):
-    return ObjectEntry(o.tile_id, o.palette_id, o.order, not o.hflip, o.vflip)
+    def get_tiles(self):
+        # Replace unused tiles with blank data
+        blank_tile = bytearray(64)
+        tiles = [ blank_tile if t is None else t for t in self.tiles ]
 
-def vflip_object_entry(o):
-    return ObjectEntry(o.tile_id, o.palette_id, o.order, o.hflip, not o.vflip)
+        # Shrink tiles
+        end_tile = 0
+        for i, t in enumerate(self.tiles):
+            if t is not None:
+                end_tile = i
+        n_tiles = end_tile + 1
 
+        if n_tiles > self.max_tiles:
+            raise ValueError(f"Too many tiles: { n_tiles }, max { self.max_tiles }")
 
+        return tiles[:n_tiles]
 
-def to_int(value):
-    try:
-        return int(value)
-    except ValueError:
-        return int(value, 0)
 
+    def _allocate_large_tile(self):
+        tile_pos = self.large_tile_pos
 
+        self.large_tile_pos += 2
+        if self.large_tile_pos & 0x0f == 0:
+            self.large_tile_pos += 0x10
 
-PATTERN_CLASSES = dict()
+            self.tiles += [ None ] * 0x20
 
-def register_pattern_class(cls):
-    PATTERN_CLASSES[cls.name] = cls
-    return cls
+        return tile_pos
 
 
+    def _allocate_small_tile(self):
+        if self.small_tile_pos >= 4:
+            self.small_tile_pos = 0
+            self.small_tile_offset = self._allocate_large_tile()
 
-class BasePattern:
-    @classmethod
-    def hflip(cls, objects):
-        raise ValueError(f"Cannot hflip { cls.name } pattern")
+        tile_pos = self.small_tile_offset + self._SMALL_TILE_OFFSETS[self.small_tile_pos]
+        self.small_tile_pos += 1
 
+        return tile_pos
 
-    @classmethod
-    def vflip(cls, objects):
-        raise ValueError(f"Cannot vflip { cls.name } pattern")
+    _SMALL_TILE_OFFSETS = [ 0x00, 0x01, 0x10, 0x11 ]
 
 
-    @classmethod
-    def flip(cls, objects, flip):
-        if flip == 'hflip':
-            return cls.hflip(objects)
-        elif flip == 'vflip':
-            return cls.vflip(objects)
-        elif flip == 'hvflip':
-            return cls.vflip(cls.hflip(objects))
-        else:
-            raise ValueError(f"Unknown flip type { flip }")
+    def add_small_tile(self, tile_data):
+        assert(len(tile_data) == 64)
 
+        tile_pos = self._allocate_small_tile()
 
+        self.tiles[tile_pos] = tile_data
 
-class Base_1x2_Pattern(BasePattern):
-    n_objects = 2
+        return tile_pos + self.starting_tile
 
 
-    @classmethod
-    def hflip(cls, objs):
-        return [
-            hflip_object_entry(objs[0]),
-            hflip_object_entry(objs[1]),
-        ]
+    def add_large_tile(self, tile_data):
+        assert(len(tile_data) == 256)
 
+        tile1, tile2, tile3, tile4 = split_large_tile(tile_data)
 
-    @classmethod
-    def vflip(cls, objs):
-        return [
-            vflip_object_entry(objs[1]),
-            vflip_object_entry(objs[0]),
-        ]
+        tile_pos = self._allocate_large_tile()
 
+        self.tiles[tile_pos] = tile1
+        self.tiles[tile_pos + 0x01] = tile2
+        self.tiles[tile_pos + 0x10] = tile3
+        self.tiles[tile_pos + 0x11] = tile4
 
+        return tile_pos + self.starting_tile
 
-class Base_2x1_Pattern(BasePattern):
-    n_objects = 2
 
+    def add_or_get_small_tile(self, tile_data):
+        assert(len(tile_data) == 64)
 
-    @classmethod
-    def hflip(cls, objs):
-        return [
-            hflip_object_entry(objs[1]),
-            hflip_object_entry(objs[0]),
-        ]
+        match = self.small_tiles_map.get(tile_data)
+        if match is None:
+            tile_id = self.add_small_tile(tile_data)
 
+            match = (tile_id, False, False)
 
-    @classmethod
-    def vflip(cls, objs):
-        return [
-            vflip_object_entry(objs[0]),
-            vflip_object_entry(objs[1]),
-        ]
+            h_tile_data = hflip_tile(tile_data)
+            v_tile_data = vflip_tile(tile_data)
+            hv_tile_data = vflip_tile(h_tile_data)
 
+            self.small_tiles_map[tile_data] = match
+            self.small_tiles_map.setdefault(h_tile_data, (tile_id, True, False))
+            self.small_tiles_map.setdefault(v_tile_data, (tile_id, False, True))
+            self.small_tiles_map.setdefault(hv_tile_data, (tile_id, True, True))
 
+        return match
 
-@register_pattern_class
-class Square_single16(BasePattern):
-    name = 'square_single16'
-    n_objects = 1
 
+    def add_or_get_large_tile(self, tile_data):
+        match = self.large_tiles_map.get(tile_data)
+        if match is None:
+            tile_id = self.add_large_tile(tile_data)
 
-    @classmethod
-    def starting_tile(cls, frame, tileId, default_order):
-        return [
-            ObjectEntry(tileId, None, default_order, False, False),
-        ]
+            match = (tile_id, False, False)
 
+            h_tile_data = hflip_large_tile(tile_data)
+            v_tile_data = vflip_large_tile(tile_data)
+            hv_tile_data = vflip_large_tile(h_tile_data)
 
-    @classmethod
-    def hflip(cls, objs):
-        return [
-            hflip_object_entry(objs[0]),
-        ]
+            self.large_tiles_map[tile_data] = match
+            self.large_tiles_map.setdefault(h_tile_data, (tile_id, True, False))
+            self.large_tiles_map.setdefault(v_tile_data, (tile_id, False, True))
+            self.large_tiles_map.setdefault(hv_tile_data, (tile_id, True, True))
 
+        return match
 
-    @classmethod
-    def vflip(cls, objs):
-        return [
-            vflip_object_entry(objs[0]),
-        ]
 
 
-
-@register_pattern_class
-class Rect_16x8_two(Base_2x1_Pattern):
-    name = 'rect_16x8_two'
-
-    @classmethod
-    def starting_tile(cls, frame, tileId, default_order):
-        return [
-            ObjectEntry(tileId,        None, default_order, False, False),
-            ObjectEntry(tileId + 0x01, None, default_order, False, False),
-        ]
-
-
-
-@register_pattern_class
-class Rect_8x16_two(Base_1x2_Pattern):
-    name = 'rect_8x16_two'
-
-    @classmethod
-    def starting_tile(cls, frame, tileId, default_order):
-        return [
-            ObjectEntry(tileId,        None, default_order, False, False),
-            ObjectEntry(tileId + 0x10, None, default_order, False, False),
-        ]
-
-
-
-@register_pattern_class
-class Rect_16x32_two(Base_1x2_Pattern):
-    name = 'rect_16x32_two'
-
-    @classmethod
-    def starting_tile(cls, frame, tileId, default_order):
-        return [
-            ObjectEntry(tileId,        None, default_order, False, False),
-            ObjectEntry(tileId + 0x20, None, default_order, False, False),
-        ]
-
-
-
-@register_pattern_class
-class Rect_16x24_three(BasePattern):
-    name = 'rect_16x24_three'
-    n_objects = 3
-
-
-    @classmethod
-    def starting_tile(cls, frame, tileId, default_order):
-        return [
-            ObjectEntry(tileId,        None, default_order, False, False),
-            ObjectEntry(tileId + 0x20, None, default_order, False, False),
-            ObjectEntry(tileId + 0x21, None, default_order, False, False),
-        ]
-
-
-    @classmethod
-    def hflip(cls, objs):
-        return [
-            hflip_object_entry(objs[0]),
-            hflip_object_entry(objs[2]),
-            hflip_object_entry(objs[1]),
-        ]
-
-
-
-@register_pattern_class
-class Rect_16x24_and_extra(BasePattern):
-    name = 'rect_16x24_and_extra'
-    n_objects = 4
-
-
-    @classmethod
-    def starting_tile(cls, frame, tileId, default_order):
-        extra_tile = to_int(frame['extra_tile'])
-
-        return [
-            ObjectEntry(tileId + 0x00, None, default_order, False, False),
-            ObjectEntry(tileId + 0x20, None, default_order, False, False),
-            ObjectEntry(tileId + 0x21, None, default_order, False, False),
-            ObjectEntry(extra_tile,    None, default_order, False, False),
-        ]
-
-
-
-def expand_spritesheet(spritesheet):
-    default_order = spritesheet['order']
-    default_xoffset = spritesheet['xoffset']
-    default_yoffset = spritesheet['yoffset']
-
-    pattern = PATTERN_CLASSES[spritesheet['pattern']]
-
-    def expand_sprite_frame(name, f, objects):
-        return SpriteFrame(
-            to_int(f.get('xoffset', default_xoffset)),
-            to_int(f.get('yoffset', default_yoffset)),
-            objects
-        )
-
-
-    frames = dict()
-
-
-    for name, f in spritesheet['frames'].items():
-        if 'objects' in f:
-            objects = list()
-
-            for o in f['objects']:
-                flip = o.get('flip')
-                objects.append(ObjectEntry(
-                            to_int(o['tile']),
-                            o.get('palette', None),
-                            o.get('order', default_order),
-                            flip == 'hflip' or flip == 'hvflip',
-                            flip == 'vflip' or flip == 'hvflip'))
-
-            if len(objects) != pattern.n_objects:
-                raise ValueError(f"Expected exactly { pattern.n_objects } objects in frame '{ spritesheet['name'] }.{ f['name'] }'")
-
-            frames[name] = expand_sprite_frame(name, f, objects)
-
-        elif 'starting_tile' in f:
-            frames[name] = expand_sprite_frame(name, f, pattern.starting_tile(f, to_int(f['starting_tile']), default_order))
-
-
-    for name, f in spritesheet['frames'].items():
-        if 'objects' not in f:
-            if 'clone' in f:
-                source = frames[f['clone']['source']];
-
-                flip = f['clone'].get('flip')
-                if flip:
-                    frames[name] = expand_sprite_frame(name, f, pattern.flip(source.objects, flip))
-                else:
-                    frames[name] = expand_sprite_frame(name, f, source.objects)
-
-
-    if None in frames:
-        missing = list()
-        for i, f in enumerate(frames):
-            if f is None:
-                missing.append(spritesheet['frames'][i]['name'])
-
-        raise ValueError(f"Unable to expand '{ spritesheet['name'] }', missing frames: { ', '.join(missing) }");
-
-
-    return SpriteSheet(spritesheet['name'],
-                       spritesheet['pattern'],
-                       spritesheet['ms-export-order'],
-                       frames)
-
-
-
-def build_frame(frame, tile_offset, tile_palette_map):
+def extract_frame(image, pattern, palettes_map, tileset, fs, block, x, y):
     data = bytearray()
 
-    data.append(frame.xoffset)
-    data.append(frame.yoffset)
+    data.append(block.x_offset)
+    data.append(block.y_offset)
 
-    for o in frame.objects:
-        tile = o.tile_id + tile_offset
-        pal = tile_palette_map[o.tile_id] if o.palette_id is None else o.palette_id
+    for o in pattern:
+        if o.size == 8:
+            tile = extract_small_tile(image, x + o.xpos, y + o.ypos)
+            palette_id, pal_map = get_palette_id(tile, palettes_map)
+            tile_data = bytes([pal_map[c] for c in tile])
+            tile_id, hflip, vflip = tileset.add_or_get_small_tile(tile_data)
+        else:
+            tile = extract_large_tile(image, x + o.xpos, y + o.ypos)
+            palette_id, pal_map = get_palette_id(tile, palettes_map)
+            tile_data = bytes([pal_map[c] for c in tile])
+            tile_id, hflip, vflip = tileset.add_or_get_large_tile(tile_data)
 
-        data.append(tile & 0xff)
-        data.append((tile >> 8)
-                    | ((pal & 7) << 1)
-                    | ((o.order & 3) << 4)
-                    | (bool(o.hflip) << 6)
-                    | (bool(o.vflip) << 7)
+        assert(tile_id < 512)
+        data.append(tile_id & 0xff)
+        data.append((tile_id >> 8)
+                    | ((palette_id & 7) << 1)
+                    | ((fs.order & 3) << 4)
+                    | (bool(hflip) << 6)
+                    | (bool(vflip) << 7)
         )
 
     return data
 
 
 
-def build_metasprites(input_data, ms_export_orders, tile_offset, tile_palette_map):
-    out = list()
+def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map):
+    frames = dict()
 
-    for ss_input in input_data:
-        ss = expand_spritesheet(ss_input)
+    pattern = PATTERNS[fs.pattern]
 
-        ss_export_order = ms_export_orders[ss.ms_export_order]
+    image = load_image(ms_dir, fs.source)
 
-        frames = [ build_frame(ss.frames[f], tile_offset, tile_palette_map) for f in ss_export_order.frames ]
+    if image.width % fs.frame_width != 0 or image.height % fs.frame_height != 0:
+        raise ValueError(f"Source image is not a multiple of frame size: { fs.name }")
 
-        out.append(SpriteSheet(ss.name, ss.pattern, ss.ms_export_order, frames))
+    frames_per_row = image.width // fs.frame_width
 
-    return out
+    for block in fs.blocks:
+        # ::TODO somehow handle clone blocks::
+        # ::TODO somehow handle flipped blocks::
+
+        for i, f in enumerate(block.frames):
+            if f in frames:
+                raise ValueError(f"Duplicate frame: { f }")
+
+            frame_number = block.start + i
+            x = (frame_number % frames_per_row) * fs.frame_width + block.x
+            y = (frame_number // frames_per_row) * fs.frame_height + block.y
+
+            try:
+                frames[f] = extract_frame(image, pattern, palettes_map, tiles, fs, block, x, y)
+            except Exception as e:
+                raise Exception(f"Error with { fs.name }, { f }: { e }")
+
+    try:
+        export_order = ms_export_orders[fs.ms_export_order]
+        eo_frames = [ frames[f] for f in export_order.frames ]
+    except Exception as e:
+        raise Exception(f"Error with { fs.name }: { e }")
+
+    return FrameSet(fs.name, fs.pattern, fs.ms_export_order, eo_frames)
 
 
 
-def generate_wiz_data(metasprites, spritesheet_name, binary_data_path):
+def build_spritesheet(ms_input, ms_export_orders, ms_dir, palettes_map):
+
+    tiles = Tileset(ms_input.first_tile, ms_input.end_tile)
+
+    spritesheet = list()
+
+    for fs in ms_input.framesets.values():
+        spritesheet.append(
+            build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map))
+
+    return spritesheet, tiles.get_tiles()
+
+
+
+def load_palette(ms_dir, palette_filename):
+    image = load_image(ms_dir, palette_filename)
+
+    if image.width != 16 or image.height != 8:
+        raise ValueError('Palette Image MUST BE 16x8 px in size')
+
+    palettes_map = create_palettes_map(image, TILE_DATA_BPP)
+    palette_data = convert_palette_image(image)
+
+    return palettes_map, palette_data
+
+
+
+def generate_wiz_data(spritesheet, spritesheet_name, binary_data_path):
     with StringIO() as out:
         out.write("""
 import "../../src/memmap";
@@ -378,21 +304,21 @@ namespace ms {
 """)
         out.write(f"namespace { spritesheet_name } {{\n")
 
-        for ss in metasprites:
-            frame_size = len(ss.frames[0])
-            n_frames = len(ss.frames)
+        for fs in spritesheet:
+            frame_size = len(fs.frames[0])
+            n_frames = len(fs.frames)
 
             frame_type = f"[u8 ; { frame_size }]"
 
             out.write('\n')
-            out.write(f"  namespace { ss.name } {{\n")
+            out.write(f"  namespace { fs.name } {{\n")
 
-            out.write(f"    // ms_export_order = { ss.ms_export_order }\n")
-            out.write(f"    let draw_function = metasprites.drawing_functions.{ ss.pattern };\n\n")
+            out.write(f"    // ms_export_order = { fs.ms_export_order }\n")
+            out.write(f"    let draw_function = metasprites.drawing_functions.{ fs.pattern };\n\n")
 
             out.write(f"    const frames : [[u8 ; { frame_size }] ; { n_frames }] = [\n")
 
-            for frame_data in ss.frames:
+            for frame_data in fs.frames:
                 assert len(frame_data) == frame_size
                 out.write(f"      [ { ', '.join(map(str, frame_data)) } ],\n")
 
@@ -420,23 +346,40 @@ namespace ms {
 
 
 
-def generate_ppu_data(palette_data, tileset):
+def generate_ppu_data(ms_input, tileset, palette_data):
     tile_data = convert_snes_tileset(tileset, TILE_DATA_BPP)
 
 
     data = bytearray()
 
-    # First two bytes = tileset size
+    # first_tile
+    data.append(ms_input.first_tile & 0xff)
+    data.append(ms_input.first_tile >> 8)
+
+    # tile_data_size
     data.append(len(tile_data) & 0xff)
     data.append(len(tile_data) >> 8)
 
-    # Next 256 bytes = palette data
-    data += palette_data
-    assert(len(data) == 128 * 2 + 2)
-
+    # tile_data
     data += tile_data
 
+    # palette_data
+    data += palette_data
+
     return data
+
+
+
+def load_image(ms_dir, filename):
+    image_filename = os.path.join(ms_dir, filename)
+
+    with PIL.Image.open(image_filename) as image:
+        image.load()
+
+    if image.mode == 'RGB':
+        return image
+    else:
+        return image.convert('RGB')
 
 
 
@@ -446,10 +389,6 @@ def parse_arguments():
                         help='ppu data output file')
     parser.add_argument('--wiz-output', required=True,
                         help='sprite output file')
-    parser.add_argument('image_filename', action='store',
-                        help='Indexed png image')
-    parser.add_argument('palette_filename', action='store',
-                        help='palette PNG image')
     parser.add_argument('json_filename', action='store',
                         help='Sprite map JSON file')
     parser.add_argument('ms_export_order_json_file', action='store',
@@ -464,35 +403,19 @@ def parse_arguments():
 def main():
     args = parse_arguments()
 
-    with PIL.Image.open(args.palette_filename) as palette_image:
-        if palette_image.width != 16 or palette_image.height != 8:
-            raise ValueError('Palette Image MUST BE 16x8 px in size')
+    ms_dir = os.path.dirname(args.json_filename)
 
-        palettes_map = create_palettes_map(palette_image, TILE_DATA_BPP)
-        palette_data = convert_palette_image(palette_image)
-
-        with PIL.Image.open(args.image_filename) as image:
-            if image.width != 128:
-                raise ValueError('MetaSprite Tileset Image MUST BE 128 px in width')
-
-            tileset, tile_palette_map = convert_tileset(extract_tileset_tiles(image), palettes_map)
-
-    with open(args.json_filename, 'r') as json_fp:
-        input_data = json.load(json_fp)
-
+    ms_input = load_metasprites_json(args.json_filename)
     ms_export_orders = load_ms_export_order_json(args.ms_export_order_json_file)
 
 
-    if os.path.basename(args.json_filename) == 'common.json':
-        tile_offset = 0
-    else:
-        tile_offset = 512 - len(tileset)
+    palettes_map, palette_data = load_palette(ms_dir, ms_input.palette)
+
+    spritesheet, tileset = build_spritesheet(ms_input, ms_export_orders, ms_dir, palettes_map)
 
 
-    metasprites = build_metasprites(input_data, ms_export_orders, tile_offset, tile_palette_map)
-
-    ppu_data = generate_ppu_data(palette_data, tileset)
-    wiz_data = generate_wiz_data(metasprites,
+    ppu_data = generate_ppu_data(ms_input, tileset, palette_data)
+    wiz_data = generate_wiz_data(spritesheet,
                                  os.path.splitext(os.path.basename(args.wiz_output))[0],
                                  os.path.relpath(args.ppu_output, os.path.dirname(args.wiz_output)))
 
@@ -501,6 +424,7 @@ def main():
 
     with open(args.wiz_output, 'w') as fp:
         fp.write(wiz_data)
+
 
 
 if __name__ == '__main__':

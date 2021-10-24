@@ -100,8 +100,16 @@ gen/entity-data.wiz: resources/entities.json tools/generate-entity-data.py $(COM
 gen/entities.wiz: resources/entities.json resources/ms-export-order.json tools/generate-entities-wiz.py $(COMMON_PYTHON_SCRIPTS)
 	python3 tools/generate-entities-wiz.py -o "$@" "resources/entities.json" "resources/ms-export-order.json"
 
-gen/metasprites/%.wiz gen/metasprites/%.bin: resources/metasprites/%.png resources/metasprites/%-palette.png resources/metasprites/%.json resources/ms-export-order.json tools/convert-metasprite.py $(COMMON_PYTHON_SCRIPTS)
-	python3 tools/convert-metasprite.py --ppu-output "gen/metasprites/$*.bin" --wiz-output "gen/metasprites/$*.wiz" "resources/metasprites/$*.png" "resources/metasprites/$*-palette.png" "resources/metasprites/$*.json" "resources/ms-export-order.json"
+gen/metasprites/%.wiz gen/metasprites/%.bin: resources/metasprites/%/_metasprites.json resources/ms-export-order.json tools/convert-metasprite.py $(COMMON_PYTHON_SCRIPTS)
+	python3 tools/convert-metasprite.py --ppu-output "gen/metasprites/$*.bin" --wiz-output "gen/metasprites/$*.wiz" "resources/metasprites/$*/_metasprites.json" "resources/ms-export-order.json"
+
+
+define __update_metasprite_dependencies
+gen/metasprites/$(firstword $1).wiz gen/metasprites/$(firstword $1).bin: $2
+endef
+
+$(foreach d, $(METASPRITE_SPRITESETS), $(eval $(call __update_metasprite_dependencies, $d, $(wildcard resources/metasprites/$d/*.png))))
+
 
 
 
