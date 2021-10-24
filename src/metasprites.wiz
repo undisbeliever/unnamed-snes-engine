@@ -137,13 +137,11 @@ let _ptr = dpTmp_farPtr;
 
     snes.dma.hdma_enable = 0;
 
-    snes.ppu.obj_control = a = (VRAM_OBJ_WADDR / 8192) | (snes.ppu.OBJ_CONTROL_8x8_16x16 << 4);
-
 
     idx8();
     #[idx8] {
         x = a;
-        if x >= sizeof(typeof(*resources.metasprites.spritesheet_list_l)) {
+        if x >= resources.metasprites.N_SPRITESHEETS {
             x = 0;
         }
 
@@ -198,6 +196,10 @@ let _ptr = dpTmp_farPtr;
         snes.ppu.vram_address_hl = xx = VRAM_OBJ_WADDR;
         dma.transfer_to_vram__forceblank(#:tile_data, tile_data as u16, tile_data_size);
     }
+
+
+    // Set OBJ Registers
+    snes.ppu.obj_control = a = (VRAM_OBJ_WADDR / 8192) | (snes.ppu.OBJ_CONTROL_8x8_16x16 << 4);
 }
 
 

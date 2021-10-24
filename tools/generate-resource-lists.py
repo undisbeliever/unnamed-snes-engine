@@ -10,9 +10,24 @@ from _json_formats import load_mappings_json
 
 
 
-def generate_wiz_code(mappings):
-    ms_spritesheet_ppu_data = [ f"resources.ms_ppu_data.{ ss }" for ss in mappings.metasprite_spritesheets ]
+def _write_byte_array(out, name, prefix, items):
+    out.write(f"const { name } : [ u8 ] = [ ")
 
+    for i in items:
+        out.write(f"{ prefix }{ i }, ")
+
+    out.write("];\n")
+
+
+
+def write_resource_lists(out, name, prefix, items):
+    _write_byte_array(out, name + '_l', '<:&' + prefix, items)
+    _write_byte_array(out, name + '_h', '>:&' + prefix, items)
+    _write_byte_array(out, name + '_b', '#:far &' + prefix, items)
+
+
+
+def generate_wiz_code(mappings):
 
     with StringIO() as out:
         out.write("""
@@ -24,22 +39,26 @@ import "../src/resources";
 in rodata0 {
 
 namespace resources {
-  namespace metatile_tilesets {
-""")
-
-        out.write(f"    let _tilesets = [ { ', '.join(mappings.tilesets) } ];")
-
-        out.write("""
-  }
+namespace metatile_tilesets {
 
 """)
 
-        out.write(f"  let _ms_spritesheets = [ { ', '.join(ms_spritesheet_ppu_data) } ];")
+        write_resource_lists(out, '_tileset_list', '', mappings.tilesets)
 
         out.write("""
 }
 
+namespace metasprites {
+""")
+
+
+        write_resource_lists(out, '_spritesheet_list', 'ms_ppu_data.', mappings.metasprite_spritesheets)
+
+        out.write("""
 }
+}
+}
+
 """)
 
         return out.getvalue()

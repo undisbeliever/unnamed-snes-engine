@@ -3,6 +3,7 @@
    "dungeon"
  ],
  "metasprite_spritesheets": [
+   "common",
    "dungeon"
  ],
  "dungeons": {

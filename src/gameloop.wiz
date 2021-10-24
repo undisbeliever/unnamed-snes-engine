@@ -278,7 +278,7 @@ inline func _setup_ppu_and_reset_graphics_subsystems() {
             metasprites.setup__fblank();
 
             // ::TODO get spritesheet_id from somewhere::
-            metasprites.load_ppu_data__fblank(0);
+            metasprites.load_ppu_data__fblank(1);
         }
         idx8();
     }

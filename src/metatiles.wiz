@@ -99,7 +99,7 @@ let _tilesetPtr = dpTmp_farPtr;
     idx8();
     #[idx8] {
         x = a;
-        if x >= sizeof(typeof(*resources.metatile_tilesets.tileset_list_l)) {
+        if x >= resources.metatile_tilesets.N_TILESETS {
             x = 0;
         }
 

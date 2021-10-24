@@ -32,12 +32,7 @@ in rodata0 {
 // ==============
 
 namespace metatile_tilesets {
-in rodata0 {
-    // ::KUDOS eggboycolor for this pattern ::
-    const _tileset_list_l : [u8] = [<:&i for let i in _tilesets];
-    const _tileset_list_h : [u8] = [>:&i for let i in _tilesets];
-    const _tileset_list_b : [u8] = [#:far &i for let i in _tilesets];
-}
+    let N_TILESETS = sizeof(typeof(_tileset_list_l));
 
     let tileset_list_l = far &_tileset_list_l as far *const u8;
     let tileset_list_h = far &_tileset_list_h as far *const u8;
@@ -46,12 +41,7 @@ in rodata0 {
 
 
 namespace metasprites {
-in rodata0 {
-    // ::KUDOS eggboycolor for this pattern ::
-    const _spritesheet_list_l : [u8] = [<:&i for let i in _ms_spritesheets];
-    const _spritesheet_list_h : [u8] = [>:&i for let i in _ms_spritesheets];
-    const _spritesheet_list_b : [u8] = [#:far &i for let i in _ms_spritesheets];
-}
+    let N_SPRITESHEETS = sizeof(typeof(_spritesheet_list_l));
 
     let spritesheet_list_l = far &_spritesheet_list_l as far *const u8;
     let spritesheet_list_h = far &_spritesheet_list_h as far *const u8;
