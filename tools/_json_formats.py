@@ -40,6 +40,13 @@ def check_name_list(l):
     return l
 
 
+def check_obj_size(v):
+    i = int(v)
+    if i not in (8, 16):
+        raise ValueError(f"Invalid Object Size: { i }")
+    return i
+
+
 def optional_int(v):
     if v is not None:
         return int(v)
@@ -121,27 +128,59 @@ def load_entities_json(filename):
 # ms-export-order.json
 # ====================
 
-MsExportOrder = namedtuple('MsExportOrder', ('name', 'frames'))
+MsPatternObject = namedtuple('MsPatternObject', ('xpos', 'ypos', 'size'))
+MsPattern       = namedtuple('MsPattern', ('name', 'id', 'objects'))
+MsFrameOrder    = namedtuple('MsFrameOrder', ('name', 'frames'))
+MsExportOrder   = namedtuple('MsExportOrder', ('patterns', 'frame_lists'))
+
+
+def _load_pattern_objects(json_list):
+    objs = list()
+
+    for o in json_list:
+        objs.append(
+            MsPatternObject(
+                xpos = int(o['x']),
+                ypos = int(o['y']),
+                size = check_obj_size(o['size'])
+            )
+        )
+
+    return objs
+
 
 
 def load_ms_export_order_json(filename):
     with open(filename, 'r') as fp:
         mseo_input = json.load(fp)
 
-    export_orders = dict()
 
-    for name, m in mseo_input.items():
-        eo = MsExportOrder(
+    patterns = OrderedDict()
+    for i, p in enumerate(list(mseo_input['patterns'])):
+        pat = MsPattern(
+                name = check_name(p['name']),
+                id = i,
+                objects = _load_pattern_objects(p['objects'])
+        )
+
+        if pat.name in patterns:
+            raise ValueError(f"Duplicate Pattern name: { pat.name }")
+        patterns[pat.name] = pat
+
+
+    frame_lists = dict()
+    for name, m in mseo_input['frame_lists'].items():
+        eo = MsFrameOrder(
                 name = check_name(name),
                 frames = check_name_list(m['frames']),
         )
 
-        if eo.name in export_orders:
+        if eo.name in frame_lists:
             raise ValueError(f"Duplicate MetaSprite Export Order Name: { eo.name }")
-        export_orders[eo.name] = eo
+        frame_lists[eo.name] = eo
 
 
-    return export_orders
+    return MsExportOrder(patterns=patterns, frame_lists=frame_lists)
 
 
 

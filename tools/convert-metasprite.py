@@ -25,41 +25,6 @@ ROM_BANK = 'rodata0'
 
 
 
-PatternObject = namedtuple('PatternObject', ('xpos', 'ypos', 'size'))
-
-# ::TODO move into a json file::
-PATTERNS = {
-    'square_single16': [
-        PatternObject( 0,  0, 16)
-    ],
-    'rect_16x8_two': [
-        PatternObject( 0,  0,  8),
-        PatternObject( 8,  0,  8),
-    ],
-    'rect_8x16_two': [
-        PatternObject( 0,  0,  8),
-        PatternObject( 0,  8,  8),
-    ],
-    'rect_16x32_two': [
-        PatternObject( 0,  0, 16),
-        PatternObject( 0, 16, 16),
-    ],
-    'rect_16x24_three': [
-        PatternObject( 0,  0, 16),
-        PatternObject( 0, 16,  8),
-        PatternObject( 8, 16,  8),
-    ],
-    'rect_16x24_and_extra': [
-        PatternObject( 0,  0, 16),
-        PatternObject( 0, 16,  8),
-        PatternObject( 8, 16,  8),
-        PatternObject(16,  8,  8),
-    ],
-}
-
-
-
-
 FrameSet = namedtuple('FrameSet', ('name', 'pattern', 'ms_export_order', 'frames'))
 
 
@@ -228,7 +193,7 @@ def extract_frame(image, pattern, palettes_map, tileset, fs, block, x, y):
 def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map):
     frames = dict()
 
-    pattern = PATTERNS[fs.pattern]
+    pattern = ms_export_orders.patterns[fs.pattern]
 
     image = load_image(ms_dir, fs.source)
 
@@ -250,12 +215,12 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map):
             y = (frame_number // frames_per_row) * fs.frame_height + block.y
 
             try:
-                frames[f] = extract_frame(image, pattern, palettes_map, tiles, fs, block, x, y)
+                frames[f] = extract_frame(image, pattern.objects, palettes_map, tiles, fs, block, x, y)
             except Exception as e:
                 raise Exception(f"Error with { fs.name }, { f }: { e }")
 
     try:
-        export_order = ms_export_orders[fs.ms_export_order]
+        export_order = ms_export_orders.frame_lists[fs.ms_export_order]
         eo_frames = [ frames[f] for f in export_order.frames ]
     except Exception as e:
         raise Exception(f"Error with { fs.name }: { e }")

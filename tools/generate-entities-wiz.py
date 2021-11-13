@@ -24,7 +24,7 @@ def generate_wiz_code(entities_input, ms_export_orders):
                 out.write(f"// ms-export-order = { ef.ms_export_order }\n")
                 out.write("namespace ms_frames {\n")
 
-                mseo = ms_export_orders[ef.ms_export_order]
+                mseo = ms_export_orders.frame_lists[ef.ms_export_order]
                 for i, ms_frame in enumerate(mseo.frames):
                     out.write(f"  let { ms_frame } = { i };\n")
 
