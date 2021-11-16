@@ -35,6 +35,7 @@ RESOURCES  += $(patsubst %,gen/metatiles/%.bin, $(METATILE_TILESETS))
 RESOURCES  += gen/resource-lists.wiz
 RESOURCES  += gen/entities.wiz
 RESOURCES  += gen/entity-data.wiz
+RESOURCES  += gen/ms-patterns-table.wiz
 RESOURCES  += gen/rooms.wiz
 
 
@@ -96,6 +97,9 @@ gen/rooms.wiz: resources/mappings.json $(ROOM_BINS) tools/generate-rooms-table.p
 
 gen/entity-data.wiz: resources/entities.json tools/generate-entity-data.py $(COMMON_PYTHON_SCRIPTS)
 	python3 tools/generate-entity-data.py -o "$@" "resources/entities.json"
+
+gen/ms-patterns-table.wiz: resources/ms-export-order.json tools/generate-ms-patterns-table-wiz.py $(COMMON_PYTHON_SCRIPTS)
+	python3 tools/generate-ms-patterns-table-wiz.py -o "$@" "resources/ms-export-order.json"
 
 gen/entities.wiz: resources/entities.json resources/ms-export-order.json tools/generate-entities-wiz.py $(COMMON_PYTHON_SCRIPTS)
 	python3 tools/generate-entities-wiz.py -o "$@" "resources/entities.json" "resources/ms-export-order.json"

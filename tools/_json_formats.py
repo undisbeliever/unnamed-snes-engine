@@ -23,6 +23,13 @@ def check_name_with_dot(s):
         raise ValueError(f"Invalid name: {s}")
 
 
+def check_optional_name(s):
+    if s:
+        return check_name(s)
+    else:
+        return None
+
+
 def check_room_name(s):
     if re.match(r'[a-zA-Z0-9_-]+$', s):
         return s
@@ -159,13 +166,17 @@ def load_ms_export_order_json(filename):
     for i, p in enumerate(list(mseo_input['patterns'])):
         pat = MsPattern(
                 name = check_name(p['name']),
-                id = i,
+                id = i * 2,
                 objects = _load_pattern_objects(p['objects'])
         )
 
         if pat.name in patterns:
             raise ValueError(f"Duplicate Pattern name: { pat.name }")
         patterns[pat.name] = pat
+
+
+    if len(patterns) > 256:
+        raise ValueError('Too many MetaSprite patterns')
 
 
     frame_lists = dict()
@@ -230,7 +241,7 @@ def load_mappings_json(filename):
 
 MsSpritesheet = namedtuple('MsSpritesheet', ('name', 'palette', 'first_tile', 'end_tile', 'framesets'))
 MsFrameset = namedtuple('MsFrameset', ('name', 'source', 'frame_width', 'frame_height', 'pattern', 'ms_export_order', 'order', 'blocks'))
-MsBlock = namedtuple('MsBlock', ('start', 'x', 'y', 'x_offset', 'y_offset', 'frames'))
+MsBlock = namedtuple('MsBlock', ('pattern', 'start', 'x', 'y', 'x_offset', 'y_offset', 'frames'))
 
 
 def __load_ms_blocks(json_input):
@@ -239,6 +250,7 @@ def __load_ms_blocks(json_input):
     for j in json_input:
         blocks.append(
             MsBlock(
+                pattern = check_optional_name(j.get('pattern')),
                 start = int(j['start']),
                 x = int(j['x']),
                 y = int(j['y']),

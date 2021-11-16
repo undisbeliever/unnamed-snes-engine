@@ -30,7 +30,7 @@
     ]
   },
   {
-    "name": "Bolt_NS",
+    "name": "Bolt",
     "source": "bolt.png",
     "frameWidth": "16",
     "frameHeight": "16",
@@ -43,6 +43,7 @@
     "blocks": [
       {
         "start": 0,
+        "pattern": "rect_8x16_two",
 
         "x": 0,
         "y": 0,
@@ -51,23 +52,10 @@
         "yoffset":  8,
 
         "frames": [ "north", "south" ]
-      }
-    ]
-  },
-  {
-    "name": "Bolt_EW",
-    "source": "bolt.png",
-    "frameWidth": "16",
-    "frameHeight": "16",
-
-    "pattern": "rect_16x8_two",
-    "ms-export-order": "projectile_ew",
-
-    "order": 2,
-
-    "blocks": [
+      },
       {
         "start": 2,
+        "pattern": "rect_16x8_two",
 
         "x": 0,
         "y": 0,
@@ -80,7 +68,7 @@
     ]
   },
   {
-    "name": "Fireball_NS",
+    "name": "Fireball",
     "source": "fireball.png",
     "frameWidth": "16",
     "frameHeight": "16",
@@ -93,6 +81,7 @@
     "blocks": [
       {
         "start": 0,
+        "pattern": "rect_8x16_two",
 
         "x": 0,
         "y": 0,
@@ -101,23 +90,10 @@
         "yoffset":  8,
 
         "frames": [ "north", "south" ]
-      }
-    ]
-  },
-  {
-    "name": "Fireball_EW",
-    "source": "fireball.png",
-    "frameWidth": "16",
-    "frameHeight": "16",
-
-    "pattern": "rect_16x8_two",
-    "ms-export-order": "projectile_ew",
-
-    "order": 2,
-
-    "blocks": [
+      },
       {
         "start": 2,
+        "pattern": "rect_16x8_two",
 
         "x": 0,
         "y": 0,

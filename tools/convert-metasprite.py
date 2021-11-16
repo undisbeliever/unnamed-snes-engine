@@ -162,10 +162,11 @@ class Tileset:
 def extract_frame(image, pattern, palettes_map, tileset, fs, block, x, y):
     data = bytearray()
 
+    data.append(pattern.id)
     data.append(block.x_offset)
     data.append(block.y_offset)
 
-    for o in pattern:
+    for o in pattern.objects:
         if o.size == 8:
             tile = extract_small_tile(image, x + o.xpos, y + o.ypos)
             palette_id, pal_map = get_palette_id(tile, palettes_map)
@@ -193,7 +194,7 @@ def extract_frame(image, pattern, palettes_map, tileset, fs, block, x, y):
 def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map):
     frames = dict()
 
-    pattern = ms_export_orders.patterns[fs.pattern]
+    base_pattern = ms_export_orders.patterns[fs.pattern]
 
     image = load_image(ms_dir, fs.source)
 
@@ -202,9 +203,20 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map):
 
     frames_per_row = image.width // fs.frame_width
 
+
+    all_blocks_use_the_same_pattern = True
+
     for block in fs.blocks:
         # ::TODO somehow handle clone blocks::
         # ::TODO somehow handle flipped blocks::
+
+        if block.pattern:
+            pattern = ms_export_orders.patterns[block.pattern]
+
+            if block.pattern != fs.pattern:
+                all_blocks_use_the_same_pattern = False
+        else:
+            pattern = base_pattern
 
         for i, f in enumerate(block.frames):
             if f in frames:
@@ -215,7 +227,7 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map):
             y = (frame_number // frames_per_row) * fs.frame_height + block.y
 
             try:
-                frames[f] = extract_frame(image, pattern.objects, palettes_map, tiles, fs, block, x, y)
+                frames[f] = extract_frame(image, pattern, palettes_map, tiles, fs, block, x, y)
             except Exception as e:
                 raise Exception(f"Error with { fs.name }, { f }: { e }")
 
@@ -225,7 +237,14 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map):
     except Exception as e:
         raise Exception(f"Error with { fs.name }: { e }")
 
-    return FrameSet(fs.name, fs.pattern, fs.ms_export_order, eo_frames)
+
+    if all_blocks_use_the_same_pattern:
+        pattern_name = fs.pattern
+    else:
+        pattern_name = "dynamic_pattern"
+
+
+    return FrameSet(fs.name, pattern_name, fs.ms_export_order, eo_frames)
 
 
 

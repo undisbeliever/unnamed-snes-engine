@@ -21,15 +21,22 @@ let MetaSpriteFrameTableOffset = 0xc10000 as far *u16;
 
 // MetaSprite Data in ROM
 namespace MsDataFormat {
-    let xOffset = 0xc10000 as far *u8;
-    let yOffset = 0xc10001 as far *u8;
+    // MetaSprite Pattern Id
+    //
+    // Only read if the entity uses multiple MetaSprite patterns.
+    //
+    // (byte index into `metasprites.ms_patterns_table`, masked by `MS_PATTERNS_TABLE_MASK`)
+    let pattern = 0xc10000 as far *u8;
+
+    let xOffset = 0xc10001 as far *u8;
+    let yOffset = 0xc10002 as far *u8;
 
     // NOTE: Not all `charAttr*` fields will be filled.
     // Most MetaSprite patterns use less then 4 charAttr words.
-    let charAttr0 = 0xc10002 as far *u16;
-    let charAttr1 = 0xc10004 as far *u16;
-    let charAttr2 = 0xc10006 as far *u16;
-    let charAttr3 = 0xc10008 as far *u16;
+    let charAttr0 = 0xc10003 as far *u16;
+    let charAttr1 = 0xc10005 as far *u16;
+    let charAttr2 = 0xc10007 as far *u16;
+    let charAttr3 = 0xc10009 as far *u16;
 }
 
 // MetaSprie PPU data format in ROM.
@@ -620,6 +627,38 @@ inline func _update_hi_table_x8_0() {
 
 
 
+// Read the `MsDataFormat.pattern` byte execute the pattern's draw function.
+//
+// DB = 0x7e, DP = 0
+#[mem8, idx16]
+func dynamic_pattern(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
+    xx = yy;
+
+    // Clear the high byte of aa
+    #[mem16] {
+        aa = direct_page;
+    }
+
+    a = MsDataFormat.pattern[unaligned xx];
+    a &= MS_PATTERNS_TABLE_MASK;
+
+    #[mem16] {
+        xx = aa;
+    }
+
+    return ms_patterns_table[unaligned xx](yy, xPos, yPos);
+}
+
+
+
+// Blank drawing function - does nothing.
+//
+#[mem8, idx16]
+func null_function(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
+}
+
+
+
 // One sprite:
 //  * 1st sprite (Large)
 //
@@ -998,4 +1037,5 @@ func rect_16x24_and_extra(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in
 // Moving this here prevents an
 // "encountered a reference to `var metasprites.xPos` before its type was known" error.
 import "entities/_variables";
+import "../gen/ms-patterns-table";
 
