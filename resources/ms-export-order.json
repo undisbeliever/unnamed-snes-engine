@@ -28,6 +28,14 @@
       ]
     },
     {
+      "name": "rect_24x16_three",
+      "objects": [
+        { "x":  0, "y":  0, "size": 16 },
+        { "x": 16, "y":  0, "size":  8 },
+        { "x": 16, "y":  8, "size":  8 }
+      ]
+    },
+    {
       "name": "rect_16x24_three",
       "objects": [
         { "x":  0, "y":  0, "size": 16 },
@@ -43,9 +51,59 @@
         { "x":  8, "y": 16, "size":  8 },
         { "x": 16, "y":  8, "size":  8 }
       ]
+    },
+    {
+      "name": "diag_two_large_overlapping_A",
+      "objects": [
+        { "x":  0, "y":  0, "size": 16 },
+        { "x":  8, "y":  8, "size": 16 }
+      ]
+    },
+    {
+      "name": "diag_two_large_overlapping_B",
+      "objects": [
+        { "x":  8, "y":  0, "size": 16 },
+        { "x":  0, "y":  8, "size": 16 }
+      ]
     }
   ],
   "frame_lists": {
+    "player": {
+      "frames": [
+        "south0",
+        "south1",
+        "south2",
+        "south3",
+        "attack_south0",
+        "attack_south1",
+        "attack_south2",
+        "attack_south3",
+        "north0",
+        "north1",
+        "north2",
+        "north3",
+        "attack_north0",
+        "attack_north1",
+        "attack_north2",
+        "attack_north3",
+        "east0",
+        "east1",
+        "east2",
+        "east3",
+        "attack_east0",
+        "attack_east1",
+        "attack_east2",
+        "attack_east3",
+        "west0",
+        "west1",
+        "west2",
+        "west3",
+        "attack_west0",
+        "attack_west1",
+        "attack_west2",
+        "attack_west3"
+      ]
+    },
     "skeleton": {
       "frames": [
         "south0",

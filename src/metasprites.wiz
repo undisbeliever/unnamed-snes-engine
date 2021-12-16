@@ -879,6 +879,72 @@ func rect_16x32_two(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos)
 
 
 
+// Three sprites, 24x16 px rectangle:
+//  * 1st Sprite (large)
+//  * 2nd Sprite (small)
+//  * 3rd Sprite (small)
+//
+// ┌──┬─┐
+// │  ├─┤
+// └──┴─┘
+//
+// DB = 0x7e
+#[mem8, idx16]
+func rect_24x16_three(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
+    xx = yy;
+
+    _subtract_ms_offset_from_position(xx, xPos, yPos);
+
+    yy = bufferPos;
+    return if negative || yy < (3 - 1) * sizeof(OamEntry);
+
+
+    a = <:xPos;
+    (&buffer[ 0].xPos)[unaligned yy] = a;
+
+    _update_hi_table_size_large();
+    _update_hi_table_x8_xPos();
+
+    _update_hi_table_size_small();
+    (&buffer[-1].xPos)[unaligned yy] = a = <:xPos + 16;
+    a = (>:xPos +# 0) >>> 1;
+    _update_hi_table_x8(carry);
+
+    _update_hi_table_size_small();
+    (&buffer[-2].xPos)[unaligned yy] = a = <:xPos + 16;
+    a = (>:xPos +# 0) >>> 1;
+    _update_hi_table_x8(carry);
+
+
+    mem16();
+    #[mem16] {
+        aa = yPos;
+        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+            aa = -16 as u16;
+        }
+        (&buffer[ 0].yPos as *u16)[unaligned yy] = aa;
+        (&buffer[-1].yPos as *u16)[unaligned yy] = aa;
+
+        aa = yPos + 8;
+        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+            aa = -16 as u16;
+        }
+        (&buffer[-2].yPos as *u16)[unaligned yy] = aa;
+
+
+        (&buffer[ 0].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr0[unaligned xx];
+        (&buffer[-1].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr1[unaligned xx];
+        (&buffer[-2].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr2[unaligned xx];
+
+        yy = aa = yy - 3 * sizeof(OamEntry);
+    }
+    mem8();
+
+    bufferPos = yy;
+}
+
+
+
 // Three sprites, 16x24 px rectangle:
 //  * 1st Sprite (large)
 //  * 2nd Sprite (small)
@@ -1021,6 +1087,121 @@ func rect_16x24_and_extra(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in
         (&buffer[-3].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr3[unaligned xx];
 
         yy = aa = yy - 4 * sizeof(OamEntry);
+    }
+    mem8();
+
+    bufferPos = yy;
+}
+
+
+
+// Two large sprites with a 8x8px overlap:
+//  * 1st Sprite: Large (top-left)
+//  * 2nd Sprite: Large (bottom-right)
+//
+// ┌──┐
+// │1┌┼─┐
+// └─┼┘2│
+//   └──┘
+//
+// DB = 0x7e
+#[mem8, idx16]
+func diag_two_large_overlapping_A(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
+    xx = yy;
+
+    _subtract_ms_offset_from_position(xx, xPos, yPos);
+
+    yy = bufferPos;
+    return if negative || yy < (2 - 1) * sizeof(OamEntry);
+
+
+    (&buffer[ 0].xPos)[unaligned yy] = a = <:xPos;
+
+    _update_hi_table_size_large();
+    _update_hi_table_x8_xPos();
+
+    _update_hi_table_size_large();
+    (&buffer[-1].xPos)[unaligned yy] = a = <:xPos + 8;
+    a = (>:xPos +# 0) >>> 1;
+    _update_hi_table_x8(carry);
+
+
+    mem16();
+    #[mem16] {
+        aa = yPos;
+        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+            aa = -16 as u16;
+        }
+        (&buffer[ 0].yPos as *u16)[unaligned yy] = aa;
+
+        aa = yPos + 8;
+        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+            aa = -16 as u16;
+        }
+        (&buffer[-1].yPos as *u16)[unaligned yy] = aa;
+
+
+        (&buffer[ 0].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr0[unaligned xx];
+        (&buffer[-1].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr1[unaligned xx];
+
+        yy = aa = yy - 2 * sizeof(OamEntry);
+    }
+    mem8();
+
+    bufferPos = yy;
+}
+
+
+
+// Two large sprites with a 8x8px overlap:
+//  * 1st Sprite: Large (top-right)
+//  * 2nd Sprite: Large (bottom-left)
+//
+//   ┌──┐
+// ┌─┼┐1│
+// │2└┼─┘
+// └──┘
+//
+// DB = 0x7e
+#[mem8, idx16]
+func diag_two_large_overlapping_B(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
+    xx = yy;
+
+    _subtract_ms_offset_from_position(xx, xPos, yPos);
+
+    yy = bufferPos;
+    return if negative || yy < (2 - 1) * sizeof(OamEntry);
+
+
+    _update_hi_table_size_large();
+    (&buffer[ 0].xPos)[unaligned yy] = a = <:xPos + 8;
+    a = (>:xPos +# 0) >>> 1;
+    _update_hi_table_x8(carry);
+
+    (&buffer[-1].xPos)[unaligned yy] = a = <:xPos;
+    _update_hi_table_size_large();
+    _update_hi_table_x8_xPos();
+
+
+    mem16();
+    #[mem16] {
+        aa = yPos;
+        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+            aa = -16 as u16;
+        }
+        (&buffer[ 0].yPos as *u16)[unaligned yy] = aa;
+
+        aa = yPos + 8;
+        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+            aa = -16 as u16;
+        }
+        (&buffer[-1].yPos as *u16)[unaligned yy] = aa;
+
+
+        (&buffer[ 0].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr0[unaligned xx];
+        (&buffer[-1].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr1[unaligned xx];
+
+        yy = aa = yy - 2 * sizeof(OamEntry);
     }
     mem8();
 

@@ -2,8 +2,160 @@
   "name": "common",
   "palette": "_palette.png",
   "firstTile": 16,
-  "endTile": 96,
+  "endTile": 192,
   "framesets": [
+  {
+    "name": "Player",
+    "source": "player.png",
+    "frameWidth": "32",
+    "frameHeight": "32",
+
+    "pattern": "square_single16",
+    "ms-export-order": "player",
+
+    "order": 2,
+
+    "__comment": "::TODO improve this mess::",
+
+    "blocks": [
+      {
+        "start": 0,
+
+        "x": 8,
+        "y": 8,
+
+        "xoffset":  8,
+        "yoffset":  13,
+
+        "frames": [
+          "north0", "north1", "north2", "north3",
+          "south0", "south1", "south2", "south3",
+          "east0",  "east1",  "east2",  "east3",
+          "west0",  "west1",  "west2",  "west3"
+        ]
+      },
+      {
+        "start": 16,
+        "pattern": "diag_two_large_overlapping_B",
+
+        "x": 8,
+        "y": 0,
+
+        "xoffset":  8,
+        "yoffset":  21,
+
+        "frames": [ "attack_north0", "attack_north1" ]
+      },
+      {
+        "start": 18,
+        "pattern": "rect_16x24_three",
+
+        "x": 8,
+        "y": 0,
+
+        "xoffset":  8,
+        "yoffset":  21,
+
+        "frames": [ "attack_north2", "attack_north3" ]
+      },
+      {
+        "start": 20,
+        "pattern": "diag_two_large_overlapping_B",
+
+        "x": 0,
+        "y": 8,
+
+        "xoffset":  16,
+        "yoffset":  13,
+
+        "frames": [ "attack_south0", "attack_south1" ]
+      },
+      {
+        "start": 22,
+        "pattern": "rect_16x24_three",
+
+        "x": 8,
+        "y": 8,
+
+        "xoffset":  8,
+        "yoffset":  13,
+
+        "frames": [ "attack_south2", "attack_south3" ]
+      },
+      {
+        "start": 24,
+        "pattern": "rect_16x24_three",
+
+        "x": 8,
+        "y": 0,
+
+        "xoffset":  8,
+        "yoffset":  21,
+
+        "frames": [ "attack_east0" ]
+      },
+      {
+        "start": 25,
+        "pattern": "diag_two_large_overlapping_B",
+
+        "x": 8,
+        "y": 0,
+
+        "xoffset":  8,
+        "yoffset":  21,
+
+        "frames": [ "attack_east1" ]
+      },
+      {
+        "start": 26,
+        "pattern": "rect_16x24_and_extra",
+
+        "x": 8,
+        "y": 8,
+
+        "xoffset":  8,
+        "yoffset":  13,
+
+        "frames": [ "attack_east2", "attack_east3" ]
+      },
+      {
+        "start": 28,
+        "pattern": "rect_16x24_three",
+
+        "x": 8,
+        "y": 0,
+
+        "xoffset":  8,
+        "yoffset":  21,
+
+        "frames": [ "attack_west0" ]
+      },
+      {
+        "start": 29,
+        "pattern": "diag_two_large_overlapping_A",
+
+        "x": 0,
+        "y": 0,
+
+        "xoffset":  16,
+        "yoffset":  21,
+
+        "frames": [ "attack_west1" ]
+      },
+      {
+        "start": 30,
+        "pattern": "rect_24x16_three",
+
+        "x": 0,
+        "y": 8,
+
+        "xoffset":  16,
+        "yoffset":  13,
+
+        "frames": [ "attack_west2", "attack_west3" ]
+      }
+    ]
+  },
   {
     "name": "Bomb",
     "source": "bomb.png",

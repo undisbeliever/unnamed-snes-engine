@@ -14,8 +14,8 @@ namespace entities {
 namespace player {
 
 
-let ms_draw_function = ms.common.Bomb.draw_function;
-let ms_frame_table = ms.common.Bomb.frame_table;
+let ms_draw_function = ms.common.Player.draw_function;
+let ms_frame_table = ms.common.Player.frame_table;
 
 
 let xPos = entities.SoA.xPos[0];
@@ -27,6 +27,8 @@ let yVelocity = entities.SoA.yVelocity[0];
 let movementState = entities.SoA.movementState[0];
 
 let metaSpriteFrame = entities.SoA.metaSpriteFrame[0];
+
+let frameCounter = <:entities.SoA.state_0[0];
 
 
 in code {
@@ -59,6 +61,9 @@ inline func init() {
         entities.SoA.yVelocity[0] = 0;
     }
     mem8();
+
+
+    frameCounter = a = 6;
 }
 
 
@@ -71,6 +76,21 @@ inline func init() {
 // DB = 0x7e
 #[mem8, idx8]
 func process(entityId : u8 in x) {
+
+    // Cycle through metasprite frames
+    frameCounter--;
+    if zero {
+        frameCounter = a = 6;
+
+        a = metaSpriteFrame;
+        a++;
+        if a >= 32 {
+            // ::TODO add number of metasprite frames to `gen/entities.wiz`::
+            a = 0;
+        }
+        metaSpriteFrame = a;
+    }
+
 
     // ::TODO add proper controller support::
     let joy1_l = snes.joy.pad1_l;
