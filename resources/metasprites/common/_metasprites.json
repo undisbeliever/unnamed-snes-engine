@@ -23,7 +23,7 @@
         "y": 0,
 
         "xoffset":  8,
-        "yoffset":  8,
+        "yoffset":  13,
 
         "frames": [ "frame0", "frame1" ]
       }

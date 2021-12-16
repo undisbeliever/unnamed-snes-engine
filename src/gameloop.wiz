@@ -309,7 +309,7 @@ func run_game {
         // Always process player entity first
         x = 0;
         entities.currentEntityId = 0;
-        entities.SoA.process_function[unaligned x](x);
+        entities.player.process(x);
 
 
         entities.process_active_entities();

@@ -7,10 +7,16 @@ import "_variables";
 
 import "../metatiles";
 import "../../wiz/common/snes/snes";
+import "../../gen/metasprites/common";
 
 
 namespace entities {
 namespace player {
+
+
+let ms_draw_function = ms.common.Bomb.draw_function;
+let ms_frame_table = ms.common.Bomb.frame_table;
+
 
 let xPos = entities.SoA.xPos[0];
 let yPos = entities.SoA.yPos[0];
@@ -20,13 +26,10 @@ let yVelocity = entities.SoA.yVelocity[0];
 
 let movementState = entities.SoA.movementState[0];
 
+let metaSpriteFrame = entities.SoA.metaSpriteFrame[0];
+
 
 in code {
-
-#[mem8, idx16]
-func ms_draw_function(entityId : u16 in yy) {
-    // ::TODO implement::
-}
 
 
 
@@ -37,7 +40,6 @@ func ms_draw_function(entityId : u16 in yy) {
 // DB = 0x7e
 #[mem8, idx8]
 inline func init() {
-    // ::TODO set ms frame::
 
     a = ShadowSize.MEDIUM as u8;
     entities.SoA.shadowSize[0] = a as ShadowSize;
@@ -47,6 +49,8 @@ inline func init() {
 
     SoA.tileHitbox_halfWidth[0] = a = 6;
     SoA.tileHitbox_halfHeight[0] = a = 3;
+
+    metaSpriteFrame = 0;
 
 
     mem16();
