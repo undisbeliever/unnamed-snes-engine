@@ -289,10 +289,7 @@ namespace ms {
         out.write(f"namespace { spritesheet_name } {{\n")
 
         for fs in spritesheet:
-            frame_size = len(fs.frames[0])
             n_frames = len(fs.frames)
-
-            frame_type = f"[u8 ; { frame_size }]"
 
             out.write('\n')
             out.write(f"  namespace { fs.name } {{\n")
@@ -300,15 +297,12 @@ namespace ms {
             out.write(f"    // ms_export_order = { fs.ms_export_order }\n")
             out.write(f"    let draw_function = metasprites.drawing_functions.{ fs.pattern };\n\n")
 
-            out.write(f"    const frames : [[u8 ; { frame_size }] ; { n_frames }] = [\n")
+            out.write(f"    const frame_table : [*const u8 ; { n_frames }] = [\n")
 
             for frame_data in fs.frames:
-                assert len(frame_data) == frame_size
-                out.write(f"      [ { ', '.join(map(str, frame_data)) } ],\n")
+                out.write(f"      @[ { frame_data[0] }u8, { ', '.join(map(str, frame_data[1:])) } ],\n")
 
             out.write( '    ];\n\n')
-
-            out.write(f"    const frame_table : [*const [u8 ; { frame_size }] ; { n_frames }] = [ &frames[i] for let i in 0..{ n_frames - 1 } ];\n\n")
 
             out.write( '  }\n')
 
