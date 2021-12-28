@@ -244,16 +244,26 @@ MsFrameset = namedtuple('MsFrameset', ('name', 'source', 'frame_width', 'frame_h
 MsBlock = namedtuple('MsBlock', ('pattern', 'start', 'x', 'y', 'x_offset', 'y_offset', 'frames'))
 
 
-def __load_ms_blocks(json_input):
+def __load_ms_blocks(json_input, fs_pattern):
     blocks = list()
 
     for j in json_input:
+        pattern = check_optional_name(j.get('pattern'))
+        if pattern or fs_pattern:
+            x = int(j['x'])
+            y = int(j['y'])
+        else:
+            if 'x' in j or 'y' in j:
+                raise ValueError("MS Blocks with no pattern must not have a 'x' or 'y' field")
+            x = None
+            y = None
+
         blocks.append(
             MsBlock(
-                pattern = check_optional_name(j.get('pattern')),
+                pattern = pattern,
                 start = int(j['start']),
-                x = int(j['x']),
-                y = int(j['y']),
+                x = x,
+                y = y,
                 x_offset = int(j['xoffset']),
                 y_offset = int(j['yoffset']),
                 frames = check_name_list(j['frames'])
@@ -268,15 +278,17 @@ def __load_ms_framesets(json_input):
     framesets = OrderedDict()
 
     for f in json_input:
+        fs_pattern = check_optional_name(f['pattern'])
+
         fs = MsFrameset(
                 name = check_name(f['name']),
                 source = str(f['source']),
                 frame_width = int(f['frameWidth']),
                 frame_height = int(f['frameHeight']),
-                pattern = check_name(f['pattern']),
+                pattern = fs_pattern,
                 ms_export_order = check_name(f['ms-export-order']),
                 order = int(f['order']),
-                blocks = __load_ms_blocks(f['blocks'])
+                blocks = __load_ms_blocks(f['blocks'], fs_pattern)
         )
 
         if fs.name in framesets:

@@ -40,6 +40,17 @@ def convert_rgb_color(c):
 
 
 
+def is_small_tile_not_transparent(image, transparent_color, xpos, ypos):
+    """ Returns True if the tile contains a non-transparent pixel """
+
+    if xpos + 8 > image.width or ypos + 8 > image.height:
+        raise ValueError(f"position out of bounds: { xpos }, { ypos }")
+
+    return any(convert_rgb_color(image.getpixel((x, y))) != transparent_color
+                 for y in range(ypos, ypos + 8) for x in range(xpos, xpos + 8))
+
+
+
 def extract_tileset_tiles(image):
     """ Extracts 8x8px tiles from the image. """
 

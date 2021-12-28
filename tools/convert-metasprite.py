@@ -14,7 +14,7 @@ from io import StringIO
 from _snes import extract_small_tile, extract_large_tile, split_large_tile, \
             hflip_tile, vflip_tile, hflip_large_tile, vflip_large_tile, \
             create_palettes_map, get_palette_id, convert_palette_image, \
-            convert_snes_tileset
+            convert_snes_tileset, is_small_tile_not_transparent
 
 from _json_formats import load_ms_export_order_json, load_metasprites_json
 
@@ -24,6 +24,8 @@ TILE_DATA_BPP = 4
 ROM_BANK = 'rodata0'
 
 
+
+PatternGrid = namedtuple('PatternGrid', ('tile_count', 'width', 'height', 'data', 'pattern'))
 
 FrameSet = namedtuple('FrameSet', ('name', 'pattern', 'ms_export_order', 'frames'))
 
@@ -159,12 +161,133 @@ class Tileset:
 
 
 
-def extract_frame(image, pattern, palettes_map, tileset, fs, block, x, y):
+def generate_pattern_grids(ms_export_orders):
+    """
+    Convert `ms_export_orders.patterns' to a list of `PatternGrid`.
+    """
+
+    pattern_grids = list()
+
+    for p in ms_export_orders.patterns.values():
+        obj_min_x = min(o.xpos for o in p.objects)
+        obj_min_y = min(o.ypos for o in p.objects)
+        obj_max_x = max(o.xpos + o.size for o in p.objects)
+        obj_max_y = max(o.ypos + o.size for o in p.objects)
+
+        if obj_min_x % 8 != 0 or obj_min_y % 8 != 0 or obj_max_x % 8 != 0 or obj_max_y % 8 != 0:
+            continue
+
+        width = (obj_max_x - obj_min_x) // 8
+        height = (obj_max_y - obj_min_y) // 8
+
+        data = [ False ] * (width * height)
+
+        tile_count = 0
+        for o in p.objects:
+            tile_pos = (o.xpos // 8) + (o.ypos // 8 * width)
+            for y in range(o.size // 8):
+                for x in range(o.size // 8):
+                    data[tile_pos + x + y * width] = True
+                    tile_count += 1
+
+        pattern_grids.append(
+            PatternGrid(
+                tile_count = tile_count,
+                width = width,
+                height = height,
+                data = data,
+                pattern = p
+            )
+        )
+
+    pattern_grids.sort(key=lambda pg: pg.tile_count)
+
+    return pattern_grids
+
+
+
+def test_pattern_grid(p_grid, i_grid, x_offset, y_offset):
+    """
+    Test if a PatternGrid can be used on an Image Grid at a given location.
+
+    Returns tuple (valid (bool), number of unused tiles in PatternGrid)
+    """
+
+    n_matches = 0
+    n_unused_tiles = 0
+
+    for y in range(p_grid.height):
+        for x in range(p_grid.width):
+            p_tile = p_grid.data[y * p_grid.width + x]
+            i_tile = i_grid.data[(y + y_offset) * i_grid.width + (x + x_offset)]
+
+            if i_tile:
+                if not p_tile:
+                    # Non-transparent tile in image grid is not in pattern grid
+                    return False, -1
+                n_matches += 1
+            else:
+                if p_tile:
+                    n_unused_tiles += 1
+
+    return (n_matches == i_grid.tile_count), n_unused_tiles
+
+
+
+def find_best_pattern(image, transparent_color, pattern_grids, x_offset, y_offset, frame_width, frame_height):
+    """
+    Search through the `pattern_grids` and find the best pattern for a given frame image.
+
+    Returns tuple (pattern, xpos, ypos)
+    """
+
+    if frame_width % 8 != 0 or frame_height % 8 != 0:
+        raise ValueError("find_best_pattern only works with frames that are a multiple of 8 in width and height")
+
+
+    # Convert frame image into a grid of booleans (True if tile is not 100% transparent)
+    i_grid_data = [ is_small_tile_not_transparent(image, transparent_color, x, y)
+                    for y in range(y_offset, y_offset + frame_height, 8) for x in range(x_offset, x_offset + frame_width, 8) ]
+    i_grid = PatternGrid(
+                tile_count = sum(i_grid_data),
+                width = frame_width // 8,
+                height = frame_height // 8,
+                data = i_grid_data,
+                pattern = None
+    )
+
+
+    best_pattern = None
+    best_n_unused_tiles = 0xffff
+    best_x = 0
+    best_y = 0
+
+    for p_grid in pattern_grids:
+        if p_grid.tile_count >= i_grid.tile_count and p_grid.width <= i_grid.width and p_grid.height <= i_grid.height:
+            for y in range(0, i_grid.height - p_grid.height + 1):
+                for x in range(0, i_grid.width - p_grid.width + 1):
+                    valid, n_unused_tiles = test_pattern_grid(p_grid, i_grid, x, y)
+                    if valid:
+                        if n_unused_tiles < best_n_unused_tiles:
+                            best_n_unused_tiles = n_unused_tiles
+                            best_pattern = p_grid.pattern
+                            best_x = x * 8
+                            best_y = y * 8
+
+    if best_pattern is None:
+        # No patterns found
+        raise ValueError(f"Cannot find pattern for frame at ({ x_offset }, { y_offset }).  (NOTE: Only the first colour in the palette image is considered transparent)")
+
+    return best_pattern, best_x, best_y
+
+
+
+def extract_frame(image, pattern, palettes_map, tileset, fs, x, y, x_offset, y_offset):
     data = bytearray()
 
     data.append(pattern.id)
-    data.append(block.x_offset)
-    data.append(block.y_offset)
+    data.append(x_offset)
+    data.append(y_offset)
 
     for o in pattern.objects:
         if o.size == 8:
@@ -191,10 +314,13 @@ def extract_frame(image, pattern, palettes_map, tileset, fs, block, x, y):
 
 
 
-def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map):
+def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparent_color, pattern_grids):
     frames = dict()
 
-    base_pattern = ms_export_orders.patterns[fs.pattern]
+    if fs.pattern:
+        base_pattern = ms_export_orders.patterns[fs.pattern]
+    else:
+        base_pattern = None
 
     image = load_image(ms_dir, fs.source)
 
@@ -204,30 +330,48 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map):
     frames_per_row = image.width // fs.frame_width
 
 
-    all_blocks_use_the_same_pattern = True
+    all_blocks_use_the_same_pattern = base_pattern is not None
+
 
     for block in fs.blocks:
         # ::TODO somehow handle clone blocks::
         # ::TODO somehow handle flipped blocks::
 
         if block.pattern:
-            pattern = ms_export_orders.patterns[block.pattern]
+            block_pattern = ms_export_orders.patterns[block.pattern]
 
             if block.pattern != fs.pattern:
                 all_blocks_use_the_same_pattern = False
         else:
-            pattern = base_pattern
+            block_pattern = base_pattern
+
 
         for i, f in enumerate(block.frames):
             if f in frames:
                 raise ValueError(f"Duplicate frame: { f }")
 
             frame_number = block.start + i
-            x = (frame_number % frames_per_row) * fs.frame_width + block.x
-            y = (frame_number // frames_per_row) * fs.frame_height + block.y
+            x = (frame_number % frames_per_row) * fs.frame_width
+            y = (frame_number // frames_per_row) * fs.frame_height
 
             try:
-                frames[f] = extract_frame(image, pattern, palettes_map, tiles, fs, block, x, y)
+                if block_pattern is None:
+                    pattern, pattern_x, pattern_y = find_best_pattern(image, transparent_color, pattern_grids, x, y, fs.frame_width, fs.frame_height)
+
+                    x += pattern_x
+                    y += pattern_y
+                    x_offset = block.x_offset - pattern_x
+                    y_offset = block.y_offset - pattern_y
+                else:
+                    pattern = block_pattern
+
+                    x += block.x
+                    y += block.y
+
+                    x_offset = block.x_offset
+                    y_offset = block.y_offset
+
+                frames[f] = extract_frame(image, pattern, palettes_map, tiles, fs, x, y, x_offset, y_offset)
             except Exception as e:
                 raise Exception(f"Error with { fs.name }, { f }: { e }")
 
@@ -248,7 +392,7 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map):
 
 
 
-def build_spritesheet(ms_input, ms_export_orders, ms_dir, palettes_map):
+def build_spritesheet(ms_input, ms_export_orders, ms_dir, palettes_map, transparent_color, pattern_grids):
 
     tiles = Tileset(ms_input.first_tile, ms_input.end_tile)
 
@@ -256,7 +400,7 @@ def build_spritesheet(ms_input, ms_export_orders, ms_dir, palettes_map):
 
     for fs in ms_input.framesets.values():
         spritesheet.append(
-            build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map))
+            build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparent_color, pattern_grids))
 
     return spritesheet, tiles.get_tiles()
 
@@ -272,6 +416,12 @@ def load_palette(ms_dir, palette_filename):
     palette_data = convert_palette_image(image)
 
     return palettes_map, palette_data
+
+
+
+def get_transparent_color(palette_data):
+    # Hack to reconstruct the first color from palette_data bytes
+    return palette_data[0] | (palette_data[1] << 8)
 
 
 
@@ -387,9 +537,13 @@ def main():
     ms_export_orders = load_ms_export_order_json(args.ms_export_order_json_file)
 
 
+    pattern_grids = generate_pattern_grids(ms_export_orders)
+
     palettes_map, palette_data = load_palette(ms_dir, ms_input.palette)
 
-    spritesheet, tileset = build_spritesheet(ms_input, ms_export_orders, ms_dir, palettes_map)
+    transparent_color = get_transparent_color(palette_data)
+
+    spritesheet, tileset = build_spritesheet(ms_input, ms_export_orders, ms_dir, palettes_map, transparent_color, pattern_grids)
 
 
     ppu_data = generate_ppu_data(ms_input, tileset, palette_data)
