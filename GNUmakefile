@@ -64,7 +64,7 @@ wiz wiz/bin/wiz:
 
 
 # Test if wiz needs recompiling
-__UNUSED__ := $(shell $(MAKE) --quiet --question -C "wiz" bin/wiz)
+__UNUSED__ := $(shell $(MAKE) --quiet --question -C 'wiz' bin/wiz)
 ifneq ($(.SHELLSTATUS), 0)
   $(BINARY): wiz
 endif
@@ -86,30 +86,30 @@ RESOURCES += $(8BPP_TILES) $(8BPP_PALETTES)
 
 
 gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palette.png resources/metatiles/%.tsx tools/convert-tileset.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/convert-tileset.py -o "$@" "resources/metatiles/$*-tiles.png" "resources/metatiles/$*-palette.png" "resources/metatiles/$*.tsx"
+	$(PYTHON3) tools/convert-tileset.py -o '$@' 'resources/metatiles/$*-tiles.png' 'resources/metatiles/$*-palette.png' 'resources/metatiles/$*.tsx'
 
 
 gen/rooms/%.bin: resources/rooms/%.tmx resources/mappings.json resources/entities.json tools/convert-room.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/convert-room.py -o "$@" "resources/rooms/$*.tmx" "resources/mappings.json" "resources/entities.json"
+	$(PYTHON3) tools/convert-room.py -o '$@' 'resources/rooms/$*.tmx' 'resources/mappings.json' 'resources/entities.json'
 
 
 gen/resource-lists.wiz: resources/mappings.json tools/generate-resource-lists.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/generate-resource-lists.py -o "$@" "resources/mappings.json"
+	$(PYTHON3) tools/generate-resource-lists.py -o '$@' 'resources/mappings.json'
 
 gen/rooms.wiz: resources/mappings.json $(ROOM_BINS) tools/generate-rooms-table.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/generate-rooms-table.py -o "$@" "resources/mappings.json" $(ROOM_BINS)
+	$(PYTHON3) tools/generate-rooms-table.py -o '$@' 'resources/mappings.json' $(ROOM_BINS)
 
 gen/entity-data.wiz: resources/entities.json tools/generate-entity-data.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/generate-entity-data.py -o "$@" "resources/entities.json"
+	$(PYTHON3) tools/generate-entity-data.py -o '$@' 'resources/entities.json'
 
 gen/ms-patterns-table.wiz: resources/ms-export-order.json tools/generate-ms-patterns-table-wiz.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/generate-ms-patterns-table-wiz.py -o "$@" "resources/ms-export-order.json"
+	$(PYTHON3) tools/generate-ms-patterns-table-wiz.py -o '$@' 'resources/ms-export-order.json'
 
 gen/entities.wiz: resources/entities.json resources/ms-export-order.json tools/generate-entities-wiz.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/generate-entities-wiz.py -o "$@" "resources/entities.json" "resources/ms-export-order.json"
+	$(PYTHON3) tools/generate-entities-wiz.py -o '$@' 'resources/entities.json' 'resources/ms-export-order.json'
 
 gen/metasprites/%.wiz gen/metasprites/%.bin: resources/metasprites/%/_metasprites.json resources/ms-export-order.json tools/convert-metasprite.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/convert-metasprite.py --ppu-output "gen/metasprites/$*.bin" --wiz-output "gen/metasprites/$*.wiz" "resources/metasprites/$*/_metasprites.json" "resources/ms-export-order.json"
+	$(PYTHON3) tools/convert-metasprite.py --ppu-output 'gen/metasprites/$*.bin' --wiz-output 'gen/metasprites/$*.wiz' 'resources/metasprites/$*/_metasprites.json' 'resources/ms-export-order.json'
 
 
 define __update_metasprite_dependencies
@@ -136,7 +136,7 @@ DIRS := $(sort $(dir $(RESOURCES)))
 
 $(RESOURCES): $(DIRS)
 $(DIRS):
-	mkdir -p "$@"
+	mkdir -p '$@'
 
 
 .PHONY: clean
