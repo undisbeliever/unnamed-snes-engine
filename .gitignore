@@ -1,4 +1,5 @@
 *.sfc
 *.sym
-gen/
+gen
+*.sh
 
