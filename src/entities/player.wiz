@@ -18,6 +18,39 @@ let ms_draw_function = ms.common.Player.draw_function;
 let ms_frame_table = ms.common.Player.frame_table;
 
 
+let PLAYER_ENTITY_ID = 0;
+
+
+// (8:8 unsigned fixed point)
+let WALK_VELOCITY = 0x0160;
+
+
+// Pixels the player is to transverse before incrementing `animationFrame`
+// (8:8 unsigned fixed point)
+let WALK_ANIMATION_FRAME_DISTANCE = 0x0980;
+
+let N_WALK_FRAMES           = 4;
+
+
+// The direction the player is facing
+// (used to calculate `metaSpriteFrame`)
+enum FacingDirection : u8 {
+    DOWN,
+    UP,
+    RIGHT,
+    LEFT,
+};
+
+let FACING_DIRECTION_SHIFT = 3;
+
+
+
+enum State : u8 {
+    WALKING,
+};
+
+
+
 let xPos = entities.SoA.xPos[0];
 let yPos = entities.SoA.yPos[0];
 
@@ -26,9 +59,17 @@ let yVelocity = entities.SoA.yVelocity[0];
 
 let movementState = entities.SoA.movementState[0];
 
-let metaSpriteFrame = entities.SoA.metaSpriteFrame[0];
 
-let frameCounter = <:entities.SoA.state_0[0];
+let state                 = <:entities.SoA.state_0[0];
+let facingDirection       = >:entities.SoA.state_0[0];
+
+// Current animation frame
+let animationFrame        = <:entities.SoA.state_1[0];
+
+// Timer used to delay the next animation frame
+// (0:8:8 fixed point)
+let animationFrameDelay = entities.SoA.state_2[0];
+
 
 
 in code {
@@ -52,8 +93,6 @@ inline func init() {
     SoA.tileHitbox_halfWidth[0] = a = 6;
     SoA.tileHitbox_halfHeight[0] = a = 3;
 
-    metaSpriteFrame = 0;
-
 
     mem16();
     #[mem16] {
@@ -63,8 +102,15 @@ inline func init() {
     mem8();
 
 
-    frameCounter = a = 6;
+    state = State.WALKING as u8;
+
+    facingDirection = a = FacingDirection.UP as u8;
+
+    reset_animation();
+
+    update_metasprite_frame();
 }
+
 
 
 // Entity process routine.
@@ -77,54 +123,352 @@ inline func init() {
 #[mem8, idx8]
 func process(entityId : u8 in x) {
 
-    // Cycle through metasprite frames
-    frameCounter--;
-    if zero {
-        frameCounter = a = 6;
-
-        a = metaSpriteFrame;
-        a++;
-        if a >= 32 {
-            // ::TODO add number of metasprite frames to `gen/entities.wiz`::
-            a = 0;
-        }
-        metaSpriteFrame = a;
+    a = state as u8;
+    {
+        // state == WALKING
+        process_dpad_update_velocity();
     }
 
+    metatiles.move_entity_and_collision_test(PLAYER_ENTITY_ID);
+
+
+    // Update animation
+    a = state as u8;
+    {
+        // state == WALKING
+        update_animation__walking();
+    }
+}
+
+
+
+// PROCESS MOVEMENT
+// ================
+
+
+// Process player direction and update velocity.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process_dpad_update_velocity() {
 
     // ::TODO add proper controller support::
-    let joy1_l = snes.joy.pad1_l;
-    let joy1_h = snes.joy.pad1_h;
+    a = *far &snes.joy.pad1_h;
 
-    idx16();
-    #[idx16] {
-        a = *far &joy1_h;
-
-        if a & (1 << snes.joy.bit_h.UP) != 0 {
-            yy = -0x0160 as u16;
+    if a & snes.joy.mask_h.UP != 0 {
+        if a & snes.joy.mask_h.LEFT != 0 {
+            ^return process_direction_north_west();
         }
-        else if a & (1 << snes.joy.bit_h.DOWN) != 0 {
-            yy = 0x0160;
+        if a & snes.joy.mask_h.RIGHT != 0 {
+            ^return process_direction_north_east();
         }
-        else {
-            yy = 0;
-        }
-        yVelocity = yy;
-
-        if a & (1 << snes.joy.bit_h.LEFT) != 0 {
-            yy = -0x0160 as u16;
-        }
-        else if a & (1 << snes.joy.bit_h.RIGHT) != 0 {
-            yy = 0x0160;
-        }
-        else {
-            yy = 0;
-        }
-        xVelocity = yy;
+        ^return process_direction_north();
     }
-    idx8();
 
-    x = metatiles.move_entity_and_collision_test(x);
+    if a & snes.joy.mask_h.DOWN != 0 {
+        if a & snes.joy.mask_h.LEFT != 0 {
+            ^return process_direction_south_west();
+        }
+        if a & snes.joy.mask_h.RIGHT != 0{
+            ^return process_direction_south_east();
+        }
+        ^return process_direction_south();
+    }
+
+    if a & snes.joy.mask_h.LEFT != 0 {
+        ^return process_direction_west();
+    }
+
+    if a & snes.joy.mask_h.RIGHT != 0{
+        ^return process_direction_east();
+    }
+
+    return process_direction_stationary();
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process_direction_stationary() {
+    // Do not change facingDirection
+
+    zero_x_velocity();
+    zero_y_velocity();
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process_direction_north() {
+    facingDirection = a = FacingDirection.UP as u8;
+
+    zero_x_velocity();
+    decrement_y_velocity();
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process_direction_north_east() {
+    a = facingDirection;
+    if a == FacingDirection.LEFT as u8 {
+        facingDirection = a = FacingDirection.UP as u8;
+    }
+    if a == FacingDirection.DOWN as u8 {
+        facingDirection = a = FacingDirection.RIGHT as u8;
+    }
+
+    increment_x_velocity();
+    decrement_y_velocity();
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process_direction_east() {
+    facingDirection = a = FacingDirection.RIGHT as u8;
+
+    increment_x_velocity();
+    zero_y_velocity();
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process_direction_south_east() {
+    a = facingDirection;
+    if a == FacingDirection.LEFT as u8 {
+        facingDirection = a = FacingDirection.DOWN as u8;
+    }
+    if a == FacingDirection.UP as u8 {
+        facingDirection = a = FacingDirection.RIGHT as u8;
+    }
+
+    increment_x_velocity();
+    increment_y_velocity();
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process_direction_south() {
+    facingDirection = a = FacingDirection.DOWN as u8;
+
+    zero_x_velocity();
+    increment_y_velocity();
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process_direction_south_west() {
+    a = facingDirection;
+    if a == FacingDirection.RIGHT as u8 {
+        facingDirection = a = FacingDirection.DOWN as u8;
+    }
+    if a == FacingDirection.UP as u8 {
+        facingDirection = a = FacingDirection.LEFT as u8;
+    }
+
+    decrement_x_velocity();
+    increment_y_velocity();
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process_direction_west() {
+    facingDirection = a = FacingDirection.LEFT as u8;
+
+    decrement_x_velocity();
+    zero_y_velocity();
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process_direction_north_west() {
+    a = facingDirection;
+    if a == FacingDirection.RIGHT as u8 {
+        facingDirection = a = FacingDirection.UP as u8;
+    }
+    if a == FacingDirection.DOWN as u8 {
+        facingDirection = a = FacingDirection.LEFT as u8;
+    }
+
+    decrement_x_velocity();
+    decrement_y_velocity();
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func decrement_x_velocity() {
+
+    // ::TODO add acceleration and friction::
+    <:xVelocity = a = <:-WALK_VELOCITY;
+    >:xVelocity = a = >:-WALK_VELOCITY;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func zero_x_velocity() {
+
+    // ::TODO add friction::
+    <:xVelocity = 0;
+    >:xVelocity = 0;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func increment_x_velocity() {
+
+    // ::TODO add acceleration and friction::
+    <:xVelocity = a = <:WALK_VELOCITY;
+    >:xVelocity = a = >:WALK_VELOCITY;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func decrement_y_velocity() {
+
+    // ::TODO add acceleration and friction::
+    <:yVelocity = a = <:-WALK_VELOCITY;
+    >:yVelocity = a = >:-WALK_VELOCITY;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func zero_y_velocity() {
+
+    // ::TODO add friction::
+    <:yVelocity = 0;
+    >:yVelocity = 0;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func increment_y_velocity() {
+
+    // ::TODO add acceleration and friction::
+    <:yVelocity = a = <:WALK_VELOCITY;
+    >:yVelocity = a = >:WALK_VELOCITY;
+}
+
+
+
+
+// ANIMATIONS
+// ==========
+
+
+// Reset animationFrame and animationFrameDelay
+//
+// DB = 0x7e
+#[mem8, idx8]
+func reset_animation() {
+    animationFrame = 0;
+
+    <:animationFrameDelay = 0;
+    >:animationFrameDelay = 0;
+}
+
+
+
+// Update animation frame for WALKING state.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func update_animation__walking() {
+
+let _tmp = dpTmp0;
+
+    mem16();
+    #[mem16] {
+
+        // aa = max(abs(xVelocity), abs(yVelocity))
+        {
+            aa = xVelocity;
+            if negative {
+                // negate
+                aa ^= 0xffff;
+                aa++;
+            }
+            _tmp = aa;
+
+            aa = yVelocity;
+            if negative {
+                // negate
+                aa ^= 0xffff;
+                aa++;
+            }
+
+            if aa < _tmp {
+                aa = _tmp;
+            }
+        }
+
+        if aa == 0 {
+            // No movement: force standing frame
+
+            animationFrame = y = 0;
+            animationFrameDelay = 0;
+        }
+        else {
+            // Movement
+
+            aa += animationFrameDelay;
+            if aa >= WALK_ANIMATION_FRAME_DISTANCE {
+                aa = 0;
+
+                // increment animationFrame (with wrapping)
+                y = animationFrame;
+                y++;
+                if y >= N_WALK_FRAMES {
+                    y = 0;
+                }
+                animationFrame = y;
+            }
+
+            animationFrameDelay = aa;
+        }
+    }
+    mem8();
+
+    return update_metasprite_frame();
+}
+
+
+
+// Calculate metaSpriteFrame value
+//
+// DB = 0x7e
+#[mem8, idx8]
+func update_metasprite_frame() {
+
+    a = ((facingDirection as u8) <<< FACING_DIRECTION_SHIFT) | animationFrame;
+
+    entities.SoA.metaSpriteFrame[PLAYER_ENTITY_ID] = a;
 }
 
 
