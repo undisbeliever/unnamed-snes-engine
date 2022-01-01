@@ -21,6 +21,9 @@ let ms_frame_table = ms.common.Player.frame_table;
 let PLAYER_ENTITY_ID = 0;
 
 
+let ATTACK_BUTTON_H = snes.joy.mask_h.Y;
+
+
 // (8:8 unsigned fixed point)
 let WALK_VELOCITY = 0x0160;
 
@@ -29,7 +32,14 @@ let WALK_VELOCITY = 0x0160;
 // (8:8 unsigned fixed point)
 let WALK_ANIMATION_FRAME_DISTANCE = 0x0980;
 
+let ATTACK_ANIMATION_FRAME_DELAY = 4;
+
+
 let N_WALK_FRAMES           = 4;
+
+let FIRST_ATTACK_FRAME      = 4;
+let N_ATTACK_FRAMES         = 4;
+
 
 
 // The direction the player is facing
@@ -47,6 +57,7 @@ let FACING_DIRECTION_SHIFT = 3;
 
 enum State : u8 {
     WALKING,
+    ATTACKING,
 };
 
 
@@ -102,11 +113,9 @@ inline func init() {
     mem8();
 
 
-    state = State.WALKING as u8;
-
     facingDirection = a = FacingDirection.UP as u8;
 
-    reset_animation();
+    set_state__walking();
 
     update_metasprite_frame();
 }
@@ -124,9 +133,12 @@ inline func init() {
 func process(entityId : u8 in x) {
 
     a = state as u8;
-    {
+    if a == State.ATTACKING as u8 {
+        process__attack();
+    }
+    else {
         // state == WALKING
-        process_dpad_update_velocity();
+        process__walking();
     }
 
     metatiles.move_entity_and_collision_test(PLAYER_ENTITY_ID);
@@ -134,11 +146,15 @@ func process(entityId : u8 in x) {
 
     // Update animation
     a = state as u8;
-    {
+    if a == State.ATTACKING as u8 {
+        update_animation__attacking();
+    }
+    else {
         // state == WALKING
         update_animation__walking();
     }
 }
+
 
 
 
@@ -377,20 +393,35 @@ func increment_y_velocity() {
 
 
 
+// WALKING STATE
+// =============
 
-// ANIMATIONS
-// ==========
 
-
-// Reset animationFrame and animationFrameDelay
-//
 // DB = 0x7e
 #[mem8, idx8]
-func reset_animation() {
+func set_state__walking() {
+    state = State.WALKING as u8;
+
+
     animationFrame = 0;
 
     <:animationFrameDelay = 0;
     >:animationFrameDelay = 0;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__walking() {
+    process_dpad_update_velocity();
+
+
+    // ::TODO add proper controller support::
+    a = *far &snes.joy.pad1_h;
+    if a & ATTACK_BUTTON_H != 0 {
+        set_state__attacking();
+    }
 }
 
 
@@ -469,6 +500,55 @@ func update_metasprite_frame() {
     a = ((facingDirection as u8) <<< FACING_DIRECTION_SHIFT) | animationFrame;
 
     entities.SoA.metaSpriteFrame[PLAYER_ENTITY_ID] = a;
+}
+
+
+
+// ATTACKING STATE
+// ===============
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_state__attacking() {
+    state = a = State.ATTACKING as u8;
+
+    // Stand still while attacking
+    <:xVelocity = 0;
+    >:xVelocity = 0;
+    <:yVelocity = 0;
+    >:yVelocity = 0;
+
+    animationFrame = a = FIRST_ATTACK_FRAME;
+    <:animationFrameDelay = a = ATTACK_ANIMATION_FRAME_DELAY - 1;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__attack() {
+
+    a = animationFrame;
+    if a == FIRST_ATTACK_FRAME + N_ATTACK_FRAMES {
+        ^return set_state__walking();
+    }
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func update_animation__attacking() {
+
+    (<:animationFrameDelay)--;
+    if negative {
+        <:animationFrameDelay = a = ATTACK_ANIMATION_FRAME_DELAY - 1;
+
+        animationFrame++;
+    }
+
+    return update_metasprite_frame();
 }
 
 
