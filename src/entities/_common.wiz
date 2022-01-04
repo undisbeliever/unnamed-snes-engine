@@ -336,6 +336,88 @@ func _blank_player_function() : bool in carry {
     return true;
 }
 
+
+
+// COLLISIONS
+// ==========
+
+
+// Update `playerHurtbox`.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func update_player_hurtbox() {
+    a = player.xPos.px - player.HURTBOX_LEFT_OFFSET;
+    if !carry {
+        a = 0;
+    }
+    playerHurtbox.left = a;
+
+    a = player.xPos.px + player.HURTBOX_RIGHT_OFFSET;
+    if carry {
+        a = 0xff;
+    }
+    playerHurtbox.right = a;
+
+    a = player.yPos.px - player.HURTBOX_TOP_OFFSET;
+    if !carry {
+        a = 0;
+    }
+    playerHurtbox.top = a;
+
+    a = player.yPos.px + player.HURTBOX_BOTTOM_OFFSET;
+    if carry {
+        a = 0xff;
+    }
+    playerHurtbox.bottom = a;
+}
+
+
+
+// Test for a collision between an entity's tile-hitbox and the player's hurtbox.
+//
+// If there is a collision, the `entities.player.hurtbox_collided_with_entity__inline()`
+// function will be called.
+//
+// ASSUMES `entityId` is not player.
+//
+// Return: true if there is a collision
+// Return: X = currentEntityId
+//
+// DB = 0x7e
+#[mem8, idx8]
+func test_tile_hitbox_player_hurtbox(entityId : u8 in x) : bool in carry {
+
+    // calculate entity tileHitbox left
+    a = entities.SoA.xPos_px[x] - entities.SoA.tileHitbox_halfWidth[x];
+    if a < playerHurtbox.right {
+
+        // calculate entity tileHitbox right
+        a = entities.SoA.xPos_px[x] + entities.SoA.tileHitbox_halfWidth[x];
+        if a >= playerHurtbox.left {
+
+            // calculate entity tileHitbox top
+            a = entities.SoA.yPos_px[x] - entities.SoA.tileHitbox_halfHeight[x];
+            if a < playerHurtbox.bottom {
+
+                // calculate entity tileHitbox bottom
+                a = entities.SoA.yPos_px[x] + entities.SoA.tileHitbox_halfHeight[x];
+                if a >= playerHurtbox.bottom {
+
+                    entities.player.hurtbox_collided_with_entity__inline(x);
+
+                    x = currentEntityId;
+
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+
 }
 
 }

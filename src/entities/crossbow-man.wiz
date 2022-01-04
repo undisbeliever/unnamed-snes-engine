@@ -75,12 +75,12 @@ func process(entityId : u8 in x) : bool in carry {
     metatiles.move_entity_and_collision_test(x);
 
 
-    // ::TODO player collision ::
+    carry = entities.test_tile_hitbox_player_hurtbox(x);
+    // ::TODO add reaction when colliding with player::
 
 
     y = x;
     x = SoA_state[y] as u8;
-
     return process__walk_functions[unaligned x]();
 }
 

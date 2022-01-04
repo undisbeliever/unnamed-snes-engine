@@ -36,7 +36,14 @@ namespace entities {
     struct _u8pair {
         first : u8,
         second : u8,
-    }
+    };
+
+    struct U8Aabb {
+        left : u8,
+        right : u8,
+        top : u8,
+        bottom : u8,
+    };
 
 
     in zeropage {
@@ -46,6 +53,10 @@ namespace entities {
         //
         // (byte index)
         var currentEntityId : u8;
+
+
+        // The player's hurtbox
+        var playerHurtbox : U8Aabb;
     }
 
 

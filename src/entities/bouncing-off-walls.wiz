@@ -75,24 +75,35 @@ func init(entityId : u8 in x, parameter : u8 in y) {
 func process(entityId : u8 in x) : bool in carry {
     metatiles.move_entity_and_collision_test(x);
 
-    // ::TODO player collision::
 
-    a = SoA.movementState[x];
-    if a & MovementState.X_AXIS_COLLISION != 0 {
+    carry = entities.test_tile_hitbox_player_hurtbox(x);
+    if carry {
+        // collided with player - bounce entity off player
         mem16();
         #[mem16] {
             SoA.xVelocity[unaligned x] = aa = 0 - SoA.xVelocity[unaligned x];
-        }
-        mem8();
-    }
-
-    a = SoA.movementState[x];
-    if a & MovementState.Y_AXIS_COLLISION != 0 {
-        mem16();
-        #[mem16] {
             SoA.yVelocity[unaligned x] = aa = 0 - SoA.yVelocity[unaligned x];
         }
         mem8();
+    }
+    else {
+        a = SoA.movementState[x];
+        if a & MovementState.X_AXIS_COLLISION != 0 {
+            mem16();
+            #[mem16] {
+                SoA.xVelocity[unaligned x] = aa = 0 - SoA.xVelocity[unaligned x];
+            }
+            mem8();
+        }
+
+        a = SoA.movementState[x];
+        if a & MovementState.Y_AXIS_COLLISION != 0 {
+            mem16();
+            #[mem16] {
+                SoA.yVelocity[unaligned x] = aa = 0 - SoA.yVelocity[unaligned x];
+            }
+            mem8();
+        }
     }
 
 
