@@ -57,6 +57,9 @@ namespace entities {
 
         // The player's hurtbox
         var playerHurtbox : U8Aabb;
+
+        // The player's hitbox
+        var playerHitbox : U8Aabb;
     }
 
 

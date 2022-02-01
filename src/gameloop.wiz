@@ -310,7 +310,7 @@ func run_game {
         x = 0;
         entities.currentEntityId = 0;
         entities.player.process(x);
-        entities.update_player_hurtbox();
+        entities.update_player_collision_boxes();
 
 
         entities.process_active_entities();

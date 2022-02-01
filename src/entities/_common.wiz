@@ -342,11 +342,22 @@ func _blank_player_function() : bool in carry {
 // ==========
 
 
+// Update player's collision boxes
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func update_player_collision_boxes() {
+    _update_player_hurtbox();
+    player.update_hitbox();
+}
+
+
+
 // Update `playerHurtbox`.
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func update_player_hurtbox() {
+inline func _update_player_hurtbox() {
     a = player.xPos.px - player.HURTBOX_LEFT_OFFSET;
     if !carry {
         a = 0;
@@ -405,6 +416,51 @@ func test_tile_hitbox_player_hurtbox(entityId : u8 in x) : bool in carry {
                 if a >= playerHurtbox.bottom {
 
                     entities.player.hurtbox_collided_with_entity__inline(x);
+
+                    x = currentEntityId;
+
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+
+
+// Test for a collision between an entity's tile-hitbox and the player's hitbox.
+//
+// If there is a collision, the `entities.player.hitbox_collided_with_entity__inline()`
+// function will be called.
+//
+// ASSUMES `entityId` is not player.
+//
+// Return: true if there is a collision
+// Return: X = currentEntityId
+//
+// DB = 0x7e
+#[mem8, idx8]
+func test_tilebox__player_hitbox(entityId : u8 in x) : bool in carry {
+
+    // calculate entity tileHitbox left
+    a = entities.SoA.xPos_px[x] - entities.SoA.tileHitbox_halfWidth[x];
+    if a < playerHitbox.right {
+
+        // calculate entity tileHitbox right
+        a = entities.SoA.xPos_px[x] + entities.SoA.tileHitbox_halfWidth[x];
+        if a >= playerHitbox.left {
+
+            // calculate entity tileHitbox top
+            a = entities.SoA.yPos_px[x] - entities.SoA.tileHitbox_halfHeight[x];
+            if a < playerHitbox.bottom {
+
+                // calculate entity tileHitbox bottom
+                a = entities.SoA.yPos_px[x] + entities.SoA.tileHitbox_halfHeight[x];
+                if a >= playerHitbox.bottom {
+
+                    entities.player.hitbox_collided_with_entity__inline(x);
 
                     x = currentEntityId;
 

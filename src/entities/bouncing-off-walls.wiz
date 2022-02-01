@@ -17,10 +17,14 @@ namespace entities {
 namespace bouncing_off_walls {
 
 
+let SoA_iframeCounter    = SoA.state_0_l;
+
 let SoA_animationCounter = SoA.state_0_h;
 
 
 let SPEED = 0x0120;
+
+let N_I_FRAMES = 20;
 
 
 let ANIMATION_DELAY = 4;
@@ -75,36 +79,7 @@ func init(entityId : u8 in x, parameter : u8 in y) {
 func process(entityId : u8 in x) : bool in carry {
     metatiles.move_entity_and_collision_test(x);
 
-
-    carry = entities.test_tile_hitbox_player_hurtbox(x);
-    if carry {
-        // collided with player - bounce entity off player
-        mem16();
-        #[mem16] {
-            SoA.xVelocity[unaligned x] = aa = 0 - SoA.xVelocity[unaligned x];
-            SoA.yVelocity[unaligned x] = aa = 0 - SoA.yVelocity[unaligned x];
-        }
-        mem8();
-    }
-    else {
-        a = SoA.movementState[x];
-        if a & MovementState.X_AXIS_COLLISION != 0 {
-            mem16();
-            #[mem16] {
-                SoA.xVelocity[unaligned x] = aa = 0 - SoA.xVelocity[unaligned x];
-            }
-            mem8();
-        }
-
-        a = SoA.movementState[x];
-        if a & MovementState.Y_AXIS_COLLISION != 0 {
-            mem16();
-            #[mem16] {
-                SoA.yVelocity[unaligned x] = aa = 0 - SoA.yVelocity[unaligned x];
-            }
-            mem8();
-        }
-    }
+    _process_collisions(x);
 
 
     // Process animation
@@ -121,6 +96,80 @@ func process(entityId : u8 in x) : bool in carry {
 
     return true;
 }
+
+
+
+// Test and react to player collisions and tile collisions.
+//
+// KEEP: X
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _process_collisions(entityId : u8 in x) : u8 in x {
+
+    a = SoA_iframeCounter[x];
+    if zero {
+        // Only test for a player collision if not in iframe
+
+        carry = entities.test_tilebox__player_hitbox(x);
+        if carry {
+            // collided with player's attack - bounce entity off player
+
+            SoA_iframeCounter[x] = a = N_I_FRAMES;
+
+            // ::TODO decrement health::
+
+            // ::TODO add reaction::
+            mem16();
+            #[mem16] {
+                SoA.xVelocity[unaligned x] = 0;
+                SoA.yVelocity[unaligned x] = 0;
+            }
+            mem8();
+
+            return x;
+        }
+
+        carry = entities.test_tile_hitbox_player_hurtbox(x);
+        if carry {
+            mem16();
+            #[mem16] {
+                SoA.xVelocity[unaligned x] = aa = 0 - SoA.xVelocity[unaligned x];
+                SoA.yVelocity[unaligned x] = aa = 0 - SoA.yVelocity[unaligned x];
+            }
+            mem8();
+
+            return x;
+        }
+    }
+    else {
+        SoA_iframeCounter[x] = --a;
+    }
+
+
+    // Check for a tile collision
+
+    a = SoA.movementState[x];
+    if a & MovementState.X_AXIS_COLLISION != 0 {
+        mem16();
+        #[mem16] {
+            SoA.xVelocity[unaligned x] = aa = 0 - SoA.xVelocity[unaligned x];
+        }
+        mem8();
+    }
+
+    a = SoA.movementState[x];
+    if a & MovementState.Y_AXIS_COLLISION != 0 {
+        mem16();
+        #[mem16] {
+            SoA.yVelocity[unaligned x] = aa = 0 - SoA.yVelocity[unaligned x];
+        }
+        mem8();
+    }
+
+    return x;
+}
+
 
 }
 

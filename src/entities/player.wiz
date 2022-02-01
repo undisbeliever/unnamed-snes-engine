@@ -106,6 +106,41 @@ let animationFrameDelay = entities.SoA.state_2[0];
 
 
 
+// DATA
+// ====
+
+in rodata0 {
+
+
+// ::TODO improve sword hitbox::
+
+// Hitbox
+//
+// NOTE: if the `top` byte of hitbox is 0 then there is no hitbox.
+//
+// (SoA x 4 signed 8 bit integer)
+namespace Hitbox {
+    //                      south,        attack_south,         north,        attack_north,         east,         attack_east,          west,         attack_west
+    const _top    : [i8] = [ 0, 0, 0, 0,    -7,  -3,  -1,  -1,   0, 0, 0, 0,   -13, -15, -17, -17,   0, 0, 0, 0,    -5,  -5,  -5,  -5,   0, 0, 0, 0,    -5,  -5,  -5,  -5,  ];
+    const _bottom : [i8] = [ 0, 0, 0, 0,     2,   6,  10,  10,   0, 0, 0, 0,    -6,  -6,  -5,  -5,   0, 0, 0, 0,     2,   2,   2,   2,   0, 0, 0, 0,     2,   2,   2,   2,  ];
+    const _left   : [i8] = [ 0, 0, 0, 0,   -12, -11,  -4,  -3,   0, 0, 0, 0,     4,   4,  -2,  -2,   0, 0, 0, 0,     0,   2,   2,   2,   0, 0, 0, 0,    -5, -13, -15, -15,  ];
+    const _right  : [i8] = [ 0, 0, 0, 0,    -3,  -4,   2,   2,   0, 0, 0, 0,    15,  12,   4,   3,   0, 0, 0, 0,     5,  13,  15,  15,   0, 0, 0, 0,     0,  -2,  -2,  -2,  ];
+
+
+    let top    = far &_top as far *const i8;
+    let bottom = far &_bottom as far *const i8;
+    let left   = far &_left as far *const i8;
+    let right  = far &_right as far *const i8;
+}
+
+}
+
+
+// CODE
+// ====
+
+
+
 in code {
 
 
@@ -197,6 +232,107 @@ inline func hurtbox_collided_with_entity__inline(entityId : u8 in x) {
     if a != State.HURT as u8 {
         _set_state__hurt(x, a);
     }
+}
+
+
+
+// Called whenever an entity collides with the player's hitbox.
+//
+// PARAM: entityId - the entity that collided with `playerHitbox`.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func hitbox_collided_with_entity__inline(entityId : u8 in x) {
+    // ::TODO implement::
+}
+
+
+
+
+// Update player hitbox
+//
+// Called once per frame
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func update_hitbox() {
+    x = entities.SoA.metaSpriteFrame[PLAYER_ENTITY_ID];
+
+
+    a = Hitbox.top[x] as u8;
+    if zero {
+        a = 0xff;
+        playerHitbox.top = a;
+        playerHitbox.bottom = 0;
+        playerHitbox.left = a;
+        playerHitbox.right = 0;
+
+        return;
+    }
+
+
+    // Add i8 signed Hitbox.top[x] to player's u8 unsigned Y position (with clamping)
+    // a = top
+    if negative {
+        a += yPos.px;
+        if !carry {
+            a = 0;
+        }
+    }
+    else {
+        a += yPos.px;
+        if carry {
+            a = 0xff;
+        }
+    }
+    playerHitbox.top = a;
+
+
+    a = Hitbox.bottom[x] as u8;
+    if negative {
+        a += yPos.px;
+        if !carry {
+            a = 0;
+        }
+    }
+    else {
+        a += yPos.px;
+        if carry {
+            a = 0xff;
+        }
+    }
+    playerHitbox.bottom = a;
+
+    a = Hitbox.left[x] as u8;
+    if negative {
+        a += xPos.px;
+        if !carry {
+            a = 0;
+        }
+    }
+    else {
+        a += xPos.px;
+        if carry {
+            a = 0xff;
+        }
+    }
+    playerHitbox.left = a;
+
+
+    a = Hitbox.right[x] as u8;
+    if negative {
+        a += xPos.px;
+        if !carry {
+            a = 0;
+        }
+    }
+    else {
+        a += xPos.px;
+        if carry {
+            a = 0xff;
+        }
+    }
+    playerHitbox.right = a;
 }
 
 
