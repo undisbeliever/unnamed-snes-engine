@@ -44,7 +44,7 @@ func process_collisions(entityId : u8 in x) : u8 in x {
     if zero {
         // Only test for a player collision if not in iframe
 
-        carry = entities.test_tilebox__player_hitbox(x);
+        carry = test_tilebox__player_hitbox(x);
         if carry {
             // collided with player's attack
 
@@ -61,7 +61,7 @@ func process_collisions(entityId : u8 in x) : u8 in x {
             return x;
         }
 
-        carry = entities.test_tile_hitbox_player_hurtbox(x);
+        carry = test_tile_hitbox_player_hurtbox(x);
         if carry {
             // Collided with player's hurtbox
 
@@ -79,6 +79,101 @@ func process_collisions(entityId : u8 in x) : u8 in x {
 
     return x;
 }
+
+
+
+// COLLISION TESTS
+// ===============
+
+
+// Test for a collision between an entity's tile-hitbox and the player's hurtbox.
+//
+// If there is a collision, the `entities.player.hurtbox_collided_with_entity__inline()`
+// function will be called.
+//
+// ASSUMES `entityId` is not player.
+//
+// Return: true if there is a collision
+// Return: X = currentEntityId
+//
+// DB = 0x7e
+#[mem8, idx8]
+func test_tile_hitbox_player_hurtbox(entityId : u8 in x) : bool in carry {
+
+    // calculate entity tileHitbox left
+    a = entities.SoA.xPos_px[x] - entities.SoA.tileHitbox_halfWidth[x];
+    if a < playerHurtbox.right {
+
+        // calculate entity tileHitbox right
+        a = entities.SoA.xPos_px[x] + entities.SoA.tileHitbox_halfWidth[x];
+        if a >= playerHurtbox.left {
+
+            // calculate entity tileHitbox top
+            a = entities.SoA.yPos_px[x] - entities.SoA.tileHitbox_halfHeight[x];
+            if a < playerHurtbox.bottom {
+
+                // calculate entity tileHitbox bottom
+                a = entities.SoA.yPos_px[x] + entities.SoA.tileHitbox_halfHeight[x];
+                if a >= playerHurtbox.bottom {
+
+                    entities.player.hurtbox_collided_with_entity__inline(x);
+
+                    x = currentEntityId;
+
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+
+
+// Test for a collision between an entity's tile-hitbox and the player's hitbox.
+//
+// If there is a collision, the `entities.player.hitbox_collided_with_entity__inline()`
+// function will be called.
+//
+// ASSUMES `entityId` is not player.
+//
+// Return: true if there is a collision
+// Return: X = currentEntityId
+//
+// DB = 0x7e
+#[mem8, idx8]
+func test_tilebox__player_hitbox(entityId : u8 in x) : bool in carry {
+
+    // calculate entity tileHitbox left
+    a = entities.SoA.xPos_px[x] - entities.SoA.tileHitbox_halfWidth[x];
+    if a < playerHitbox.right {
+
+        // calculate entity tileHitbox right
+        a = entities.SoA.xPos_px[x] + entities.SoA.tileHitbox_halfWidth[x];
+        if a >= playerHitbox.left {
+
+            // calculate entity tileHitbox top
+            a = entities.SoA.yPos_px[x] - entities.SoA.tileHitbox_halfHeight[x];
+            if a < playerHitbox.bottom {
+
+                // calculate entity tileHitbox bottom
+                a = entities.SoA.yPos_px[x] + entities.SoA.tileHitbox_halfHeight[x];
+                if a >= playerHitbox.bottom {
+
+                    entities.player.hitbox_collided_with_entity__inline(x);
+
+                    x = currentEntityId;
+
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
 
 }
 }
