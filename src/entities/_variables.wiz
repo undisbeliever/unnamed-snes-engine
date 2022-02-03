@@ -32,6 +32,14 @@ namespace entities {
         let Y_AXIS_COLLISION = UP_COLLISION | DOWN_COLLISION;
     };
 
+    namespace CollisionState {
+        let PLAYER_WEAPON   = 1 << 7;
+        let PLAYER_HURTBOX  = 1 << 6;
+
+        let PLAYER_WEAPON_BIT   = 7;
+        let PLAYER_HURTBOX_BIT  = 6;
+    };
+
 
     struct _u8pair {
         first : u8,
@@ -60,6 +68,12 @@ namespace entities {
 
         // The player's hitbox
         var playerHitbox : U8Aabb;
+
+
+
+        // Collision flags
+        // (bitfield of `entities.CollisionState`)
+        var collisionState : u8;
     }
 
 
@@ -152,9 +166,19 @@ namespace entities {
 
             var _movementStateAndBlank : [ u16 ; N_ENTITIES ];
 
-            // Updated by `metatiles.move_entity_and_collision_test`
+            // Updated by `metatiles.move_entity_and_collision_test` or `entities.base.process_collisions`
             // (bitfield of `entities.MovementState`)
             let movementState = &<:_movementStateAndBlank[0] as *u8;
+
+
+            var _healthAndIframeCounter : [ _u8pair ; N_ENTITIES ];
+
+            // Entity health
+            let health = &_healthAndIframeCounter[0].first as *u8;
+
+            // Updated by `base.process_collisions`
+            // Invincibility frames counter
+            let iframeCounter = &_healthAndIframeCounter[0].second as *u8;
 
 
             // Variables used to store the entity's state between `process_function` calls

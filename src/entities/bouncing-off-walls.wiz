@@ -5,10 +5,7 @@ import "../memmap";
 
 import "_variables";
 import "_common";
-
-
-import "../metatiles";
-import "../metasprites";
+import "_base";
 
 import "../../gen/entities";
 
@@ -17,14 +14,10 @@ namespace entities {
 namespace bouncing_off_walls {
 
 
-let SoA_iframeCounter    = SoA.state_0_l;
-
-let SoA_animationCounter = SoA.state_0_h;
+let SoA_animationCounter = SoA.state_0_l;
 
 
 let SPEED = 0x0120;
-
-let N_I_FRAMES = 20;
 
 
 let ANIMATION_DELAY = 4;
@@ -77,77 +70,34 @@ func init(entityId : u8 in x, parameter : u8 in y) {
 // DB = 0x7e
 #[mem8, idx8]
 func process(entityId : u8 in x) : bool in carry {
-    metatiles.move_entity_and_collision_test(x);
 
-    _process_collisions(x);
-
-
-    // Process animation
-    SoA_animationCounter[x]--;
-    if negative {
-        SoA_animationCounter[x] = a = ANIMATION_DELAY - 1;
-
-        // Increment animation Frame
-        a = SoA.metaSpriteFrame[x];
-        a++;
-        SoA.metaSpriteFrame[x] = a = a & ANIMATION_FRAME_MASK;
-    }
+    x = base.process_collisions(x);
 
 
-    return true;
-}
-
-
-
-// Test and react to player collisions and tile collisions.
-//
-// KEEP: X
-//
-// DB = 0x7e
-#[mem8, idx8]
-inline func _process_collisions(entityId : u8 in x) : u8 in x {
-
-    a = SoA_iframeCounter[x];
-    if zero {
-        // Only test for a player collision if not in iframe
-
-        carry = entities.test_tilebox__player_hitbox(x);
-        if carry {
-            // collided with player's attack - bounce entity off player
-
-            SoA_iframeCounter[x] = a = N_I_FRAMES;
-
-            // ::TODO decrement health::
-
-            // ::TODO add reaction::
-            mem16();
-            #[mem16] {
-                SoA.xVelocity[unaligned x] = 0;
-                SoA.yVelocity[unaligned x] = 0;
-            }
-            mem8();
-
-            return x;
+    // React to colliding with player's weapon
+    if collisionState $ CollisionState.PLAYER_WEAPON_BIT {
+        // ::TODO change velocity (based on sword position) ::
+        mem16();
+        #[mem16] {
+            SoA.xVelocity[unaligned x] = 0;
+            SoA.yVelocity[unaligned x] = 0;
         }
+        mem8();
+    }
 
-        carry = entities.test_tile_hitbox_player_hurtbox(x);
-        if carry {
-            mem16();
-            #[mem16] {
-                SoA.xVelocity[unaligned x] = aa = 0 - SoA.xVelocity[unaligned x];
-                SoA.yVelocity[unaligned x] = aa = 0 - SoA.yVelocity[unaligned x];
-            }
-            mem8();
 
-            return x;
+    // React to colliding with player
+    if collisionState $ CollisionState.PLAYER_HURTBOX_BIT {
+        mem16();
+        #[mem16] {
+            SoA.xVelocity[unaligned x] = aa = 0 - SoA.xVelocity[unaligned x];
+            SoA.yVelocity[unaligned x] = aa = 0 - SoA.yVelocity[unaligned x];
         }
-    }
-    else {
-        SoA_iframeCounter[x] = --a;
+        mem8();
     }
 
 
-    // Check for a tile collision
+    // Change velocity on a tile collision
 
     a = SoA.movementState[x];
     if a & MovementState.X_AXIS_COLLISION != 0 {
@@ -167,8 +117,22 @@ inline func _process_collisions(entityId : u8 in x) : u8 in x {
         mem8();
     }
 
-    return x;
+
+    // Process animation
+    SoA_animationCounter[x]--;
+    if negative {
+        SoA_animationCounter[x] = a = ANIMATION_DELAY - 1;
+
+        // Increment animation Frame
+        a = SoA.metaSpriteFrame[x];
+        a++;
+        SoA.metaSpriteFrame[x] = a = a & ANIMATION_FRAME_MASK;
+    }
+
+
+    return true;
 }
+
 
 
 }

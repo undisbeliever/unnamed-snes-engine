@@ -5,10 +5,8 @@ import "../memmap";
 
 import "_variables";
 import "_common";
+import "_base";
 
-
-import "../metatiles";
-import "../metasprites";
 
 import "../../gen/entities";
 
@@ -73,17 +71,15 @@ func init(entityId : u8 in x, parameter : u8 in y) {
 #[mem8, idx8]
 func process(entityId : u8 in x) : bool in carry {
 
-    metatiles.move_entity_and_collision_test(x);
+    x = base.process_collisions(x);
 
 
-    carry = entities.test_tile_hitbox_player_hurtbox(x);
-    // ::TODO add reaction when colliding with player::
-
-
-    carry = entities.test_tilebox__player_hitbox(x);
-    if carry {
+    if collisionState $ CollisionState.PLAYER_WEAPON_BIT {
         x = set_state__hurt(x);
     }
+
+
+    // ::TODO add reaction when colliding with player hurtbox ::
 
 
     y = x;

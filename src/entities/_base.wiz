@@ -1,0 +1,88 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+
+import "../memmap";
+
+import "_variables";
+import "_common";
+
+
+import "../metatiles";
+import "../metasprites";
+
+
+let N_INVINCIBILITY_FRAMES = 20;
+
+
+
+in code {
+
+
+namespace entities {
+namespace base {
+
+
+
+// Test for player collisions and tile collisions.
+//
+// The results of the collision tests will be stored in `collisionState`.
+//
+// Also updates `SoA.movementState`, `SoA.iframeCounter` and `SoA.health`.
+//
+// KEEP: X
+// RETURN: collisionState
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process_collisions(entityId : u8 in x) : u8 in x {
+
+    x = metatiles.move_entity_and_collision_test(x);
+
+
+    a = SoA.iframeCounter[x];
+    if zero {
+        // Only test for a player collision if not in iframe
+
+        carry = entities.test_tilebox__player_hitbox(x);
+        if carry {
+            // collided with player's attack
+
+            // ::TODO Different iframe intervals for different entities::
+            // ::TODO Different iframe intervals for NTSC/PAL::
+            SoA.iframeCounter[x] = a = N_INVINCIBILITY_FRAMES;
+
+
+            // ::TODO decrement health::
+
+
+            collisionState = a = CollisionState.PLAYER_WEAPON;
+
+            return x;
+        }
+
+        carry = entities.test_tile_hitbox_player_hurtbox(x);
+        if carry {
+            // Collided with player's hurtbox
+
+            collisionState = a = CollisionState.PLAYER_HURTBOX;
+
+            return x;
+        }
+    }
+    else {
+        SoA.iframeCounter[x] = --a;
+    }
+
+
+    collisionState = 0;
+
+    return x;
+}
+
+}
+}
+
+}
+
+
