@@ -249,13 +249,51 @@ inline func hitbox_collided_with_entity__inline(entityId : u8 in x) {
 
 
 
+// Collisions
+// ==========
+
+
+// Update `playerHurtbox`.
+//
+// Called once per frame
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func update_player_hurtbox() {
+    a = xPos.px - player.HURTBOX_LEFT_OFFSET;
+    if !carry {
+        a = 0;
+    }
+    playerHurtbox.left = a;
+
+    a = xPos.px + player.HURTBOX_RIGHT_OFFSET;
+    if carry {
+        a = 0xff;
+    }
+    playerHurtbox.right = a;
+
+    a = yPos.px - player.HURTBOX_TOP_OFFSET;
+    if !carry {
+        a = 0;
+    }
+    playerHurtbox.top = a;
+
+    a = yPos.px + player.HURTBOX_BOTTOM_OFFSET;
+    if carry {
+        a = 0xff;
+    }
+    playerHurtbox.bottom = a;
+}
+
+
+
 // Update player hitbox
 //
 // Called once per frame
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func update_hitbox() {
+inline func update_player_hitbox() {
     x = entities.SoA.metaSpriteFrame[PLAYER_ENTITY_ID];
 
 

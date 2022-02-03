@@ -343,48 +343,6 @@ func _blank_player_function() : bool in carry {
 // ==========
 
 
-// Update player's collision boxes
-//
-// DB = 0x7e
-#[mem8, idx8]
-inline func update_player_collision_boxes() {
-    _update_player_hurtbox();
-    player.update_hitbox();
-}
-
-
-
-// Update `playerHurtbox`.
-//
-// DB = 0x7e
-#[mem8, idx8]
-inline func _update_player_hurtbox() {
-    a = player.xPos.px - player.HURTBOX_LEFT_OFFSET;
-    if !carry {
-        a = 0;
-    }
-    playerHurtbox.left = a;
-
-    a = player.xPos.px + player.HURTBOX_RIGHT_OFFSET;
-    if carry {
-        a = 0xff;
-    }
-    playerHurtbox.right = a;
-
-    a = player.yPos.px - player.HURTBOX_TOP_OFFSET;
-    if !carry {
-        a = 0;
-    }
-    playerHurtbox.top = a;
-
-    a = player.yPos.px + player.HURTBOX_BOTTOM_OFFSET;
-    if carry {
-        a = 0xff;
-    }
-    playerHurtbox.bottom = a;
-}
-
-
 
 // Test for a collision between an entity's tile-hitbox and the player's hurtbox.
 //
