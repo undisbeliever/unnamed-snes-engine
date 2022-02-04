@@ -169,14 +169,10 @@
         "frame1"
       ]
     },
-    "projectile_ns": {
+    "projectile": {
       "frames": [
         "north",
-        "south"
-      ]
-    },
-    "projectile_ew": {
-      "frames": [
+        "south",
         "east",
         "west"
       ]

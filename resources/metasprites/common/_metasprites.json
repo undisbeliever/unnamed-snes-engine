@@ -66,8 +66,8 @@
     "frameWidth": "16",
     "frameHeight": "16",
 
-    "pattern": "rect_8x16_two",
-    "ms-export-order": "projectile_ns",
+    "pattern": null,
+    "ms-export-order": "projectile",
 
     "order": 2,
 
@@ -104,8 +104,8 @@
     "frameWidth": "16",
     "frameHeight": "16",
 
-    "pattern": "rect_8x16_two",
-    "ms-export-order": "projectile_ns",
+    "pattern": null,
+    "ms-export-order": "projectile",
 
     "order": 2,
 

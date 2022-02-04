@@ -23,6 +23,14 @@
         "type": "enum",
         "values": [ "down", "up", "left", "right" ]
       }
+    },
+    {
+      "name": "projectile",
+      "ms-export-order": "projectile",
+      "parameter": {
+        "type": "enum",
+        "values": [ "up", "down", "right", "left" ]
+      }
     }
   ],
   "entities": [
@@ -44,6 +52,13 @@
       "name": "skull",
       "code": "bouncing_off_walls",
       "metasprites": "dungeon.Skull",
+      "shadowSize": "SMALL",
+      "zpos": "4"
+    },
+    {
+      "name": "bolt",
+      "code": "projectile",
+      "metasprites": "common.Bolt",
       "shadowSize": "SMALL",
       "zpos": "4"
     }

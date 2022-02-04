@@ -4,6 +4,7 @@
 import "../memmap";
 
 import "_variables";
+import "_common";
 import "_base";
 
 
@@ -19,6 +20,8 @@ let SPEED = 0x00aa;
 let ANIMATION_DELAY = 15;
 let ANIMATION_FRAME_MASK = 0x3;
 
+let BOLT_WAIT_FRAMES = 40;
+
 
 // State must be in the same order as the MetaSprite frames
 enum State : u8 {
@@ -29,9 +32,14 @@ enum State : u8 {
     HURT      = 8,
 };
 
+let N_DIRECTIONS = 4;
+
 
 let SoA_state            = SoA.state_0_l as *State;
 let SoA_animationCounter = SoA.state_0_h;
+
+// Cooldown time until the next bolt can be fired
+let SoA_boltTimer        = SoA.state_1_l;
 
 
 
@@ -79,6 +87,12 @@ func process(entityId : u8 in x) : bool in carry {
 
 
     // ::TODO add reaction when colliding with player hurtbox ::
+
+    a = SoA_boltTimer[x];
+    if zero {
+        fire_bolt(x);
+    }
+    SoA_boltTimer[x]--;
 
 
     y = x;
@@ -308,6 +322,36 @@ func set_direction_west(entityid : u8 in x) : bool in carry {
     mem8();
 
     return true;
+}
+
+
+
+// Firing
+// ======
+
+
+// KEEP: X (ASSUMES X == currentEntityId)
+// DB = 0x7e
+#[mem8, idx8]
+func fire_bolt(entityid : u8 in x) : u8 in x {
+
+    a = SoA_state[x] as u8;
+    if a >= N_DIRECTIONS * 2 {
+        return x;
+    }
+
+    // ASSUMES: Projectile Parameter and State are in the same order
+    y = a = a >>> 1;
+
+    entities.spawn_entity(a = SoA.xPos_px[x],
+                          a = SoA.yPos_px[x],
+                          a = 3, // ::TODO add entityTypes to `entities.wiz`::
+                          y);
+
+    x = currentEntityId;
+    SoA_boltTimer[x] = a = BOLT_WAIT_FRAMES;
+
+    return x;
 }
 
 

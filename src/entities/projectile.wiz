@@ -1,0 +1,109 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "_variables";
+import "_base";
+
+
+import "../../gen/entities";
+
+namespace entities {
+namespace projectile {
+
+
+let SPEED = 0x0280;
+
+
+let N_FRAMES_IN_WALL = 40;
+let N_FRAMES_IN_PLAYER = 10;
+let N_FRAMES_IN_SWORD  = 10;
+
+
+in code {
+
+// If non-zero then the projectile is inactive and will despawn when timer reaches 0.
+let SoA_despawnTimer = SoA.state_0_l;
+
+
+// Entity process routine.
+//
+// Called when the entity is spawned
+//
+// DB = 0x7e
+#[mem8, idx8]
+func init(entityId : u8 in x, parameter : u8 in y) {
+
+    mem16();
+    #[mem16] {
+        // Set starting velocity depending on `parameter`
+
+        if y == init_parameter.up as u8 {
+            SoA.yVelocity[unaligned x] = aa = -SPEED as u16;
+        }
+        else if y == init_parameter.down as u8 {
+            SoA.yVelocity[unaligned x] = aa = SPEED;
+        }
+        else if y == init_parameter.left as u8 {
+            SoA.xVelocity[unaligned x] = aa = -SPEED as u16;
+        }
+        else if y == init_parameter.right as u8 {
+            SoA.xVelocity[unaligned x] = aa = SPEED;
+        }
+    }
+    mem8();
+
+    SoA.metaSpriteFrame[unaligned x] = a = y;
+}
+
+
+
+// Entity process routine.
+//
+// Called once per frame.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process(entityId : u8 in x) : bool in carry {
+
+    a = SoA_despawnTimer[x];
+    if !zero {
+        a--;
+        SoA_despawnTimer[x] = a;
+
+        if zero {
+            return false;
+        }
+
+        return true;
+    }
+
+
+    x = base.process_collisions(x);
+
+
+    if collisionState $ CollisionState.PLAYER_WEAPON_BIT {
+        // ::TODO animate projectile's fall to ground ::
+        SoA.zPos[x] = 0;
+        SoA_despawnTimer[x] = a = N_FRAMES_IN_SWORD;
+    }
+    else if collisionState $ CollisionState.PLAYER_HURTBOX_BIT {
+        SoA_despawnTimer[x] = a = N_FRAMES_IN_PLAYER;
+    }
+    else {
+        a = SoA.movementState[x];
+        if !zero {
+            SoA_despawnTimer[x] = a = N_FRAMES_IN_WALL;
+        }
+    }
+
+    return true;
+}
+
+
+}
+
+}
+}
+
