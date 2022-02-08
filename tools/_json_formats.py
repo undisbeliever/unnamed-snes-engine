@@ -298,11 +298,7 @@ def __load_ms_framesets(json_input):
     return framesets
 
 
-
-def load_metasprites_json(filename):
-    with open(filename, 'r') as fp:
-        json_input = json.load(fp)
-
+def _load_metasprites(json_input):
     return MsSpritesheet(
             name = check_name(json_input['name']),
             palette = str(json_input['palette']),
@@ -310,5 +306,18 @@ def load_metasprites_json(filename):
             end_tile = int(json_input['endTile']),
             framesets = __load_ms_framesets(json_input['framesets'])
     )
+
+
+
+def load_metasprites_json(filename):
+    with open(filename, 'r') as fp:
+        json_input = json.load(fp)
+    return _load_metasprites(json_input)
+
+
+
+def load_metasprites_string(text):
+    json_input = json.loads(text)
+    return _load_metasprites(json_input)
 
 
