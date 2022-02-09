@@ -10,6 +10,9 @@
     "frameWidth": "32",
     "frameHeight": "32",
 
+    "xorigin": 16,
+    "yorigin": 23,
+
     "pattern": "rect_16x24_three",
     "ms-export-order": "skeleton",
 
@@ -21,9 +24,6 @@
 
         "x": 7,
         "y": 0,
-
-        "xoffset":  8,
-        "yoffset": 23,
 
         "frames": [
           "south0", "south1", "south2", "south3",
@@ -40,6 +40,9 @@
     "frameWidth": "32",
     "frameHeight": "32",
 
+    "xorigin": 16,
+    "yorigin": 23,
+
     "pattern": "rect_16x24_and_extra",
     "ms-export-order": "crossbow_man",
 
@@ -51,9 +54,6 @@
 
         "x": 6,
         "y": 2,
-
-        "xoffset": 10,
-        "yoffset": 21,
 
         "frames": [
           "south0", "south1", "south2", "south3"
@@ -82,6 +82,9 @@
     "frameWidth": "16",
     "frameHeight": "16",
 
+    "xorigin": 8,
+    "yorigin": 11,
+
     "pattern": "square_single16",
     "ms-export-order": "eight_direction_spinner",
 
@@ -94,9 +97,6 @@
         "x": 0,
         "y": 0,
 
-        "xoffset":  8,
-        "yoffset": 11,
-
         "frames": [ "frame0", "frame1", "frame2", "frame3",
                     "frame4", "frame5", "frame6", "frame7" ]
       }
@@ -107,6 +107,9 @@
     "source": "rook.png",
     "frameWidth": "32",
     "frameHeight": "48",
+
+    "xorigin": 16,
+    "yorigin": 37,
 
     "pattern": "rect_16x32_two",
     "ms-export-order": "rook",
@@ -119,9 +122,6 @@
 
         "x": 8,
         "y": 8,
-
-        "xoffset":  8,
-        "yoffset": 29,
 
         "frames": [ "standing", "landing0", "landing1" ]
       }

@@ -203,6 +203,10 @@ class Editor:
         frame_width = ZOOM * fs.frame_width
         frame_height = ZOOM * fs.frame_height
 
+        x_origin = fs.x_origin * ZOOM
+        y_origin = fs.y_origin * ZOOM
+
+
         for x in range(0, image_width + 1, frame_width):
             c.create_line(((x, 0), (x, image_height)), width=FRAME_WIDTH)
 
@@ -214,14 +218,6 @@ class Editor:
                 block_pattern = self.ms_export_orders.patterns.get(block.pattern, base_pattern)
             else:
                 block_pattern = base_pattern
-
-            x_origin = block.x_offset * ZOOM
-            y_origin = block.y_offset * ZOOM
-
-            if block.x is not None and block.y is not None:
-                x_origin += block.x * ZOOM
-                y_origin += block.y * ZOOM
-
 
             for i, frame_name in enumerate(block.frames):
                 frame_number = block.start + i

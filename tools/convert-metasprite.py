@@ -360,16 +360,16 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparen
 
                     x += pattern_x
                     y += pattern_y
-                    x_offset = block.x_offset - pattern_x
-                    y_offset = block.y_offset - pattern_y
+                    x_offset = fs.x_origin - pattern_x
+                    y_offset = fs.y_origin - pattern_y
                 else:
                     pattern = block_pattern
 
                     x += block.x
                     y += block.y
 
-                    x_offset = block.x_offset
-                    y_offset = block.y_offset
+                    x_offset = fs.x_origin - block.x
+                    y_offset = fs.y_origin - block.y
 
                 frames[f] = extract_frame(image, pattern, palettes_map, tiles, fs, x, y, x_offset, y_offset)
             except Exception as e:

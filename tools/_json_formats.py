@@ -240,8 +240,8 @@ def load_mappings_json(filename):
 
 
 MsSpritesheet = namedtuple('MsSpritesheet', ('name', 'palette', 'first_tile', 'end_tile', 'framesets'))
-MsFrameset = namedtuple('MsFrameset', ('name', 'source', 'frame_width', 'frame_height', 'pattern', 'ms_export_order', 'order', 'blocks'))
-MsBlock = namedtuple('MsBlock', ('pattern', 'start', 'x', 'y', 'x_offset', 'y_offset', 'frames'))
+MsFrameset = namedtuple('MsFrameset', ('name', 'source', 'frame_width', 'frame_height', 'x_origin', 'y_origin', 'pattern', 'ms_export_order', 'order', 'blocks'))
+MsBlock = namedtuple('MsBlock', ('pattern', 'start', 'x', 'y', 'frames'))
 
 
 def __load_ms_blocks(json_input, fs_pattern):
@@ -264,8 +264,6 @@ def __load_ms_blocks(json_input, fs_pattern):
                 start = int(j['start']),
                 x = x,
                 y = y,
-                x_offset = int(j['xoffset']),
-                y_offset = int(j['yoffset']),
                 frames = check_name_list(j['frames'])
             )
         )
@@ -285,6 +283,8 @@ def __load_ms_framesets(json_input):
                 source = str(f['source']),
                 frame_width = int(f['frameWidth']),
                 frame_height = int(f['frameHeight']),
+                x_origin = int(f['xorigin']),
+                y_origin = int(f['yorigin']),
                 pattern = fs_pattern,
                 ms_export_order = check_name(f['ms-export-order']),
                 order = int(f['order']),
