@@ -13,6 +13,9 @@
     "xorigin": 16,
     "yorigin": 23,
 
+    "shadowSize": "MEDIUM",
+    "tilehitbox": "6 3",
+
     "pattern": "rect_16x24_three",
     "ms-export-order": "skeleton",
 
@@ -42,6 +45,9 @@
 
     "xorigin": 16,
     "yorigin": 23,
+
+    "shadowSize": "MEDIUM",
+    "tilehitbox": "6 3",
 
     "pattern": "rect_16x24_and_extra",
     "ms-export-order": "crossbow_man",
@@ -85,6 +91,9 @@
     "xorigin": 8,
     "yorigin": 11,
 
+    "shadowSize": "SMALL",
+    "tilehitbox": "3 3",
+
     "pattern": "square_single16",
     "ms-export-order": "eight_direction_spinner",
 
@@ -110,6 +119,9 @@
 
     "xorigin": 16,
     "yorigin": 37,
+
+    "shadowSize": "LARGE",
+    "tilehitbox": "8 4",
 
     "pattern": "rect_16x32_two",
     "ms-export-order": "rook",

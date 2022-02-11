@@ -13,15 +13,6 @@ namespace entities {
         px : u8
     };
 
-    enum ShadowSize : u8 {
-        // Deleted entities MUST NOT have a shadow
-        NONE,
-
-        SMALL,
-        MEDIUM,
-        LARGE,
-    };
-
     namespace MovementState {
         let RIGHT_COLLISION = 1 << 0;
         let LEFT_COLLISION  = 1 << 1;
@@ -126,7 +117,7 @@ namespace entities {
 
 
             // The size of the shadow underneath the entity
-            let shadowSize = &_zPosAndShadow[0].second as *ShadowSize;
+            let shadowSize = &_zPosAndShadow[0].second as *metasprites.ShadowSize;
 
 
             // MetaSprite frame table address.

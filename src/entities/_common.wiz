@@ -110,36 +110,45 @@ let _init_function_ptr = _init_function_u16 as func(u8 in x, u8 in y);
             // Y = entityId
             // X = entity Data Index
 
-            (&<:entities.SoA.process_function[0] as *u8)[y] = a = (far &entities.entity_data.process_function_l as far *u8)[x];
-            (&>:entities.SoA.process_function[0] as *u8)[y] = a = (far &entities.entity_data.process_function_h as far *u8)[x];
-
-            (&<:entities.SoA.ms_draw_function[0] as *u8)[y] = a = (far &entities.entity_data.ms_draw_function_l as far *u8)[x];
-            (&>:entities.SoA.ms_draw_function[0] as *u8)[y] = a = (far &entities.entity_data.ms_draw_function_h as far *u8)[x];
-
-            (&<:entities.SoA.metaSpriteFrameTable[0] as *u8)[y] = a = (far &entities.entity_data.ms_frame_table_l as far *u8)[x];
-            (&>:entities.SoA.metaSpriteFrameTable[0] as *u8)[y] = a = (far &entities.entity_data.ms_frame_table_h as far *u8)[x];
-
-            a = (far &entities.entity_data.shadow_size as far *u8)[x];
-            entities.SoA.shadowSize[y] = a as entities.ShadowSize;
-
-            entities.SoA.zPos[y] = a = (far &entities.entity_data.initial_zpos as far *u8)[x];
-            entities.SoA.tileHitbox_halfWidth[y] = a = (far &entities.entity_data.tile_hitbox_half_width as far *u8)[x];
-            entities.SoA.tileHitbox_halfHeight[y] = a = (far &entities.entity_data.tile_hitbox_half_height as far *u8)[x];
-
             <:_init_function_u16 = a = (far &entities.entity_data.init_function_l as far *u8)[x];
             >:_init_function_u16 = a = (far &entities.entity_data.init_function_h as far *u8)[x];
 
+            (&<:entities.SoA.process_function[0] as *u8)[y] = a = (far &entities.entity_data.process_function_l as far *u8)[x];
+            (&>:entities.SoA.process_function[0] as *u8)[y] = a = (far &entities.entity_data.process_function_h as far *u8)[x];
 
-            // Clear unused data
-            x = y;
+            entities.SoA.zPos[y] = a = (far &entities.entity_data.initial_zpos as far *u8)[x];
 
-            entities.SoA.xPos_sx[x] = 0;
-            entities.SoA.xPos_px[x] = a = xPos;
-            entities.SoA.yPos_sx[x] = 0;
-            entities.SoA.yPos_px[x] = a = yPos;
 
-            mem16();
-            #[mem16] {
+            a = (far &entities.entity_data.ms_frameset_h as far *u8)[x];
+            swap_bytes(aa);
+            a = (far &entities.entity_data.ms_frameset_l as far *u8)[x];
+            // aa = ms_frameset
+
+
+            idx16();
+            #[mem8, idx16] {
+                #[mem16, idx16] {
+                    xx = aa;
+                }
+
+                a = (metasprites.MsFsData.shadowSize as far *u8)[unaligned xx];
+                entities.SoA.shadowSize[yy] = a as metasprites.ShadowSize;
+            }
+
+
+            mem16_idx16();
+            #[mem16, idx16] {
+                (&entities.SoA.tileHitbox[0].first as *u16)[unaligned yy] = aa = metasprites.MsFsData.tileHitbox[unaligned xx];
+
+                (&<:entities.SoA.ms_draw_function[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.drawFunction[unaligned xx];
+                (&<:entities.SoA.metaSpriteFrameTable[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.frameTable[unaligned xx];
+            }
+            idx8();
+
+            #[mem16, idx8] {
+                // Clear unused data
+                x = y;
+
                 entities.SoA.xVelocity[unaligned x] = 0;
                 entities.SoA.yVelocity[unaligned x] = 0;
 
@@ -155,8 +164,14 @@ let _init_function_ptr = _init_function_u16 as func(u8 in x, u8 in y);
                 entities.SoA.state_6[unaligned x] = 0;
                 entities.SoA.state_7[unaligned x] = 0;
             }
-            mem8();
+            mem8_idx8();
 
+            // x = entityId
+
+            entities.SoA.xPos_sx[x] = 0;
+            entities.SoA.xPos_px[x] = a = xPos;
+            entities.SoA.yPos_sx[x] = 0;
+            entities.SoA.yPos_px[x] = a = yPos;
 
             // Call spawn function
             y = pop8();
@@ -223,7 +238,7 @@ let _tmp = <:dpTmp0;
                 // Do not draw a shadow on unused entities.
                 //
                 // X is currentEntityId;
-                SoA.shadowSize[unaligned x] = ShadowSize.NONE;
+                SoA.shadowSize[unaligned x] = metasprites.ShadowSize.NONE;
             }
 
             y = __currentEntityTablePos;

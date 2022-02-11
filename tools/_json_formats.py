@@ -72,7 +72,7 @@ EntitiesJson = namedtuple('EntitiesJson', ('entity_functions', 'entities'))
 EntityFunction = namedtuple('EntityFunction', ('name', 'id', 'ms_export_order', 'parameter'))
 EfParameter = namedtuple('EfParameter', ('type', 'values'))
 
-Entity = namedtuple('Entity', ('name', 'id', 'code', 'metasprites', 'shadow_size', 'zpos', 'half_height', 'half_width'))
+Entity = namedtuple('Entity', ('name', 'id', 'code', 'metasprites', 'zpos'))
 
 
 
@@ -112,10 +112,7 @@ def load_entities_json(filename):
                     id = i,
                     code = entity_functions[e['code']],
                     metasprites = check_name_with_dot(e['metasprites']),
-                    shadow_size = check_name(e['shadowSize']),
                     zpos = int(e['zpos']),
-                    half_width = optional_int(e.get('halfWidth')),
-                    half_height = optional_int(e.get('halfHeight')),
         )
 
         if entity.name in entities:
@@ -138,7 +135,7 @@ def load_entities_json(filename):
 MsPatternObject = namedtuple('MsPatternObject', ('xpos', 'ypos', 'size'))
 MsPattern       = namedtuple('MsPattern', ('name', 'id', 'objects'))
 MsFrameOrder    = namedtuple('MsFrameOrder', ('name', 'frames'))
-MsExportOrder   = namedtuple('MsExportOrder', ('patterns', 'frame_lists'))
+MsExportOrder   = namedtuple('MsExportOrder', ('patterns', 'shadow_sizes', 'frame_lists'))
 
 
 def _load_pattern_objects(json_list):
@@ -175,6 +172,13 @@ def load_ms_export_order_json(filename):
         patterns[pat.name] = pat
 
 
+    shadow_sizes = OrderedDict()
+    for i, s in enumerate(mseo_input['shadow_sizes']):
+        if s in shadow_sizes:
+            raise ValueError(f"Duplicate shadow size: { s }")
+        shadow_sizes[check_name(s)] = i
+
+
     if len(patterns) > 256:
         raise ValueError('Too many MetaSprite patterns')
 
@@ -191,7 +195,7 @@ def load_ms_export_order_json(filename):
         frame_lists[eo.name] = eo
 
 
-    return MsExportOrder(patterns=patterns, frame_lists=frame_lists)
+    return MsExportOrder(patterns=patterns, shadow_sizes=shadow_sizes, frame_lists=frame_lists)
 
 
 
@@ -240,8 +244,21 @@ def load_mappings_json(filename):
 
 
 MsSpritesheet = namedtuple('MsSpritesheet', ('name', 'palette', 'first_tile', 'end_tile', 'framesets'))
-MsFrameset = namedtuple('MsFrameset', ('name', 'source', 'frame_width', 'frame_height', 'x_origin', 'y_origin', 'pattern', 'ms_export_order', 'order', 'blocks'))
+MsFrameset = namedtuple('MsFrameset', ('name', 'source', 'frame_width', 'frame_height', 'x_origin', 'y_origin', 'shadow_size', 'tilehitbox', 'pattern', 'ms_export_order', 'order', 'blocks'))
 MsBlock = namedtuple('MsBlock', ('pattern', 'start', 'x', 'y', 'frames'))
+
+
+TileHitbox = namedtuple('TileHitbox', ('half_width', 'half_height'))
+
+
+def __read_tilehitbox(s):
+    if not isinstance(s, str):
+        raise ValueError('Error: Expected a string containing two integers (tilehitbox)')
+    v = s.split(' ')
+    if len(v) != 2:
+        raise ValueError('Error: Expected a string containing two integers (tilehitbox)')
+    return TileHitbox(int(v[0]), int(v[1]))
+
 
 
 def __load_ms_blocks(json_input, fs_pattern):
@@ -285,6 +302,8 @@ def __load_ms_framesets(json_input):
                 frame_height = int(f['frameHeight']),
                 x_origin = int(f['xorigin']),
                 y_origin = int(f['yorigin']),
+                shadow_size = check_name(f['shadowSize']),
+                tilehitbox = __read_tilehitbox(f['tilehitbox']),
                 pattern = fs_pattern,
                 ms_export_order = check_name(f['ms-export-order']),
                 order = int(f['order']),

@@ -14,6 +14,37 @@ let N_OBJECTS = 128;
 let DISPLAY_HEIGHT = 224;
 
 
+enum ShadowSize : u8 {
+    // Deleted entities MUST NOT have a shadow
+    NONE,
+
+    SMALL,
+    MEDIUM,
+    LARGE,
+};
+
+
+// MetaSprite Frameset Data format in ROM
+struct MsFramesetFormat {
+    shadowSize : ShadowSize,
+    tileHitbox : [u8; 2],
+
+    // func(msFrame : u16 in yy, xPos : u16 in metasprites.xPos, yPos : u16 in metasprites.yPos)
+    drawFunction : func,
+
+    // List of pointers to `MsFramesetFormat` entries
+    frameTable : *const *const u8,
+};
+
+// ::HACK manually create accessors to MsFramesetFormat data ::
+namespace MsFsData {
+    let shadowSize      = 0xc10000 as far *ShadowSize;
+    let tileHitbox      = 0xc10001 as far *u16;
+    let drawFunction    = 0xc10003 as far *u16;
+    let frameTable      = 0xc10005 as far *u16;
+};
+
+
 // MetaSprite Frame Table Data offset in ROM
 // (word addr table)
 let MetaSpriteFrameTableOffset = 0xc10000 as far *u16;
@@ -38,6 +69,8 @@ namespace MsDataFormat {
     let charAttr2 = 0xc10007 as far *u16;
     let charAttr3 = 0xc10009 as far *u16;
 }
+
+
 
 // MetaSprie PPU data format in ROM.
 struct _PpuDataFormat {
@@ -390,7 +423,7 @@ inline func draw_shadows() {
         if !zero {
             _update_hi_table_size_small();
 
-            if a == entities.ShadowSize.SMALL as u8 {
+            if a == ShadowSize.SMALL as u8 {
                 // ::ANNOY cannot do `buffer[xx].xPos = a`::
                 // ::ANNOY cannot do `u8_array[xx + 4] = a`::
 
@@ -406,7 +439,7 @@ inline func draw_shadows() {
                 _update_hi_table_x9(carry);
             }
             else {
-                if a == entities.ShadowSize.MEDIUM as u8 {
+                if a == ShadowSize.MEDIUM as u8 {
                     a = SHADOW_MEDIUM_CHAR;
                 }
                 else {

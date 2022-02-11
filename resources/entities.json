@@ -38,28 +38,24 @@
       "name": "crossbow_man",
       "code": "crossbow_man",
       "metasprites": "dungeon.CrossbowMan",
-      "shadowSize": "MEDIUM",
       "zpos": "0"
     },
     {
       "name": "skeleton",
       "code": "skeleton",
       "metasprites": "dungeon.Skeleton",
-      "shadowSize": "MEDIUM",
       "zpos": "0"
     },
     {
       "name": "skull",
       "code": "bouncing_off_walls",
       "metasprites": "dungeon.Skull",
-      "shadowSize": "SMALL",
       "zpos": "4"
     },
     {
       "name": "bolt",
       "code": "projectile",
       "metasprites": "common.Bolt",
-      "shadowSize": "SMALL",
       "zpos": "4"
     }
   ]

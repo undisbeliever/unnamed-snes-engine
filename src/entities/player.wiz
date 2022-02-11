@@ -6,6 +6,7 @@ import "../memmap";
 import "_variables";
 
 import "../metatiles";
+import "../metasprites";
 import "../../wiz/common/snes/snes";
 import "../../gen/metasprites/common";
 
@@ -14,8 +15,8 @@ namespace entities {
 namespace player {
 
 
-let ms_draw_function = ms.common.Player.draw_function;
-let ms_frame_table = ms.common.Player.frame_table;
+let ms_draw_function = ms_framesets.common.Player.drawFunction;
+let ms_frame_table = ms_framesets.common.Player.frameTable;
 
 
 let PLAYER_ENTITY_ID = 0;
@@ -153,8 +154,8 @@ in code {
 #[mem8, idx8]
 inline func init() {
 
-    a = ShadowSize.MEDIUM as u8;
-    entities.SoA.shadowSize[0] = a as ShadowSize;
+    a = metasprites.ShadowSize.MEDIUM as u8;
+    entities.SoA.shadowSize[0] = a as metasprites.ShadowSize;
 
     xPos.px = a = 128;
     yPos.px = a = 112;

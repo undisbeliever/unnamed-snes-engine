@@ -13,6 +13,9 @@
     "xorigin":  16,
     "yorigin":  21,
 
+    "shadowSize": "MEDIUM",
+    "tilehitbox": "6 3",
+
     "pattern": null,
     "ms-export-order": "player",
 
@@ -44,6 +47,9 @@
     "xorigin":  8,
     "yorigin":  13,
 
+    "shadowSize": "SMALL",
+    "tilehitbox": "4 4",
+
     "pattern": "square_single16",
     "ms-export-order": "bomb",
 
@@ -68,6 +74,9 @@
 
     "xorigin":  8,
     "yorigin":  8,
+
+    "shadowSize": "SMALL",
+    "tilehitbox": "3 2",
 
     "pattern": null,
     "ms-export-order": "projectile",
@@ -103,6 +112,9 @@
 
     "xorigin":  8,
     "yorigin":  8,
+
+    "shadowSize": "SMALL",
+    "tilehitbox": "3 2",
 
     "pattern": null,
     "ms-export-order": "projectile",

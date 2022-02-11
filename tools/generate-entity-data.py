@@ -10,19 +10,6 @@ from io import StringIO
 from _json_formats import load_entities_json
 
 
-DEFAULT_HALF_WIDTH = {
-    'SMALL': 3,
-    'MEDIUM': 6,
-    'LARGE': 8,
-}
-
-DEFAULT_HALF_HEIGHT = {
-    'SMALL': 2,
-    'MEDIUM': 3,
-    'LARGE': 4,
-}
-
-
 
 def get_metasprite_spritesheets(entities):
     # Python does not have an OrderedSet and I want this function to return a list of consistent order
@@ -34,14 +21,6 @@ def get_metasprite_spritesheets(entities):
         ss[ms_ss] = None
 
     return list(ss)
-
-
-
-def optional_value(v, alt):
-    if v:
-        return v
-    else:
-        return alt
 
 
 
@@ -84,18 +63,10 @@ in rodata0 {
         write_list('process_function_l', [ f"<:&{ e.code.name }.process" for e in entities ])
         write_list('process_function_h', [ f">:&{ e.code.name }.process" for e in entities ])
 
-        write_list('ms_draw_function_l', [ f"<:&ms.{ e.metasprites }.draw_function" for e in entities ])
-        write_list('ms_draw_function_h', [ f">:&ms.{ e.metasprites }.draw_function" for e in entities ])
-
-        write_list('ms_frame_table_l', [ f"<:&ms.{ e.metasprites }.frame_table" for e in entities ])
-        write_list('ms_frame_table_h', [ f">:&ms.{ e.metasprites }.frame_table" for e in entities ])
-
-        write_list('shadow_size', [ f"ShadowSize.{ e.shadow_size } as u8" for e in entities ])
+        write_list('ms_frameset_l', [ f"<:&ms_framesets.{ e.metasprites }" for e in entities ])
+        write_list('ms_frameset_h', [ f">:&ms_framesets.{ e.metasprites }" for e in entities ])
 
         write_list('initial_zpos', [ f"{ e.zpos } as u8" for e in entities ])
-
-        write_list('tile_hitbox_half_width', [ f"{ optional_value(e.half_width, DEFAULT_HALF_WIDTH[e.shadow_size]) }" for e in entities ])
-        write_list('tile_hitbox_half_height', [ f"{ optional_value(e.half_height, DEFAULT_HALF_HEIGHT[e.shadow_size]) }" for e in entities ])
 
         out.write("""
 }

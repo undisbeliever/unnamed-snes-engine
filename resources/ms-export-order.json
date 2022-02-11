@@ -67,6 +67,12 @@
       ]
     }
   ],
+  "shadow_sizes": [
+    "NONE",
+    "SMALL",
+    "MEDIUM",
+    "LARGE"
+  ],
   "frame_lists": {
     "player": {
       "frames": [

@@ -27,7 +27,7 @@ ROM_BANK = 'rodata0'
 
 PatternGrid = namedtuple('PatternGrid', ('tile_count', 'width', 'height', 'data', 'pattern'))
 
-FrameSet = namedtuple('FrameSet', ('name', 'pattern', 'ms_export_order', 'frames'))
+FrameSet = namedtuple('FrameSet', ('name', 'shadow_size', 'tile_hitbox', 'pattern', 'ms_export_order', 'frames'))
 
 
 
@@ -322,6 +322,13 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparen
     else:
         base_pattern = None
 
+
+    ms_export_orders.shadow_sizes[fs.shadow_size]
+    shadow_size = fs.shadow_size
+
+    tile_hitbox = fs.tilehitbox
+
+
     image = load_image(ms_dir, fs.source)
 
     if image.width % fs.frame_width != 0 or image.height % fs.frame_height != 0:
@@ -388,7 +395,7 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparen
         pattern_name = "dynamic_pattern"
 
 
-    return FrameSet(fs.name, pattern_name, fs.ms_export_order, eo_frames)
+    return FrameSet(fs.name, shadow_size, tile_hitbox, pattern_name, fs.ms_export_order, eo_frames)
 
 
 
@@ -425,6 +432,11 @@ def get_transparent_color(palette_data):
 
 
 
+def to_csv(l):
+    return ', '.join(map(str, l))
+
+
+
 def generate_wiz_data(spritesheet, spritesheet_name, binary_data_path):
     with StringIO() as out:
         out.write("""
@@ -434,7 +446,7 @@ import "../../src/metasprites";
         out.write(f"in { ROM_BANK } {{")
         out.write("""
 
-namespace ms {
+namespace ms_framesets {
 """)
         out.write(f"namespace { spritesheet_name } {{\n")
 
@@ -442,19 +454,35 @@ namespace ms {
             n_frames = len(fs.frames)
 
             out.write('\n')
-            out.write(f"  namespace { fs.name } {{\n")
+            if fs.name != 'Player':
+                out.write(f"  const { fs.name } = metasprites.MsFramesetFormat{{\n")
 
-            out.write(f"    // ms_export_order = { fs.ms_export_order }\n")
-            out.write(f"    let draw_function = metasprites.drawing_functions.{ fs.pattern };\n\n")
+                out.write(f"    shadowSize = metasprites.ShadowSize.{ fs.shadow_size },\n")
+                out.write(f"    tileHitbox = [ { to_csv(fs.tile_hitbox) } ],\n")
+                out.write(f"    drawFunction = metasprites.drawing_functions.{ fs.pattern } as func,\n")
+                out.write(f"    frameTable = @[\n")
 
-            out.write(f"    const frame_table : [*const u8 ; { n_frames }] = [\n")
+                for frame_data in fs.frames:
+                    out.write(f"      @[ { frame_data[0] }u8, { to_csv(frame_data[1:]) } ],\n")
 
-            for frame_data in fs.frames:
-                out.write(f"      @[ { frame_data[0] }u8, { ', '.join(map(str, frame_data[1:])) } ],\n")
+                out.write( '    ]\n')
+                out.write( '  };\n')
 
-            out.write( '    ];\n\n')
+            else:
+                # Player frameset
+                out.write(f"  namespace { fs.name } {{\n")
 
-            out.write( '  }\n')
+                out.write(f"    let shadowSize = metasprites.ShadowSize.{ fs.shadow_size };\n")
+                out.write(f"    let tileHitbox = [ { to_csv(fs.tile_hitbox) } ];\n")
+                out.write(f"    let drawFunction = metasprites.drawing_functions.{ fs.pattern };\n")
+                out.write(f"    const frameTable : [*const u8] = [\n")
+
+                for frame_data in fs.frames:
+                    out.write(f"      @[ { frame_data[0] }u8, { to_csv(frame_data[1:]) } ],\n")
+
+                out.write( '    ];\n')
+                out.write( '  }\n')
+
 
         out.write("""
 }

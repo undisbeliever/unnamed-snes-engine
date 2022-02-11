@@ -23,6 +23,9 @@ FRAME_WIDTH = 3
 OBJ_WIDTH = 3
 OBJ_COLOR = '#22cc22'
 
+TILE_HITBOX_WIDTH = 3
+TILE_HITBOX_COLOR = '#ffaa00'
+
 
 
 class Editor:
@@ -69,6 +72,7 @@ class Editor:
             cb = tk.Checkbutton(top_row, text=text, variable=v, command=self._update_canvas)
             cb.pack(side=tk.RIGHT)
             return v
+        self.show_tilehitboxes = add_show_cb('TileHitboxes')
         self.show_objects = add_show_cb('Objects')
         self.show_labels = add_show_cb('Labels')
 
@@ -187,6 +191,7 @@ class Editor:
 
         show_labels = self.show_labels.get()
         show_objects = self.show_objects.get()
+        show_tilehitboxes = self.show_tilehitboxes.get()
 
 
         if fs.pattern:
@@ -205,6 +210,11 @@ class Editor:
 
         x_origin = fs.x_origin * ZOOM
         y_origin = fs.y_origin * ZOOM
+
+        th_x1 = x_origin - fs.tilehitbox.half_width * ZOOM
+        th_x2 = x_origin + fs.tilehitbox.half_width * ZOOM
+        th_y1 = y_origin - fs.tilehitbox.half_height * ZOOM
+        th_y2 = y_origin + fs.tilehitbox.half_height * ZOOM
 
 
         for x in range(0, image_width + 1, frame_width):
@@ -238,6 +248,10 @@ class Editor:
                         osize = o.size * ZOOM
                         c.create_rectangle(ox, oy, ox + osize, oy + osize,
                                            width=OBJ_WIDTH, outline=OBJ_COLOR)
+
+                if show_tilehitboxes:
+                    c.create_rectangle(x + th_x1, y + th_y1, x + th_x2, y + th_y2,
+                                       width=TILE_HITBOX_WIDTH, outline=TILE_HITBOX_COLOR)
 
 
 
