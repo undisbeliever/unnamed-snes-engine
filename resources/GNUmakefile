@@ -8,7 +8,7 @@ all: $(METASPRITES)
 
 
 metasprites/%.png: metasprites/%.aseprite
-	aseprite --batch "$<" --sheet-type "horizontal" --sheet-rows 8 --sheet "$@"
+	aseprite --batch "$<" --sheet-type "rows" --sheet-width 128px --sheet "$@"
 
 
 .PHONY: clean
