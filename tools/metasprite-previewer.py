@@ -26,6 +26,11 @@ OBJ_COLOR = '#22cc22'
 TILE_HITBOX_WIDTH = 3
 TILE_HITBOX_COLOR = '#ffaa00'
 
+HITBOX_WIDTH = 3
+HITBOX_COLOR = '#aa0000'
+
+HURTBOX_WIDTH = 3
+HURTBOX_COLOR = '#0000aa'
 
 
 class Editor:
@@ -72,6 +77,8 @@ class Editor:
             cb = tk.Checkbutton(top_row, text=text, variable=v, command=self._update_canvas)
             cb.pack(side=tk.RIGHT)
             return v
+        self.show_hitboxes = add_show_cb('Hitboxes')
+        self.show_hurtboxes = add_show_cb('Hurtboxes')
         self.show_tilehitboxes = add_show_cb('TileHitboxes')
         self.show_objects = add_show_cb('Objects')
         self.show_labels = add_show_cb('Labels')
@@ -138,6 +145,7 @@ class Editor:
             # Parse json file
             self.ms_data = load_metasprites_string(json_text)
         except:
+            self.ms_data = None
             self.print_exception_traceback()
 
 
@@ -192,6 +200,8 @@ class Editor:
         show_labels = self.show_labels.get()
         show_objects = self.show_objects.get()
         show_tilehitboxes = self.show_tilehitboxes.get()
+        show_hurtboxes = self.show_hurtboxes.get()
+        show_hitboxes = self.show_hitboxes.get()
 
 
         if fs.pattern:
@@ -252,6 +262,18 @@ class Editor:
                 if show_tilehitboxes:
                     c.create_rectangle(x + th_x1, y + th_y1, x + th_x2, y + th_y2,
                                        width=TILE_HITBOX_WIDTH, outline=TILE_HITBOX_COLOR)
+
+                if show_hurtboxes:
+                    box = fs.hurtbox_overrides.get(frame_name, block.default_hurtbox)
+                    if box is not None:
+                        c.create_rectangle(x + box.x * ZOOM, y + box.y * ZOOM, x + (box.x + box.width) * ZOOM, y + (box.y + box.height) * ZOOM,
+                                           width=HURTBOX_WIDTH, outline=HURTBOX_COLOR)
+
+                if show_hitboxes:
+                    box = fs.hitbox_overrides.get(frame_name, block.default_hitbox)
+                    if box is not None:
+                        c.create_rectangle(x + box.x * ZOOM, y + box.y * ZOOM, x + (box.x + box.width) * ZOOM, y + (box.y + box.height) * ZOOM,
+                                           width=HITBOX_WIDTH, outline=HITBOX_COLOR)
 
 
 

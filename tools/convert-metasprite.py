@@ -282,8 +282,44 @@ def find_best_pattern(image, transparent_color, pattern_grids, x_offset, y_offse
 
 
 
-def extract_frame(image, pattern, palettes_map, tileset, fs, x, y, x_offset, y_offset):
+def i8_cast(i):
+    if i < 0:
+        return 0x100 + i
+    return i;
+
+
+NO_AABB_VALUE = 0x80
+
+def add_i8aabb(data, box, fs):
+    if box is not None:
+        if box.x < 0 or box.y < 0 or box.width <= 0 or box.height <= 0:
+            raise ValueError(f"AABB box is invalid: { box }")
+        x1 = box.x
+        x2 = box.x + box.width
+        y1 = box.y
+        y2 = box.y + box.height
+        if x2 > fs.frame_width or y2 > fs.frame_height:
+            raise ValueError(f"AABB box out of bounds: { box }")
+        x1 = i8_cast(x1 - fs.x_origin)
+        x2 = i8_cast(x2 - fs.x_origin)
+        y1 = i8_cast(y1 - fs.y_origin)
+        y2 = i8_cast(y2 - fs.y_origin)
+
+        if x1 == NO_AABB_VALUE:
+            raiseValueError(f"Invalid AABB (x1 cannot be { NO_AABB_VALUE }): { box }")
+
+    else:
+        x1 = x2 = y1 = y2 = NO_AABB_VALUE
+
+    data.extend((x1, x2, y1, y2))
+
+
+
+def extract_frame(image, pattern, palettes_map, tileset, fs, x, y, x_offset, y_offset, hitbox, hurtbox):
     data = bytearray()
+
+    add_i8aabb(data, hitbox, fs)
+    add_i8aabb(data, hurtbox, fs)
 
     data.append(pattern.id)
     data.append(x_offset)
@@ -353,9 +389,9 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparen
             block_pattern = base_pattern
 
 
-        for i, f in enumerate(block.frames):
-            if f in frames:
-                raise ValueError(f"Duplicate frame: { f }")
+        for i, frame_name in enumerate(block.frames):
+            if frame_name in frames:
+                raise ValueError(f"Duplicate frame: { frame_name }")
 
             frame_number = block.start + i
             x = (frame_number % frames_per_row) * fs.frame_width
@@ -378,9 +414,12 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparen
                     x_offset = fs.x_origin - block.x
                     y_offset = fs.y_origin - block.y
 
-                frames[f] = extract_frame(image, pattern, palettes_map, tiles, fs, x, y, x_offset, y_offset)
+                hitbox = fs.hitbox_overrides.get(frame_name, block.default_hitbox)
+                hurtbox = fs.hurtbox_overrides.get(frame_name, block.default_hurtbox)
+
+                frames[frame_name] = extract_frame(image, pattern, palettes_map, tiles, fs, x, y, x_offset, y_offset, hitbox, hurtbox)
             except Exception as e:
-                raise Exception(f"Error with { fs.name }, { f }: { e }")
+                raise Exception(f"Error with { fs.name }, { frame_name }: { e }")
 
     try:
         export_order = ms_export_orders.frame_lists[fs.ms_export_order]

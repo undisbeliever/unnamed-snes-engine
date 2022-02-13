@@ -107,39 +107,8 @@ let animationFrameDelay = entities.SoA.state_2[0];
 
 
 
-// DATA
-// ====
-
-in rodata0 {
-
-
-// ::TODO improve sword hitbox::
-
-// Hitbox
-//
-// NOTE: if the `top` byte of hitbox is 0 then there is no hitbox.
-//
-// (SoA x 4 signed 8 bit integer)
-namespace Hitbox {
-    //                      south,        attack_south,         north,        attack_north,         east,         attack_east,          west,         attack_west
-    const _top    : [i8] = [ 0, 0, 0, 0,    -7,  -3,  -1,  -1,   0, 0, 0, 0,   -13, -15, -17, -17,   0, 0, 0, 0,    -5,  -5,  -5,  -5,   0, 0, 0, 0,    -5,  -5,  -5,  -5,  ];
-    const _bottom : [i8] = [ 0, 0, 0, 0,     2,   6,  10,  10,   0, 0, 0, 0,    -6,  -6,  -5,  -5,   0, 0, 0, 0,     2,   2,   2,   2,   0, 0, 0, 0,     2,   2,   2,   2,  ];
-    const _left   : [i8] = [ 0, 0, 0, 0,   -12, -11,  -4,  -3,   0, 0, 0, 0,     4,   4,  -2,  -2,   0, 0, 0, 0,     0,   2,   2,   2,   0, 0, 0, 0,    -5, -13, -15, -15,  ];
-    const _right  : [i8] = [ 0, 0, 0, 0,    -3,  -4,   2,   2,   0, 0, 0, 0,    15,  12,   4,   3,   0, 0, 0, 0,     5,  13,  15,  15,   0, 0, 0, 0,     0,  -2,  -2,  -2,  ];
-
-
-    let top    = far &_top as far *const i8;
-    let bottom = far &_bottom as far *const i8;
-    let left   = far &_left as far *const i8;
-    let right  = far &_right as far *const i8;
-}
-
-}
-
-
 // CODE
 // ====
-
 
 
 in code {
@@ -254,36 +223,83 @@ inline func hitbox_collided_with_entity__inline(entityId : u8 in x) {
 // ==========
 
 
-// Update `playerHurtbox`.
-//
-// Called once per frame
+// Update player's hitbox and hurtbox
 //
 // DB = 0x7e
-#[mem8, idx8]
-inline func update_player_hurtbox() {
-    a = xPos.px - player.HURTBOX_LEFT_OFFSET;
-    if !carry {
-        a = 0;
+#[mem8, idx16]
+inline func update_collision_boxes__inline() {
+    // Extend 8 bit metaSpriteFrame to 16 bit AA
+    #[mem16] {
+        // DP = 0
+        aa = direct_page;
     }
-    playerHurtbox.left = a;
+    a = entities.SoA.metaSpriteFrame[PLAYER_ENTITY_ID];
 
-    a = xPos.px + player.HURTBOX_RIGHT_OFFSET;
-    if carry {
-        a = 0xff;
+    mem16_idx16();
+    #[mem16, idx16] {
+        // Safe: (aa << 1) will never set carry
+        xx = aa = (aa << 1) +# entities.SoA.metaSpriteFrameTable[PLAYER_ENTITY_ID];
+        xx = aa = metasprites.MetaSpriteFrameTableOffset[unaligned xx];
     }
-    playerHurtbox.right = a;
+    mem8();
 
-    a = yPos.px - player.HURTBOX_TOP_OFFSET;
-    if !carry {
-        a = 0;
-    }
-    playerHurtbox.top = a;
+    // xx = msFrameAddr
 
-    a = yPos.px + player.HURTBOX_BOTTOM_OFFSET;
-    if carry {
-        a = 0xff;
+    _update_player_hitbox(xx);
+    _update_player_hurtbox(xx);
+}
+
+
+
+// Add the player's unsigned xPos to a signed i8 accumulator with clamping.
+//
+// ASSUMES: negative flag contains the MSB of A (the previous instruction is an `lda`).
+//
+// KEEP: xx & yy
+//
+// DB = 0x7e
+#[mem8, idx16]
+inline func __add_xPos_to_i8a_clamp(a : u8 in a, n : bool in negative) : u8 in a {
+    if negative {
+        a += xPos.px;
+        if !carry {
+            a = 0;
+        }
     }
-    playerHurtbox.bottom = a;
+    else {
+        a += xPos.px;
+        if carry {
+            a = 0xff;
+        }
+    }
+
+    return a;
+}
+
+
+// Add the player's unsigned yPos to a signed i8 accumulator with clamping.
+//
+// ASSUMES: negative flag contains the MSB of A (the previous instruction is an `lda`).
+//
+// KEEP: xx & yy
+//
+// DB = 0x7e
+#[mem8, idx16]
+inline func __add_yPos_to_i8a_clamp(a : u8 in a, n : bool in negative) : u8 in a {
+    if negative {
+        a += yPos.px;
+        if !carry {
+            a = 0;
+        }
+    }
+    else {
+        a += yPos.px;
+        if carry {
+            a = 0xff;
+        }
+    }
+
+    return a;
 }
 
 
@@ -292,58 +308,27 @@ inline func update_player_hurtbox() {
 //
 // Called once per frame
 //
+// KEEP: xx
+//
 // DB = 0x7e
-#[mem8, idx8]
-inline func update_player_hitbox() {
-    x = entities.SoA.metaSpriteFrame[PLAYER_ENTITY_ID];
+#[mem8, idx16]
+inline func _update_player_hitbox(msFrameAddr : u16 in xx) {
 
+    // Add i8 signed offset to player's u8 unsigned position (with clamping)
 
-    a = Hitbox.top[x] as u8;
-    if zero {
-        a = 0xff;
-        playerHitbox.top = a;
-        playerHitbox.bottom = 0;
-        playerHitbox.left = a;
-        playerHitbox.right = 0;
-
-        return;
-    }
-
-
-    // Add i8 signed Hitbox.top[x] to player's u8 unsigned Y position (with clamping)
-    // a = top
+    a = metasprites.MsDataFormat.hitbox_left[xx] as u8;
     if negative {
-        a += yPos.px;
-        if !carry {
-            a = 0;
-        }
-    }
-    else {
-        a += yPos.px;
-        if carry {
+        // Putting the no-hitbox test here as it is faster.
+        if a == metasprites.MsDataFormat.NO_AABB_VALUE {
+            // MS frame has no hitbox
             a = 0xff;
+            playerHitbox.top = a;
+            playerHitbox.bottom = 0;
+            playerHitbox.left = a;
+            playerHitbox.right = 0;
+            return;
         }
-    }
-    playerHitbox.top = a;
 
-
-    a = Hitbox.bottom[x] as u8;
-    if negative {
-        a += yPos.px;
-        if !carry {
-            a = 0;
-        }
-    }
-    else {
-        a += yPos.px;
-        if carry {
-            a = 0xff;
-        }
-    }
-    playerHitbox.bottom = a;
-
-    a = Hitbox.left[x] as u8;
-    if negative {
         a += xPos.px;
         if !carry {
             a = 0;
@@ -358,8 +343,46 @@ inline func update_player_hitbox() {
     playerHitbox.left = a;
 
 
-    a = Hitbox.right[x] as u8;
+    a = metasprites.MsDataFormat.hitbox_right[xx] as u8;
+    __add_xPos_to_i8a_clamp(a, negative);
+    playerHitbox.right = a;
+
+
+    a = metasprites.MsDataFormat.hitbox_top[xx] as u8;
+    __add_yPos_to_i8a_clamp(a, negative);
+    playerHitbox.top = a;
+
+
+    a = metasprites.MsDataFormat.hitbox_bottom[xx] as u8;
+    __add_yPos_to_i8a_clamp(a, negative);
+    playerHitbox.bottom = a;
+}
+
+
+
+// Update player hurtbox
+//
+// Called once per frame
+//
+// DB = 0x7e
+#[mem8, idx16]
+inline func _update_player_hurtbox(msFrameAddr : u16 in xx) {
+
+    // Add i8 signed offset to player's u8 unsigned position (with clamping)
+
+    a = metasprites.MsDataFormat.hurtbox_left[xx] as u8;
     if negative {
+        // Putting the no-hurtbox test here as it is faster.
+        if a == metasprites.MsDataFormat.NO_AABB_VALUE {
+            // MS frame has no hurtbox
+            a = 0xff;
+            playerHurtbox.top = a;
+            playerHurtbox.bottom = 0;
+            playerHurtbox.left = a;
+            playerHurtbox.right = 0;
+            return;
+        }
+
         a += xPos.px;
         if !carry {
             a = 0;
@@ -371,7 +394,21 @@ inline func update_player_hitbox() {
             a = 0xff;
         }
     }
-    playerHitbox.right = a;
+    playerHurtbox.left = a;
+
+
+    a = metasprites.MsDataFormat.hurtbox_right[xx] as u8;
+    __add_xPos_to_i8a_clamp(a, negative);
+    playerHurtbox.right = a;
+
+
+    a = metasprites.MsDataFormat.hurtbox_top[xx] as u8;
+    __add_yPos_to_i8a_clamp(a, negative);
+    playerHurtbox.top = a;
+
+    a = metasprites.MsDataFormat.hurtbox_bottom[xx] as u8;
+    __add_yPos_to_i8a_clamp(a, negative);
+    playerHurtbox.bottom = a;
 }
 
 

@@ -28,7 +28,12 @@ namespace base {
 //
 // The results of the collision tests will be stored in `collisionState`.
 //
+// If there is a player collision, the `entities.player.hitbox_collided_with_entity__inline()`
+// or `entities.player.hurtbox_collided_with_entity__inline()` function will be called.
+//
 // Also updates `SoA.movementState`, `SoA.iframeCounter` and `SoA.health`.
+//
+// ASSUMES `entityId` is not player.
 //
 // KEEP: X
 // RETURN: collisionState
@@ -44,31 +49,71 @@ func process_collisions(entityId : u8 in x) : u8 in x {
     if zero {
         // Only test for a player collision if not in iframe
 
-        carry = test_tilebox__player_hitbox(x);
-        if carry {
-            // collided with player's attack
+        y = x;
 
-            // ::TODO Different iframe intervals for different entities::
-            // ::TODO Different iframe intervals for NTSC/PAL::
-            SoA.iframeCounter[x] = a = N_INVINCIBILITY_FRAMES;
-
-
-            // ::TODO decrement health::
-
-
-            collisionState = a = CollisionState.PLAYER_WEAPON;
-
-            return x;
+        // Calculate entity's msFrameAddr
+        // Extend 8 bit metaSpriteFrame to 16 bit AA
+        #[mem16] {
+            // DP = 0
+            aa = direct_page;
         }
+        a = entities.SoA.metaSpriteFrame[x];
 
-        carry = test_tile_hitbox_player_hurtbox(x);
-        if carry {
-            // Collided with player's hurtbox
-
-            collisionState = a = CollisionState.PLAYER_HURTBOX;
-
-            return x;
+        mem16_idx16();
+        #[mem16, idx16] {
+            // Safe: (aa << 1) will never set carry
+            xx = aa = (aa << 1) +# entities.SoA.metaSpriteFrameTable[unaligned xx];
+            xx = aa = metasprites.MetaSpriteFrameTableOffset[unaligned xx];
         }
+        mem8();
+
+
+        #[mem8, idx16] {
+            // xx = msFrameAddr
+            // yy = entityId
+
+            carry = __test__entity_hurtbox__player_hitbox(yy, xx);
+            if carry {
+                // collided with player's attack
+
+                mem8_idx8();
+                #[mem8, idx8] {
+                    entities.player.hitbox_collided_with_entity__inline(y);
+                    x = currentEntityId;
+
+                    // ::TODO Different iframe intervals for different entities::
+                    // ::TODO Different iframe intervals for NTSC/PAL::
+                    SoA.iframeCounter[x] = a = N_INVINCIBILITY_FRAMES;
+
+
+                    // ::TODO decrement health::
+
+
+                    collisionState = a = CollisionState.PLAYER_WEAPON;
+
+                    return x;
+                }
+            }
+
+            carry = __test__entity_hitbox__player_hurtbox(yy, xx);
+            if carry {
+                // Collided with player's hurtbox
+
+                mem8_idx8();
+                #[mem8, idx8] {
+                    entities.player.hurtbox_collided_with_entity__inline(y);
+                    x = currentEntityId;
+
+                    collisionState = a = CollisionState.PLAYER_HURTBOX;
+
+                    return x;
+                }
+            }
+        }
+        mem8_idx8();
+
+        // Restore entityId to X register
+        x = y;
     }
     else {
         SoA.iframeCounter[x] = --a;
@@ -86,40 +131,107 @@ func process_collisions(entityId : u8 in x) : u8 in x {
 // ===============
 
 
-// Test for a collision between an entity's tile-hitbox and the player's hurtbox.
+// Add the entity's unsigned xPos to a signed i8 accumulator with clamping.
 //
-// If there is a collision, the `entities.player.hurtbox_collided_with_entity__inline()`
-// function will be called.
+// ASSUMES: negative flag contains the MSB of A (the previous instruction is an `lda`).
+//
+// KEEP: xx & yy
+//
+// DB = 0x7e
+#[mem8, idx16]
+inline func __add_xPos_to_i8a_clamp(a : u8 in a, n : bool in negative, entityId : u16 in yy) : u8 in a {
+    if negative {
+        a += entities.SoA.xPos_px[yy];
+        if !carry {
+            a = 0;
+        }
+    }
+    else {
+        a += entities.SoA.xPos_px[yy];
+        if carry {
+            a = 0xff;
+        }
+    }
+
+    return a;
+}
+
+
+// Add the entity's unsigned yPos to a signed i8 accumulator with clamping.
+//
+// ASSUMES: negative flag contains the MSB of A (the previous instruction is an `lda`).
+//
+// KEEP: xx & yy
+//
+// DB = 0x7e
+#[mem8, idx16]
+inline func __add_yPos_to_i8a_clamp(i8a : u8 in a, n : bool in negative, entityId : u16 in yy) : u8 in a {
+    if negative {
+        a += entities.SoA.yPos_px[yy];
+        if !carry {
+            a = 0;
+        }
+    }
+    else {
+        a += entities.SoA.yPos_px[yy];
+        if carry {
+            a = 0xff;
+        }
+    }
+
+    return a;
+}
+
+
+
+// Test for a collision between an entity's hurtbox and the player's hurtbox.
+//
+// NOTE: This function will NOT call the player collided callback.
 //
 // ASSUMES `entityId` is not player.
 //
-// Return: true if there is a collision
-// Return: X = currentEntityId
+// KEEP: xx & yy
+// RETURN: true if there is a collision
 //
 // DB = 0x7e
-#[mem8, idx8]
-func test_tile_hitbox_player_hurtbox(entityId : u8 in x) : bool in carry {
+#[mem8, idx16]
+func __test__entity_hitbox__player_hurtbox(entityId : u16 in yy, msFrameAddr : u16 in xx) : bool in carry {
 
-    // calculate entity tileHitbox left
-    a = entities.SoA.xPos_px[x] - entities.SoA.tileHitbox_halfWidth[x];
+    // calculate entity hitbox left
+    // Add i8 signed offset to entity's u8 unsigned position (with clamping)
+    a = metasprites.MsDataFormat.hitbox_left[xx] as u8;
+    if negative {
+        // Putting the no-hitbox test here as it is faster.
+        if a == metasprites.MsDataFormat.NO_AABB_VALUE {
+            // MS frame has no hitbox
+            return false;
+        }
+
+        a += entities.SoA.xPos_px[yy];
+        if !carry {
+            a = 0;
+        }
+    }
+    else {
+        a += entities.SoA.xPos_px[yy];
+        if carry {
+            a = 0xff;
+        }
+    }
+
     if a < playerHurtbox.right {
-
-        // calculate entity tileHitbox right
-        a = entities.SoA.xPos_px[x] + entities.SoA.tileHitbox_halfWidth[x];
+        // calculate entity hitbox right
+        a = metasprites.MsDataFormat.hitbox_right[xx] as u8;
+        a = __add_xPos_to_i8a_clamp(a, negative, yy);
         if a >= playerHurtbox.left {
-
-            // calculate entity tileHitbox top
-            a = entities.SoA.yPos_px[x] - entities.SoA.tileHitbox_halfHeight[x];
+            // calculate entity hitbox top
+            a = metasprites.MsDataFormat.hitbox_top[xx] as u8;
+            a = __add_yPos_to_i8a_clamp(a, negative, yy);
             if a < playerHurtbox.bottom {
-
-                // calculate entity tileHitbox bottom
-                a = entities.SoA.yPos_px[x] + entities.SoA.tileHitbox_halfHeight[x];
+                // calculate entity hitbox bottom
+                a = metasprites.MsDataFormat.hitbox_bottom[xx] as u8;
+                a = __add_yPos_to_i8a_clamp(a, negative, yy);
                 if a >= playerHurtbox.bottom {
-
-                    entities.player.hurtbox_collided_with_entity__inline(x);
-
-                    x = currentEntityId;
-
                     return true;
                 }
             }
@@ -131,40 +243,54 @@ func test_tile_hitbox_player_hurtbox(entityId : u8 in x) : bool in carry {
 
 
 
-// Test for a collision between an entity's tile-hitbox and the player's hitbox.
+// Test for a collision between an entity's hurtbox and the player's hitbox.
 //
-// If there is a collision, the `entities.player.hitbox_collided_with_entity__inline()`
-// function will be called.
+// NOTE: This function will NOT call the player collided callback.
 //
 // ASSUMES `entityId` is not player.
 //
-// Return: true if there is a collision
-// Return: X = currentEntityId
+// KEEP: xx & yy
+// RETURN: true if there is a collision
 //
 // DB = 0x7e
-#[mem8, idx8]
-func test_tilebox__player_hitbox(entityId : u8 in x) : bool in carry {
+#[mem8, idx16]
+func __test__entity_hurtbox__player_hitbox(entityId : u16 in yy, msFrameAddr : u16 in xx) : bool in carry {
 
-    // calculate entity tileHitbox left
-    a = entities.SoA.xPos_px[x] - entities.SoA.tileHitbox_halfWidth[x];
+    // calculate entity hurtbox left
+    // Add i8 signed offset to entity's u8 unsigned position (with clamping)
+    a = metasprites.MsDataFormat.hurtbox_left[xx] as u8;
+    if negative {
+        // Putting the no-hitbox test here as it is faster.
+        if a == metasprites.MsDataFormat.NO_AABB_VALUE {
+            // MS frame has no hitbox
+            return false;
+        }
+
+        a += entities.SoA.xPos_px[yy];
+        if !carry {
+            a = 0;
+        }
+    }
+    else {
+        a += entities.SoA.xPos_px[yy];
+        if carry {
+            a = 0xff;
+        }
+    }
+
     if a < playerHitbox.right {
-
-        // calculate entity tileHitbox right
-        a = entities.SoA.xPos_px[x] + entities.SoA.tileHitbox_halfWidth[x];
+        // calculate entity hurtbox right
+        a = metasprites.MsDataFormat.hurtbox_right[xx] as u8;
+        a = __add_xPos_to_i8a_clamp(a, negative, yy);
         if a >= playerHitbox.left {
-
-            // calculate entity tileHitbox top
-            a = entities.SoA.yPos_px[x] - entities.SoA.tileHitbox_halfHeight[x];
+            // calculate entity hurtbox top
+            a = metasprites.MsDataFormat.hurtbox_top[xx] as u8;
+            a = __add_yPos_to_i8a_clamp(a, negative, yy);
             if a < playerHitbox.bottom {
-
-                // calculate entity tileHitbox bottom
-                a = entities.SoA.yPos_px[x] + entities.SoA.tileHitbox_halfHeight[x];
+                // calculate entity hurtbox bottom
+                a = metasprites.MsDataFormat.hurtbox_bottom[xx] as u8;
+                a = __add_yPos_to_i8a_clamp(a, negative, yy);
                 if a >= playerHitbox.bottom {
-
-                    entities.player.hitbox_collided_with_entity__inline(x);
-
-                    x = currentEntityId;
-
                     return true;
                 }
             }

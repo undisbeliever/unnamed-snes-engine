@@ -52,22 +52,44 @@ let MetaSpriteFrameTableOffset = 0xc10000 as far *u16;
 
 // MetaSprite Data in ROM
 namespace MsDataFormat {
+    // Byte value to use when there is no hitbox or hurtbox.
+    let NO_AABB_VALUE = 0x80;
+
+
+    // The MetaSprite frame's hitbox.
+    //
+    // If `hitbox_left` == `NO_AABB_VALUE` then the frame has no hitbox.
+    let hitbox_left     = 0xc10000 as far *i8;
+    let hitbox_right    = 0xc10001 as far *i8;
+    let hitbox_top      = 0xc10002 as far *i8;
+    let hitbox_bottom   = 0xc10003 as far *i8;
+
+
+    // The MetaSprite frame's hurtbox.
+    //
+    // If `hurtbox_left` == `NO_AABB_VALUE` then the frame has no hurtbox.
+    let hurtbox_left     = 0xc10004 as far *i8;
+    let hurtbox_right    = 0xc10005 as far *i8;
+    let hurtbox_top      = 0xc10006 as far *i8;
+    let hurtbox_bottom   = 0xc10007 as far *i8;
+
+
     // MetaSprite Pattern Id
     //
     // Only read if the entity uses multiple MetaSprite patterns.
     //
     // (byte index into `metasprites.ms_patterns_table`, masked by `MS_PATTERNS_TABLE_MASK`)
-    let pattern = 0xc10000 as far *u8;
+    let pattern = 0xc10008 as far *u8;
 
-    let xOffset = 0xc10001 as far *u8;
-    let yOffset = 0xc10002 as far *u8;
+    let xOffset = 0xc10009 as far *u8;
+    let yOffset = 0xc1000a as far *u8;
 
     // NOTE: Not all `charAttr*` fields will be filled.
     // Most MetaSprite patterns use less then 4 charAttr words.
-    let charAttr0 = 0xc10003 as far *u16;
-    let charAttr1 = 0xc10005 as far *u16;
-    let charAttr2 = 0xc10007 as far *u16;
-    let charAttr3 = 0xc10009 as far *u16;
+    let charAttr0 = 0xc1000b as far *u16;
+    let charAttr1 = 0xc1000d as far *u16;
+    let charAttr2 = 0xc1000f as far *u16;
+    let charAttr3 = 0xc10011 as far *u16;
 }
 
 

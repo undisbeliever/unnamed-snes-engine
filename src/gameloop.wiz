@@ -311,8 +311,11 @@ func run_game {
         entities.currentEntityId = 0;
         entities.player.process(x);
 
-        entities.player.update_player_hurtbox();
-        entities.player.update_player_hitbox();
+        idx16();
+        #[mem8, idx16] {
+            entities.player.update_collision_boxes__inline();
+        }
+        mem8_idx8();
 
 
         entities.process_active_entities();

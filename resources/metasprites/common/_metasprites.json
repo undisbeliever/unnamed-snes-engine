@@ -36,7 +36,28 @@
           "attack_west0",  "attack_west1",  "attack_west2",  "attack_west3"
         ]
       }
-    ]
+    ],
+
+    "defaultHurtbox":   "12 15    8  8",
+
+    "hitboxes": {
+      "attack_north0":  "20  8   11  7",
+      "attack_north1":  "20  6    8  9",
+      "attack_north2":  "14  4    6 12",
+      "attack_north3":  "14  4    5 12",
+      "attack_south0":  " 3 15   11  7",
+      "attack_south1":  " 4 18    8  9",
+      "attack_south2":  "12 20    6 11",
+      "attack_south3":  "13 20    5 11",
+      "attack_east0":   "16 16    5  7",
+      "attack_east1":   "18 16   10  7",
+      "attack_east2":   "18 16   13  7",
+      "attack_east3":   "18 16   13  7",
+      "attack_west0":   "11 16    5  7",
+      "attack_west1":   " 3 16   11  7",
+      "attack_west2":   " 1 16   13  7",
+      "attack_west3":   " 1 16   13  7"
+    }
   },
   {
     "name": "Bomb",
@@ -102,7 +123,21 @@
 
         "frames": [ "east", "west" ]
       }
-    ]
+    ],
+
+    "hitboxes": {
+      "north":  " 7  0    3  8",
+      "south":  " 7  8    3  8",
+      "east":   " 8  7    8  3",
+      "west":   " 0  7    8  3"
+    },
+
+    "hurtboxes": {
+      "north":  " 7  0    3 10",
+      "south":  " 7  6    3 10",
+      "east":   " 6  7   10  3",
+      "west":   " 0  7   10  3"
+    }
   },
   {
     "name": "Fireball",
@@ -140,7 +175,21 @@
 
         "frames": [ "east", "west" ]
       }
-    ]
+    ],
+
+    "hitboxes": {
+      "north":  " 5  0    6  8",
+      "south":  " 5  8    6  8",
+      "east":   " 8  5    8  6",
+      "west":   " 0  5    8  6"
+    },
+
+    "hurtboxes": {
+      "north":  " 5  0    6  8",
+      "south":  " 5  8    6  8",
+      "east":   " 8  5    8  6",
+      "west":   " 0  5    8  6"
+    }
   }
 ]
 }

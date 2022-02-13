@@ -28,6 +28,9 @@
         "x": 7,
         "y": 0,
 
+        "defaultHitbox":  "13 12   6  11",
+        "defaultHurtbox": "12 10   8  14",
+
         "frames": [
           "south0", "south1", "south2", "south3",
           "north0", "north1", "north2", "north3",
@@ -61,6 +64,9 @@
         "x": 6,
         "y": 2,
 
+        "defaultHitbox":  "13 12   6  11",
+        "defaultHurtbox": "12 10   8  14",
+
         "frames": [
           "south0", "south1", "south2", "south3"
         ]
@@ -73,6 +79,9 @@
 
         "xoffset": 8,
         "yoffset": 21,
+
+        "defaultHitbox":  "13 12   6  11",
+        "defaultHurtbox": "12 10   8  14",
 
         "frames": [
           "north0", "north1", "north2", "north3",
@@ -98,6 +107,9 @@
     "ms-export-order": "eight_direction_spinner",
 
     "order": 2,
+
+    "defaultHitbox":  "4   5   8  6",
+    "defaultHurtbox": "4   4   8  8",
 
     "blocks": [
       {
@@ -127,6 +139,9 @@
     "ms-export-order": "rook",
 
     "order": 2,
+
+    "defaultHurtbox": "8  16  16  23",
+    "defaultHitbox":  "8  16  16  22",
 
     "blocks": [
       {

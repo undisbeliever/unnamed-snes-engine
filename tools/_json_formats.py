@@ -244,24 +244,57 @@ def load_mappings_json(filename):
 
 
 MsSpritesheet = namedtuple('MsSpritesheet', ('name', 'palette', 'first_tile', 'end_tile', 'framesets'))
-MsFrameset = namedtuple('MsFrameset', ('name', 'source', 'frame_width', 'frame_height', 'x_origin', 'y_origin', 'shadow_size', 'tilehitbox', 'pattern', 'ms_export_order', 'order', 'blocks'))
-MsBlock = namedtuple('MsBlock', ('pattern', 'start', 'x', 'y', 'frames'))
+MsFrameset = namedtuple('MsFrameset', ('name', 'source', 'frame_width', 'frame_height', 'x_origin', 'y_origin',
+                                       'shadow_size', 'tilehitbox', 'default_hitbox', 'default_hurtbox',
+                                       'pattern', 'ms_export_order', 'order', 'blocks',
+                                       'hitbox_overrides', 'hurtbox_overrides'))
+MsBlock = namedtuple('MsBlock', ('pattern', 'start', 'x', 'y', 'frames', 'default_hitbox', 'default_hurtbox'))
 
 
 TileHitbox = namedtuple('TileHitbox', ('half_width', 'half_height'))
+Aabb = namedtuple('Aabb', ('x', 'y', 'width', 'height'))
 
 
 def __read_tilehitbox(s):
     if not isinstance(s, str):
         raise ValueError('Error: Expected a string containing two integers (tilehitbox)')
-    v = s.split(' ')
+    v = s.split()
     if len(v) != 2:
         raise ValueError('Error: Expected a string containing two integers (tilehitbox)')
     return TileHitbox(int(v[0]), int(v[1]))
 
 
 
-def __load_ms_blocks(json_input, fs_pattern):
+def __read_aabb(s):
+    # Allow blank aabb in json source
+    if not s:
+        return None
+    if not isinstance(s, str):
+        raise ValueError('Error: Expected a string containing four integers (aabb)')
+    v = s.split()
+    if len(v) != 4:
+        raise ValueError('Error: Expected a string containing four integers (aabb)')
+    return Aabb(int(v[0]), int(v[1]), int(v[2]), int(v[3]))
+
+
+
+def __load_aabb_overrides(json_map):
+    out = dict()
+
+    if json_map is None:
+        return out
+
+    if not isinstance(json_map, dict):
+        raise ValueError('Error: Expected a map for AABB overrides')
+
+    for k, v in json_map.items():
+        out[k] = __read_aabb(v)
+
+    return out
+
+
+
+def __load_ms_blocks(json_input, fs_pattern, fs_default_hitbox, fs_default_hurtbox):
     blocks = list()
 
     for j in json_input:
@@ -275,13 +308,16 @@ def __load_ms_blocks(json_input, fs_pattern):
             x = None
             y = None
 
+
         blocks.append(
             MsBlock(
                 pattern = pattern,
                 start = int(j['start']),
                 x = x,
                 y = y,
-                frames = check_name_list(j['frames'])
+                frames = check_name_list(j['frames']),
+                default_hitbox = __read_aabb(j['defaultHitbox']) if 'defaultHitbox' in j else fs_default_hitbox,
+                default_hurtbox = __read_aabb(j['defaultHurtbox']) if 'defaultHurtbox' in j else fs_default_hurtbox,
             )
         )
 
@@ -294,6 +330,8 @@ def __load_ms_framesets(json_input):
 
     for f in json_input:
         fs_pattern = check_optional_name(f['pattern'])
+        fs_default_hitbox = __read_aabb(f['defaultHitbox']) if 'defaultHitbox' in f else None
+        fs_default_hurtbox = __read_aabb(f['defaultHurtbox']) if 'defaultHurtbox' in f else None
 
         fs = MsFrameset(
                 name = check_name(f['name']),
@@ -304,10 +342,14 @@ def __load_ms_framesets(json_input):
                 y_origin = int(f['yorigin']),
                 shadow_size = check_name(f['shadowSize']),
                 tilehitbox = __read_tilehitbox(f['tilehitbox']),
+                default_hitbox = fs_default_hitbox,
+                default_hurtbox = fs_default_hurtbox,
                 pattern = fs_pattern,
                 ms_export_order = check_name(f['ms-export-order']),
                 order = int(f['order']),
-                blocks = __load_ms_blocks(f['blocks'], fs_pattern)
+                blocks = __load_ms_blocks(f['blocks'], fs_pattern, fs_default_hitbox, fs_default_hurtbox),
+                hitbox_overrides = __load_aabb_overrides(f.get('hitboxes')),
+                hurtbox_overrides = __load_aabb_overrides(f.get('hurtboxes')),
         )
 
         if fs.name in framesets:
