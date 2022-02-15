@@ -16,11 +16,19 @@ let N_INVINCIBILITY_FRAMES = 20;
 
 
 
-in code {
-
 
 namespace entities {
 namespace base {
+
+
+in zeropage {
+    // Centre of the collision (if one occurs)
+    var collisionCentre_x : u8;
+    var collisionCentre_y : u8;
+}
+
+
+in code {
 
 
 
@@ -193,6 +201,12 @@ inline func __add_yPos_to_i8a_clamp(i8a : u8 in a, n : bool in negative, entityI
 #[mem8, idx16]
 func __test__entity_hitbox__player_hurtbox(entityId : u16 in yy, msFrameAddr : u16 in xx) : bool in carry {
 
+let _hb_left   = <:dpTmp0;
+let _hb_right  = <:dpTmp1;
+let _hb_top    = <:dpTmp2;
+let _tmp       = <:dpTmp3;
+
+
     // calculate entity hitbox left
     // Add i8 signed offset to entity's u8 unsigned position (with clamping)
     a = metasprites.MsDataFormat.hitbox_left[xx] as u8;
@@ -215,19 +229,50 @@ func __test__entity_hitbox__player_hurtbox(entityId : u16 in yy, msFrameAddr : u
         }
     }
 
-    if a < playerHurtbox.right {
-        // calculate entity hitbox right
+    ^if a < playerHurtbox.right {
+        _hb_left = a;
+
         a = metasprites.MsDataFormat.hitbox_right[xx] as u8;
         a = __add_xPos_to_i8a_clamp(a, negative, yy);
         if a >= playerHurtbox.left {
-            // calculate entity hitbox top
+            _hb_right = a;
+
             a = metasprites.MsDataFormat.hitbox_top[xx] as u8;
             a = __add_yPos_to_i8a_clamp(a, negative, yy);
             if a < playerHurtbox.bottom {
-                // calculate entity hitbox bottom
+                _hb_top = a;
+
                 a = metasprites.MsDataFormat.hitbox_bottom[xx] as u8;
                 a = __add_yPos_to_i8a_clamp(a, negative, yy);
                 if a >= playerHurtbox.top {
+                    // Calculate collision centre and return true
+                    //   centre_y = avg(min(hb_bottom, player_bottom), max(hb_top, player_top))
+                    //   centre_x = avg(min(hb_right, player_right), max(hb_left, player_left))
+
+                    // a = _hb_bottom;
+                    if a >= playerHurtbox.bottom {
+                        a = playerHurtbox.bottom;
+                    }
+                    _tmp = a;
+
+                    a = _hb_top;
+                    if a < playerHurtbox.top {
+                        a = playerHurtbox.top;
+                    }
+                    collisionCentre_y = a = (a + _tmp) >>>># 1;
+
+                    a = _hb_right;
+                    if a >= playerHurtbox.right {
+                        a = playerHurtbox.right;
+                    }
+                    _tmp = a;
+
+                    a = _hb_left;
+                    if a < playerHurtbox.left {
+                        a = playerHurtbox.left;
+                    }
+                    collisionCentre_x = a = (a + _tmp) >>>># 1;
+
                     return true;
                 }
             }
@@ -252,6 +297,12 @@ func __test__entity_hitbox__player_hurtbox(entityId : u16 in yy, msFrameAddr : u
 #[mem8, idx16]
 func __test__entity_hurtbox__player_hitbox(entityId : u16 in yy, msFrameAddr : u16 in xx) : bool in carry {
 
+let _hb_left   = <:dpTmp0;
+let _hb_right  = <:dpTmp1;
+let _hb_top    = <:dpTmp2;
+let _tmp       = <:dpTmp3;
+
+
     // calculate entity hurtbox left
     // Add i8 signed offset to entity's u8 unsigned position (with clamping)
     a = metasprites.MsDataFormat.hurtbox_left[xx] as u8;
@@ -274,19 +325,50 @@ func __test__entity_hurtbox__player_hitbox(entityId : u16 in yy, msFrameAddr : u
         }
     }
 
-    if a < playerHitbox.right {
-        // calculate entity hurtbox right
+    ^if a < playerHitbox.right {
+        _hb_left = a;
+
         a = metasprites.MsDataFormat.hurtbox_right[xx] as u8;
         a = __add_xPos_to_i8a_clamp(a, negative, yy);
         if a >= playerHitbox.left {
-            // calculate entity hurtbox top
+            _hb_right = a;
+
             a = metasprites.MsDataFormat.hurtbox_top[xx] as u8;
             a = __add_yPos_to_i8a_clamp(a, negative, yy);
             if a < playerHitbox.bottom {
-                // calculate entity hurtbox bottom
+                _hb_top = a;
+
                 a = metasprites.MsDataFormat.hurtbox_bottom[xx] as u8;
                 a = __add_yPos_to_i8a_clamp(a, negative, yy);
                 if a >= playerHitbox.top {
+                    // Calculate collision centre and return true
+                    //   centre_y = avg(min(hb_bottom, player_bottom), max(hb_top, player_top))
+                    //   centre_x = avg(min(hb_right, player_right), max(hb_left, player_left))
+
+                    // a = _hb_bottom;
+                    if a >= playerHitbox.bottom {
+                        a = playerHitbox.bottom;
+                    }
+                    _tmp = a;
+
+                    a = _hb_top;
+                    if a < playerHitbox.top {
+                        a = playerHitbox.top;
+                    }
+                    collisionCentre_y = a = (a + _tmp) >>>># 1;
+
+                    a = _hb_right;
+                    if a >= playerHitbox.right {
+                        a = playerHitbox.right;
+                    }
+                    _tmp = a;
+
+                    a = _hb_left;
+                    if a < playerHitbox.left {
+                        a = playerHitbox.left;
+                    }
+                    collisionCentre_x = a = (a + _tmp) >>>># 1;
+
                     return true;
                 }
             }
@@ -296,10 +378,9 @@ func __test__entity_hurtbox__player_hitbox(entityId : u16 in yy, msFrameAddr : u
     return false;
 }
 
-
-}
 }
 
+}
 }
 
 
