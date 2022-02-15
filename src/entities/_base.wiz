@@ -227,7 +227,7 @@ func __test__entity_hitbox__player_hurtbox(entityId : u16 in yy, msFrameAddr : u
                 // calculate entity hitbox bottom
                 a = metasprites.MsDataFormat.hitbox_bottom[xx] as u8;
                 a = __add_yPos_to_i8a_clamp(a, negative, yy);
-                if a >= playerHurtbox.bottom {
+                if a >= playerHurtbox.top {
                     return true;
                 }
             }
@@ -286,7 +286,7 @@ func __test__entity_hurtbox__player_hitbox(entityId : u16 in yy, msFrameAddr : u
                 // calculate entity hurtbox bottom
                 a = metasprites.MsDataFormat.hurtbox_bottom[xx] as u8;
                 a = __add_yPos_to_i8a_clamp(a, negative, yy);
-                if a >= playerHitbox.bottom {
+                if a >= playerHitbox.top {
                     return true;
                 }
             }
