@@ -262,15 +262,13 @@ inline func update_collision_boxes__inline() {
 inline func __add_xPos_to_i8a_clamp(a : u8 in a, n : bool in negative) : u8 in a {
     if negative {
         a += xPos.px;
-        if !carry {
+        return a if carry;
             a = 0;
-        }
     }
     else {
         a += xPos.px;
-        if carry {
+        return a if !carry;
             a = 0xff;
-        }
     }
 
     return a;
@@ -288,15 +286,13 @@ inline func __add_xPos_to_i8a_clamp(a : u8 in a, n : bool in negative) : u8 in a
 inline func __add_yPos_to_i8a_clamp(a : u8 in a, n : bool in negative) : u8 in a {
     if negative {
         a += yPos.px;
-        if !carry {
+        return a if carry;
             a = 0;
-        }
     }
     else {
         a += yPos.px;
-        if carry {
+        return a if !carry;
             a = 0xff;
-        }
     }
 
     return a;

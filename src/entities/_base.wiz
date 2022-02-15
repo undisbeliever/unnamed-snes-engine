@@ -142,15 +142,13 @@ func process_collisions(entityId : u8 in x) : u8 in x {
 inline func __add_xPos_to_i8a_clamp(a : u8 in a, n : bool in negative, entityId : u16 in yy) : u8 in a {
     if negative {
         a += entities.SoA.xPos_px[yy];
-        if !carry {
+        return a if carry;
             a = 0;
-        }
     }
     else {
         a += entities.SoA.xPos_px[yy];
-        if carry {
+        return a if !carry;
             a = 0xff;
-        }
     }
 
     return a;
@@ -168,15 +166,13 @@ inline func __add_xPos_to_i8a_clamp(a : u8 in a, n : bool in negative, entityId 
 inline func __add_yPos_to_i8a_clamp(i8a : u8 in a, n : bool in negative, entityId : u16 in yy) : u8 in a {
     if negative {
         a += entities.SoA.yPos_px[yy];
-        if !carry {
+        return a if carry;
             a = 0;
-        }
     }
     else {
         a += entities.SoA.yPos_px[yy];
-        if carry {
+        return a if !carry;
             a = 0xff;
-        }
     }
 
     return a;
