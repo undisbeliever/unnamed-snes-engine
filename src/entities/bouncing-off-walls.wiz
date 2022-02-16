@@ -5,6 +5,7 @@ import "../memmap";
 
 import "_variables";
 import "_base";
+import "../common/math";
 
 import "../../gen/entities";
 
@@ -16,7 +17,9 @@ namespace bouncing_off_walls {
 let SoA_animationCounter = SoA.state_0_l;
 
 
-let SPEED = 0x0120;
+let SPEED          = 0x0120;
+let SPEED_INCREASE = 0x0085;
+let MAX_SPEED      = 0x0380;
 
 
 let ANIMATION_DELAY = 4;
@@ -75,24 +78,13 @@ func process(entityId : u8 in x) : bool in carry {
 
     // React to colliding with player's weapon
     if collisionState $ CollisionState.PLAYER_WEAPON_BIT {
-        // ::TODO change velocity (based on sword position) ::
-        mem16();
-        #[mem16] {
-            SoA.xVelocity[unaligned x] = 0;
-            SoA.yVelocity[unaligned x] = 0;
-        }
-        mem8();
+        collided_with_player_hitbox(x);
     }
 
 
     // React to colliding with player
     if collisionState $ CollisionState.PLAYER_HURTBOX_BIT {
-        mem16();
-        #[mem16] {
-            SoA.xVelocity[unaligned x] = aa = 0 - SoA.xVelocity[unaligned x];
-            SoA.yVelocity[unaligned x] = aa = 0 - SoA.yVelocity[unaligned x];
-        }
-        mem8();
+        collided_with_player_hurtbox(x);
     }
 
 
@@ -133,6 +125,69 @@ func process(entityId : u8 in x) : bool in carry {
 }
 
 
+
+// Reflect the entity when it collides with the player's sword.
+//
+// The collision centre is used to determine the new direction of the entity.
+//
+// ASSUMES: `collisionCentre` is valid.
+//
+// KEEP: X
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func collided_with_player_hitbox(entityId : u8 in x) {
+    mem16();
+    #[mem16] {
+        aa = SoA.xVelocity[unaligned x];
+        if negative {
+            aa = negate16(aa);
+        }
+        aa += SPEED_INCREASE;
+        if aa >= MAX_SPEED + 1 {
+            aa = MAX_SPEED;
+        }
+
+        y = SoA.xPos_px[unaligned x];
+        if y < base.collisionCentre_x {
+            aa = negate16(aa);
+        }
+        SoA.xVelocity[unaligned x] = aa;
+
+
+        aa = SoA.yVelocity[unaligned x];
+        if negative {
+            aa = negate16(aa);
+        }
+        aa += SPEED_INCREASE;
+        if aa >= MAX_SPEED + 1 {
+            aa = MAX_SPEED;
+        }
+
+        y = SoA.yPos_px[unaligned x];
+        if y < base.collisionCentre_y {
+            aa = negate16(aa);
+        }
+        SoA.yVelocity[unaligned x] = aa;
+    }
+    mem8();
+}
+
+
+
+// Bounce back when colliding with player body.
+//
+// KEEP: x
+//
+// DB = 0x
+inline func collided_with_player_hurtbox(entityId : u8 in x) {
+    mem16();
+    #[mem16] {
+        SoA.xVelocity[unaligned x] = aa = 0 - SoA.xVelocity[unaligned x];
+        SoA.yVelocity[unaligned x] = aa = 0 - SoA.yVelocity[unaligned x];
+    }
+    mem8();
+}
 
 }
 

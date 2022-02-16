@@ -1,0 +1,30 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+
+in code {
+
+
+// Returns `-a` (i8 a)
+#[mem8]
+inline func negate8(i8a : u8 in a) : i8 in a {
+    a ^= 0xff;
+    a++;
+    return a;
+}
+
+
+
+// Returns `-aa` (i16 aa).
+#[mem16]
+inline func negate16(i16aa : u16 in aa) : i16 in aa {
+    aa ^= 0xffff;
+    aa++;
+    return aa;
+}
+
+
+}
+
