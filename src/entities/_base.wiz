@@ -50,7 +50,7 @@ in code {
 #[mem8, idx8]
 func process_collisions(entityId : u8 in x) : u8 in x {
 
-    x = metatiles.move_entity_and_collision_test(x);
+    x = metatiles.move_entity_and_collision_test__bounded(x);
 
 
     a = SoA.iframeCounter[x];

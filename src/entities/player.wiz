@@ -172,7 +172,7 @@ func process(entityId : u8 in x) {
         process__walking();
     }
 
-    metatiles.move_entity_and_collision_test(PLAYER_ENTITY_ID);
+    metatiles.move_entity_and_collision_test__unbounded(PLAYER_ENTITY_ID);
 
 
     // Update animation
