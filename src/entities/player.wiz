@@ -4,6 +4,8 @@
 import "../memmap";
 
 import "_variables";
+import "_common";
+import "_base";
 
 import "../metatiles";
 import "../metasprites";
@@ -213,7 +215,13 @@ inline func hurtbox_collided_with_entity__inline(entityId : u8 in x) {
 // DB = 0x7e
 #[mem8, idx8]
 inline func hitbox_collided_with_entity__inline(entityId : u8 in x) {
-    // ::TODO implement::
+
+    // ::TODO add a has-sword-particle flag to entity::
+
+    entities.spawn_entity(a = base.collisionCentre_x,
+                          a = base.collisionCentre_y,
+                          a = 0, // ::TODO add entityTypes to `gen/entities.wiz`::
+                          y = 0);
 }
 
 

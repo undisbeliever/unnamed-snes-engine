@@ -60,6 +60,33 @@
     }
   },
   {
+    "name": "SwordParticles",
+    "source": "sword-particles.png",
+    "frameWidth": 8,
+    "frameHeight": 8,
+
+    "xorigin": 3,
+    "yorigin": 3,
+    "shadowSize": "NONE",
+    "tilehitbox": "0 0",
+
+    "pattern": "square_single8",
+    "ms-export-order": "sword_particles",
+
+    "order": 2,
+
+    "blocks": [
+      {
+        "start": 0,
+
+        "x": 0,
+        "y": 0,
+
+        "frames": [ "collision0", "collision1", "collision2" ]
+      }
+    ]
+  },
+  {
     "name": "Bomb",
     "source": "bomb.png",
     "frameWidth": "16",

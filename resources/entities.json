@@ -1,6 +1,14 @@
 {
   "entity_functions": [
     {
+      "name": "sword_particles",
+      "ms-export-order": "sword_particles",
+      "parameter": {
+        "type": "enum",
+        "values": [ "collision" ]
+      }
+    },
+    {
       "name": "bouncing_off_walls",
       "ms-export-order": "eight_direction_spinner",
       "parameter": {
@@ -34,6 +42,12 @@
     }
   ],
   "entities": [
+    {
+      "name": "sword_particles",
+      "code": "sword_particles",
+      "metasprites": "common.SwordParticles",
+      "zpos": "30"
+    },
     {
       "name": "crossbow_man",
       "code": "crossbow_man",

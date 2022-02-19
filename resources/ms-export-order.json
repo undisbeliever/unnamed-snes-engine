@@ -1,6 +1,12 @@
 {
   "patterns": [
     {
+      "name": "square_single8",
+      "objects": [
+        { "x":  0, "y":  0, "size": 8 }
+      ]
+    },
+    {
       "name": "square_single16",
       "objects": [
         { "x":  0, "y":  0, "size": 16 }
@@ -108,6 +114,13 @@
         "attack_west1",
         "attack_west2",
         "attack_west3"
+      ]
+    },
+    "sword_particles": {
+      "frames": [
+        "collision0",
+        "collision1",
+        "collision2"
       ]
     },
     "skeleton": {

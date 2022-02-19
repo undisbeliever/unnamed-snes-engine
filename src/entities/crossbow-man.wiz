@@ -345,7 +345,7 @@ func fire_bolt(entityid : u8 in x) : u8 in x {
 
     entities.spawn_entity(a = SoA.xPos_px[x],
                           a = SoA.yPos_px[x],
-                          a = 3, // ::TODO add entityTypes to `entities.wiz`::
+                          a = 4, // ::TODO add entityTypes to `gen/entities.wiz`::
                           y);
 
     x = currentEntityId;

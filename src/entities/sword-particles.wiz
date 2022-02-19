@@ -1,0 +1,72 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "_variables";
+import "_base";
+import "../common/math";
+
+import "../../gen/entities";
+
+
+// ::TODO add a generic particle entity::
+
+
+namespace entities {
+namespace sword_particles {
+
+let SoA_animationCounter = SoA.state_0_l;
+
+
+let ANIMATION_DELAY    = 6;
+let N_ANIMATION_FRAMES = 3;
+
+
+in code {
+
+
+// Entity init routine.
+//
+// Called when the entity is spawned
+//
+// DB = 0x7e
+#[mem8, idx8]
+func init(entityId : u8 in x, parameter : u8 in y) {
+
+    SoA.yPos_px[x] = a = SoA.yPos_px[x] + SoA.zPos[x];
+
+    SoA.metaSpriteFrame[x] = 0;
+    SoA_animationCounter[x] = a = ANIMATION_DELAY - 1;
+}
+
+
+
+// Entity process routine
+//
+// Called once per frame.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process(entityId : u8 in x) : bool in carry {
+    SoA_animationCounter[x]--;
+    if negative {
+        SoA_animationCounter[x] = a = ANIMATION_DELAY - 1;
+
+        a = SoA.metaSpriteFrame[x];
+        a++;
+        if a >= N_ANIMATION_FRAMES {
+            return false;
+        }
+        SoA.metaSpriteFrame[x] = a;
+    }
+
+    return true;
+}
+
+}
+
+
+}
+}
+
