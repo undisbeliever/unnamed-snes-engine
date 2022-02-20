@@ -11,6 +11,7 @@ import "../metatiles";
 import "../metasprites";
 import "../../wiz/common/snes/snes";
 import "../../gen/metasprites/common";
+import "../../gen/entities";
 
 
 namespace entities {
@@ -219,7 +220,7 @@ inline func hitbox_collided_with_entity__inline(entityId : u8 in x) {
 
     entities.spawn_entity(a = base.collisionCentre_x,
                           a = base.collisionCentre_y,
-                          a = 0, // ::TODO add entityTypes to `gen/entities.wiz`::
+                          a = EntityTypes.sword_particles as u8,
                           y = 0);
 }
 

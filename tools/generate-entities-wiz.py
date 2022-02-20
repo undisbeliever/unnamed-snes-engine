@@ -17,6 +17,13 @@ def generate_wiz_code(entities_input, ms_export_orders):
     with StringIO() as out:
         out.write("namespace entities {\n\n")
 
+
+        out.write("enum EntityTypes : u8 {\n")
+        for e in entities:
+            out.write(f"  { e.name },\n")
+        out.write("};\n\n")
+
+
         for ef in entity_functions:
             out.write(f"namespace { ef.name } {{\n")
 
