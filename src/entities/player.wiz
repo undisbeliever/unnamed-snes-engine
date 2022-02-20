@@ -180,7 +180,6 @@ func process(entityId : u8 in x) {
     // Update animation
     a = state as u8;
     if a == State.ATTACKING as u8 {
-        update_animation__attacking();
     }
     else if a == State.HURT as u8 {
         update_animation__hurt();
@@ -789,26 +788,19 @@ func set_state__attacking() {
 #[mem8, idx8]
 func process__attack() {
 
-    a = animationFrame;
-    if a == FIRST_ATTACK_FRAME + N_ATTACK_FRAMES {
-        ^return set_state__walking();
-    }
-}
-
-
-
-// DB = 0x7e
-#[mem8, idx8]
-func update_animation__attacking() {
-
     (<:animationFrameDelay)--;
     if negative {
         <:animationFrameDelay = a = ATTACK_ANIMATION_FRAME_DELAY - 1;
 
-        animationFrame++;
+        a = animationFrame;
+        a++;
+        if a == FIRST_ATTACK_FRAME + N_ATTACK_FRAMES {
+            ^return set_state__walking();
+        }
+        animationFrame = a;
     }
 
-    return update_metasprite_frame();
+    update_metasprite_frame();
 }
 
 
