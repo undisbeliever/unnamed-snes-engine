@@ -1,0 +1,464 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "_variables";
+import "_base";
+import "player";
+
+import "../common/math";
+
+import "../../gen/entities";
+
+
+namespace entities {
+namespace swarming {
+
+
+// ::TODO store speed in entity SoA::
+let FACING_SPEED = 0x00c0;
+let ALT_SPEED    = 0x0060;
+
+
+let X_ALT_VELOCITY_THRESHOLD = 8;
+let Y_ALT_VELOCITY_THRESHOLD = 2;
+
+let X_TURN_THRESHOLD = 16;
+let Y_TURN_THRESHOLD = 14;
+
+let X_TURNAROUND_THRESHOLD = 24;
+let Y_TURNAROUND_THRESHOLD = 21;
+
+
+let ANIMATION_DELAY = 12;
+let ANIMATION_FRAME_MASK = 0x3;
+
+
+// State must be in the same order as the MetaSprite frames
+enum State : u8 {
+    FACING_SOUTH = 0,
+    FACING_NORTH = 2,
+    FACING_EAST = 4,
+    FACING_WEST = 6,
+    HURT      = 8,
+};
+
+
+let SoA_state            = SoA.state_0_l as *State;
+let SoA_animationCounter = SoA.state_0_h;
+
+
+// Will be invalidated on a function call outside this entity.
+let _absDifference_x = <:dpTmp0;
+let _absDifference_y = >:dpTmp0;
+
+
+
+in code {
+
+
+// Entity process routine.
+//
+// Called when the entity is spawned
+//
+// DB = 0x7e
+#[mem8, idx8]
+func init(entityId : u8 in x, parameter : u8 in y) {
+
+    if y == init_parameter.left as u8 {
+        set_direction_east(x);
+    }
+    else if y == init_parameter.right as u8 {
+        set_direction_west(x);
+    }
+    else if y == init_parameter.up as u8 {
+        set_direction_north(x);
+    }
+    else {
+        set_direction_south(x);
+    }
+}
+
+
+
+// Entity process routine.
+//
+// Called once per frame.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process(entityId : u8 in x) : bool in carry {
+
+    x = base.process_collisions(x);
+
+
+    if collisionState $ CollisionState.PLAYER_WEAPON_BIT {
+        x = set_state__hurt(x);
+    }
+
+
+    // ::TODO add reaction when colliding with player hurtbox ::
+
+    a = SoA.xPos_px[x] - player.xPos.px;
+    if negative {
+        negate8(a);
+    }
+    _absDifference_x = a;
+
+    a = SoA.yPos_px[x] - player.yPos.px;
+    if negative {
+        negate8(a);
+    }
+    _absDifference_y = a;
+
+
+    y = x;
+    x = SoA_state[y] as u8;
+    return process__state_functions[unaligned x]();
+}
+
+
+const process__state_functions = [
+    process__facing_south,
+    process__facing_north,
+    process__facing_east,
+    process__facing_west,
+    process__hurt,
+];
+
+
+
+// KEEP: x
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _update_velocity__facing_north_or_south(entityId : u8 in x) {
+    y = a = SoA.xPos_px[unaligned x] - player.xPos.px;
+
+    mem16();
+    #[mem16] {
+        aa = 0;
+
+        // carry contains comparison from subtraction above
+        if carry {
+            if y >= X_ALT_VELOCITY_THRESHOLD + 1 {
+                aa = -ALT_SPEED as u16;
+            }
+        }
+        else {
+            if y < -X_ALT_VELOCITY_THRESHOLD as u8 {
+                aa = ALT_SPEED;
+            }
+        }
+
+        SoA.xVelocity[unaligned x] = aa;
+    }
+    mem8();
+}
+
+
+
+// KEEP: x
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _update_velocity__facing_east_or_west(entityId : u8 in x) {
+    y = a = SoA.yPos_px[unaligned x] - player.yPos.px;
+
+    mem16();
+    #[mem16] {
+        aa = 0;
+
+        // carry contains comparison from subtraction above
+        if carry {
+            if y >= Y_ALT_VELOCITY_THRESHOLD + 1 {
+                aa = -ALT_SPEED as u16;
+            }
+        }
+        else {
+            if y < -Y_ALT_VELOCITY_THRESHOLD as u8 {
+                aa = ALT_SPEED;
+            }
+        }
+
+        SoA.yVelocity[unaligned x] = aa;
+    }
+    mem8();
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__facing_south() : bool in carry {
+    x = currentEntityId;
+
+
+    a = _absDifference_y + Y_TURN_THRESHOLD;
+    if a < _absDifference_x {
+        ^return set_direction_east_or_west(x);
+    }
+
+    a = SoA.yPos_px[unaligned x];
+    if a >= player.yPos.px {
+        a -= Y_TURNAROUND_THRESHOLD;
+        if !carry { a = 0; }
+        if a >= player.yPos.px {
+            ^return set_direction_north(x);
+        }
+    }
+
+    _update_velocity__facing_north_or_south(x);
+
+    ^return _update_walk_animation(x);
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__facing_north() : bool in carry {
+    x = currentEntityId;
+
+    a = _absDifference_y + Y_TURN_THRESHOLD;
+    if a < _absDifference_x {
+        ^return set_direction_east_or_west(x);
+    }
+
+    a = SoA.yPos_px[unaligned x];
+    if a < player.yPos.px {
+        a += Y_TURNAROUND_THRESHOLD;
+        if carry { a = 0xff; }
+        if a < player.yPos.px {
+            ^return set_direction_south(x);
+        }
+    }
+
+    _update_velocity__facing_north_or_south(x);
+
+    return _update_walk_animation(x);
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__facing_east() : bool in carry {
+    x = currentEntityId;
+
+    a = _absDifference_x + X_TURN_THRESHOLD;
+    if a < _absDifference_y {
+        ^return set_direction_north_or_south(x);
+    }
+
+    a = SoA.xPos_px[unaligned x];
+    if a >= player.xPos.px {
+        a -= X_TURNAROUND_THRESHOLD;
+        if !carry { a = 0; }
+        if a >= player.xPos.px {
+            ^return set_direction_west(x);
+        }
+    }
+
+    _update_velocity__facing_east_or_west(x);
+
+    return _update_walk_animation(x);
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__facing_west() : bool in carry {
+    x = currentEntityId;
+
+    a = _absDifference_x + X_TURN_THRESHOLD;
+    if a < _absDifference_y {
+        ^return set_direction_north_or_south(x);
+    }
+
+    a = SoA.xPos_px[unaligned x];
+    if a < player.xPos.px {
+        a += X_TURNAROUND_THRESHOLD;
+        if carry { a = 0xff; }
+        if a < player.xPos.px {
+            ^return set_direction_east(x);
+        }
+    }
+
+    _update_velocity__facing_east_or_west(x);
+
+    return _update_walk_animation(x);
+}
+
+
+
+// returns true
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _update_walk_animation(entityId : u8 in x) : bool in carry {
+let _tmp = <:dpTmp0;
+
+    SoA_animationCounter[x]--;
+    if negative {
+        SoA_animationCounter[x] = a = ANIMATION_DELAY - 1;
+
+        // Increment animation Frame
+        a = SoA.metaSpriteFrame[x];
+        a++;
+        _tmp = a = a & ANIMATION_FRAME_MASK;
+
+        SoA.metaSpriteFrame[x] = a = (SoA.metaSpriteFrame[x] & (ANIMATION_FRAME_MASK ^ 0xff)) | _tmp;
+    }
+
+    return true;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_direction_south(entityId : u8 in x) : bool in carry {
+    SoA_state[x] = State.FACING_SOUTH;
+
+    SoA.metaSpriteFrame[x] = ms_frames.south0;
+    SoA_animationCounter[x] = 0;
+
+    mem16();
+    #[mem16] {
+        SoA.xVelocity[unaligned x] = 0;
+        SoA.yVelocity[unaligned x] = aa = FACING_SPEED as u16;
+    }
+    mem8();
+
+    return true;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_direction_north(entityId : u8 in x) : bool in carry {
+    a = State.FACING_NORTH as u8;
+    SoA_state[x] = a as State;
+
+    SoA.metaSpriteFrame[x] = a = ms_frames.north0;
+    SoA_animationCounter[x] = 0;
+
+    mem16();
+    #[mem16] {
+        SoA.xVelocity[unaligned x] = 0;
+        SoA.yVelocity[unaligned x] = aa = -FACING_SPEED as u16;
+    }
+    mem8();
+
+    return true;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_direction_east(entityId : u8 in x) : bool in carry {
+    a = State.FACING_EAST as u8;
+    SoA_state[x] = a as State;
+
+    SoA.metaSpriteFrame[x] = a = ms_frames.east0;
+    SoA_animationCounter[x] = 0;
+
+    mem16();
+    #[mem16] {
+        SoA.xVelocity[unaligned x] = aa = FACING_SPEED;
+        SoA.yVelocity[unaligned x] = 0;
+    }
+    mem8();
+
+    return true;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_direction_west(entityId : u8 in x) : bool in carry {
+    a = State.FACING_WEST as u8;
+    SoA_state[x] = a as State;
+
+    SoA.metaSpriteFrame[x] = a = ms_frames.west0;
+    SoA_animationCounter[x] = 0;
+
+    mem16();
+    #[mem16] {
+        SoA.xVelocity[unaligned x] = aa = -FACING_SPEED as u16;
+        SoA.yVelocity[unaligned x] = 0;
+    }
+    mem8();
+
+    return true;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_direction_north_or_south(entityId : u8 in x) : bool in carry {
+    a = SoA.yPos_px[x];
+
+    return set_direction_south(x) if a < player.yPos.px;
+    return set_direction_north(x);
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_direction_east_or_west(entityId : u8 in x) : bool in carry {
+    a = SoA.xPos_px[x];
+
+    return set_direction_east(x) if a < player.xPos.px;
+    return set_direction_west(x);
+}
+
+
+
+// Hurt
+// ====
+
+// KEEP: X
+// DB = 0x7e
+#[mem8, idx8]
+func set_state__hurt(entityId : u8 in x) : u8 in x {
+    a = State.HURT as u8;
+    SoA_state[x] = a as State;
+
+    return x;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__hurt() : bool in carry {
+    x = currentEntityId;
+
+    // ::TODO add reaction ::
+
+    mem16();
+    #[mem16] {
+        entities.SoA.xVelocity[unaligned x] = 0;
+        entities.SoA.yVelocity[unaligned x] = 0;
+    }
+    mem8();
+
+    return true;
+}
+
+
+
+}
+
+}
+}
+
