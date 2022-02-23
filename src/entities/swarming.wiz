@@ -27,8 +27,8 @@ let Y_ALT_VELOCITY_THRESHOLD = 2;
 let X_TURN_THRESHOLD = 16;
 let Y_TURN_THRESHOLD = 14;
 
-let X_TURNAROUND_THRESHOLD = 24;
-let Y_TURNAROUND_THRESHOLD = 21;
+let X_TURNAROUND_THRESHOLD = 21;
+let Y_TURNAROUND_THRESHOLD = 28;
 
 
 let ANIMATION_DELAY = 12;
@@ -48,11 +48,45 @@ enum State : u8 {
 let SoA_state            = SoA.state_0_l as *State;
 let SoA_animationCounter = SoA.state_0_h;
 
+// Offset between player's position and the entity's target.
+let SoA_targetOffset_x   = SoA.state_1_l as *i8;
+let SoA_targetOffset_y   = SoA.state_1_h as *i8;
 
+
+// Location to swarm to.
+//
 // Will be invalidated on a function call outside this entity.
-let _absDifference_x = <:dpTmp0;
-let _absDifference_y = >:dpTmp0;
+//
+// (u8 position)
+let _target_x = <:dpTmp0;
+let _target_y = >:dpTmp0;
 
+// Absolute difference between target and entity position.
+//
+// Will be invalidated on a function call outside this entity.
+//
+// (2x u8)
+let _absDifference_x = <:dpTmp1;
+let _absDifference_y = >:dpTmp1;
+
+
+
+in wram7e {
+    // Index into the last entry read in `OffsetTable_x` and `OffsetTable_y`.
+    var offsetTableIndex : u8;
+}
+
+
+in rodata0 {
+    // SoA table of player/target offsets.
+    //
+    // Values were generated and shuffled using a python script.
+    const _OffsetTable_x : [ i8 ; 64 ] = [-4, 11, -6, -4, 14, -10, 5, -9, 7, -6, 9, -2, 1, 4, -8, -5, 11, -5, 2, -11, 1, -6, 9, -3, -1, -1, 3, 6, 2, 8, 11, -2, 14, -13, -2, -7, 2, 6, 6, 7, 1, -1, -7, -4, -9, -9, -11, 5, -14, 10, 2, 4, 13, -14, -9, -2, 4, -11, -8, 9, 9, 8, -7, 7];
+    const _OffsetTable_y : [ i8 ; 64 ] = [-1, 6, 8, -11, -1, 8, -7, -2, -2, -8, -6, 10, -6, 1, 4, 7, 2, -4, 10, -6, -8, 10, -1, -7, 6, 11, 7, -8, -3, 9, -2, -6, 3, 5, -10, -6, 6, 8, -10, 1, -11, 8, -1, 5, 6, 1, -2, 4, 1, -8, -10, -5, -5, -3, -5, 3, 11, 2, -9, 2, 5, -4, 2, 6];
+
+    let OffsetTable_x = far &_OffsetTable_x as far *const i8;
+    let OffsetTable_y = far &_OffsetTable_y as far *const i8;
+}
 
 
 in code {
@@ -65,6 +99,25 @@ in code {
 // DB = 0x7e
 #[mem8, idx8]
 func init(entityId : u8 in x, parameter : u8 in y) {
+
+    y = x;
+    {
+        // Read the next value in OffsetTable
+        x = offsetTableIndex;
+        x++;
+        if x >= sizeof(typeof(OffsetTable_x)) + 1{
+            x = 0;
+        }
+        offsetTableIndex = x;
+
+        a = OffsetTable_x[x] as u8;
+        SoA_targetOffset_x[y] = a as i8;
+
+        a = OffsetTable_y[x] as u8;
+        SoA_targetOffset_y[y] = a as i8;
+    }
+    x = y;
+
 
     if y == init_parameter.left as u8 {
         set_direction_east(x);
@@ -98,15 +151,37 @@ func process(entityId : u8 in x) : bool in carry {
     }
 
 
-    // ::TODO add reaction when colliding with player hurtbox ::
+    // Add offset to player position to create target position (with wrapping)
+    a = SoA_targetOffset_x[x] as u8;
+    if negative {
+        a += player.xPos.px;
+        if !carry { a = 0; }
+    }
+    else {
+        a += player.xPos.px;
+        if carry { a = 0xff; }
+    }
+    _target_x = a;
 
-    a = SoA.xPos_px[x] - player.xPos.px;
+    a = SoA_targetOffset_y[x] as u8;
+    if negative {
+        a += player.yPos.px;
+        if !carry { a = 0; }
+    }
+    else {
+        a += player.yPos.px;
+        if carry { a = 0xff; }
+    }
+    _target_y = a;
+
+
+    a = SoA.xPos_px[x] - _target_x;
     if negative {
         negate8(a);
     }
     _absDifference_x = a;
 
-    a = SoA.yPos_px[x] - player.yPos.px;
+    a = SoA.yPos_px[x] - _target_y;
     if negative {
         negate8(a);
     }
@@ -134,7 +209,7 @@ const process__state_functions = [
 // DB = 0x7e
 #[mem8, idx8]
 func _update_velocity__facing_north_or_south(entityId : u8 in x) {
-    y = a = SoA.xPos_px[unaligned x] - player.xPos.px;
+    y = a = SoA.xPos_px[unaligned x] - _target_x;
 
     mem16();
     #[mem16] {
@@ -164,7 +239,7 @@ func _update_velocity__facing_north_or_south(entityId : u8 in x) {
 // DB = 0x7e
 #[mem8, idx8]
 func _update_velocity__facing_east_or_west(entityId : u8 in x) {
-    y = a = SoA.yPos_px[unaligned x] - player.yPos.px;
+    y = a = SoA.yPos_px[unaligned x] - _target_y;
 
     mem16();
     #[mem16] {
@@ -201,10 +276,10 @@ func process__facing_south() : bool in carry {
     }
 
     a = SoA.yPos_px[unaligned x];
-    if a >= player.yPos.px {
+    if a >= _target_y {
         a -= Y_TURNAROUND_THRESHOLD;
         if !carry { a = 0; }
-        if a >= player.yPos.px {
+        if a >= _target_y {
             ^return set_direction_north(x);
         }
     }
@@ -227,10 +302,10 @@ func process__facing_north() : bool in carry {
     }
 
     a = SoA.yPos_px[unaligned x];
-    if a < player.yPos.px {
+    if a < _target_y {
         a += Y_TURNAROUND_THRESHOLD;
         if carry { a = 0xff; }
-        if a < player.yPos.px {
+        if a < _target_y {
             ^return set_direction_south(x);
         }
     }
@@ -253,10 +328,10 @@ func process__facing_east() : bool in carry {
     }
 
     a = SoA.xPos_px[unaligned x];
-    if a >= player.xPos.px {
+    if a >= _target_x {
         a -= X_TURNAROUND_THRESHOLD;
         if !carry { a = 0; }
-        if a >= player.xPos.px {
+        if a >= _target_x {
             ^return set_direction_west(x);
         }
     }
@@ -279,10 +354,10 @@ func process__facing_west() : bool in carry {
     }
 
     a = SoA.xPos_px[unaligned x];
-    if a < player.xPos.px {
+    if a < _target_x {
         a += X_TURNAROUND_THRESHOLD;
         if carry { a = 0xff; }
-        if a < player.xPos.px {
+        if a < _target_x {
             ^return set_direction_east(x);
         }
     }
@@ -406,7 +481,7 @@ func set_direction_west(entityId : u8 in x) : bool in carry {
 func set_direction_north_or_south(entityId : u8 in x) : bool in carry {
     a = SoA.yPos_px[x];
 
-    return set_direction_south(x) if a < player.yPos.px;
+    return set_direction_south(x) if a < _target_y;
     return set_direction_north(x);
 }
 
@@ -417,7 +492,7 @@ func set_direction_north_or_south(entityId : u8 in x) : bool in carry {
 func set_direction_east_or_west(entityId : u8 in x) : bool in carry {
     a = SoA.xPos_px[x];
 
-    return set_direction_east(x) if a < player.xPos.px;
+    return set_direction_east(x) if a < _target_x;
     return set_direction_west(x);
 }
 
