@@ -32,6 +32,13 @@ let H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK = 13;
 let V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK = 11;
 
 
+let PLAYER_XPOS_AFTER_LEFT_TRANSITION  = DISPLAY_WIDTH - 1 - PLAYER_MAP_TRANSITION_END_POS;
+let PLAYER_XPOS_AFTER_RIGHT_TRANSITION = PLAYER_MAP_TRANSITION_END_POS;
+
+let PLAYER_YPOS_AFTER_UP_TRANSITION    = DISPLAY_HEIGHT - 1 - PLAYER_MAP_TRANSITION_END_POS;
+let PLAYER_YPOS_AFTER_DOWN_TRANSITION  = PLAYER_MAP_TRANSITION_END_POS;
+
+
 
 let ENTITIES_IN_MAP = 8;
 
@@ -157,6 +164,10 @@ func _check_room_exists() : bool in carry {
 
 
 // Load the room into memory and check if the MetaTile tileset has changed.
+//
+// `entities.player.xPos.px` and `entities.player.yPos.px` MUST contain the position of the
+// player AFTER the room transition ends and play resumes (the variables might be used by an
+// entity init routine)
 //
 // Returns zero set if it is OK to preform a scroll transition into the next room without glitches.
 //
@@ -541,19 +552,20 @@ func _room_transition__fadeout__room_in_memory() {
 #[mem8, idx8]
 func room_transition__scroll_right() {
 
-    entities.player.xPos.sx = 0;
-    entities.player.xPos.px = a = DISPLAY_WIDTH - 1;
+let SOLID_CHECK_XPOS = DISPLAY_WIDTH - 1 - H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
 
+    entities.player.xPos.sx = 0;
 
     currentRoom++;
 
+    entities.player.xPos.px = a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION;
     zero = _load_room_and_check_if_ok_to_scroll();
     if !zero {
-        entities.player.xPos.px = a = PLAYER_MAP_TRANSITION_END_POS;
-
         return _room_transition__fadeout__room_in_memory();
     }
 
+
+    entities.player.xPos.px = a = DISPLAY_WIDTH - 1;
 
     metatiles.transitions.scroll_right__setup();
 
@@ -561,7 +573,7 @@ func room_transition__scroll_right() {
         wait_frame();
 
         a = entities.player.xPos.px;
-        if a == DISPLAY_WIDTH - 1 - H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED {
+        if a == SOLID_CHECK_XPOS {
             negative = metatiles.check_tile_solid(0, entities.player.yPos.px);
             if negative {
                 // Tile is solid - cannot place player here
@@ -571,13 +583,15 @@ func room_transition__scroll_right() {
                 currentRoom--;
 
                 // Rewind room transition
+                entities.player.xPos.px = a = PLAYER_XPOS_AFTER_LEFT_TRANSITION;
                 _load_room_and_check_if_ok_to_scroll();
+                entities.player.xPos.px = a = SOLID_CHECK_XPOS;
                 return _rollback_room_transition__scroll_right();
             }
         }
 
         a = entities.player.xPos.px - metatiles.transitions.TRANSITION_SPEED;
-        if !carry { a = PLAYER_MAP_TRANSITION_END_POS; }
+        if !carry { a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION; }
         entities.player.xPos.px = a;
 
 
@@ -604,7 +618,7 @@ func _rollback_room_transition__scroll_right() {
         wait_frame();
 
         a = entities.player.xPos.px + metatiles.transitions.TRANSITION_SPEED;
-        if carry { a = DISPLAY_WIDTH - 1 - PLAYER_MAP_TRANSITION_END_POS; }
+        if carry { a = PLAYER_XPOS_AFTER_LEFT_TRANSITION; }
         entities.player.xPos.px = a;
 
 
@@ -615,7 +629,7 @@ func _rollback_room_transition__scroll_right() {
     } while !zero;
 
 
-    entities.player.xPos.px = a = DISPLAY_WIDTH - 1 - PLAYER_MAP_TRANSITION_END_POS;
+    entities.player.xPos.px = a = PLAYER_XPOS_AFTER_LEFT_TRANSITION;
 
 
     gameMode = GameModes.RUN_GAME;
@@ -631,19 +645,21 @@ func _rollback_room_transition__scroll_right() {
 #[mem8, idx8]
 func room_transition__scroll_left() {
 
+let SOLID_CHECK_XPOS = H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
+
     entities.player.xPos.sx = 0;
-    entities.player.xPos.px = 0;
 
 
     currentRoom--;
 
+    entities.player.xPos.px = a = PLAYER_XPOS_AFTER_LEFT_TRANSITION;
     zero = _load_room_and_check_if_ok_to_scroll();
     if !zero {
-        entities.player.xPos.px = a = DISPLAY_WIDTH - 1 - PLAYER_MAP_TRANSITION_END_POS;
-
         ^return _room_transition__fadeout__room_in_memory();
     }
 
+
+    entities.player.xPos.px = 0;
 
     metatiles.transitions.scroll_left__setup();
 
@@ -652,7 +668,7 @@ func room_transition__scroll_left() {
 
 
         a = entities.player.xPos.px;
-        if a == H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED {
+        if a == SOLID_CHECK_XPOS {
             negative = metatiles.check_tile_solid(0xff, entities.player.yPos.px);
             if negative {
                 // Tile is solid - cannot place player here
@@ -662,7 +678,9 @@ func room_transition__scroll_left() {
                 currentRoom++;
 
                 // Rewind room transition
+                entities.player.xPos.px = a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION;
                 _load_room_and_check_if_ok_to_scroll();
+                entities.player.xPos.px = a = SOLID_CHECK_XPOS;
                 return _rollback_room_transition__scroll_left();
             }
         }
@@ -670,7 +688,7 @@ func room_transition__scroll_left() {
 
 
         a = entities.player.xPos.px + metatiles.transitions.TRANSITION_SPEED;
-        if carry { a = DISPLAY_WIDTH - 1 - PLAYER_MAP_TRANSITION_END_POS; }
+        if carry { a = PLAYER_XPOS_AFTER_LEFT_TRANSITION; }
         entities.player.xPos.px = a;
 
 
@@ -697,7 +715,7 @@ func _rollback_room_transition__scroll_left() {
         wait_frame();
 
         a = entities.player.xPos.px - metatiles.transitions.TRANSITION_SPEED;
-        if !carry { a = PLAYER_MAP_TRANSITION_END_POS; }
+        if !carry { a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION; }
         entities.player.xPos.px = a;
 
 
@@ -708,7 +726,7 @@ func _rollback_room_transition__scroll_left() {
     } while !zero;
 
 
-    entities.player.xPos.px = a = PLAYER_MAP_TRANSITION_END_POS;
+    entities.player.xPos.px = a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION;
 
 
     gameMode = GameModes.RUN_GAME;
@@ -725,18 +743,18 @@ func _rollback_room_transition__scroll_left() {
 func room_transition__scroll_down() {
 
     entities.player.yPos.sx = 0;
-    entities.player.yPos.px = a = DISPLAY_HEIGHT - 1;
 
 
     currentRoom = a = currentRoom + 0x10;
 
+    entities.player.yPos.px = a = PLAYER_YPOS_AFTER_DOWN_TRANSITION;
     zero = _load_room_and_check_if_ok_to_scroll();
     if !zero {
-        entities.player.yPos.px = a = PLAYER_MAP_TRANSITION_END_POS;
-
         ^return _room_transition__fadeout__room_in_memory();
     }
 
+
+    entities.player.yPos.px = a = DISPLAY_HEIGHT - 1;
 
     metatiles.transitions.scroll_down__setup();
 
@@ -755,11 +773,14 @@ func room_transition__scroll_down() {
 // DB = 0x7e
 #[mem8, idx8]
 func _room_transition__scroll_down__loop() {
+
+let SOLID_CHECK_YPOS = DISPLAY_HEIGHT - 1 - V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
+
     do {
         wait_frame();
 
         a = entities.player.yPos.px;
-        if a == DISPLAY_HEIGHT - 1 - V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED {
+        if a == SOLID_CHECK_YPOS {
             negative = metatiles.check_tile_solid(entities.player.xPos.px, 0);
             if negative {
                 // Tile is solid - cannot place player here
@@ -769,13 +790,15 @@ func _room_transition__scroll_down__loop() {
                 currentRoom = a = currentRoom - 0x10;
 
                 // Rewind down transition
+                entities.player.yPos.px = a = PLAYER_YPOS_AFTER_UP_TRANSITION;
                 _load_room_and_check_if_ok_to_scroll();
+                entities.player.yPos.px = a = SOLID_CHECK_YPOS;
                 return _room_transition__scroll_up__loop();
             }
         }
 
         a = entities.player.yPos.px - metatiles.transitions.TRANSITION_SPEED;
-        if !carry { a = PLAYER_MAP_TRANSITION_END_POS; }
+        if !carry { a = PLAYER_YPOS_AFTER_DOWN_TRANSITION; }
         entities.player.yPos.px = a;
 
 
@@ -787,7 +810,7 @@ func _room_transition__scroll_down__loop() {
     while !carry;
 
 
-    entities.player.yPos.px = a = PLAYER_MAP_TRANSITION_END_POS;
+    entities.player.yPos.px = a = PLAYER_YPOS_AFTER_DOWN_TRANSITION;
 }
 
 
@@ -801,18 +824,18 @@ func _room_transition__scroll_down__loop() {
 func room_transition__scroll_up() {
 
     entities.player.yPos.sx = 0;
-    entities.player.yPos.px = 0;
 
 
     currentRoom = a = currentRoom - 0x10;
 
+    entities.player.yPos.px = a = PLAYER_YPOS_AFTER_UP_TRANSITION;
     zero = _load_room_and_check_if_ok_to_scroll();
     if !zero {
-        entities.player.yPos.px = a = DISPLAY_HEIGHT - 1 - PLAYER_MAP_TRANSITION_END_POS;
-
         ^return _room_transition__fadeout__room_in_memory();
     }
 
+
+    entities.player.yPos.px = 0;
 
     metatiles.transitions.scroll_up__setup();
 
@@ -832,13 +855,13 @@ func room_transition__scroll_up() {
 #[mem8, idx8]
 func _room_transition__scroll_up__loop() {
 
-let MAX_PLAYER_YPOS = DISPLAY_HEIGHT - 1 - PLAYER_MAP_TRANSITION_END_POS;
+let SOLID_CHECK_YPOS = V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
 
     do {
         wait_frame();
 
         a = entities.player.yPos.px;
-        if a == V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED {
+        if a == SOLID_CHECK_YPOS {
             negative = metatiles.check_tile_solid(entities.player.xPos.px, DISPLAY_HEIGHT - 1);
             if negative {
                 // Tile is solid - cannot place player here
@@ -848,14 +871,16 @@ let MAX_PLAYER_YPOS = DISPLAY_HEIGHT - 1 - PLAYER_MAP_TRANSITION_END_POS;
                 currentRoom = a = currentRoom + 0x10;
 
                 // Rewind up transition
+                entities.player.yPos.px = a = PLAYER_YPOS_AFTER_DOWN_TRANSITION;
                 _load_room_and_check_if_ok_to_scroll();
+                entities.player.yPos.px = a = SOLID_CHECK_YPOS;
                 ^return _room_transition__scroll_down__loop();
             }
         }
 
 
         a = entities.player.yPos.px + metatiles.transitions.TRANSITION_SPEED;
-        if a >= MAX_PLAYER_YPOS + 1 { a = MAX_PLAYER_YPOS; }
+        if a >= PLAYER_YPOS_AFTER_UP_TRANSITION + 1 { a = PLAYER_YPOS_AFTER_UP_TRANSITION; }
         entities.player.yPos.px = a;
 
         draw_entities();
@@ -866,7 +891,7 @@ let MAX_PLAYER_YPOS = DISPLAY_HEIGHT - 1 - PLAYER_MAP_TRANSITION_END_POS;
     while !carry;
 
 
-    entities.player.yPos.px = a = MAX_PLAYER_YPOS;
+    entities.player.yPos.px = a = PLAYER_YPOS_AFTER_UP_TRANSITION;
 }
 
 
