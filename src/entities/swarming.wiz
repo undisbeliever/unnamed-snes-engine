@@ -119,17 +119,36 @@ func init(entityId : u8 in x, parameter : u8 in y) {
     x = y;
 
 
-    if y == init_parameter.left as u8 {
-        set_direction_east(x);
+    // Determine which direction best faces the player.
+
+    a = SoA.xPos_px[x] - player.xPos.px;
+    if negative {
+        a = negate8(a);
     }
-    else if y == init_parameter.right as u8 {
-        set_direction_west(x);
+    _absDifference_x = a;
+
+    a = SoA.yPos_px[x] - player.yPos.px;
+    if negative {
+        a = negate8(a);
     }
-    else if y == init_parameter.up as u8 {
-        set_direction_north(x);
+
+    if a >= _absDifference_x {
+        a = SoA.yPos_px[x];
+        if a >= player.yPos.px {
+            ^return set_direction_north(x);
+        }
+        else {
+            ^return set_direction_south(x);
+        }
     }
     else {
-        set_direction_south(x);
+        a = SoA.xPos_px[x];
+        if a >= player.xPos.px {
+            ^return set_direction_west(x);
+        }
+        else {
+            ^return set_direction_east(x);
+        }
     }
 }
 
@@ -177,13 +196,13 @@ func process(entityId : u8 in x) : bool in carry {
 
     a = SoA.xPos_px[x] - _target_x;
     if negative {
-        negate8(a);
+        a = negate8(a);
     }
     _absDifference_x = a;
 
     a = SoA.yPos_px[x] - _target_y;
     if negative {
-        negate8(a);
+        a = negate8(a);
     }
     _absDifference_y = a;
 

@@ -34,11 +34,7 @@
     },
     {
       "name": "swarming",
-      "ms-export-order": "skeleton",
-      "parameter": {
-        "type": "enum",
-        "values": [ "down", "up", "left", "right" ]
-      }
+      "ms-export-order": "skeleton"
     },
     {
       "name": "projectile",
