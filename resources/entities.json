@@ -29,7 +29,7 @@
       "ms-export-order": "skeleton",
       "parameter": {
         "type": "enum",
-        "values": [ "down", "up", "left", "right" ]
+        "values": [ "down", "up", "left", "right", "swarm" ]
       }
     },
     {
@@ -61,13 +61,6 @@
     {
       "name": "skeleton",
       "code": "skeleton",
-      "metasprites": "dungeon.Skeleton",
-      "zpos": "0"
-    },
-    {
-      "__COMMENT__": "::TODO remove swarm enemy and add swarm parameter to skeleton ::",
-      "name": "swarm",
-      "code": "swarming",
       "metasprites": "dungeon.Skeleton",
       "zpos": "0"
     },

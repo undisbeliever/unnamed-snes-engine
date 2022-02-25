@@ -6,6 +6,7 @@ import "../memmap";
 import "_variables";
 import "_base";
 
+import "swarming";
 
 import "../../gen/entities";
 
@@ -56,8 +57,12 @@ func init(entityId : u8 in x, parameter : u8 in y) {
     else if y == init_parameter.up as u8 {
         set_direction_north(x);
     }
-    else {
+    else if y == init_parameter.down as u8 {
         set_direction_south(x);
+    }
+    else {
+        // parameter = init_parameter.swarm
+        swarming.change_to_swarming_entity(x);
     }
 }
 
