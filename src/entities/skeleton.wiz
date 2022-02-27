@@ -29,7 +29,6 @@ enum State : u8 {
     WALK_NORTH = 2,
     WALK_EAST = 4,
     WALK_WEST = 6,
-    HURT      = 8,
 };
 
 
@@ -81,7 +80,7 @@ func process(entityId : u8 in x) : bool in carry {
 
 
     if collisionState $ CollisionState.PLAYER_WEAPON_BIT {
-        x = set_state__hurt(x);
+        ^return swarming.change_to_swarming_entity(x);
     }
 
 
@@ -99,7 +98,6 @@ const process__walk_functions = [
     process__walk_north,
     process__walk_east,
     process__walk_west,
-    process__hurt,
 ];
 
 
@@ -112,6 +110,7 @@ func process__walk_south() : bool in carry {
 
     carry = vision_cone.test_down(x);
     if carry {
+        // ::TODO add change_to_swarming_entity_in_hurt_state ::
         ^return swarming.change_to_swarming_entity(x);
     }
 
@@ -331,43 +330,6 @@ func set_direction_west(entityId : u8 in x) : bool in carry {
 
     return true;
 }
-
-
-
-// Hurt
-// ====
-
-// KEEP: X
-// DB = 0x7e
-#[mem8, idx8]
-func set_state__hurt(entityId : u8 in x) : u8 in x {
-    a = State.HURT as u8;
-    SoA_state[x] = a as State;
-
-    return x;
-}
-
-
-
-// DB = 0x7e
-#[mem8, idx8]
-func process__hurt() : bool in carry {
-    x = currentEntityId;
-
-    // ::TODO add reaction ::
-
-    mem16();
-    #[mem16] {
-        entities.SoA.xVelocity[unaligned x] = 0;
-        entities.SoA.yVelocity[unaligned x] = 0;
-    }
-    mem8();
-
-    return true;
-}
-
-
-
 
 
 }
