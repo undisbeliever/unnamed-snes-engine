@@ -5,6 +5,7 @@ import "../memmap";
 
 import "_variables";
 import "_base";
+import "_vision_cone";
 
 import "swarming";
 
@@ -109,6 +110,12 @@ func process__walk_south() : bool in carry {
     x = currentEntityId;
 
 
+    carry = vision_cone.test_down(x);
+    if carry {
+        ^return swarming.change_to_swarming_entity(x);
+    }
+
+
     // Check for a tile collision in the previous frame
     a = SoA.movementState[x];
     if a & MovementState.X_AXIS_COLLISION != 0 {
@@ -120,7 +127,6 @@ func process__walk_south() : bool in carry {
 
 
     // ::TODO check for solid tile 2 tiles below the entity ::
-    // ::TODO speedup and lean left or right if player is nearby ::
 
 
     return _update_walk_animation(x);
@@ -132,6 +138,11 @@ func process__walk_south() : bool in carry {
 #[mem8, idx8]
 func process__walk_north() : bool in carry {
     x = currentEntityId;
+
+    carry = vision_cone.test_up(x);
+    if carry {
+        ^return swarming.change_to_swarming_entity(x);
+    }
 
 
     // Check for a tile collision in the previous frame
@@ -145,7 +156,6 @@ func process__walk_north() : bool in carry {
 
 
     // ::TODO check for solid tile 2 tiles above the entity ::
-    // ::TODO speedup and lean left or right if player is nearby ::
 
 
     return _update_walk_animation(x);
@@ -159,6 +169,12 @@ func process__walk_east() : bool in carry {
     x = currentEntityId;
 
 
+    carry = vision_cone.test_right(x);
+    if carry {
+        ^return swarming.change_to_swarming_entity(x);
+    }
+
+
     // Check for a tile collision in the previous frame
     a = SoA.movementState[x];
     if a & MovementState.X_AXIS_COLLISION != 0 {
@@ -170,7 +186,6 @@ func process__walk_east() : bool in carry {
 
 
     // ::TODO check for solid tile 2 tiles to the right of the entity ::
-    // ::TODO speedup and lean up or down if player is nearby ::
 
 
     return _update_walk_animation(x);
@@ -184,6 +199,12 @@ func process__walk_west() : bool in carry {
     x = currentEntityId;
 
 
+    carry = vision_cone.test_left(x);
+    if carry {
+        ^return swarming.change_to_swarming_entity(x);
+    }
+
+
     // Check for a tile collision in the previous frame
     a = SoA.movementState[x];
     if a & MovementState.X_AXIS_COLLISION != 0 {
@@ -195,7 +216,6 @@ func process__walk_west() : bool in carry {
 
 
     // ::TODO check for solid tile 2 tiles to the left of the entity ::
-    // ::TODO speedup and lean up or down if player is nearby ::
 
 
     return _update_walk_animation(x);

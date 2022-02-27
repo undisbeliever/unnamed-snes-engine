@@ -1,0 +1,164 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "_variables";
+import "player";
+import "../common/math";
+
+
+namespace entities {
+namespace vision_cone {
+
+
+let CONE_LENGTH           = 75;
+let CONE_SHORT_HALF_WIDTH = 4;
+let CONE_LONG_HALF_WIDTH  = 24;
+
+
+in code {
+
+
+// Test if the player is inside the vision cone when looking up.
+//
+// KEEP: X
+//
+// DB = 0x7e
+#[mem8, idx8]
+func test_up(entityId : u8 in x) : bool in carry {
+    return _vertical_test(player.yPos.px, SoA.yPos_px[x], x);
+}
+
+
+
+// Test if the player is inside the vision cone when looking down.
+//
+// KEEP: X
+//
+// DB = 0x7e
+#[mem8, idx8]
+func test_down(entityId : u8 in x) : bool in carry {
+    return _vertical_test(SoA.yPos_px[x], player.yPos.px, x);
+}
+
+
+
+// Test if the player is inside the vision cone when looking left.
+//
+// KEEP: X
+//
+// DB = 0x7e
+#[mem8, idx8]
+func test_left(entityId : u8 in x) : bool in carry {
+    return _horizontal_test(player.xPos.px, SoA.xPos_px[x], x);
+}
+
+
+
+// Test if the player is inside the vision cone when looking right.
+//
+// KEEP: X
+//
+// DB = 0x7e
+#[mem8, idx8]
+func test_right(entityId : u8 in x) : bool in carry {
+    return _horizontal_test(SoA.xPos_px[x], player.xPos.px, x);
+}
+
+
+
+// Vertical vision cone test.
+//
+// KEEP: X
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _vertical_test(a_yPos_ : u8 in a, b_yPos_ : u8 in y, entityId : u8 in x) : bool in carry {
+
+let _a_yPos = >:dpTmp0;
+let _b_yPos = <:dpTmp0;
+let _tmp    = <:dpTmp1;
+
+    // MUST NOT change `y` in this function (used at the bottom).
+
+    _b_yPos = y;
+    if a < _b_yPos {
+        _a_yPos = a;
+
+        a += CONE_LENGTH;
+        if carry { a = 0xff; }
+
+        if a >= _b_yPos {
+            a = SoA.xPos_px[x] - player.xPos.px;
+            if !carry {
+                a = negate8(a);
+            }
+
+            if a < CONE_LONG_HALF_WIDTH {
+                // Will not underflow if short < long
+                _tmp = a = a - CONE_SHORT_HALF_WIDTH;
+
+                // Will not underflow: y >= _a_yPos;
+                a = y - _a_yPos;
+                if a >= _tmp {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+
+
+// Horizontal vision cone test.
+//
+// KEEP: X
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _horizontal_test(a_xPos_ : u8 in a, b_xPos_ : u8 in y, entityId : u8 in x) : bool in carry {
+
+let _a_xPos = >:dpTmp0;
+let _b_xPos = <:dpTmp0;
+let _tmp    = <:dpTmp1;
+
+    // MUST NOT change `y` in this function
+
+    _b_xPos = y;
+    if a < _b_xPos {
+        _a_xPos = a;
+
+        a += CONE_LENGTH;
+        if carry { a = 0xff; }
+
+        if a >= _b_xPos {
+            a = SoA.yPos_px[x] - player.yPos.px;
+            if !carry {
+                a = negate8(a);
+            }
+
+            if a < CONE_LONG_HALF_WIDTH {
+                // Will not underflow if short < long
+                _tmp = a = a - CONE_SHORT_HALF_WIDTH;
+
+                // Will not underflow: y >= _a_xPos;
+                a = y - _a_xPos;
+                if a >= _tmp {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+
+}
+
+}
+}
+
