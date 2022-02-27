@@ -50,10 +50,10 @@ in code {
 func init(entityId : u8 in x, parameter : u8 in y) {
 
     if y == init_parameter.left as u8 {
-        set_direction_east(x);
+        set_direction_west(x);
     }
     else if y == init_parameter.right as u8 {
-        set_direction_west(x);
+        set_direction_east(x);
     }
     else if y == init_parameter.up as u8 {
         set_direction_north(x);
