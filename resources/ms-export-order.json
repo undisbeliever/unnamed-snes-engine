@@ -190,8 +190,8 @@
     },
     "projectile": {
       "frames": [
-        "north",
         "south",
+        "north",
         "east",
         "west"
       ]

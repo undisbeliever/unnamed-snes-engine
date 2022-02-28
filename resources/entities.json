@@ -41,7 +41,7 @@
       "ms-export-order": "projectile",
       "parameter": {
         "type": "enum",
-        "values": [ "up", "down", "right", "left" ]
+        "values": [ "down", "up", "right", "left" ]
       }
     }
   ],
