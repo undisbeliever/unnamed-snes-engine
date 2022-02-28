@@ -102,7 +102,7 @@ func process(entityId : u8 in x) : bool in carry {
 
     y = x;
     x = SoA_state[y] as u8;
-    return process__state_functions[unaligned x]();
+    return process__state_functions[unaligned x](y);
 }
 
 
@@ -120,8 +120,8 @@ const process__state_functions = [
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__walk_south() : bool in carry {
-    x = currentEntityId;
+func process__walk_south(entityId : u8 in y) : bool in carry {
+    x = y;
 
 
     // Check for a tile collision in the previous frame
@@ -152,8 +152,8 @@ func process__walk_south() : bool in carry {
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__walk_north() : bool in carry {
-    x = currentEntityId;
+func process__walk_north(entityId : u8 in a) : bool in carry {
+    x = y;
 
 
     // Check for a tile collision in the previous frame
@@ -184,8 +184,8 @@ func process__walk_north() : bool in carry {
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__walk_east() : bool in carry {
-    x = currentEntityId;
+func process__walk_east(entityId : u8 in y) : bool in carry {
+    x = y;
 
 
     // Check for a tile collision in the previous frame
@@ -216,8 +216,8 @@ func process__walk_east() : bool in carry {
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__walk_west() : bool in carry {
-    x = currentEntityId;
+func process__walk_west(entityId : u8 in y) : bool in carry {
+    x = y;
 
 
     // Check for a tile collision in the previous frame
@@ -402,8 +402,9 @@ inline func _set_state__attacking__immediate(entityId : u8 in x) {
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__attacking() : bool in carry {
-    x = currentEntityId;
+func process__attacking(entityId : u8 in y) : bool in carry {
+    x = y;
+
 
     a = SoA_boltTimer[x];
     if !zero {
@@ -451,8 +452,9 @@ inline func _set_state__attack_recovery(entityId : u8 in x) {
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__attack_recovery() : bool in carry {
-    x = currentEntityId;
+func process__attack_recovery(entityId : u8 in y) : bool in carry {
+    x = y;
+
 
     a = SoA_boltTimer[x];
     if !zero {
@@ -516,8 +518,8 @@ func set_state__hurt(entityId : u8 in x) : u8 in x {
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__hurt() : bool in carry {
-    x = currentEntityId;
+func process__hurt(entityId : u8 in a) : bool in carry {
+    x = y;
 
     // ::TODO add reaction ::
 
