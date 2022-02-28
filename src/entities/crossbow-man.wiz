@@ -102,11 +102,11 @@ func process(entityId : u8 in x) : bool in carry {
 
     y = x;
     x = SoA_state[y] as u8;
-    return process__walk_functions[unaligned x]();
+    return process__state_functions[unaligned x]();
 }
 
 
-const process__walk_functions = [
+const process__state_functions = [
     process__walk_south,
     process__walk_north,
     process__walk_east,
