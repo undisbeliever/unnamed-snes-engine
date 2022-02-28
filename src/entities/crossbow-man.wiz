@@ -40,17 +40,33 @@ enum State : u8 {
     HURT            = 12,
 };
 
+
+// Direction must be in the same order as the MetaSprite frames
+enum Direction : u8 {
+    SOUTH = 0,
+    NORTH = 2,
+    EAST  = 4,
+    WEST  = 6,
+};
+
+
 let N_DIRECTIONS = 4;
+
+let DIRECTION_MS_SHIFT = 2 - 1;
+
+// ::TODO determine which frame (1 or 3) is the more correct firing stance::
+let ATTACK_MS_FRAME = 1;
 
 
 let SoA_state            = SoA.state_0_l as *State;
-let SoA_direction        = SoA.state_0_h as *State;
+let SoA_walkingDirection = SoA.state_0_h as *Direction;
+let SoA_firingDirection  = SoA.state_1_l as *Direction;
 
-let SoA_animationCounter = SoA.state_1_l;
+let SoA_animationCounter = SoA.state_1_h;
 
 // Countdown timer until the next action when attacking
 // (display frame countdown timer)
-let SoA_boltTimer        = SoA.state_1_h;
+let SoA_boltTimer        = SoA.state_2_l;
 
 
 
@@ -65,18 +81,8 @@ in code {
 #[mem8, idx8]
 func init(entityId : u8 in x, parameter : u8 in y) {
 
-    if y == init_parameter.left as u8 {
-        set_direction_east(x);
-    }
-    else if y == init_parameter.right as u8 {
-        set_direction_west(x);
-    }
-    else if y == init_parameter.up as u8 {
-        set_direction_north(x);
-    }
-    else {
-        set_direction_south(x);
-    }
+    a = y <<< 1;
+    ^return set_state__walk(x, a);
 }
 
 
@@ -136,7 +142,15 @@ func process__walk_south(entityId : u8 in y) : bool in carry {
 
     carry = vision_cone.test_down(x);
     if carry {
-        ^return set_state__attacking(x);
+        ^return set_state__attacking(x, Direction.SOUTH as u8);
+    }
+    carry = vision_cone.test_right(x);
+    if carry {
+        ^return set_state__attacking(x, Direction.EAST as u8);
+    }
+    carry = vision_cone.test_left(x);
+    if carry {
+        ^return set_state__attacking(x, Direction.WEST as u8);
     }
 
 
@@ -145,7 +159,7 @@ func process__walk_south(entityId : u8 in y) : bool in carry {
     // ::TODO check for player and change state to FIRING_BOLT_SOUTH ::
 
 
-    return _update_walk_animation(x);
+    ^return _update_walk_animation(x);
 }
 
 
@@ -168,7 +182,15 @@ func process__walk_north(entityId : u8 in a) : bool in carry {
 
     carry = vision_cone.test_up(x);
     if carry {
-        ^return set_state__attacking(x);
+        ^return set_state__attacking(x, Direction.NORTH as u8);
+    }
+    carry = vision_cone.test_right(x);
+    if carry {
+        ^return set_state__attacking(x, Direction.EAST as u8);
+    }
+    carry = vision_cone.test_left(x);
+    if carry {
+        ^return set_state__attacking(x, Direction.WEST as u8);
     }
 
 
@@ -177,7 +199,7 @@ func process__walk_north(entityId : u8 in a) : bool in carry {
     // ::TODO check for player and change state to FIRING_BOLT_NORTH ::
 
 
-    return _update_walk_animation(x);
+    ^return _update_walk_animation(x);
 }
 
 
@@ -200,7 +222,15 @@ func process__walk_east(entityId : u8 in y) : bool in carry {
 
     carry = vision_cone.test_right(x);
     if carry {
-        ^return set_state__attacking(x);
+        ^return set_state__attacking(x, Direction.EAST as u8);
+    }
+    carry = vision_cone.test_up(x);
+    if carry {
+        ^return set_state__attacking(x, Direction.NORTH as u8);
+    }
+    carry = vision_cone.test_down(x);
+    if carry {
+        ^return set_state__attacking(x, Direction.SOUTH as u8);
     }
 
 
@@ -232,7 +262,15 @@ func process__walk_west(entityId : u8 in y) : bool in carry {
 
     carry = vision_cone.test_left(x);
     if carry {
-        ^return set_state__attacking(x);
+        ^return set_state__attacking(x, Direction.WEST as u8);
+    }
+    carry = vision_cone.test_up(x);
+    if carry {
+        ^return set_state__attacking(x, Direction.NORTH as u8);
+    }
+    carry = vision_cone.test_down(x);
+    if carry {
+        ^return set_state__attacking(x, Direction.SOUTH as u8);
     }
 
 
@@ -271,13 +309,33 @@ let _tmp = <:dpTmp0;
 }
 
 
+// DB = 0x7e
+#[mem8, idx8]
+func set_state__walk(entityId : u8 in x, direction : u8 in a) : bool in carry {
+
+    if a == Direction.EAST as u8 {
+        return set_direction_east(x);
+    }
+    else if a == Direction.WEST as u8 {
+        return set_direction_west(x);
+    }
+    else if a == Direction.NORTH as u8 {
+        return set_direction_north(x);
+    }
+    else {
+        return set_direction_south(x);
+    }
+
+    return true;
+}
+
 
 
 // DB = 0x7e
 #[mem8, idx8]
 func set_direction_south(entityId : u8 in x) : bool in carry {
     SoA_state[x] = State.WALK_SOUTH;
-    SoA_direction[x] = State.WALK_SOUTH;
+    SoA_walkingDirection[x] = Direction.SOUTH;
 
     SoA.metaSpriteFrame[x] = ms_frames.south0;
     SoA_animationCounter[x] = 0;
@@ -299,7 +357,7 @@ func set_direction_south(entityId : u8 in x) : bool in carry {
 func set_direction_north(entityId : u8 in x) : bool in carry {
     a = State.WALK_NORTH as u8;
     SoA_state[x] = a as State;
-    SoA_direction[x] = a as State;
+    SoA_walkingDirection[x] = a as Direction;
 
     SoA.metaSpriteFrame[x] = a = ms_frames.north0;
     SoA_animationCounter[x] = 0;
@@ -321,7 +379,7 @@ func set_direction_north(entityId : u8 in x) : bool in carry {
 func set_direction_east(entityId : u8 in x) : bool in carry {
     a = State.WALK_EAST as u8;
     SoA_state[x] = a as State;
-    SoA_direction[x] = a as State;
+    SoA_walkingDirection[x] = a as Direction;
 
     SoA.metaSpriteFrame[x] = a = ms_frames.east0;
     SoA_animationCounter[x] = 0;
@@ -343,7 +401,7 @@ func set_direction_east(entityId : u8 in x) : bool in carry {
 func set_direction_west(entityid : u8 in x) : bool in carry {
     a = State.WALK_WEST as u8;
     SoA_state[x] = a as State;
-    SoA_direction[x] = a as State;
+    SoA_walkingDirection[x] = a as Direction;
 
     SoA.metaSpriteFrame[x] = a = ms_frames.west0;
     SoA_animationCounter[x] = 0;
@@ -368,7 +426,13 @@ func set_direction_west(entityid : u8 in x) : bool in carry {
 // KEEP: X
 // DB = 0x7e
 #[mem8, idx8]
-func set_state__attacking(entityId : u8 in x) : bool in carry {
+func set_state__attacking(entityId : u8 in x, direction : u8 in a) : bool in carry {
+
+    SoA_firingDirection[x] = a as Direction;
+
+    SoA.metaSpriteFrame[x] = a = (a <<< DIRECTION_MS_SHIFT) + ATTACK_MS_FRAME;
+
+
     a = State.ATTACKING as u8;
     SoA_state[x] = a as State;
 
@@ -413,7 +477,7 @@ func process__attacking(entityId : u8 in y) : bool in carry {
     }
     else {
         // Fire bolt
-        a = SoA_direction[x] as u8;
+        a = SoA_firingDirection[x] as u8;
         if a < N_DIRECTIONS * 2 {
             y = a = a >>> 1;
 
@@ -465,30 +529,29 @@ func process__attack_recovery(entityId : u8 in y) : bool in carry {
         // Bolt recovery ended
         // Check if player is still inside the vision cone
 
-        a = SoA_direction[x] as u8;
-
-        if a == State.WALK_EAST as u8 {
+        a = SoA_firingDirection[x] as u8;
+        if a == Direction.EAST as u8 {
             carry = vision_cone.test_right(x);
             if !carry {
-                ^return set_direction_east(x);
+                return _attack_recovery_ended(x);
             }
         }
-        else if a == State.WALK_WEST as u8 {
+        else if a == Direction.WEST as u8 {
             carry = vision_cone.test_left(x);
             if !carry {
-                ^return set_direction_west(x);
+                return _attack_recovery_ended(x);
             }
         }
-        else if a == State.WALK_NORTH as u8 {
+        else if a == Direction.NORTH as u8 {
             carry = vision_cone.test_up(x);
             if !carry {
-                ^return set_direction_north(x);
+                return _attack_recovery_ended(x);
             }
         }
         else {
             carry = vision_cone.test_down(x);
             if !carry {
-                ^return set_direction_south(x);
+                return _attack_recovery_ended(x);
             }
         }
 
@@ -497,6 +560,15 @@ func process__attack_recovery(entityId : u8 in y) : bool in carry {
     }
 
     return true;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func _attack_recovery_ended(enttyId : u8 in x) : bool in carry {
+    // Continue walking in the same direction the enemy was walking before they saw the player.
+    ^return set_state__walk(x, SoA_walkingDirection[x] as u8);
 }
 
 
