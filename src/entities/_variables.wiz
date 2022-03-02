@@ -6,7 +6,7 @@ import "../metasprites";
 
 
 namespace entities {
-    let N_ENTITIES = 12;
+    let N_ENTITIES = 21;
 
     struct pos {
         sx : u8,
