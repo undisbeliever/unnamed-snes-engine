@@ -118,6 +118,8 @@ let _init_function_ptr = _init_function_u16 as func(u8 in x, u8 in y);
 
             entities.SoA.zPos[y] = a = (far &entities.entity_data.initial_zpos as far *u8)[x];
 
+            entities.SoA.visionA[y] = a = (far &entities.entity_data.vision_a as far *u8)[x];
+            entities.SoA.visionB[y] = a = (far &entities.entity_data.vision_b as far *u8)[x];
 
             a = (far &entities.entity_data.ms_frameset_h as far *u8)[x];
             swap_bytes(aa);

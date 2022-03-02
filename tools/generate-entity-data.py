@@ -68,6 +68,9 @@ in rodata0 {
 
         write_list('initial_zpos', [ f"{ e.zpos } as u8" for e in entities ])
 
+        write_list('vision_a', [ f"{ e.vision.a if e.vision else '0xff' }" for e in entities ])
+        write_list('vision_b', [ f"{ e.vision.b if e.vision else '0xff' }" for e in entities ])
+
         out.write("""
 }
 }

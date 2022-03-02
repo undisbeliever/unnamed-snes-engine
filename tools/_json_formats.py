@@ -71,8 +71,21 @@ EntitiesJson = namedtuple('EntitiesJson', ('entity_functions', 'entities'))
 
 EntityFunction = namedtuple('EntityFunction', ('name', 'id', 'ms_export_order', 'parameter'))
 EfParameter = namedtuple('EfParameter', ('type', 'values'))
+EntityVision = namedtuple('EntityVision', ('a', 'b'))
 
-Entity = namedtuple('Entity', ('name', 'id', 'code', 'metasprites', 'zpos'))
+Entity = namedtuple('Entity', ('name', 'id', 'code', 'metasprites', 'zpos', 'vision'))
+
+
+
+def _read_entity_vision_parameter(s):
+    if s is None:
+        return None
+    if not isinstance(s, str):
+        raise ValueError('Error: Expected a string containing two integers (vision)')
+    v = s.split()
+    if len(v) != 2:
+        raise ValueError('Error: Expected a string containing two integers (vision)')
+    return EntityVision(int(v[0]), int(v[1]))
 
 
 
@@ -113,6 +126,7 @@ def load_entities_json(filename):
                     code = entity_functions[e['code']],
                     metasprites = check_name_with_dot(e['metasprites']),
                     zpos = int(e['zpos']),
+                    vision = _read_entity_vision_parameter(e.get('vision')),
         )
 
         if entity.name in entities:

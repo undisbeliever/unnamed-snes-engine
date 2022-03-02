@@ -172,6 +172,16 @@ namespace entities {
             let iframeCounter = &_healthAndIframeCounter[0].second as *u8;
 
 
+            // Vision parameters
+            // (two bytes, depends on the vision system used)
+            var _visionAB : [ _u8pair ; N_ENTITIES ];
+            let visionA = &_visionAB[0].first as *u8;
+            let visionB = &_visionAB[0].second as *u8;
+
+            // ::TODO should I add a third vision variable?::
+            // ::: Currently small end of vision_cone is constant::
+
+
             // Variables used to store the entity's state between `process_function` calls
             //
             // NOTE: if I add more states here then I need to clear them in `spawn_entity`

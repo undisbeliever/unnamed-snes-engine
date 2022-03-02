@@ -56,13 +56,15 @@
       "name": "crossbow_man",
       "code": "crossbow_man",
       "metasprites": "dungeon.CrossbowMan",
-      "zpos": "0"
+      "zpos": "0",
+      "vision": "200 14"
     },
     {
       "name": "skeleton",
       "code": "skeleton",
       "metasprites": "dungeon.Skeleton",
-      "zpos": "0"
+      "zpos": "0",
+      "vision": "75 28"
     },
     {
       "name": "skull",

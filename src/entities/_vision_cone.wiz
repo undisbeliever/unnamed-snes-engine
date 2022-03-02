@@ -12,9 +12,21 @@ namespace entities {
 namespace vision_cone {
 
 
-let CONE_LENGTH           = 75;
+// The half-width of the short end of the vision code.
+//
+// This prevents a blind spot in front of the entity.
 let CONE_SHORT_HALF_WIDTH = 4;
-let CONE_LONG_HALF_WIDTH  = 24;
+
+
+
+// Length of the vision cone.
+let SoA_visionCone_length    = SoA.visionA;
+
+// The half-width of the wide end of the vision code.
+//
+// Value SHOULD be > 4
+let SoA_visionCone_halfWidth = SoA.visionB;
+
 
 
 in code {
@@ -86,7 +98,7 @@ let _tmp    = <:dpTmp1;
     if a < _b_yPos {
         _a_yPos = a;
 
-        a += CONE_LENGTH;
+        a += SoA_visionCone_length[x];
         if carry { a = 0xff; }
 
         if a >= _b_yPos {
@@ -95,8 +107,8 @@ let _tmp    = <:dpTmp1;
                 a = negate8(a);
             }
 
-            if a < CONE_LONG_HALF_WIDTH {
-                // Will not underflow if short < long
+            if a < SoA_visionCone_halfWidth[x] {
+                // Will not underflow if width >= short_width
                 _tmp = a = a - CONE_SHORT_HALF_WIDTH;
 
                 // Will not underflow: y >= _a_yPos;
@@ -131,7 +143,7 @@ let _tmp    = <:dpTmp1;
     if a < _b_xPos {
         _a_xPos = a;
 
-        a += CONE_LENGTH;
+        a += SoA_visionCone_length[x];
         if carry { a = 0xff; }
 
         if a >= _b_xPos {
@@ -140,8 +152,8 @@ let _tmp    = <:dpTmp1;
                 a = negate8(a);
             }
 
-            if a < CONE_LONG_HALF_WIDTH {
-                // Will not underflow if short < long
+            if a < SoA_visionCone_halfWidth[x] {
+                // Will not underflow if width >= short_width
                 _tmp = a = a - CONE_SHORT_HALF_WIDTH;
 
                 // Will not underflow: y >= _a_xPos;
