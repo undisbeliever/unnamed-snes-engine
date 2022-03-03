@@ -43,6 +43,14 @@
         "type": "enum",
         "values": [ "down", "up", "right", "left" ]
       }
+    },
+    {
+      "name": "projectile_angled",
+      "ms-export-order": "projectile",
+      "parameter": {
+        "type": "enum",
+        "values": [ "down", "up", "right", "left" ]
+      }
     }
   ],
   "entities": [
@@ -73,8 +81,14 @@
       "zpos": "4"
     },
     {
-      "name": "bolt",
+      "name": "bolt_straight",
       "code": "projectile",
+      "metasprites": "common.Bolt",
+      "zpos": "4"
+    },
+    {
+      "name": "bolt_angled",
+      "code": "projectile_angled",
       "metasprites": "common.Bolt",
       "zpos": "4"
     }
