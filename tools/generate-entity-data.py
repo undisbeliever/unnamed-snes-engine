@@ -5,6 +5,7 @@
 
 import argparse
 from collections import OrderedDict
+from itertools import chain
 from io import StringIO
 
 from _json_formats import load_entities_json
@@ -29,14 +30,27 @@ def generate_wiz_code(entities_input):
     entities = entities_input.entities.values()
     entity_functions = entities_input.entity_functions.values()
 
+    n_entities = len(entities)
+
+
+    if len(entities) >= 0xff / 2:
+        raise ValueError("Too many entity types.")
+
+
     with StringIO() as out:
-        def write_list(name, values):
-            out.write(f"  const {name} : [u8] = [ { ', '.join(values) } ];\n")
+
+        def write_list(name, type_, values):
+            out.write(f"  const { name } : [{ type_ } ; { n_entities }] = [ { ', '.join(values) } ];\n")
+
+        def write_list_u8(name, a_values, b_values):
+            interleaved_values = chain.from_iterable(zip(a_values, b_values))
+            out.write(f"  const __{ name } : [u8 ; { n_entities * 2}] = [ { ', '.join(interleaved_values) } ];\n")
+            out.write(f"  let { name } = far &__{ name } as far *u16;\n\n")
 
 
         out.write("""
 import "../src/memmap";
-import "../src/entities/_variables";
+import "../src/metasprites";
 """)
 
 
@@ -50,32 +64,28 @@ import "../src/entities/_variables";
 
 
         out.write("""
-
-namespace entities {
-namespace entity_data {
+namespace entity_rom_data {
 in rodata0 {
-
 """)
 
-        write_list('init_function_l', [ f"<:&{ e.code.name }.init" for e in entities ])
-        write_list('init_function_h', [ f">:&{ e.code.name }.init" for e in entities ])
+        write_list('init_functions', 'func(u8 in x, u8 in y)',
+                    [ f"entities.{ e.code.name }.init" for e in entities ])
+        write_list('process_functions', 'func(u8 in x) : bool in carry',
+                    [ f"entities.{ e.code.name }.process" for e in entities ])
+        write_list('metasprite_framesets', '*const metasprites.MsFramesetFormat',
+                    [ f"&ms_framesets.{ e.metasprites }" for e in entities ])
 
-        write_list('process_function_l', [ f"<:&{ e.code.name }.process" for e in entities ])
-        write_list('process_function_h', [ f">:&{ e.code.name }.process" for e in entities ])
-
-        write_list('ms_frameset_l', [ f"<:&ms_framesets.{ e.metasprites }" for e in entities ])
-        write_list('ms_frameset_h', [ f">:&ms_framesets.{ e.metasprites }" for e in entities ])
-
-        write_list('initial_zpos', [ f"{ e.zpos } as u8" for e in entities ])
-
-        write_list('vision_a', [ f"{ e.vision.a if e.vision else '0xff' }" for e in entities ])
-        write_list('vision_b', [ f"{ e.vision.b if e.vision else '0xff' }" for e in entities ])
+        write_list_u8('vision_ab',
+                    [ f"{ e.vision.a if e.vision else '0xff' }" for e in entities ],
+                    [ f"{ e.vision.b if e.vision else '0xff' }" for e in entities ])
+        write_list_u8('initial_zpos_and_blank',
+                    [ f"{ e.zpos }" for e in entities ],
+                    [ "0" for e in entities ])
 
         out.write("""
 }
-}
-}
 
+}
 """)
 
         return out.getvalue()

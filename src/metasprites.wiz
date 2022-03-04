@@ -39,6 +39,8 @@ struct MsFramesetFormat {
 // ::HACK manually create accessors to MsFramesetFormat data ::
 namespace MsFsData {
     let shadowSize      = 0xc10000 as far *ShadowSize;
+            let shadowSize__u16 = 0xc10000 as far *u16;
+
     let tileHitbox      = 0xc10001 as far *u16;
     let drawFunction    = 0xc10003 as far *u16;
     let frameTable      = 0xc10005 as far *u16;
