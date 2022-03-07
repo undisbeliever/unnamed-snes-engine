@@ -8,6 +8,7 @@ import "_common";
 import "_base";
 import "_vision_cone";
 
+import "player";
 
 import "../../gen/entities";
 
@@ -60,7 +61,7 @@ let ATTACK_MS_FRAME = 1;
 
 let SoA_state            = SoA.state_0_l as *State;
 let SoA_walkingDirection = SoA.state_0_h as *Direction;
-let SoA_firingDirection  = SoA.state_1_l as *Direction;
+let SoA_facingDirection  = SoA.state_1_l as *Direction;
 
 let SoA_animationCounter = SoA.state_1_h;
 
@@ -99,7 +100,7 @@ func process(entityId : u8 in x) : bool in carry {
 
 
     if collisionState $ CollisionState.PLAYER_WEAPON_BIT {
-        x = set_state__hurt(x);
+        collided_with_player_weapon__inline(x);
     }
 
 
@@ -110,6 +111,7 @@ func process(entityId : u8 in x) : bool in carry {
     x = SoA_state[y] as u8;
     return process__state_functions[unaligned x](y);
 }
+
 
 
 const process__state_functions = [
@@ -336,6 +338,7 @@ func set_state__walk(entityId : u8 in x, direction : u8 in a) : bool in carry {
 func set_direction_south(entityId : u8 in x) : bool in carry {
     SoA_state[x] = State.WALK_SOUTH;
     SoA_walkingDirection[x] = Direction.SOUTH;
+    SoA_facingDirection[x] = Direction.SOUTH;
 
     SoA.metaSpriteFrame[x] = ms_frames.south0;
     SoA_animationCounter[x] = 0;
@@ -358,6 +361,7 @@ func set_direction_north(entityId : u8 in x) : bool in carry {
     a = State.WALK_NORTH as u8;
     SoA_state[x] = a as State;
     SoA_walkingDirection[x] = a as Direction;
+    SoA_facingDirection[x] = a as Direction;
 
     SoA.metaSpriteFrame[x] = a = ms_frames.north0;
     SoA_animationCounter[x] = 0;
@@ -380,6 +384,7 @@ func set_direction_east(entityId : u8 in x) : bool in carry {
     a = State.WALK_EAST as u8;
     SoA_state[x] = a as State;
     SoA_walkingDirection[x] = a as Direction;
+    SoA_facingDirection[x] = a as Direction;
 
     SoA.metaSpriteFrame[x] = a = ms_frames.east0;
     SoA_animationCounter[x] = 0;
@@ -402,6 +407,7 @@ func set_direction_west(entityid : u8 in x) : bool in carry {
     a = State.WALK_WEST as u8;
     SoA_state[x] = a as State;
     SoA_walkingDirection[x] = a as Direction;
+    SoA_facingDirection[x] = a as Direction;
 
     SoA.metaSpriteFrame[x] = a = ms_frames.west0;
     SoA_animationCounter[x] = 0;
@@ -428,7 +434,7 @@ func set_direction_west(entityid : u8 in x) : bool in carry {
 #[mem8, idx8]
 func set_state__attacking(entityId : u8 in x, direction : u8 in a) : bool in carry {
 
-    SoA_firingDirection[x] = a as Direction;
+    SoA_facingDirection[x] = a as Direction;
 
     SoA.metaSpriteFrame[x] = a = (a <<< DIRECTION_MS_SHIFT) + ATTACK_MS_FRAME;
 
@@ -477,7 +483,7 @@ func process__attacking(entityId : u8 in y) : bool in carry {
     }
     else {
         // Fire bolt
-        a = SoA_firingDirection[x] as u8;
+        a = SoA_facingDirection[x] as u8;
         if a < N_DIRECTIONS * 2 {
             y = a = a >>> 1;
 
@@ -529,7 +535,7 @@ func process__attack_recovery(entityId : u8 in y) : bool in carry {
         // Bolt recovery ended
         // Check if player is still inside the vision cone
 
-        a = SoA_firingDirection[x] as u8;
+        a = SoA_facingDirection[x] as u8;
         if a == Direction.EAST as u8 {
             carry = vision_cone.test_right(x);
             if !carry {
@@ -576,14 +582,50 @@ func _attack_recovery_ended(enttyId : u8 in x) : bool in carry {
 // Hurt
 // ====
 
+
+
 // KEEP: X
+//
 // DB = 0x7e
 #[mem8, idx8]
-func set_state__hurt(entityId : u8 in x) : u8 in x {
+inline func collided_with_player_weapon__inline(entityId : u8 in x) {
+    // Change state to HURT if player is not facing the enemy's shield.
+
+    y = player.facingDirection;
+
+    a = SoA_facingDirection[x] as u8;
+    if a == Direction.EAST as u8 {
+        if y != player.FacingDirection.LEFT as u8 {
+            set_state__hurt(x);
+        }
+    }
+    else if a == Direction.WEST as u8 {
+        if y != player.FacingDirection.RIGHT as u8 {
+            set_state__hurt(x);
+        }
+    }
+    else if a == Direction.NORTH as u8 {
+        if y != player.FacingDirection.DOWN as u8 {
+            set_state__hurt(x);
+        }
+    }
+    else {
+        // Direction.SOUTH
+        if y != player.FacingDirection.UP as u8 {
+            set_state__hurt(x);
+        }
+    }
+}
+
+
+
+// KEEP: X
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_state__hurt(entityId : u8 in x) {
     a = State.HURT as u8;
     SoA_state[x] = a as State;
-
-    return x;
 }
 
 
