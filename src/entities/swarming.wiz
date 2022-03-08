@@ -130,18 +130,21 @@ func change_to_swarming_entity(entityId : u8 in x) : bool in carry {
     }
     mem8();
 
-    init(x, y);
-
-    return true;
+    return _reset(x);
 }
 
 
 
-// Entity init routine.
+// (`init` function does not use a parameter)
+let init = _reset as func(entityId : u8 in x, parameter : u8 in y);
+
+
+
+// Reset entity state.
 //
 // DB = 0x7e
 #[mem8, idx8]
-func init(entityId : u8 in x, parameter : u8 in y) {
+func _reset(entityId : u8 in x) : bool in carry {
 
     y = x;
     {
@@ -189,10 +192,9 @@ func init(entityId : u8 in x, parameter : u8 in y) {
         if a >= player.xPos.px {
             ^return set_direction_west(x);
         }
-        else {
-            ^return set_direction_east(x);
-        }
     }
+
+    ^return set_direction_east(x);
 }
 
 
@@ -665,8 +667,7 @@ func process__recoil(entityId : u8 in y) : bool in carry {
 
     SoA_countdownTimer[x]--;
     if negative {
-        // Reset entity
-        init(x, y);
+        ^return _reset(x);
     }
 
     return true;
