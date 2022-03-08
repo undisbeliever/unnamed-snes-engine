@@ -21,14 +21,21 @@ let FACING_SPEED = 0x00c0;
 let ALT_SPEED    = 0x0060;
 
 
+// Swarming entity will directly target the player if the Manhattan distance to
+// the player is less than this value.
+//
+// (Manhattan distance)
+let DIRECTLY_TARGET_PLAYER_THRESHOLD = 14;
+
+
 let X_ALT_VELOCITY_THRESHOLD = 8;
 let Y_ALT_VELOCITY_THRESHOLD = 2;
 
 let X_TURN_THRESHOLD = 16;
 let Y_TURN_THRESHOLD = 14;
 
-let X_TURNAROUND_THRESHOLD = 21;
-let Y_TURNAROUND_THRESHOLD = 28;
+let X_TURNAROUND_THRESHOLD = 11;
+let Y_TURNAROUND_THRESHOLD = 8;
 
 
 let ANIMATION_DELAY = 12;
@@ -192,41 +199,74 @@ func process(entityId : u8 in x) : bool in carry {
     }
 
 
-    // Add offset to player position to create target position (with wrapping)
-    a = SoA_targetOffset_x[x] as u8;
-    if negative {
-        a += player.xPos.px;
-        if !carry { a = 0; }
-    }
-    else {
-        a += player.xPos.px;
-        if carry { a = 0xff; }
-    }
-    _target_x = a;
-
-    a = SoA_targetOffset_y[x] as u8;
-    if negative {
-        a += player.yPos.px;
-        if !carry { a = 0; }
-    }
-    else {
-        a += player.yPos.px;
-        if carry { a = 0xff; }
-    }
-    _target_y = a;
+    // ::TODO add push-back from player::
 
 
-    a = SoA.xPos_px[x] - _target_x;
+    // Calculate Manhattan distance to player
+    a = SoA.xPos_px[x] - player.xPos.px;
     if !carry {
         a = negate8(a);
     }
     _absDifference_x = a;
 
-    a = SoA.yPos_px[x] - _target_y;
+    a = SoA.yPos_px[x] - player.yPos.px;
     if !carry {
         a = negate8(a);
     }
-    _absDifference_y = a;
+    a += _absDifference_x;
+
+    if a < DIRECTLY_TARGET_PLAYER_THRESHOLD {
+        // Entity is close to the player.  Directly target player.
+
+        _target_x = a = player.xPos.px;
+        _target_y = a = player.yPos.px;
+
+        a -= SoA.yPos_px[x];
+        if !carry {
+            a = negate8(a);
+        }
+        _absDifference_y = a;
+    }
+    else {
+        // Entity is not close to the player.
+
+        // Add offset to player position to create target position (with wrapping)
+        a = SoA_targetOffset_x[x] as u8;
+        if negative {
+            a += player.xPos.px;
+            if !carry { a = 0; }
+        }
+        else {
+            a += player.xPos.px;
+            if carry { a = 0xff; }
+        }
+        _target_x = a;
+
+        a = SoA_targetOffset_y[x] as u8;
+        if negative {
+            a += player.yPos.px;
+            if !carry { a = 0; }
+        }
+        else {
+            a += player.yPos.px;
+            if carry { a = 0xff; }
+        }
+        _target_y = a;
+
+
+        // Calculate absolute difference to target
+        a = SoA.xPos_px[x] - _target_x;
+        if !carry {
+            a = negate8(a);
+        }
+        _absDifference_x = a;
+
+        a = SoA.yPos_px[x] - _target_y;
+        if !carry {
+            a = negate8(a);
+        }
+        _absDifference_y = a;
+    }
 
 
     y = x;
