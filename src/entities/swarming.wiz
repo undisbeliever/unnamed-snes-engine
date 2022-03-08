@@ -31,8 +31,16 @@ let DIRECTLY_TARGET_PLAYER_THRESHOLD = 14;
 let X_ALT_VELOCITY_THRESHOLD = 8;
 let Y_ALT_VELOCITY_THRESHOLD = 2;
 
-let X_TURN_THRESHOLD = 16;
-let Y_TURN_THRESHOLD = 14;
+// Threshold before turning 90 degrees.
+//
+// NOTE:  If this value is too large the swarming entity can occasionally
+// erroneously cycle north-south or east-west near the player instead of
+// turning towards the player.
+//
+// Some quick and incomplete testing shows a threshold of 8 does not exhibit this bug.
+let X_TURN_THRESHOLD = 7;
+let Y_TURN_THRESHOLD = 5;
+
 
 let X_TURNAROUND_THRESHOLD = 11;
 let Y_TURNAROUND_THRESHOLD = 8;
@@ -42,13 +50,17 @@ let ANIMATION_DELAY = 12;
 let ANIMATION_FRAME_MASK = 0x3;
 
 
+let RECOIL_TIME_IN_FRAMES = 8;
+
+
 // State must be in the same order as the MetaSprite frames
 enum State : u8 {
-    FACING_SOUTH = 0,
-    FACING_NORTH = 2,
-    FACING_EAST = 4,
-    FACING_WEST = 6,
-    HURT      = 8,
+    FACING_SOUTH =  0,
+    FACING_NORTH =  2,
+    FACING_EAST  =  4,
+    FACING_WEST  =  6,
+    HURT         =  8,
+    RECOIL       = 10,
 };
 
 
@@ -58,6 +70,10 @@ let SoA_animationCounter = SoA.state_0_h;
 // Offset between player's position and the entity's target.
 let SoA_targetOffset_x   = SoA.state_1_l as *i8;
 let SoA_targetOffset_y   = SoA.state_1_h as *i8;
+
+// Countdown timer for RECOIL state
+// (time remaining in frames)
+let SoA_countdownTimer   = SoA.state_2_l;
 
 
 // Location to swarm to.
@@ -121,9 +137,7 @@ func change_to_swarming_entity(entityId : u8 in x) : bool in carry {
 
 
 
-// Entity process routine.
-//
-// Called when the entity is spawned
+// Entity init routine.
 //
 // DB = 0x7e
 #[mem8, idx8]
@@ -198,8 +212,9 @@ func process(entityId : u8 in x) : bool in carry {
         x = set_state__hurt(x);
     }
 
-
-    // ::TODO add push-back from player::
+    if collisionState $ CollisionState.PLAYER_HURTBOX_BIT {
+        set_state__recoil__inline(x);
+    }
 
 
     // Calculate Manhattan distance to player
@@ -281,6 +296,7 @@ const process__state_functions = [
     process__facing_east,
     process__facing_west,
     process__hurt,
+    process__recoil,
 ];
 
 
@@ -610,6 +626,48 @@ func process__hurt(entityId : u8 in y) : bool in carry {
         entities.SoA.yVelocity[unaligned x] = 0;
     }
     mem8();
+
+    return true;
+}
+
+
+
+// RECOIL
+// ======
+
+
+// KEEP: X
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func set_state__recoil__inline(entityId : u8 in x) {
+    a = State.RECOIL as u8;
+    if a != SoA_state[x] as u8 {
+        SoA_state[x] = a as State;
+
+        // Invert velocity
+        mem16();
+        #[mem16] {
+            SoA.xVelocity[unaligned x] = aa = 0 - SoA.xVelocity[unaligned x];
+            SoA.yVelocity[unaligned x] = aa = 0 - SoA.yVelocity[unaligned x];
+        }
+        mem8();
+
+        SoA_countdownTimer[unaligned x] = a = RECOIL_TIME_IN_FRAMES - 1;
+    }
+}
+
+
+
+#[mem8, idx8]
+func process__recoil(entityId : u8 in y) : bool in carry {
+    x = y;
+
+    SoA_countdownTimer[x]--;
+    if negative {
+        // Reset entity
+        init(x, y);
+    }
 
     return true;
 }
