@@ -144,13 +144,13 @@ func init(entityId : u8 in x, parameter : u8 in y) {
     // Determine which direction best faces the player.
 
     a = SoA.xPos_px[x] - player.xPos.px;
-    if negative {
+    if !carry {
         a = negate8(a);
     }
     _absDifference_x = a;
 
     a = SoA.yPos_px[x] - player.yPos.px;
-    if negative {
+    if !carry {
         a = negate8(a);
     }
 
@@ -217,13 +217,13 @@ func process(entityId : u8 in x) : bool in carry {
 
 
     a = SoA.xPos_px[x] - _target_x;
-    if negative {
+    if !carry {
         a = negate8(a);
     }
     _absDifference_x = a;
 
     a = SoA.yPos_px[x] - _target_y;
-    if negative {
+    if !carry {
         a = negate8(a);
     }
     _absDifference_y = a;
