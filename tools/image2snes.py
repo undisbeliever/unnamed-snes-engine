@@ -10,11 +10,18 @@ import argparse
 from _snes import image_to_snes, create_tilemap_data
 
 
+FORMATS_BPP = {
+    '2bpp'  : 2,
+    '4bpp'  : 4,
+    '8bpp'  : 8,
+}
+
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', '--format', required=True,
-                        choices=VALID_FORMATS.keys(),
+                        choices=FORMATS_BPP.keys(),
                         help='tile format')
     parser.add_argument('-t', '--tileset-output', required=True,
                         help='tileset output file')
@@ -38,7 +45,7 @@ def parse_arguments():
 def main():
     args = parse_arguments()
 
-    bpp = VALID_FORMATS[args.format]
+    bpp = FORMATS_BPP[args.format]
 
     image = PIL.Image.open(args.image_filename)
     palette_image = PIL.Image.open(args.palette_image)
