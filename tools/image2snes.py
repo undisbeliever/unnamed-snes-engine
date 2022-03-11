@@ -29,7 +29,7 @@ def parse_arguments():
                         help='tilemap output file')
     parser.add_argument('-p', '--palette-output', required=True,
                         help='palette output file')
-    parser.add_argument('--order', required=False, action='store_true',
+    parser.add_argument('--high-priority', required=False, action='store_true',
                         help='increase tilemap priority')
     parser.add_argument('image_filename', action='store',
                         help='Indexed png image')
@@ -52,7 +52,7 @@ def main():
 
     tilemap, tileset_data, palette_data = image_to_snes(image, palette_image, bpp)
 
-    tilemap_data = create_tilemap_data(tilemap, args.order)
+    tilemap_data = create_tilemap_data(tilemap, args.high_priority)
 
     with open(args.tileset_output, 'wb') as fp:
         fp.write(tileset_data)
