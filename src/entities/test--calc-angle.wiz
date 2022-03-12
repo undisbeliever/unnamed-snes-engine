@@ -1,0 +1,98 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+
+import "../memmap";
+
+import "_variables";
+import "_common";
+import "player";
+
+import "../common/math";
+
+import "../../gen/entities";
+import "../../gen/cosine-tables";
+
+
+namespace entities {
+namespace test__calc_angle {
+
+
+let SoA_startX      = entities.SoA.state_0;
+let SoA_startX_px   = entities.SoA.state_0_h;
+
+let SoA_startY      = entities.SoA.state_1;
+let SoA_startY_px   = entities.SoA.state_1_h;
+
+let SoA_parameter   = entities.SoA.state_2_l;
+
+
+
+in code {
+
+
+
+// Entity init routine.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func init(entityId : u8 in x, parameter : u8 in y) {
+
+    mem16();
+    #[mem16] {
+        SoA_startX[unaligned x] = aa = SoA.xPos_u16[unaligned x];
+        SoA_startY[unaligned x] = aa = SoA.yPos_u16[unaligned x];
+    }
+    mem8();
+
+    a = y;
+    SoA_parameter[x] = a;
+    if zero {
+        entities.spawn_entity(a = SoA.xPos_px[x],
+                              a = SoA.yPos_px[x],
+                              a = EntityTypes.test__calc_angle as u8,
+                              y = 1);
+    }
+}
+
+
+
+// Entity process routine.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process(entityId : u8 in x) : bool in carry {
+
+let CosineTable = CosineTables.CalcAngleTest;
+
+
+    a = SoA_parameter[x];
+    if !zero {
+        x = calc_angle_32x2(a = SoA_startX_px[unaligned x],
+                            a = SoA_startY_px[unaligned x],
+                            player.xPos.px,
+                            player.yPos.px);
+
+        y = currentEntityId;
+
+        mem16();
+        #[mem16] {
+            SoA.xPos_u16[unaligned y] = aa = SoA_startX[unaligned y] + CosineTable[unaligned x] as u16;
+
+            #[idx16] {
+                xx = aa = (xx + CosineTables.SINE_OFFSET) & CosineTables.TABLE_MASK;
+            }
+
+            SoA.yPos_u16[unaligned y] = aa = SoA_startY[unaligned y] + CosineTable[unaligned x] as u16;
+        }
+        mem8();
+    }
+
+    return true;
+}
+
+}
+
+}
+}
+

@@ -2,6 +2,9 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "../memmap";
+import "../../wiz/common/snes/snes";
+
+import "../../gen/arctan-table";
 
 
 in code {
@@ -23,6 +26,200 @@ inline func negate16(i16aa : u16 in aa) : i16 in aa {
     aa ^= 0xffff;
     aa++;
     return aa;
+}
+
+
+
+// Calculate the angle between two points.
+//
+// Returns an 32-division angle multiplied by two.  Useful as an index into a Cosine Table.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func calc_angle_32x2(x1 : u8 in <:dpTmp0, y1 : u8 in >:dpTmp0, x2 : u8 in a, y2 : u8 in y) : u8 in x {
+
+    a -= x1;
+    goto ZeroX if zero;
+    if carry {
+        x = a;
+
+        a = y - y1;
+        if carry {
+            y = __calc_angle_32x2.QUADRANT_3_INDEX;
+            goto EndIf;
+        }
+        else {
+            a = negate8(a);
+            y = __calc_angle_32x2.QUADRANT_0_INDEX;
+        }
+    }
+    else {
+        x = a = negate8(a);
+
+        a = y - y1;
+        if carry {
+            y = __calc_angle_32x2.QUADRANT_2_INDEX;
+        }
+        else {
+            a = negate8(a);
+            y = __calc_angle_32x2.QUADRANT_1_INDEX;
+        }
+    }
+EndIf:
+    // X = absolute difference in X axis
+    // A = absolute difference in Y axis
+    // Y = quadrant of angle
+
+    mem16();
+    #[mem16] {
+        // the large number is multiplied by (1 << N_ARCTAN_FIXED_POINT_BITS)
+
+        aa &= 0xff;
+        #[compile_if(math.N_ARCTAN_FIXED_POINT_BITS <= 4)] {
+            aa <<= math.N_ARCTAN_FIXED_POINT_BITS;
+        }
+        #[compile_if(math.N_ARCTAN_FIXED_POINT_BITS > 4)] {
+            swap_bytes(aa); // << 8
+            #[compile_if(math.N_ARCTAN_FIXED_POINT_BITS < 8)] {
+                aa >>>= (8 - math.N_ARCTAN_FIXED_POINT_BITS);
+            }
+        }
+
+        *(far &snes.divider.left_hl) = aa;
+    }
+    mem8();
+
+    *(far &snes.divider.right) = a = x;
+
+    // Must wait 16 cycles before reading result.
+    x = y;                                                      // 2
+    nop();                                                      // 2
+    return __calc_angle_32x2.quadrant_functions[unaligned x](); // 6 = 10 (+3 from `rep #$30` and +3 from `lda.l RDDIV` makes 16)
+
+
+ZeroX:
+    if y < y1 {
+        return (math.N_ARCTAN_ANGLES / 4) * 2;
+    }
+
+    return (math.N_ARCTAN_ANGLES * 3 / 4) * 2;
+}
+
+
+namespace __calc_angle_32x2 {
+
+const quadrant_functions : [func :u8 in x ; 4] = [
+    _quadrant_0,
+    _quadrant_1,
+    _quadrant_2,
+    _quadrant_3,
+];
+
+let QUADRANT_0_INDEX = 0;
+let QUADRANT_1_INDEX = 2;
+let QUADRANT_2_INDEX = 4;
+let QUADRANT_3_INDEX = 6;
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func _quadrant_0() : u8 in x {
+    mem16_idx16();
+    #[mem16, idx16]{
+        aa = *(far &snes.divider.div_result_hl);
+
+        // This comparison saves over 8000 bytes of ROM data
+        cmp(aa, math.ARCTAN_32x2_TABLE_SIZE);
+    }
+    mem8_idx8();
+
+    if !carry {
+        // a < math.ARCTAN_32x2_TABLE_SIZE
+
+        x = a;
+        a = math.Arctan_32x2_Table[x];
+        x = a;
+        return x;
+    }
+    // a >= math.ARCTAN_32x2_TABLE_SIZE
+    return math.ARCTAN_32x2_OVERFLOW_VALUE;
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func _quadrant_1() : u8 in x {
+    mem16_idx16();
+    #[mem16, idx16]{
+        aa = *(far &snes.divider.div_result_hl);
+
+        cmp(aa, math.ARCTAN_32x2_TABLE_SIZE);
+    }
+    mem8_idx8();
+
+    if !carry {
+        // a < math.ARCTAN_32x2_TABLE_SIZE
+
+        x = a;
+        a = (math.N_ARCTAN_ANGLES / 2 * 2) - math.Arctan_32x2_Table[x];
+        x = a;
+        return x;
+    }
+
+    // a >= math.ARCTAN_32x2_TABLE_SIZE
+    return a = (math.N_ARCTAN_ANGLES / 2 * 2) - math.ARCTAN_32x2_OVERFLOW_VALUE;
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func _quadrant_2() : u8 in x {
+    mem16_idx16();
+    #[mem16, idx16]{
+        aa = *(far &snes.divider.div_result_hl);
+
+        cmp(aa, math.ARCTAN_32x2_TABLE_SIZE);
+    }
+    mem8_idx8();
+
+    if !carry {
+        // a < math.ARCTAN_32x2_TABLE_SIZE
+
+        x = a;
+        // carry is clear
+        a = (math.N_ARCTAN_ANGLES / 2 * 2) +# math.Arctan_32x2_Table[x];
+        x = a;
+        return x;
+    }
+    // a >= math.ARCTAN_32x2_TABLE_SIZE
+    return a = (math.N_ARCTAN_ANGLES / 2 * 2) + math.ARCTAN_32x2_OVERFLOW_VALUE;
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func _quadrant_3() : u8 in x {
+    mem16_idx16();
+    #[mem16, idx16]{
+        aa = *(far &snes.divider.div_result_hl);
+
+        cmp(aa, math.ARCTAN_32x2_TABLE_SIZE);
+    }
+    mem8_idx8();
+
+    if !carry {
+        // a < math.ARCTAN_32x2_TABLE_SIZE
+
+        x = a;
+        a = (math.N_ARCTAN_ANGLES - 1) * 2 - math.Arctan_32x2_Table[x];
+        x = a;
+        return x;
+    }
+
+    // a >= math.ARCTAN_32x2_TABLE_SIZE
+    return a = (math.N_ARCTAN_ANGLES - 1) * 2 - math.ARCTAN_32x2_OVERFLOW_VALUE;
+}
+
 }
 
 

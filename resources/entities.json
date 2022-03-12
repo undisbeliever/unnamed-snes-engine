@@ -51,6 +51,10 @@
         "type": "enum",
         "values": [ "down", "up", "right", "left" ]
       }
+    },
+    {
+      "name": "test__calc_angle",
+      "ms-export-order": "eight_direction_spinner"
     }
   ],
   "entities": [
@@ -91,6 +95,12 @@
       "code": "projectile_angled",
       "metasprites": "common.Bolt",
       "zpos": "4"
+    },
+    {
+      "name": "test__calc_angle",
+      "code": "test__calc_angle",
+      "metasprites": "dungeon.Skull",
+      "zpos": "0"
     }
   ]
 }

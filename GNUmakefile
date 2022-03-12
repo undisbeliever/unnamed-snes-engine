@@ -37,6 +37,8 @@ RESOURCES  += gen/entities.wiz
 RESOURCES  += gen/entity-data.wiz
 RESOURCES  += gen/ms-patterns-table.wiz
 RESOURCES  += gen/rooms.wiz
+RESOURCES  += gen/arctan-table.wiz
+RESOURCES  += gen/cosine-tables.wiz
 
 
 METASPRITE_SPRITESETS = common dungeon
@@ -107,6 +109,12 @@ gen/ms-patterns-table.wiz: resources/ms-export-order.json tools/generate-ms-patt
 
 gen/entities.wiz: resources/entities.json resources/ms-export-order.json tools/generate-entities-wiz.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate-entities-wiz.py -o '$@' 'resources/entities.json' 'resources/ms-export-order.json'
+
+gen/arctan-table.wiz: tools/generate-arctan-table.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/generate-arctan-table.py -o '$@'
+
+gen/cosine-tables.wiz: tools/generate-cosine-tables.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/generate-cosine-tables.py -o '$@'
 
 gen/metasprites/%.wiz gen/metasprites/%.bin: resources/metasprites/%/_metasprites.json resources/ms-export-order.json tools/convert-metasprite.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/convert-metasprite.py --ppu-output 'gen/metasprites/$*.bin' --wiz-output 'gen/metasprites/$*.wiz' 'resources/metasprites/$*/_metasprites.json' 'resources/ms-export-order.json'
