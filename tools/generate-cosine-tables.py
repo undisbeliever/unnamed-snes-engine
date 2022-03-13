@@ -13,7 +13,8 @@ N_ANGLES = 32
 
 
 COSINE_TABLES = (
-    ('CalcAngleTest', 0x2000),
+    ('PlayerHurtVelocity',  0x0200),
+    ('CalcAngleTest',       0x2000),
 )
 
 

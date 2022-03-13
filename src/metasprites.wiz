@@ -550,7 +550,9 @@ inline func finalize_buffer() {
 // ================
 
 
-// Draw the entity's MetaSprite frame
+// Draw the entity's MetaSprite frame.
+//
+// Also updates `entities.SoA.previousXpos` and `entities.SoA.previousYpos`.
 //
 // DB = 0x7e
 #[mem8, idx8]
@@ -558,10 +560,14 @@ inline func _draw_entity__inline(entityId : u8 in y) {
 
     // Calculate MetaSprite position
 
-    <:xPos = a = entities.SoA.xPos_px[unaligned y];
+    a = entities.SoA.xPos_px[unaligned y];
+    entities.SoA.previousXpos[unaligned y] = a;
+    <:xPos = a;
     >:xPos = 0;
 
-    <:yPos = a = entities.SoA.yPos_px[unaligned y] - entities.SoA.zPos[unaligned y];
+    a = entities.SoA.yPos_px[unaligned y];
+    entities.SoA.previousYpos[unaligned y] = a;
+    <:yPos = a = a - entities.SoA.zPos[unaligned y];
     a = 0;
     >:yPos = a = a -# 0;
 

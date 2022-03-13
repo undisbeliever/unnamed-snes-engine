@@ -109,6 +109,18 @@ namespace entities {
             let yPos_px = &yPos[0].px as *u8;
 
 
+            // Previous position of the entity
+            //
+            // You SHOULD NOT write to these variables.
+            // They will be automatically updated in the MetaSprite draw function
+            //
+            // (2x uint8)
+            var _previousPosition : [_u8pair ; N_ENTITIES];
+
+            let previousXpos = &_previousPosition[0].first as *u8;
+            let previousYpos = &_previousPosition[0].second as *u8;
+
+
             var _zPosAndBlank : [_u8pair ; N_ENTITIES];
 
             // Z position of the entity

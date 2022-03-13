@@ -9,9 +9,13 @@ import "_base";
 
 import "../metatiles";
 import "../metasprites";
+import "../common/math";
+
 import "../../wiz/common/snes/snes";
+
 import "../../gen/metasprites/common";
 import "../../gen/entities";
+import "../../gen/cosine-tables";
 
 
 namespace entities {
@@ -32,13 +36,6 @@ let ATTACK_BUTTON_H = snes.joy.mask_h.Y;
 let WALK_VELOCITY = 0x0160;
 
 
-// (pixels)
-let HURT_DIAGONAL_CHECK = 2;
-
-// (8:8 unsigned fixed point)
-let HURT_PUSHBACK_VELOCITY = 0x0055;
-
-
 // Pixels the player is to transverse before incrementing `animationFrame`
 // (8:8 unsigned fixed point)
 let WALK_ANIMATION_FRAME_DISTANCE = 0x0980;
@@ -47,7 +44,7 @@ let ATTACK_ANIMATION_FRAME_DELAY = 4;
 
 
 // (frames)
-let HURT_STATE_DURATION     = 15;
+let HURT_STATE_DURATION     = 6;
 
 
 let N_WALK_FRAMES           = 4;
@@ -57,7 +54,7 @@ let N_ATTACK_FRAMES         = 4;
 
 
 // ::TODO draw hurt frame ::
-let HURT_ANIMATION_FRAME    = 2;
+let HURT_ANIMATION_FRAME    = 0;
 
 
 
@@ -815,32 +812,22 @@ func process__attack() {
 func _set_state__hurt(entityId : u8 in x, oldState : u8 in a) {
     state = a = State.HURT as u8;
 
+    x = calc_angle_32x2(a = SoA.previousXpos[unaligned x],
+                        a = SoA.previousYpos[unaligned x],
+                        SoA.previousXpos[PLAYER_ENTITY_ID],
+                        SoA.previousYpos[PLAYER_ENTITY_ID]);
 
-    // ::TODO improve pushback direction test ::
+    mem16();
+    #[mem16] {
+        xVelocity = aa = CosineTables.PlayerHurtVelocity[unaligned x] as u16;
 
-    a = xPos.px;
-    if a >= SoA.xPos_px[unaligned x] {
-        a = >:HURT_PUSHBACK_VELOCITY;
-        y = <:HURT_PUSHBACK_VELOCITY;
-    }
-    else {
-        a = >:(-HURT_PUSHBACK_VELOCITY);
-        y = <:(-HURT_PUSHBACK_VELOCITY);
-    }
-    >:xVelocity = a;
-    <:xVelocity = y;
+        #[idx16] {
+            xx = aa = (xx + CosineTables.SINE_OFFSET) & CosineTables.TABLE_MASK;
+        }
 
-    a = yPos.px;
-    if a >= SoA.yPos_px[unaligned x] {
-        a = >:HURT_PUSHBACK_VELOCITY;
-        y = <:HURT_PUSHBACK_VELOCITY;
+        yVelocity = aa = CosineTables.PlayerHurtVelocity[unaligned x] as u16;
     }
-    else {
-        a = >:(-HURT_PUSHBACK_VELOCITY);
-        y = <:(-HURT_PUSHBACK_VELOCITY);
-    }
-    >:yVelocity = a;
-    <:yVelocity = y;
+    mem8();
 
 
     <:animationFrameDelay = a = HURT_STATE_DURATION;
