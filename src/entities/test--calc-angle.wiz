@@ -36,20 +36,20 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func init(entityId : u8 in x, parameter : u8 in y) {
+func init(entityId : u8 in y, parameter : u8 in x) {
 
     mem16();
     #[mem16] {
-        SoA_startX[unaligned x] = aa = SoA.xPos_u16[unaligned x];
-        SoA_startY[unaligned x] = aa = SoA.yPos_u16[unaligned x];
+        SoA_startX[unaligned y] = aa = SoA.xPos_u16[unaligned y];
+        SoA_startY[unaligned y] = aa = SoA.yPos_u16[unaligned y];
     }
     mem8();
 
-    a = y;
-    SoA_parameter[x] = a;
+    a = x;
+    SoA_parameter[y] = a;
     if zero {
-        entities.spawn_entity(a = SoA.xPos_px[x],
-                              a = SoA.yPos_px[x],
+        entities.spawn_entity(a = SoA.xPos_px[y],
+                              a = SoA.yPos_px[y],
                               a = EntityTypes.test__calc_angle as u8,
                               y = 1);
     }
@@ -61,15 +61,15 @@ func init(entityId : u8 in x, parameter : u8 in y) {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func process(entityId : u8 in x) : bool in carry {
+func process(entityId : u8 in y) : bool in carry {
 
 let CosineTable = CosineTables.CalcAngleTest;
 
 
-    a = SoA_parameter[x];
+    a = SoA_parameter[y];
     if !zero {
-        x = calc_angle_32x2(a = SoA_startX_px[unaligned x],
-                            a = SoA_startY_px[unaligned x],
+        x = calc_angle_32x2(a = SoA_startX_px[unaligned y],
+                            a = SoA_startY_px[unaligned y],
                             player.xPos.px,
                             player.yPos.px);
 

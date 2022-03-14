@@ -34,85 +34,85 @@ in code {
 
 // Test if the player is inside the vision cone when looking up.
 //
-// KEEP: X
+// KEEP: Y
 //
 // DB = 0x7e
 #[mem8, idx8]
-func test_up(entityId : u8 in x) : bool in carry {
-    return _vertical_test(player.yPos.px, SoA.yPos_px[x], x);
+func test_up(entityId : u8 in y) : bool in carry {
+    return _vertical_test(player.yPos.px, SoA.yPos_px[y], y);
 }
 
 
 
 // Test if the player is inside the vision cone when looking down.
 //
-// KEEP: X
+// KEEP: Y
 //
 // DB = 0x7e
 #[mem8, idx8]
-func test_down(entityId : u8 in x) : bool in carry {
-    return _vertical_test(SoA.yPos_px[x], player.yPos.px, x);
+func test_down(entityId : u8 in y) : bool in carry {
+    return _vertical_test(SoA.yPos_px[y], player.yPos.px, y);
 }
 
 
 
 // Test if the player is inside the vision cone when looking left.
 //
-// KEEP: X
+// KEEP: Y
 //
 // DB = 0x7e
 #[mem8, idx8]
-func test_left(entityId : u8 in x) : bool in carry {
-    return _horizontal_test(player.xPos.px, SoA.xPos_px[x], x);
+func test_left(entityId : u8 in y) : bool in carry {
+    return _horizontal_test(player.xPos.px, SoA.xPos_px[y], y);
 }
 
 
 
 // Test if the player is inside the vision cone when looking right.
 //
-// KEEP: X
+// KEEP: Y
 //
 // DB = 0x7e
 #[mem8, idx8]
-func test_right(entityId : u8 in x) : bool in carry {
-    return _horizontal_test(SoA.xPos_px[x], player.xPos.px, x);
+func test_right(entityId : u8 in y) : bool in carry {
+    return _horizontal_test(SoA.xPos_px[y], player.xPos.px, y);
 }
 
 
 
 // Vertical vision cone test.
 //
-// KEEP: X
+// KEEP: Y
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _vertical_test(a_yPos_ : u8 in a, b_yPos_ : u8 in y, entityId : u8 in x) : bool in carry {
+func _vertical_test(a_yPos_ : u8 in a, b_yPos_ : u8 in x, entityId : u8 in y) : bool in carry {
 
 let _a_yPos = >:dpTmp0;
 let _b_yPos = <:dpTmp0;
 let _tmp    = <:dpTmp1;
 
-    // MUST NOT change `y` in this function (used at the bottom).
+    // MUST NOT change `x` in this function (used at the bottom).
 
-    _b_yPos = y;
+    _b_yPos = x;
     if a < _b_yPos {
         _a_yPos = a;
 
-        a += SoA_visionCone_length[x];
+        a += SoA_visionCone_length[y];
         if carry { a = 0xff; }
 
         if a >= _b_yPos {
-            a = SoA.xPos_px[x] - player.xPos.px;
+            a = SoA.xPos_px[y] - player.xPos.px;
             if !carry {
                 a = negate8(a);
             }
 
-            if a < SoA_visionCone_halfWidth[x] {
+            if a < SoA_visionCone_halfWidth[y] {
                 // Will not underflow if width >= short_width
                 _tmp = a = a - CONE_SHORT_HALF_WIDTH;
 
-                // Will not underflow: y >= _a_yPos;
-                a = y - _a_yPos;
+                // Will not underflow: x >= _a_yPos;
+                a = x - _a_yPos;
                 if a >= _tmp {
                     return true;
                 }
@@ -127,37 +127,37 @@ let _tmp    = <:dpTmp1;
 
 // Horizontal vision cone test.
 //
-// KEEP: X
+// KEEP: Y
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _horizontal_test(a_xPos_ : u8 in a, b_xPos_ : u8 in y, entityId : u8 in x) : bool in carry {
+func _horizontal_test(a_xPos_ : u8 in a, b_xPos_ : u8 in x, entityId : u8 in y) : bool in carry {
 
 let _a_xPos = >:dpTmp0;
 let _b_xPos = <:dpTmp0;
 let _tmp    = <:dpTmp1;
 
-    // MUST NOT change `y` in this function
+    // MUST NOT change `x` in this function
 
-    _b_xPos = y;
+    _b_xPos = x;
     if a < _b_xPos {
         _a_xPos = a;
 
-        a += SoA_visionCone_length[x];
+        a += SoA_visionCone_length[y];
         if carry { a = 0xff; }
 
         if a >= _b_xPos {
-            a = SoA.yPos_px[x] - player.yPos.px;
+            a = SoA.yPos_px[y] - player.yPos.px;
             if !carry {
                 a = negate8(a);
             }
 
-            if a < SoA_visionCone_halfWidth[x] {
+            if a < SoA_visionCone_halfWidth[y] {
                 // Will not underflow if width >= short_width
                 _tmp = a = a - CONE_SHORT_HALF_WIDTH;
 
-                // Will not underflow: y >= _a_xPos;
-                a = y - _a_xPos;
+                // Will not underflow: x >= _a_xPos;
+                a = x - _a_xPos;
                 if a >= _tmp {
                     return true;
                 }

@@ -80,10 +80,10 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func init(entityId : u8 in x, parameter : u8 in y) {
+func init(entityId : u8 in y, parameter : u8 in x) {
 
-    a = y <<< 1;
-    ^return set_state__walk(x, a);
+    a = x <<< 1;
+    ^return set_state__walk(y, a);
 }
 
 
@@ -94,20 +94,19 @@ func init(entityId : u8 in x, parameter : u8 in y) {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func process(entityId : u8 in x) : bool in carry {
+func process(entityId : u8 in y) : bool in carry {
 
-    x = base.process_collisions(x);
+    y = base.process_collisions(y);
 
 
     if collisionState $ CollisionState.PLAYER_WEAPON_BIT {
-        collided_with_player_weapon__inline(x);
+        collided_with_player_weapon__inline(y);
     }
 
 
     // ::TODO add reaction when colliding with player hurtbox ::
 
 
-    y = x;
     x = SoA_state[y] as u8;
     return process__state_functions[unaligned x](y);
 }
@@ -129,30 +128,28 @@ const process__state_functions = [
 // DB = 0x7e
 #[mem8, idx8]
 func process__walk_south(entityId : u8 in y) : bool in carry {
-    x = y;
-
 
     // Check for a tile collision in the previous frame
-    a = SoA.movementState[x];
+    a = SoA.movementState[y];
     if a & MovementState.X_AXIS_COLLISION != 0 {
-        ^return set_direction_east(x);
+        ^return set_direction_east(y);
     }
     else if a & MovementState.Y_AXIS_COLLISION != 0 {
-        ^return set_direction_north(x);
+        ^return set_direction_north(y);
     }
 
 
-    carry = vision_cone.test_down(x);
+    carry = vision_cone.test_down(y);
     if carry {
-        ^return set_state__attacking(x, Direction.SOUTH as u8);
+        ^return set_state__attacking(y, Direction.SOUTH as u8);
     }
-    carry = vision_cone.test_right(x);
+    carry = vision_cone.test_right(y);
     if carry {
-        ^return set_state__attacking(x, Direction.EAST as u8);
+        ^return set_state__attacking(y, Direction.EAST as u8);
     }
-    carry = vision_cone.test_left(x);
+    carry = vision_cone.test_left(y);
     if carry {
-        ^return set_state__attacking(x, Direction.WEST as u8);
+        ^return set_state__attacking(y, Direction.WEST as u8);
     }
 
 
@@ -161,38 +158,36 @@ func process__walk_south(entityId : u8 in y) : bool in carry {
     // ::TODO check for player and change state to FIRING_BOLT_SOUTH ::
 
 
-    ^return _update_walk_animation(x);
+    ^return _update_walk_animation(y);
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__walk_north(entityId : u8 in a) : bool in carry {
-    x = y;
-
+func process__walk_north(entityId : u8 in y) : bool in carry {
 
     // Check for a tile collision in the previous frame
-    a = SoA.movementState[x];
+    a = SoA.movementState[y];
     if a & MovementState.X_AXIS_COLLISION != 0 {
-        ^return set_direction_west(x);
+        ^return set_direction_west(y);
     }
     else if a & MovementState.Y_AXIS_COLLISION != 0 {
-        ^return set_direction_south(x);
+        ^return set_direction_south(y);
     }
 
 
-    carry = vision_cone.test_up(x);
+    carry = vision_cone.test_up(y);
     if carry {
-        ^return set_state__attacking(x, Direction.NORTH as u8);
+        ^return set_state__attacking(y, Direction.NORTH as u8);
     }
-    carry = vision_cone.test_right(x);
+    carry = vision_cone.test_right(y);
     if carry {
-        ^return set_state__attacking(x, Direction.EAST as u8);
+        ^return set_state__attacking(y, Direction.EAST as u8);
     }
-    carry = vision_cone.test_left(x);
+    carry = vision_cone.test_left(y);
     if carry {
-        ^return set_state__attacking(x, Direction.WEST as u8);
+        ^return set_state__attacking(y, Direction.WEST as u8);
     }
 
 
@@ -201,7 +196,7 @@ func process__walk_north(entityId : u8 in a) : bool in carry {
     // ::TODO check for player and change state to FIRING_BOLT_NORTH ::
 
 
-    ^return _update_walk_animation(x);
+    ^return _update_walk_animation(y);
 }
 
 
@@ -209,30 +204,28 @@ func process__walk_north(entityId : u8 in a) : bool in carry {
 // DB = 0x7e
 #[mem8, idx8]
 func process__walk_east(entityId : u8 in y) : bool in carry {
-    x = y;
-
 
     // Check for a tile collision in the previous frame
-    a = SoA.movementState[x];
+    a = SoA.movementState[y];
     if a & MovementState.X_AXIS_COLLISION != 0 {
-        ^return set_direction_west(x);
+        ^return set_direction_west(y);
     }
     else if a & MovementState.Y_AXIS_COLLISION != 0 {
-        ^return set_direction_north(x);
+        ^return set_direction_north(y);
     }
 
 
-    carry = vision_cone.test_right(x);
+    carry = vision_cone.test_right(y);
     if carry {
-        ^return set_state__attacking(x, Direction.EAST as u8);
+        ^return set_state__attacking(y, Direction.EAST as u8);
     }
-    carry = vision_cone.test_up(x);
+    carry = vision_cone.test_up(y);
     if carry {
-        ^return set_state__attacking(x, Direction.NORTH as u8);
+        ^return set_state__attacking(y, Direction.NORTH as u8);
     }
-    carry = vision_cone.test_down(x);
+    carry = vision_cone.test_down(y);
     if carry {
-        ^return set_state__attacking(x, Direction.SOUTH as u8);
+        ^return set_state__attacking(y, Direction.SOUTH as u8);
     }
 
 
@@ -241,7 +234,7 @@ func process__walk_east(entityId : u8 in y) : bool in carry {
     // ::TODO check for player and change state to FIRING_BOLT_EAST ::
 
 
-    return _update_walk_animation(x);
+    return _update_walk_animation(y);
 }
 
 
@@ -249,30 +242,28 @@ func process__walk_east(entityId : u8 in y) : bool in carry {
 // DB = 0x7e
 #[mem8, idx8]
 func process__walk_west(entityId : u8 in y) : bool in carry {
-    x = y;
-
 
     // Check for a tile collision in the previous frame
-    a = SoA.movementState[x];
+    a = SoA.movementState[y];
     if a & MovementState.X_AXIS_COLLISION != 0 {
-        ^return set_direction_east(x);
+        ^return set_direction_east(y);
     }
     else if a & MovementState.Y_AXIS_COLLISION != 0 {
-        ^return set_direction_south(x);
+        ^return set_direction_south(y);
     }
 
 
-    carry = vision_cone.test_left(x);
+    carry = vision_cone.test_left(y);
     if carry {
-        ^return set_state__attacking(x, Direction.WEST as u8);
+        ^return set_state__attacking(y, Direction.WEST as u8);
     }
-    carry = vision_cone.test_up(x);
+    carry = vision_cone.test_up(y);
     if carry {
-        ^return set_state__attacking(x, Direction.NORTH as u8);
+        ^return set_state__attacking(y, Direction.NORTH as u8);
     }
-    carry = vision_cone.test_down(x);
+    carry = vision_cone.test_down(y);
     if carry {
-        ^return set_state__attacking(x, Direction.SOUTH as u8);
+        ^return set_state__attacking(y, Direction.SOUTH as u8);
     }
 
 
@@ -281,7 +272,7 @@ func process__walk_west(entityId : u8 in y) : bool in carry {
     // ::TODO check for player and change state to FIRING_BOLT_WEST ::
 
 
-    return _update_walk_animation(x);
+    return _update_walk_animation(y);
 }
 
 
@@ -292,19 +283,20 @@ func process__walk_west(entityId : u8 in y) : bool in carry {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _update_walk_animation(entityId : u8 in x) : bool in carry {
+func _update_walk_animation(entityId : u8 in y) : bool in carry {
 let _tmp = <:dpTmp0;
 
+    x = y;
     SoA_animationCounter[x]--;
     if negative {
-        SoA_animationCounter[x] = a = ANIMATION_DELAY - 1;
+        SoA_animationCounter[y] = a = ANIMATION_DELAY - 1;
 
         // Increment animation Frame
-        a = SoA.metaSpriteFrame[x];
+        a = SoA.metaSpriteFrame[y];
         a++;
         _tmp = a = a & ANIMATION_FRAME_MASK;
 
-        SoA.metaSpriteFrame[x] = a = (SoA.metaSpriteFrame[x] & (ANIMATION_FRAME_MASK ^ 0xff)) | _tmp;
+        SoA.metaSpriteFrame[y] = a = (SoA.metaSpriteFrame[y] & (ANIMATION_FRAME_MASK ^ 0xff)) | _tmp;
     }
 
     return true;
@@ -313,19 +305,19 @@ let _tmp = <:dpTmp0;
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_state__walk(entityId : u8 in x, direction : u8 in a) : bool in carry {
+func set_state__walk(entityId : u8 in y, direction : u8 in a) : bool in carry {
 
     if a == Direction.EAST as u8 {
-        return set_direction_east(x);
+        return set_direction_east(y);
     }
     else if a == Direction.WEST as u8 {
-        return set_direction_west(x);
+        return set_direction_west(y);
     }
     else if a == Direction.NORTH as u8 {
-        return set_direction_north(x);
+        return set_direction_north(y);
     }
     else {
-        return set_direction_south(x);
+        return set_direction_south(y);
     }
 
     return true;
@@ -335,7 +327,9 @@ func set_state__walk(entityId : u8 in x, direction : u8 in a) : bool in carry {
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_south(entityId : u8 in x) : bool in carry {
+func set_direction_south(entityId : u8 in y) : bool in carry {
+    x = y;
+
     SoA_state[x] = State.WALK_SOUTH;
     SoA_walkingDirection[x] = Direction.SOUTH;
     SoA_facingDirection[x] = Direction.SOUTH;
@@ -357,7 +351,9 @@ func set_direction_south(entityId : u8 in x) : bool in carry {
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_north(entityId : u8 in x) : bool in carry {
+func set_direction_north(entityId : u8 in y) : bool in carry {
+    x = y;
+
     a = State.WALK_NORTH as u8;
     SoA_state[x] = a as State;
     SoA_walkingDirection[x] = a as Direction;
@@ -380,7 +376,9 @@ func set_direction_north(entityId : u8 in x) : bool in carry {
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_east(entityId : u8 in x) : bool in carry {
+func set_direction_east(entityId : u8 in y) : bool in carry {
+    x = y;
+
     a = State.WALK_EAST as u8;
     SoA_state[x] = a as State;
     SoA_walkingDirection[x] = a as Direction;
@@ -403,7 +401,9 @@ func set_direction_east(entityId : u8 in x) : bool in carry {
 
 // db = 0x7e
 #[mem8, idx8]
-func set_direction_west(entityid : u8 in x) : bool in carry {
+func set_direction_west(entityid : u8 in y) : bool in carry {
+    x = y;
+
     a = State.WALK_WEST as u8;
     SoA_state[x] = a as State;
     SoA_walkingDirection[x] = a as Direction;
@@ -429,23 +429,24 @@ func set_direction_west(entityid : u8 in x) : bool in carry {
 
 
 
-// KEEP: X
+// KEEP: Y
 // DB = 0x7e
 #[mem8, idx8]
-func set_state__attacking(entityId : u8 in x, direction : u8 in a) : bool in carry {
+func set_state__attacking(entityId : u8 in y, direction : u8 in a) : bool in carry {
 
-    SoA_facingDirection[x] = a as Direction;
+    SoA_facingDirection[y] = a as Direction;
 
-    SoA.metaSpriteFrame[x] = a = (a <<< DIRECTION_MS_SHIFT) + ATTACK_MS_FRAME;
+    SoA.metaSpriteFrame[y] = a = (a <<< DIRECTION_MS_SHIFT) + ATTACK_MS_FRAME;
 
 
     a = State.ATTACKING as u8;
-    SoA_state[x] = a as State;
+    SoA_state[y] = a as State;
 
-    SoA_boltTimer[x] = a = ATTACK_DELAY;
+    SoA_boltTimer[y] = a = ATTACK_DELAY;
 
     mem16();
     #[mem16] {
+        x = y;
         entities.SoA.xVelocity[unaligned x] = 0;
         entities.SoA.yVelocity[unaligned x] = 0;
     }
@@ -458,13 +459,14 @@ func set_state__attacking(entityId : u8 in x, direction : u8 in a) : bool in car
 
 // Fire a bolt on the next frame.
 //
-// KEEP: X
+// KEEP: Y
 // DB = 0x7e
 #[mem8, idx8]
-inline func _set_state__attacking__immediate(entityId : u8 in x) {
+inline func _set_state__attacking__immediate(entityId : u8 in y) {
     a = State.ATTACKING as u8;
-    SoA_state[x] = a as State;
+    SoA_state[y] = a as State;
 
+    x = y;
     SoA_boltTimer[x] = 0;
 }
 
@@ -473,29 +475,27 @@ inline func _set_state__attacking__immediate(entityId : u8 in x) {
 // DB = 0x7e
 #[mem8, idx8]
 func process__attacking(entityId : u8 in y) : bool in carry {
-    x = y;
 
-
-    a = SoA_boltTimer[x];
+    a = SoA_boltTimer[y];
     if !zero {
         a--;
-        SoA_boltTimer[x] = a;
+        SoA_boltTimer[y] = a;
     }
     else {
         // Fire bolt
-        a = SoA_facingDirection[x] as u8;
+        a = SoA_facingDirection[y] as u8;
         if a < N_DIRECTIONS * 2 {
-            y = a = a >>> 1;
+            x = a = a >>> 1;
 
-            entities.spawn_entity(a = SoA.xPos_px[x],
-                                  a = SoA.yPos_px[x],
+            entities.spawn_entity(a = SoA.xPos_px[y],
+                                  a = SoA.yPos_px[y],
                                   a = EntityTypes.bolt_angled as u8,
-                                  y);
+                                  x);
 
-            x = currentEntityId;
+            y = currentEntityId;
         }
 
-        _set_state__attack_recovery(x);
+        _set_state__attack_recovery(y);
     }
 
     return true;
@@ -507,15 +507,15 @@ func process__attacking(entityId : u8 in y) : bool in carry {
 // ===============
 
 
-// KEEP: X
+// KEEP: Y
 // DB = 0x7e
 #[mem8, idx8]
-inline func _set_state__attack_recovery(entityId : u8 in x) {
+inline func _set_state__attack_recovery(entityId : u8 in y) {
 
     a = State.ATTACK_RECOVERY as u8;
-    SoA_state[x] = a as State;
+    SoA_state[y] = a as State;
 
-    SoA_boltTimer[x] = a = ATTACK_RECOVERY_DELAY;
+    SoA_boltTimer[y] = a = ATTACK_RECOVERY_DELAY;
 }
 
 
@@ -523,46 +523,44 @@ inline func _set_state__attack_recovery(entityId : u8 in x) {
 // DB = 0x7e
 #[mem8, idx8]
 func process__attack_recovery(entityId : u8 in y) : bool in carry {
-    x = y;
 
-
-    a = SoA_boltTimer[x];
+    a = SoA_boltTimer[y];
     if !zero {
         a--;
-        SoA_boltTimer[x] = a;
+        SoA_boltTimer[y] = a;
     }
     else {
         // Bolt recovery ended
         // Check if player is still inside the vision cone
 
-        a = SoA_facingDirection[x] as u8;
+        a = SoA_facingDirection[y] as u8;
         if a == Direction.EAST as u8 {
-            carry = vision_cone.test_right(x);
+            carry = vision_cone.test_right(y);
             if !carry {
-                return _attack_recovery_ended(x);
+                return _attack_recovery_ended(y);
             }
         }
         else if a == Direction.WEST as u8 {
-            carry = vision_cone.test_left(x);
+            carry = vision_cone.test_left(y);
             if !carry {
-                return _attack_recovery_ended(x);
+                return _attack_recovery_ended(y);
             }
         }
         else if a == Direction.NORTH as u8 {
-            carry = vision_cone.test_up(x);
+            carry = vision_cone.test_up(y);
             if !carry {
-                return _attack_recovery_ended(x);
+                return _attack_recovery_ended(y);
             }
         }
         else {
-            carry = vision_cone.test_down(x);
+            carry = vision_cone.test_down(y);
             if !carry {
-                return _attack_recovery_ended(x);
+                return _attack_recovery_ended(y);
             }
         }
 
         // Player is still in vision code, fire bolt on next frame
-        _set_state__attacking__immediate(x);
+        _set_state__attacking__immediate(y);
     }
 
     return true;
@@ -572,9 +570,9 @@ func process__attack_recovery(entityId : u8 in y) : bool in carry {
 
 // DB = 0x7e
 #[mem8, idx8]
-func _attack_recovery_ended(enttyId : u8 in x) : bool in carry {
+func _attack_recovery_ended(enttyId : u8 in y) : bool in carry {
     // Continue walking in the same direction the enemy was walking before they saw the player.
-    ^return set_state__walk(x, SoA_walkingDirection[x] as u8);
+    ^return set_state__walk(y, SoA_walkingDirection[y] as u8);
 }
 
 
@@ -584,61 +582,61 @@ func _attack_recovery_ended(enttyId : u8 in x) : bool in carry {
 
 
 
-// KEEP: X
+// KEEP: Y
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func collided_with_player_weapon__inline(entityId : u8 in x) {
+inline func collided_with_player_weapon__inline(entityId : u8 in y) {
     // Change state to HURT if player is not facing the enemy's shield.
 
-    y = player.facingDirection;
+    x = player.facingDirection;
 
-    a = SoA_facingDirection[x] as u8;
+    a = SoA_facingDirection[y] as u8;
     if a == Direction.EAST as u8 {
-        if y != player.FacingDirection.LEFT as u8 {
-            set_state__hurt(x);
+        if x != player.FacingDirection.LEFT as u8 {
+            set_state__hurt(y);
         }
     }
     else if a == Direction.WEST as u8 {
-        if y != player.FacingDirection.RIGHT as u8 {
-            set_state__hurt(x);
+        if x != player.FacingDirection.RIGHT as u8 {
+            set_state__hurt(y);
         }
     }
     else if a == Direction.NORTH as u8 {
-        if y != player.FacingDirection.DOWN as u8 {
-            set_state__hurt(x);
+        if x != player.FacingDirection.DOWN as u8 {
+            set_state__hurt(y);
         }
     }
     else {
         // Direction.SOUTH
-        if y != player.FacingDirection.UP as u8 {
-            set_state__hurt(x);
+        if x != player.FacingDirection.UP as u8 {
+            set_state__hurt(y);
         }
     }
 }
 
 
 
-// KEEP: X
+// KEEP: Y
 //
 // DB = 0x7e
 #[mem8, idx8]
-func set_state__hurt(entityId : u8 in x) {
+func set_state__hurt(entityId : u8 in y) {
     a = State.HURT as u8;
-    SoA_state[x] = a as State;
+    SoA_state[y] = a as State;
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__hurt(entityId : u8 in a) : bool in carry {
-    x = y;
+func process__hurt(entityId : u8 in y) : bool in carry {
 
     // ::TODO add reaction ::
 
     mem16();
     #[mem16] {
+        x = y;
         entities.SoA.xVelocity[unaligned x] = 0;
         entities.SoA.yVelocity[unaligned x] = 0;
     }

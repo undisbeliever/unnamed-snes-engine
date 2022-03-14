@@ -46,23 +46,23 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func init(entityId : u8 in x, parameter : u8 in y) {
+func init(entityId : u8 in y, parameter : u8 in x) {
 
-    if y == init_parameter.left as u8 {
-        set_direction_west(x);
+    if x == init_parameter.left as u8 {
+        set_direction_west(y);
     }
-    else if y == init_parameter.right as u8 {
-        set_direction_east(x);
+    else if x == init_parameter.right as u8 {
+        set_direction_east(y);
     }
-    else if y == init_parameter.up as u8 {
-        set_direction_north(x);
+    else if x == init_parameter.up as u8 {
+        set_direction_north(y);
     }
-    else if y == init_parameter.down as u8 {
-        set_direction_south(x);
+    else if x == init_parameter.down as u8 {
+        set_direction_south(y);
     }
     else {
         // parameter = init_parameter.swarm
-        swarming.change_to_swarming_entity(x);
+        swarming.change_to_swarming_entity(y);
     }
 }
 
@@ -74,20 +74,19 @@ func init(entityId : u8 in x, parameter : u8 in y) {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func process(entityId : u8 in x) : bool in carry {
+func process(entityId : u8 in y) : bool in carry {
 
-    x = base.process_collisions(x);
+    y = base.process_collisions(y);
 
 
     if collisionState $ CollisionState.PLAYER_WEAPON_BIT {
-        ^return swarming.change_to_swarming_entity(x);
+        ^return swarming.change_to_swarming_entity(y);
     }
 
 
     // ::TODO add reaction when colliding with player hurtbox ::
 
 
-    y = x;
     x = SoA_state[y] as u8;
     return process__state_functions[unaligned x](y);
 }
@@ -105,30 +104,28 @@ const process__state_functions = [
 // DB = 0x7e
 #[mem8, idx8]
 func process__walk_south(entityId : u8 in y) : bool in carry {
-    x = y;
 
-
-    carry = vision_cone.test_down(x);
+    carry = vision_cone.test_down(y);
     if carry {
         // ::TODO add change_to_swarming_entity_in_hurt_state ::
-        ^return swarming.change_to_swarming_entity(x);
+        ^return swarming.change_to_swarming_entity(y);
     }
 
 
     // Check for a tile collision in the previous frame
-    a = SoA.movementState[x];
+    a = SoA.movementState[y];
     if a & MovementState.X_AXIS_COLLISION != 0 {
-        ^return set_direction_east(x);
+        ^return set_direction_east(y);
     }
     else if a & MovementState.Y_AXIS_COLLISION != 0 {
-        ^return set_direction_north(x);
+        ^return set_direction_north(y);
     }
 
 
     // ::TODO check for solid tile 2 tiles below the entity ::
 
 
-    return _update_walk_animation(x);
+    return _update_walk_animation(y);
 }
 
 
@@ -136,29 +133,27 @@ func process__walk_south(entityId : u8 in y) : bool in carry {
 // DB = 0x7e
 #[mem8, idx8]
 func process__walk_north(entityId : u8 in y) : bool in carry {
-    x = y;
 
-
-    carry = vision_cone.test_up(x);
+    carry = vision_cone.test_up(y);
     if carry {
-        ^return swarming.change_to_swarming_entity(x);
+        ^return swarming.change_to_swarming_entity(y);
     }
 
 
     // Check for a tile collision in the previous frame
-    a = SoA.movementState[x];
+    a = SoA.movementState[y];
     if a & MovementState.X_AXIS_COLLISION != 0 {
-        ^return set_direction_west(x);
+        ^return set_direction_west(y);
     }
     else if a & MovementState.Y_AXIS_COLLISION != 0 {
-        ^return set_direction_south(x);
+        ^return set_direction_south(y);
     }
 
 
     // ::TODO check for solid tile 2 tiles above the entity ::
 
 
-    return _update_walk_animation(x);
+    return _update_walk_animation(y);
 }
 
 
@@ -166,29 +161,27 @@ func process__walk_north(entityId : u8 in y) : bool in carry {
 // DB = 0x7e
 #[mem8, idx8]
 func process__walk_east(entityId : u8 in y) : bool in carry {
-    x = y;
 
-
-    carry = vision_cone.test_right(x);
+    carry = vision_cone.test_right(y);
     if carry {
-        ^return swarming.change_to_swarming_entity(x);
+        ^return swarming.change_to_swarming_entity(y);
     }
 
 
     // Check for a tile collision in the previous frame
-    a = SoA.movementState[x];
+    a = SoA.movementState[y];
     if a & MovementState.X_AXIS_COLLISION != 0 {
-        ^return set_direction_west(x);
+        ^return set_direction_west(y);
     }
     else if a & MovementState.Y_AXIS_COLLISION != 0 {
-        ^return set_direction_north(x);
+        ^return set_direction_north(y);
     }
 
 
     // ::TODO check for solid tile 2 tiles to the right of the entity ::
 
 
-    return _update_walk_animation(x);
+    return _update_walk_animation(y);
 }
 
 
@@ -196,29 +189,27 @@ func process__walk_east(entityId : u8 in y) : bool in carry {
 // DB = 0x7e
 #[mem8, idx8]
 func process__walk_west(entityId : u8 in y) : bool in carry {
-    x = y;
 
-
-    carry = vision_cone.test_left(x);
+    carry = vision_cone.test_left(y);
     if carry {
-        ^return swarming.change_to_swarming_entity(x);
+        ^return swarming.change_to_swarming_entity(y);
     }
 
 
     // Check for a tile collision in the previous frame
-    a = SoA.movementState[x];
+    a = SoA.movementState[y];
     if a & MovementState.X_AXIS_COLLISION != 0 {
-        ^return set_direction_east(x);
+        ^return set_direction_east(y);
     }
     else if a & MovementState.Y_AXIS_COLLISION != 0 {
-        ^return set_direction_south(x);
+        ^return set_direction_south(y);
     }
 
 
     // ::TODO check for solid tile 2 tiles to the left of the entity ::
 
 
-    return _update_walk_animation(x);
+    return _update_walk_animation(y);
 }
 
 
@@ -229,19 +220,20 @@ func process__walk_west(entityId : u8 in y) : bool in carry {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _update_walk_animation(entityId : u8 in x) : bool in carry {
+func _update_walk_animation(entityId : u8 in y) : bool in carry {
 let _tmp = <:dpTmp0;
 
+    x = y;
     SoA_animationCounter[x]--;
     if negative {
-        SoA_animationCounter[x] = a = ANIMATION_DELAY - 1;
+        SoA_animationCounter[y] = a = ANIMATION_DELAY - 1;
 
         // Increment animation Frame
-        a = SoA.metaSpriteFrame[x];
+        a = SoA.metaSpriteFrame[y];
         a++;
         _tmp = a = a & ANIMATION_FRAME_MASK;
 
-        SoA.metaSpriteFrame[x] = a = (SoA.metaSpriteFrame[x] & (ANIMATION_FRAME_MASK ^ 0xff)) | _tmp;
+        SoA.metaSpriteFrame[y] = a = (SoA.metaSpriteFrame[y] & (ANIMATION_FRAME_MASK ^ 0xff)) | _tmp;
     }
 
     return true;
@@ -253,7 +245,9 @@ let _tmp = <:dpTmp0;
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_south(entityId : u8 in x) : bool in carry {
+func set_direction_south(entityId : u8 in y) : bool in carry {
+    x = y;
+
     SoA_state[x] = State.WALK_SOUTH;
 
     SoA.metaSpriteFrame[x] = ms_frames.south0;
@@ -273,7 +267,9 @@ func set_direction_south(entityId : u8 in x) : bool in carry {
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_north(entityId : u8 in x) : bool in carry {
+func set_direction_north(entityId : u8 in y) : bool in carry {
+    x = y;
+
     a = State.WALK_NORTH as u8;
     SoA_state[x] = a as State;
 
@@ -294,7 +290,9 @@ func set_direction_north(entityId : u8 in x) : bool in carry {
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_east(entityId : u8 in x) : bool in carry {
+func set_direction_east(entityId : u8 in y) : bool in carry {
+    x = y;
+
     a = State.WALK_EAST as u8;
     SoA_state[x] = a as State;
 
@@ -315,7 +313,9 @@ func set_direction_east(entityId : u8 in x) : bool in carry {
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_west(entityId : u8 in x) : bool in carry {
+func set_direction_west(entityId : u8 in y) : bool in carry {
+    x = y;
+
     a = State.WALK_WEST as u8;
     SoA_state[x] = a as State;
 

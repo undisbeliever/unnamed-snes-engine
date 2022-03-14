@@ -312,17 +312,17 @@ let _tmp    = <:dpTmp0;
 //
 // OUTPUT: entities.SoA.movementState bits will be set if there is a collision, otherwise cleared.
 //
-// KEEP: X
+// KEEP: Y
 // DB = 0x7e
 #[mem8, idx8]
-func move_entity_and_collision_test__unbounded(entityId : u8 in x) : u8 in x {
+func move_entity_and_collision_test__unbounded(entityId : u8 in y) : u8 in y {
     // Clear movementState flags;
-    entities.SoA.movementState[x] = 0;
+    entities.SoA.movementState[y] = a = 0;
 
-    x = _move_entity_and_collision_test__unbounded__x_axis(x);
-    x = _move_entity_and_collision_test__unbounded__y_axis(x);
+    y = _move_entity_and_collision_test__unbounded__x_axis(y);
+    y = _move_entity_and_collision_test__unbounded__y_axis(y);
 
-    return x;
+    return y;
 }
 
 
@@ -332,9 +332,9 @@ func move_entity_and_collision_test__unbounded(entityId : u8 in x) : u8 in x {
 // NOTE: If you edit this function, you should also edit `_move_entity_and_collision_test__bounded__x_axis`.
 //
 // OUTPUT: entities.SoA.movementState bits will be set if there is a collision, otherwise cleared.
-// KEEP: X
+// KEEP: Y
 #[mem8, idx8]
-inline func _move_entity_and_collision_test__unbounded__x_axis(entityId : u8 in x) : u8 in x {
+inline func _move_entity_and_collision_test__unbounded__x_axis(entityId : u8 in y) : u8 in y {
 let _tmp    = <:dpTmp0;
 let _top    = >:dpTmp0;
 let _left   = <:dpTmp1;
@@ -343,85 +343,85 @@ let _right  = <:dpTmp1;
     // X Axis
     // ------
 
-    a = entities.SoA.yPos_px[x] - entities.SoA.tileHitbox_halfHeight[x];
+    a = entities.SoA.yPos_px[y] - entities.SoA.tileHitbox_halfHeight[y];
     if !carry { a = 0; }
     _top = a;
 
-    entities.SoA.xPos_sx[x] = a = entities.SoA.xVelocity_sx[x] + entities.SoA.xPos_sx[x];
-    a = entities.SoA.xVelocity_px[x];
+    entities.SoA.xPos_sx[y] = a = entities.SoA.xVelocity_sx[y] + entities.SoA.xPos_sx[y];
+    a = entities.SoA.xVelocity_px[y];
     if negative {
-        a +#= entities.SoA.xPos_px[x];
+        a +#= entities.SoA.xPos_px[y];
         if !carry { a = 0; }
-        entities.SoA.xPos_px[x] = a;
+        entities.SoA.xPos_px[y] = a;
 
         // Entity moving left
 
-        a -= entities.SoA.tileHitbox_halfWidth[x];
+        a -= entities.SoA.tileHitbox_halfWidth[y];
         if !carry { a = 0; }
         _left = a;
 
         // calculate tile position
         _tmp = a = a >>> 4;
-        y = a = (_top & 0xf0) + _tmp;
+        x = a = (_top & 0xf0) + _tmp;
 
-        a = mapTileProperties[y];
+        a = mapTileProperties[x];
         if negative {
             // solid collision
-            entities.SoA.xPos_px[x] = a = (~_left & 0xf) + 1 + entities.SoA.xPos_px[x];
-            entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.LEFT_COLLISION;
+            entities.SoA.xPos_px[y] = a = (~_left & 0xf) + 1 + entities.SoA.xPos_px[y];
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.LEFT_COLLISION;
         }
         else {
             // Check if the hitbox touches the tile below this one
-            a = (_top & 0xf) + entities.SoA.tileHitbox_halfHeight[x] + entities.SoA.tileHitbox_halfHeight[x];
+            a = (_top & 0xf) + entities.SoA.tileHitbox_halfHeight[y] + entities.SoA.tileHitbox_halfHeight[y];
             if a >= METATILE_SIZE + 1 {
-                a = (&mapTileProperties[MAP_WIDTH])[y];
+                a = (&mapTileProperties[MAP_WIDTH])[x];
                 if negative {
-                    entities.SoA.xPos_px[x] = a = (~_left & 0xf) + 1 + entities.SoA.xPos_px[x];
-                    entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.LEFT_COLLISION;
+                    entities.SoA.xPos_px[y] = a = (~_left & 0xf) + 1 + entities.SoA.xPos_px[y];
+                    entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.LEFT_COLLISION;
                 }
             }
         }
     }
     else {
-        a +#= entities.SoA.xPos_px[x];
+        a +#= entities.SoA.xPos_px[y];
         if carry { a = 0xff; }
-        entities.SoA.xPos_px[x] = a;
+        entities.SoA.xPos_px[y] = a;
 
         // Entity moving right
 
-        a += entities.SoA.tileHitbox_halfWidth[x];
+        a += entities.SoA.tileHitbox_halfWidth[y];
         if carry { a = 0xff; }
         _right = a;
 
         // calculate tile position
         _tmp = a = a >>> 4;
-        y = a = (_top & 0xf0) + _tmp;
+        x = a = (_top & 0xf0) + _tmp;
 
-        a = mapTileProperties[y];
+        a = mapTileProperties[x];
         if negative {
             // solid collision
-            a = (_right & 0xf0) - entities.SoA.tileHitbox_halfWidth[x];
+            a = (_right & 0xf0) - entities.SoA.tileHitbox_halfWidth[y];
             if !carry { a = 1; }
-            entities.SoA.xPos_px[x] = a;
-            entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.RIGHT_COLLISION;
+            entities.SoA.xPos_px[y] = a;
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.RIGHT_COLLISION;
         }
         else {
             // Check if the hitbox touches the tile below this one
-            a = (_top & 0xf) + entities.SoA.tileHitbox_halfHeight[x] + entities.SoA.tileHitbox_halfHeight[x];
+            a = (_top & 0xf) + entities.SoA.tileHitbox_halfHeight[y] + entities.SoA.tileHitbox_halfHeight[y];
             if a >= METATILE_SIZE + 1 {
-                a = (&mapTileProperties[MAP_WIDTH])[y];
+                a = (&mapTileProperties[MAP_WIDTH])[x];
                 if negative {
                     // solid collision
-                    a = (_right & 0xf0) - entities.SoA.tileHitbox_halfWidth[x];
+                    a = (_right & 0xf0) - entities.SoA.tileHitbox_halfWidth[y];
                     if !carry { a = 1; }
-                    entities.SoA.xPos_px[x] = a;
-                    entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.RIGHT_COLLISION;
+                    entities.SoA.xPos_px[y] = a;
+                    entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.RIGHT_COLLISION;
                 }
             }
         }
     }
 
-    return x;
+    return y;
 }
 
 
@@ -431,101 +431,101 @@ let _right  = <:dpTmp1;
 // NOTE: If you edit this function, you should also edit `_move_entity_and_collision_test__bounded__y_axis`.
 //
 // OUTPUT: entities.SoA.movementState bits will be set if there is a collision, otherwise cleared.
-// KEEP: X
+// KEEP: Y
 // DB = 0x7e
 #[mem8, idx8]
-inline func _move_entity_and_collision_test__unbounded__y_axis(entityId : u8 in x) : u8 in x {
+inline func _move_entity_and_collision_test__unbounded__y_axis(entityId : u8 in y) : u8 in y {
 let _tmp    = <:dpTmp0;
 let _left   = >:dpTmp0;
 let _top    = <:dpTmp1;
 let _bottom = <:dpTmp1;
 
-    a = entities.SoA.xPos_px[x] - entities.SoA.tileHitbox_halfWidth[x];
+    a = entities.SoA.xPos_px[y] - entities.SoA.tileHitbox_halfWidth[y];
     if !carry { a = 0; }
     _left = a;
 
-    entities.SoA.yPos_sx[x] = a = entities.SoA.yVelocity_sx[x] + entities.SoA.yPos_sx[x];
-    a = entities.SoA.yVelocity_px[x];
+    entities.SoA.yPos_sx[y] = a = entities.SoA.yVelocity_sx[y] + entities.SoA.yPos_sx[y];
+    a = entities.SoA.yVelocity_px[y];
     if negative {
-        a +#= entities.SoA.yPos_px[x];
+        a +#= entities.SoA.yPos_px[y];
         if !carry { a = 0; }
-        entities.SoA.yPos_px[x] = a;
+        entities.SoA.yPos_px[y] = a;
 
         // Entity moving up
 
-        a -= entities.SoA.tileHitbox_halfHeight[x];
+        a -= entities.SoA.tileHitbox_halfHeight[y];
         if !carry { a = 0; }
         _top = a;
 
         // calculate tile position
         _tmp = a = _left >>> 4;
-        y = a = (_top & 0xf0) + _tmp;
+        x = a = (_top & 0xf0) + _tmp;
 
-        a = mapTileProperties[y];
+        a = mapTileProperties[x];
         if negative {
             // solid collision
-            entities.SoA.yPos_px[x] = a = (~_top & 0xf) + 1 + entities.SoA.yPos_px[x];
-            entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.UP_COLLISION;
+            entities.SoA.yPos_px[y] = a = (~_top & 0xf) + 1 + entities.SoA.yPos_px[y];
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.UP_COLLISION;
         }
         else {
             // Check if the hitbox touches the tile to the right of this one
-            a = (_left & 0xf) + entities.SoA.tileHitbox_halfWidth[x] + entities.SoA.tileHitbox_halfWidth[x];
+            a = (_left & 0xf) + entities.SoA.tileHitbox_halfWidth[y] + entities.SoA.tileHitbox_halfWidth[y];
             if a >= METATILE_SIZE + 1 {
-                // Test Y index to prevent an out-of-bounds read past the rightmost tile.
-                a = y & 0xf;
+                // Test X index to prevent an out-of-bounds read past the rightmost tile.
+                a = x & 0xf;
                 if a != 0x0f {
-                    a = (&mapTileProperties[1])[y];
+                    a = (&mapTileProperties[1])[x];
                     if negative {
-                        entities.SoA.yPos_px[x] = a = (~_top & 0xf) + 1 + entities.SoA.yPos_px[x];
-                        entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.UP_COLLISION;
+                        entities.SoA.yPos_px[y] = a = (~_top & 0xf) + 1 + entities.SoA.yPos_px[y];
+                        entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.UP_COLLISION;
                     }
                 }
             }
         }
     }
     else {
-        a +#= entities.SoA.yPos_px[x];
+        a +#= entities.SoA.yPos_px[y];
         if carry { a = 0xff; }
-        entities.SoA.yPos_px[x] = a;
+        entities.SoA.yPos_px[y] = a;
 
         // Entity moving down
 
-        a += entities.SoA.tileHitbox_halfHeight[x];
+        a += entities.SoA.tileHitbox_halfHeight[y];
         if carry { a = 0xff; }
         _bottom = a;
 
         // calculate tile position
         _tmp = a = _left >>> 4;
-        y = a = (_bottom & 0xf0) + _tmp;
+        x = a = (_bottom & 0xf0) + _tmp;
 
-        a = mapTileProperties[y];
+        a = mapTileProperties[x];
         if negative {
             // solid collision
-            a = (_bottom & 0xf0) - entities.SoA.tileHitbox_halfHeight[x];
+            a = (_bottom & 0xf0) - entities.SoA.tileHitbox_halfHeight[y];
             if !carry { a = 1; }
-            entities.SoA.yPos_px[x] = a;
-            entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.DOWN_COLLISION;
+            entities.SoA.yPos_px[y] = a;
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.DOWN_COLLISION;
         }
         else {
             // Check if the hitbox touches the tile to the right of this one
-            a = (_left & 0xf) + entities.SoA.tileHitbox_halfWidth[x] + entities.SoA.tileHitbox_halfWidth[x];
+            a = (_left & 0xf) + entities.SoA.tileHitbox_halfWidth[y] + entities.SoA.tileHitbox_halfWidth[y];
             if a >= METATILE_SIZE + 1 {
-                // Test Y index to prevent an out-of-bounds read past the rightmost tile.
-                a = y & 0xf;
+                // Test X index to prevent an out-of-bounds read past the rightmost tile.
+                a = x & 0xf;
                 if a != 0x0f {
-                    a = (&mapTileProperties[1])[y];
+                    a = (&mapTileProperties[1])[x];
                     if negative {
-                        a = (_bottom & 0xf0) - entities.SoA.tileHitbox_halfHeight[x];
+                        a = (_bottom & 0xf0) - entities.SoA.tileHitbox_halfHeight[y];
                         if !carry { a = 1; }
-                        entities.SoA.yPos_px[x] = a;
-                        entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.DOWN_COLLISION;
+                        entities.SoA.yPos_px[y] = a;
+                        entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.DOWN_COLLISION;
                     }
                 }
             }
         }
     }
 
-    return x;
+    return y;
 }
 
 
@@ -539,17 +539,17 @@ let _bottom = <:dpTmp1;
 //
 // OUTPUT: entities.SoA.movementState bits will be set if there is a collision, otherwise cleared.
 //
-// KEEP: X
+// KEEP: Y
 // DB = 0x7e
 #[mem8, idx8]
-func move_entity_and_collision_test__bounded(entityId : u8 in x) : u8 in x {
+func move_entity_and_collision_test__bounded(entityId : u8 in y) : u8 in y {
     // Clear movementState flags;
-    entities.SoA.movementState[x] = 0;
+    entities.SoA.movementState[y] = a = 0;
 
-    x = _move_entity_and_collision_test__bounded__x_axis(x);
-    x = _move_entity_and_collision_test__bounded__y_axis(x);
+    y = _move_entity_and_collision_test__bounded__x_axis(y);
+    y = _move_entity_and_collision_test__bounded__y_axis(y);
 
-    return x;
+    return y;
 }
 
 
@@ -559,9 +559,9 @@ func move_entity_and_collision_test__bounded(entityId : u8 in x) : u8 in x {
 // NOTE: If you edit this function, you should also edit `_move_entity_and_collision_test__unbounded__x_axis`.
 //
 // OUTPUT: entities.SoA.movementState bits will be set if there is a collision, otherwise cleared.
-// KEEP: X
+// KEEP: Y
 #[mem8, idx8]
-inline func _move_entity_and_collision_test__bounded__x_axis(entityId : u8 in x) : u8 in x {
+inline func _move_entity_and_collision_test__bounded__x_axis(entityId : u8 in y) : u8 in y {
 let _tmp    = <:dpTmp0;
 let _top    = >:dpTmp0;
 let _left   = <:dpTmp1;
@@ -570,95 +570,95 @@ let _right  = <:dpTmp1;
     // X Axis
     // ------
 
-    a = entities.SoA.yPos_px[x] - entities.SoA.tileHitbox_halfHeight[x];
+    a = entities.SoA.yPos_px[y] - entities.SoA.tileHitbox_halfHeight[y];
     if !carry { a = 0; }
     _top = a;
 
-    entities.SoA.xPos_sx[x] = a = entities.SoA.xVelocity_sx[x] + entities.SoA.xPos_sx[x];
-    a = entities.SoA.xVelocity_px[x];
+    entities.SoA.xPos_sx[y] = a = entities.SoA.xVelocity_sx[y] + entities.SoA.xPos_sx[y];
+    a = entities.SoA.xVelocity_px[y];
     if negative {
-        a +#= entities.SoA.xPos_px[x];
+        a +#= entities.SoA.xPos_px[y];
         if !carry { a = 0; }
-        entities.SoA.xPos_px[x] = a;
+        entities.SoA.xPos_px[y] = a;
 
         // Entity moving left
 
-        a -= entities.SoA.tileHitbox_halfWidth[x];
+        a -= entities.SoA.tileHitbox_halfWidth[y];
         if !carry {
             // Collided with left edge of the screen
-            entities.SoA.xPos_px[x] = a = entities.SoA.tileHitbox_halfWidth[x];
-            entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.LEFT_COLLISION;
-            ^return x;
+            entities.SoA.xPos_px[y] = a = entities.SoA.tileHitbox_halfWidth[y];
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.LEFT_COLLISION;
+            ^return y;
         }
         _left = a;
 
         // calculate tile position
         _tmp = a = a >>> 4;
-        y = a = (_top & 0xf0) + _tmp;
+        x = a = (_top & 0xf0) + _tmp;
 
-        a = mapTileProperties[y];
+        a = mapTileProperties[x];
         if negative {
             // solid collision
-            entities.SoA.xPos_px[x] = a = (~_left & 0xf) + 1 + entities.SoA.xPos_px[x];
-            entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.LEFT_COLLISION;
+            entities.SoA.xPos_px[y] = a = (~_left & 0xf) + 1 + entities.SoA.xPos_px[y];
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.LEFT_COLLISION;
         }
         else {
             // Check if the hitbox touches the tile below this one
-            a = (_top & 0xf) + entities.SoA.tileHitbox_halfHeight[x] + entities.SoA.tileHitbox_halfHeight[x];
+            a = (_top & 0xf) + entities.SoA.tileHitbox_halfHeight[y] + entities.SoA.tileHitbox_halfHeight[y];
             if a >= METATILE_SIZE + 1 {
-                a = (&mapTileProperties[MAP_WIDTH])[y];
+                a = (&mapTileProperties[MAP_WIDTH])[x];
                 if negative {
-                    entities.SoA.xPos_px[x] = a = (~_left & 0xf) + 1 + entities.SoA.xPos_px[x];
-                    entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.LEFT_COLLISION;
+                    entities.SoA.xPos_px[y] = a = (~_left & 0xf) + 1 + entities.SoA.xPos_px[y];
+                    entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.LEFT_COLLISION;
                 }
             }
         }
     }
     else {
-        a +#= entities.SoA.xPos_px[x];
+        a +#= entities.SoA.xPos_px[y];
         if carry { a = 0xff; }
-        entities.SoA.xPos_px[x] = a;
+        entities.SoA.xPos_px[y] = a;
 
         // Entity moving right
 
-        a += entities.SoA.tileHitbox_halfWidth[x];
+        a += entities.SoA.tileHitbox_halfWidth[y];
         if carry {
             // Collided with right edge of the screen
-            entities.SoA.xPos_px[x] = a = (MAP_WIDTH_PIXELS - 1) - entities.SoA.tileHitbox_halfWidth[x];
-            entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.RIGHT_COLLISION;
-            return x;
+            entities.SoA.xPos_px[y] = a = (MAP_WIDTH_PIXELS - 1) - entities.SoA.tileHitbox_halfWidth[y];
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.RIGHT_COLLISION;
+            return y;
         }
         _right = a;
 
         // calculate tile position
         _tmp = a = a >>> 4;
-        y = a = (_top & 0xf0) + _tmp;
+        x = a = (_top & 0xf0) + _tmp;
 
-        a = mapTileProperties[y];
+        a = mapTileProperties[x];
         if negative {
             // solid collision
-            a = (_right & 0xf0) - entities.SoA.tileHitbox_halfWidth[x];
+            a = (_right & 0xf0) - entities.SoA.tileHitbox_halfWidth[y];
             if !carry { a = 1; }
-            entities.SoA.xPos_px[x] = a;
-            entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.RIGHT_COLLISION;
+            entities.SoA.xPos_px[y] = a;
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.RIGHT_COLLISION;
         }
         else {
             // Check if the hitbox touches the tile below this one
-            a = (_top & 0xf) + entities.SoA.tileHitbox_halfHeight[x] + entities.SoA.tileHitbox_halfHeight[x];
+            a = (_top & 0xf) + entities.SoA.tileHitbox_halfHeight[y] + entities.SoA.tileHitbox_halfHeight[y];
             if a >= METATILE_SIZE + 1 {
-                a = (&mapTileProperties[MAP_WIDTH])[y];
+                a = (&mapTileProperties[MAP_WIDTH])[x];
                 if negative {
                     // solid collision
-                    a = (_right & 0xf0) - entities.SoA.tileHitbox_halfWidth[x];
+                    a = (_right & 0xf0) - entities.SoA.tileHitbox_halfWidth[y];
                     if !carry { a = 1; }
-                    entities.SoA.xPos_px[x] = a;
-                    entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.RIGHT_COLLISION;
+                    entities.SoA.xPos_px[y] = a;
+                    entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.RIGHT_COLLISION;
                 }
             }
         }
     }
 
-    return x;
+    return y;
 }
 
 
@@ -668,111 +668,111 @@ let _right  = <:dpTmp1;
 // NOTE: If you edit this function, you should also edit `_move_entity_and_collision_test__unbounded__y_axis`.
 //
 // OUTPUT: entities.SoA.movementState bits will be set if there is a collision, otherwise cleared.
-// KEEP: X
+// KEEP: Y
 // DB = 0x7e
 #[mem8, idx8]
-inline func _move_entity_and_collision_test__bounded__y_axis(entityId : u8 in x) : u8 in x {
+inline func _move_entity_and_collision_test__bounded__y_axis(entityId : u8 in y) : u8 in y {
 let _tmp    = <:dpTmp0;
 let _left   = >:dpTmp0;
 let _top    = <:dpTmp1;
 let _bottom = <:dpTmp1;
 
-    a = entities.SoA.xPos_px[x] - entities.SoA.tileHitbox_halfWidth[x];
+    a = entities.SoA.xPos_px[y] - entities.SoA.tileHitbox_halfWidth[y];
     if !carry { a = 0; }
     _left = a;
 
-    entities.SoA.yPos_sx[x] = a = entities.SoA.yVelocity_sx[x] + entities.SoA.yPos_sx[x];
-    a = entities.SoA.yVelocity_px[x];
+    entities.SoA.yPos_sx[y] = a = entities.SoA.yVelocity_sx[y] + entities.SoA.yPos_sx[y];
+    a = entities.SoA.yVelocity_px[y];
     ^if negative {
-        a +#= entities.SoA.yPos_px[x];
+        a +#= entities.SoA.yPos_px[y];
         if !carry { a = 0; }
-        entities.SoA.yPos_px[x] = a;
+        entities.SoA.yPos_px[y] = a;
 
         // Entity moving up
 
-        a -= entities.SoA.tileHitbox_halfHeight[x];
+        a -= entities.SoA.tileHitbox_halfHeight[y];
         if !carry {
             // Collided with top edge of screen
-            entities.SoA.yPos_px[x] = a = entities.SoA.tileHitbox_halfHeight[x];
-            entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.UP_COLLISION;
-            ^return x;
+            entities.SoA.yPos_px[y] = a = entities.SoA.tileHitbox_halfHeight[y];
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.UP_COLLISION;
+            ^return y;
         }
         _top = a;
 
         // calculate tile position
         _tmp = a = _left >>> 4;
-        y = a = (_top & 0xf0) + _tmp;
+        x = a = (_top & 0xf0) + _tmp;
 
-        a = mapTileProperties[y];
+        a = mapTileProperties[x];
         if negative {
             // solid collision
-            entities.SoA.yPos_px[x] = a = (~_top & 0xf) + 1 + entities.SoA.yPos_px[x];
-            entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.UP_COLLISION;
+            entities.SoA.yPos_px[y] = a = (~_top & 0xf) + 1 + entities.SoA.yPos_px[y];
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.UP_COLLISION;
         }
         else {
             // Check if the hitbox touches the tile to the right of this one
-            a = (_left & 0xf) + entities.SoA.tileHitbox_halfWidth[x] + entities.SoA.tileHitbox_halfWidth[x];
+            a = (_left & 0xf) + entities.SoA.tileHitbox_halfWidth[y] + entities.SoA.tileHitbox_halfWidth[y];
             if a >= METATILE_SIZE + 1 {
-                // Test Y index to prevent an out-of-bounds read past the rightmost tile.
-                a = y & 0xf;
+                // Test X index to prevent an out-of-bounds read past the rightmost tile.
+                a = x & 0xf;
                 if a != 0x0f {
-                    a = (&mapTileProperties[1])[y];
+                    a = (&mapTileProperties[1])[x];
                     if negative {
-                        entities.SoA.yPos_px[x] = a = (~_top & 0xf) + 1 + entities.SoA.yPos_px[x];
-                        entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.UP_COLLISION;
+                        entities.SoA.yPos_px[y] = a = (~_top & 0xf) + 1 + entities.SoA.yPos_px[y];
+                        entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.UP_COLLISION;
                     }
                 }
             }
         }
     }
     else {
-        a +#= entities.SoA.yPos_px[x];
+        a +#= entities.SoA.yPos_px[y];
         if carry { a = 0xff; }
-        entities.SoA.yPos_px[x] = a;
+        entities.SoA.yPos_px[y] = a;
 
         // Entity moving down
 
-        a += entities.SoA.tileHitbox_halfHeight[x];
+        a += entities.SoA.tileHitbox_halfHeight[y];
         if carry || a >= MAP_HEIGHT_PIXELS {
             // Collided with bottom edge of the screen
-            entities.SoA.yPos_px[x] = a = (MAP_HEIGHT_PIXELS - 1) - entities.SoA.tileHitbox_halfHeight[x];
-            entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.DOWN_COLLISION;
-            ^return x;
+            entities.SoA.yPos_px[y] = a = (MAP_HEIGHT_PIXELS - 1) - entities.SoA.tileHitbox_halfHeight[y];
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.DOWN_COLLISION;
+            ^return y;
         }
         _bottom = a;
 
         // calculate tile position
         _tmp = a = _left >>> 4;
-        y = a = (_bottom & 0xf0) + _tmp;
+        x = a = (_bottom & 0xf0) + _tmp;
 
-        a = mapTileProperties[y];
+        a = mapTileProperties[x];
         if negative {
             // solid collision
-            a = (_bottom & 0xf0) - entities.SoA.tileHitbox_halfHeight[x];
+            a = (_bottom & 0xf0) - entities.SoA.tileHitbox_halfHeight[y];
             if !carry { a = 1; }
-            entities.SoA.yPos_px[x] = a;
-            entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.DOWN_COLLISION;
+            entities.SoA.yPos_px[y] = a;
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.DOWN_COLLISION;
         }
         else {
             // Check if the hitbox touches the tile to the right of this one
-            a = (_left & 0xf) + entities.SoA.tileHitbox_halfWidth[x] + entities.SoA.tileHitbox_halfWidth[x];
+            a = (_left & 0xf) + entities.SoA.tileHitbox_halfWidth[y] + entities.SoA.tileHitbox_halfWidth[y];
             if a >= METATILE_SIZE + 1 {
-                // Test Y index to prevent an out-of-bounds read past the rightmost tile.
-                a = y & 0xf;
+                // Test X index to prevent an out-of-bounds read past the rightmost tile.
+                a = x & 0xf;
                 if a != 0x0f {
-                    a = (&mapTileProperties[1])[y];
+                    a = (&mapTileProperties[1])[x];
                     if negative {
-                        a = (_bottom & 0xf0) - entities.SoA.tileHitbox_halfHeight[x];
+                        a = (_bottom & 0xf0) - entities.SoA.tileHitbox_halfHeight[y];
                         if !carry { a = 1; }
-                        entities.SoA.yPos_px[x] = a;
-                        entities.SoA.movementState[x] = a = entities.SoA.movementState[x] | entities.MovementState.DOWN_COLLISION;
+                        entities.SoA.yPos_px[y] = a;
+                        entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.DOWN_COLLISION;
                     }
                 }
             }
         }
     }
 
-    return x;
+    return y;
 }
 
 }

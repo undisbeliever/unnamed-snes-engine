@@ -123,20 +123,21 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func change_to_swarming_entity(entityId : u8 in x) : bool in carry {
+func change_to_swarming_entity(entityId : u8 in y) : bool in carry {
+
     mem16();
     #[mem16] {
-        (&SoA.process_function[0] as *u16)[unaligned x] = aa = &process as u16;
+        (&SoA.process_function[0] as *u16)[unaligned y] = aa = &process as u16;
     }
     mem8();
 
-    return _reset(x);
+    return _reset(y);
 }
 
 
 
 // (`init` function does not use a parameter)
-let init = _reset as func(entityId : u8 in x, parameter : u8 in y);
+let init = _reset as func(entityId : u8 in y, parameter : u8 in x);
 
 
 
@@ -144,57 +145,53 @@ let init = _reset as func(entityId : u8 in x, parameter : u8 in y);
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _reset(entityId : u8 in x) : bool in carry {
+func _reset(entityId : u8 in y) : bool in carry {
 
-    y = x;
-    {
-        // Read the next value in OffsetTable
-        x = offsetTableIndex;
-        x++;
-        if x >= sizeof(typeof(OffsetTable_x)) + 1{
-            x = 0;
-        }
-        offsetTableIndex = x;
-
-        a = OffsetTable_x[x] as u8;
-        SoA_targetOffset_x[y] = a as i8;
-
-        a = OffsetTable_y[x] as u8;
-        SoA_targetOffset_y[y] = a as i8;
+    // Read the next value in OffsetTable
+    x = offsetTableIndex;
+    x++;
+    if x >= sizeof(typeof(OffsetTable_x)) + 1{
+        x = 0;
     }
-    x = y;
+    offsetTableIndex = x;
+
+    a = OffsetTable_x[x] as u8;
+    SoA_targetOffset_x[y] = a as i8;
+
+    a = OffsetTable_y[x] as u8;
+    SoA_targetOffset_y[y] = a as i8;
 
 
     // Determine which direction best faces the player.
 
-    a = SoA.xPos_px[x] - player.xPos.px;
+    a = SoA.xPos_px[y] - player.xPos.px;
     if !carry {
         a = negate8(a);
     }
     _absDifference_x = a;
 
-    a = SoA.yPos_px[x] - player.yPos.px;
+    a = SoA.yPos_px[y] - player.yPos.px;
     if !carry {
         a = negate8(a);
     }
 
     if a >= _absDifference_x {
-        a = SoA.yPos_px[x];
+        a = SoA.yPos_px[y];
         if a >= player.yPos.px {
-            ^return set_direction_north(x);
+            ^return set_direction_north(y);
         }
         else {
-            ^return set_direction_south(x);
+            ^return set_direction_south(y);
         }
     }
     else {
-        a = SoA.xPos_px[x];
+        a = SoA.xPos_px[y];
         if a >= player.xPos.px {
-            ^return set_direction_west(x);
+            ^return set_direction_west(y);
         }
     }
 
-    ^return set_direction_east(x);
+    ^return set_direction_east(y);
 }
 
 
@@ -205,28 +202,28 @@ func _reset(entityId : u8 in x) : bool in carry {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func process(entityId : u8 in x) : bool in carry {
+func process(entityId : u8 in y) : bool in carry {
 
-    x = base.process_collisions(x);
+    y = base.process_collisions(y);
 
 
     if collisionState $ CollisionState.PLAYER_WEAPON_BIT {
-        x = set_state__hurt(x);
+        y = set_state__hurt(y);
     }
 
     if collisionState $ CollisionState.PLAYER_HURTBOX_BIT {
-        set_state__recoil__inline(x);
+        set_state__recoil__inline(y);
     }
 
 
     // Calculate Manhattan distance to player
-    a = SoA.xPos_px[x] - player.xPos.px;
+    a = SoA.xPos_px[y] - player.xPos.px;
     if !carry {
         a = negate8(a);
     }
     _absDifference_x = a;
 
-    a = SoA.yPos_px[x] - player.yPos.px;
+    a = SoA.yPos_px[y] - player.yPos.px;
     if !carry {
         a = negate8(a);
     }
@@ -238,7 +235,7 @@ func process(entityId : u8 in x) : bool in carry {
         _target_x = a = player.xPos.px;
         _target_y = a = player.yPos.px;
 
-        a -= SoA.yPos_px[x];
+        a -= SoA.yPos_px[y];
         if !carry {
             a = negate8(a);
         }
@@ -248,7 +245,7 @@ func process(entityId : u8 in x) : bool in carry {
         // Entity is not close to the player.
 
         // Add offset to player position to create target position (with wrapping)
-        a = SoA_targetOffset_x[x] as u8;
+        a = SoA_targetOffset_x[y] as u8;
         if negative {
             a += player.xPos.px;
             if !carry { a = 0; }
@@ -259,7 +256,7 @@ func process(entityId : u8 in x) : bool in carry {
         }
         _target_x = a;
 
-        a = SoA_targetOffset_y[x] as u8;
+        a = SoA_targetOffset_y[y] as u8;
         if negative {
             a += player.yPos.px;
             if !carry { a = 0; }
@@ -272,13 +269,13 @@ func process(entityId : u8 in x) : bool in carry {
 
 
         // Calculate absolute difference to target
-        a = SoA.xPos_px[x] - _target_x;
+        a = SoA.xPos_px[y] - _target_x;
         if !carry {
             a = negate8(a);
         }
         _absDifference_x = a;
 
-        a = SoA.yPos_px[x] - _target_y;
+        a = SoA.yPos_px[y] - _target_y;
         if !carry {
             a = negate8(a);
         }
@@ -286,7 +283,6 @@ func process(entityId : u8 in x) : bool in carry {
     }
 
 
-    y = x;
     x = SoA_state[y] as u8;
     return process__state_functions[unaligned x](y);
 }
@@ -303,12 +299,12 @@ const process__state_functions = [
 
 
 
-// KEEP: x
+// KEEP: Y
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _update_velocity__facing_north_or_south(entityId : u8 in x) {
-    y = a = SoA.xPos_px[unaligned x] - _target_x;
+func _update_velocity__facing_north_or_south(entityId : u8 in y) {
+    x = a = SoA.xPos_px[unaligned y] - _target_x;
 
     mem16();
     #[mem16] {
@@ -316,29 +312,29 @@ func _update_velocity__facing_north_or_south(entityId : u8 in x) {
 
         // carry contains comparison from subtraction above
         if carry {
-            if y >= X_ALT_VELOCITY_THRESHOLD + 1 {
+            if x >= X_ALT_VELOCITY_THRESHOLD + 1 {
                 aa = -ALT_SPEED as u16;
             }
         }
         else {
-            if y < -X_ALT_VELOCITY_THRESHOLD as u8 {
+            if x < -X_ALT_VELOCITY_THRESHOLD as u8 {
                 aa = ALT_SPEED;
             }
         }
 
-        SoA.xVelocity[unaligned x] = aa;
+        SoA.xVelocity[unaligned y] = aa;
     }
     mem8();
 }
 
 
 
-// KEEP: x
+// KEEP: Y
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _update_velocity__facing_east_or_west(entityId : u8 in x) {
-    y = a = SoA.yPos_px[unaligned x] - _target_y;
+func _update_velocity__facing_east_or_west(entityId : u8 in y) {
+    x = a = SoA.yPos_px[unaligned y] - _target_y;
 
     mem16();
     #[mem16] {
@@ -346,17 +342,17 @@ func _update_velocity__facing_east_or_west(entityId : u8 in x) {
 
         // carry contains comparison from subtraction above
         if carry {
-            if y >= Y_ALT_VELOCITY_THRESHOLD + 1 {
+            if x >= Y_ALT_VELOCITY_THRESHOLD + 1 {
                 aa = -ALT_SPEED as u16;
             }
         }
         else {
-            if y < -Y_ALT_VELOCITY_THRESHOLD as u8 {
+            if x < -Y_ALT_VELOCITY_THRESHOLD as u8 {
                 aa = ALT_SPEED;
             }
         }
 
-        SoA.yVelocity[unaligned x] = aa;
+        SoA.yVelocity[unaligned y] = aa;
     }
     mem8();
 }
@@ -366,26 +362,24 @@ func _update_velocity__facing_east_or_west(entityId : u8 in x) {
 // DB = 0x7e
 #[mem8, idx8]
 func process__facing_south(entityId : u8 in y) : bool in carry {
-    x = y;
-
 
     a = _absDifference_y + Y_TURN_THRESHOLD;
     if a < _absDifference_x {
-        ^return set_direction_east_or_west(x);
+        ^return set_direction_east_or_west(y);
     }
 
-    a = SoA.yPos_px[unaligned x];
+    a = SoA.yPos_px[unaligned y];
     if a >= _target_y {
         a -= Y_TURNAROUND_THRESHOLD;
         if !carry { a = 0; }
         if a >= _target_y {
-            ^return set_direction_north(x);
+            ^return set_direction_north(y);
         }
     }
 
-    _update_velocity__facing_north_or_south(x);
+    _update_velocity__facing_north_or_south(y);
 
-    ^return _update_walk_animation(x);
+    ^return _update_walk_animation(y);
 }
 
 
@@ -393,26 +387,24 @@ func process__facing_south(entityId : u8 in y) : bool in carry {
 // DB = 0x7e
 #[mem8, idx8]
 func process__facing_north(entityId : u8 in y) : bool in carry {
-    x = y;
-
 
     a = _absDifference_y + Y_TURN_THRESHOLD;
     if a < _absDifference_x {
-        ^return set_direction_east_or_west(x);
+        ^return set_direction_east_or_west(y);
     }
 
-    a = SoA.yPos_px[unaligned x];
+    a = SoA.yPos_px[unaligned y];
     if a < _target_y {
         a += Y_TURNAROUND_THRESHOLD;
         if carry { a = 0xff; }
         if a < _target_y {
-            ^return set_direction_south(x);
+            ^return set_direction_south(y);
         }
     }
 
-    _update_velocity__facing_north_or_south(x);
+    _update_velocity__facing_north_or_south(y);
 
-    return _update_walk_animation(x);
+    return _update_walk_animation(y);
 }
 
 
@@ -420,26 +412,24 @@ func process__facing_north(entityId : u8 in y) : bool in carry {
 // DB = 0x7e
 #[mem8, idx8]
 func process__facing_east(entityId : u8 in y) : bool in carry {
-    x = y;
-
 
     a = _absDifference_x + X_TURN_THRESHOLD;
     if a < _absDifference_y {
-        ^return set_direction_north_or_south(x);
+        ^return set_direction_north_or_south(y);
     }
 
-    a = SoA.xPos_px[unaligned x];
+    a = SoA.xPos_px[unaligned y];
     if a >= _target_x {
         a -= X_TURNAROUND_THRESHOLD;
         if !carry { a = 0; }
         if a >= _target_x {
-            ^return set_direction_west(x);
+            ^return set_direction_west(y);
         }
     }
 
-    _update_velocity__facing_east_or_west(x);
+    _update_velocity__facing_east_or_west(y);
 
-    return _update_walk_animation(x);
+    return _update_walk_animation(y);
 }
 
 
@@ -447,26 +437,24 @@ func process__facing_east(entityId : u8 in y) : bool in carry {
 // DB = 0x7e
 #[mem8, idx8]
 func process__facing_west(entityId : u8 in y) : bool in carry {
-    x = y;
-
 
     a = _absDifference_x + X_TURN_THRESHOLD;
     if a < _absDifference_y {
-        ^return set_direction_north_or_south(x);
+        ^return set_direction_north_or_south(y);
     }
 
-    a = SoA.xPos_px[unaligned x];
+    a = SoA.xPos_px[unaligned y];
     if a < _target_x {
         a += X_TURNAROUND_THRESHOLD;
         if carry { a = 0xff; }
         if a < _target_x {
-            ^return set_direction_east(x);
+            ^return set_direction_east(y);
         }
     }
 
-    _update_velocity__facing_east_or_west(x);
+    _update_velocity__facing_east_or_west(y);
 
-    return _update_walk_animation(x);
+    return _update_walk_animation(y);
 }
 
 
@@ -475,19 +463,20 @@ func process__facing_west(entityId : u8 in y) : bool in carry {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _update_walk_animation(entityId : u8 in x) : bool in carry {
+func _update_walk_animation(entityId : u8 in y) : bool in carry {
 let _tmp = <:dpTmp0;
 
+    x = y;
     SoA_animationCounter[x]--;
     if negative {
-        SoA_animationCounter[x] = a = ANIMATION_DELAY - 1;
+        SoA_animationCounter[y] = a = ANIMATION_DELAY - 1;
 
         // Increment animation Frame
-        a = SoA.metaSpriteFrame[x];
+        a = SoA.metaSpriteFrame[y];
         a++;
         _tmp = a = a & ANIMATION_FRAME_MASK;
 
-        SoA.metaSpriteFrame[x] = a = (SoA.metaSpriteFrame[x] & (ANIMATION_FRAME_MASK ^ 0xff)) | _tmp;
+        SoA.metaSpriteFrame[y] = a = (SoA.metaSpriteFrame[y] & (ANIMATION_FRAME_MASK ^ 0xff)) | _tmp;
     }
 
     return true;
@@ -497,7 +486,9 @@ let _tmp = <:dpTmp0;
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_south(entityId : u8 in x) : bool in carry {
+func set_direction_south(entityId : u8 in y) : bool in carry {
+    x = y;
+
     SoA_state[x] = State.FACING_SOUTH;
 
     SoA.metaSpriteFrame[x] = ms_frames.south0;
@@ -517,7 +508,9 @@ func set_direction_south(entityId : u8 in x) : bool in carry {
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_north(entityId : u8 in x) : bool in carry {
+func set_direction_north(entityId : u8 in y) : bool in carry {
+    x = y;
+
     a = State.FACING_NORTH as u8;
     SoA_state[x] = a as State;
 
@@ -538,7 +531,9 @@ func set_direction_north(entityId : u8 in x) : bool in carry {
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_east(entityId : u8 in x) : bool in carry {
+func set_direction_east(entityId : u8 in y) : bool in carry {
+    x = y;
+
     a = State.FACING_EAST as u8;
     SoA_state[x] = a as State;
 
@@ -559,7 +554,9 @@ func set_direction_east(entityId : u8 in x) : bool in carry {
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_west(entityId : u8 in x) : bool in carry {
+func set_direction_west(entityId : u8 in y) : bool in carry {
+    x = y;
+
     a = State.FACING_WEST as u8;
     SoA_state[x] = a as State;
 
@@ -580,22 +577,22 @@ func set_direction_west(entityId : u8 in x) : bool in carry {
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_north_or_south(entityId : u8 in x) : bool in carry {
-    a = SoA.yPos_px[x];
+func set_direction_north_or_south(entityId : u8 in y) : bool in carry {
+    a = SoA.yPos_px[y];
 
-    return set_direction_south(x) if a < _target_y;
-    return set_direction_north(x);
+    return set_direction_south(y) if a < _target_y;
+    return set_direction_north(y);
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_east_or_west(entityId : u8 in x) : bool in carry {
-    a = SoA.xPos_px[x];
+func set_direction_east_or_west(entityId : u8 in y) : bool in carry {
+    a = SoA.xPos_px[y];
 
-    return set_direction_east(x) if a < _target_x;
-    return set_direction_west(x);
+    return set_direction_east(y) if a < _target_x;
+    return set_direction_west(y);
 }
 
 
@@ -603,14 +600,14 @@ func set_direction_east_or_west(entityId : u8 in x) : bool in carry {
 // Hurt
 // ====
 
-// KEEP: X
+// KEEP: Y
 // DB = 0x7e
 #[mem8, idx8]
-func set_state__hurt(entityId : u8 in x) : u8 in x {
+func set_state__hurt(entityId : u8 in y) : u8 in y {
     a = State.HURT as u8;
-    SoA_state[x] = a as State;
+    SoA_state[y] = a as State;
 
-    return x;
+    return y;
 }
 
 
@@ -618,14 +615,14 @@ func set_state__hurt(entityId : u8 in x) : u8 in x {
 // DB = 0x7e
 #[mem8, idx8]
 func process__hurt(entityId : u8 in y) : bool in carry {
-    x = y;
 
     // ::TODO add reaction ::
 
     mem16();
     #[mem16] {
-        entities.SoA.xVelocity[unaligned x] = 0;
-        entities.SoA.yVelocity[unaligned x] = 0;
+        aa = 0;
+        entities.SoA.xVelocity[unaligned y] = aa;
+        entities.SoA.yVelocity[unaligned y] = aa;
     }
     mem8();
 
@@ -638,24 +635,24 @@ func process__hurt(entityId : u8 in y) : bool in carry {
 // ======
 
 
-// KEEP: X
+// KEEP: Y
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func set_state__recoil__inline(entityId : u8 in x) {
+inline func set_state__recoil__inline(entityId : u8 in y) {
     a = State.RECOIL as u8;
-    if a != SoA_state[x] as u8 {
-        SoA_state[x] = a as State;
+    if a != SoA_state[y] as u8 {
+        SoA_state[y] = a as State;
 
         // Invert velocity
         mem16();
         #[mem16] {
-            SoA.xVelocity[unaligned x] = aa = 0 - SoA.xVelocity[unaligned x];
-            SoA.yVelocity[unaligned x] = aa = 0 - SoA.yVelocity[unaligned x];
+            SoA.xVelocity[unaligned y] = aa = 0 - SoA.xVelocity[unaligned y];
+            SoA.yVelocity[unaligned y] = aa = 0 - SoA.yVelocity[unaligned y];
         }
         mem8();
 
-        SoA_countdownTimer[unaligned x] = a = RECOIL_TIME_IN_FRAMES - 1;
+        SoA_countdownTimer[unaligned y] = a = RECOIL_TIME_IN_FRAMES - 1;
     }
 }
 
@@ -663,11 +660,11 @@ inline func set_state__recoil__inline(entityId : u8 in x) {
 
 #[mem8, idx8]
 func process__recoil(entityId : u8 in y) : bool in carry {
-    x = y;
 
+    x = y;
     SoA_countdownTimer[x]--;
     if negative {
-        ^return _reset(x);
+        ^return _reset(y);
     }
 
     return true;

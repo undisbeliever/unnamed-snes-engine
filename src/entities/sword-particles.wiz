@@ -32,12 +32,12 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func init(entityId : u8 in x, parameter : u8 in y) {
+func init(entityId : u8 in y, parameter : u8 in x) {
 
-    SoA.yPos_px[x] = a = SoA.yPos_px[x] + SoA.zPos[x];
+    SoA.yPos_px[y] = a = SoA.yPos_px[y] + SoA.zPos[y];
 
-    SoA.metaSpriteFrame[x] = 0;
-    SoA_animationCounter[x] = a = ANIMATION_DELAY - 1;
+    SoA.metaSpriteFrame[y] = a = 0;
+    SoA_animationCounter[y] = a = ANIMATION_DELAY - 1;
 }
 
 
@@ -48,17 +48,18 @@ func init(entityId : u8 in x, parameter : u8 in y) {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func process(entityId : u8 in x) : bool in carry {
+func process(entityId : u8 in y) : bool in carry {
+    x = y;
     SoA_animationCounter[x]--;
     if negative {
-        SoA_animationCounter[x] = a = ANIMATION_DELAY - 1;
+        SoA_animationCounter[y] = a = ANIMATION_DELAY - 1;
 
-        a = SoA.metaSpriteFrame[x];
+        a = SoA.metaSpriteFrame[y];
         a++;
         if a >= N_ANIMATION_FRAMES {
             return false;
         }
-        SoA.metaSpriteFrame[x] = a;
+        SoA.metaSpriteFrame[y] = a;
     }
 
     return true;

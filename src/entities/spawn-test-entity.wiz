@@ -37,15 +37,15 @@ let ms_draw_function = ms.dungeon.Skull.pattern;
 //
 // DB = 0x7e
 #[mem8, idx8]
-func init(entityId : u8 in x) {
+func init(entityId : u8 in y) {
     mem16();
     #[mem16] {
-        SoA.xVelocity[unaligned x] = aa =  0x0120;
-        SoA.yVelocity[unaligned x] = aa = -0x0120 as u16;
+        SoA.xVelocity[unaligned y] = aa =  0x0120;
+        SoA.yVelocity[unaligned y] = aa = -0x0120 as u16;
 
-        SoA.metaSpriteFrame[unaligned x] = aa = &ms.dungeon.Skull.frames[0] as u16;
+        SoA.metaSpriteFrame[unaligned y] = aa = &ms.dungeon.Skull.frames[0] as u16;
 
-        SoA_counter[unaligned x] = aa = 10 * 60;
+        SoA_counter[unaligned y] = aa = 10 * 60;
     }
     mem8();
 }
@@ -57,23 +57,23 @@ func init(entityId : u8 in x) {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func process(entityId : u8 in x) : bool in carry {
-    metatiles.move_entity_and_collision_test(x);
+func process(entityId : u8 in y) : bool in carry {
+    metatiles.move_entity_and_collision_test(y);
 
-    a = SoA.movementState[x];
+    a = SoA.movementState[y];
     if a & MovementState.X_AXIS_COLLISION != 0 {
         mem16();
         #[mem16] {
-            SoA.xVelocity[unaligned x] = aa = 0 - SoA.xVelocity[unaligned x];
+            SoA.xVelocity[unaligned y] = aa = 0 - SoA.xVelocity[unaligned y];
         }
         mem8();
     }
 
-    a = SoA.movementState[x];
+    a = SoA.movementState[y];
     if a & MovementState.Y_AXIS_COLLISION != 0 {
         mem16();
         #[mem16] {
-            SoA.yVelocity[unaligned x] = aa = 0 - SoA.yVelocity[unaligned x];
+            SoA.yVelocity[unaligned y] = aa = 0 - SoA.yVelocity[unaligned y];
         }
         mem8();
     }
@@ -84,9 +84,9 @@ func process(entityId : u8 in x) : bool in carry {
 
     // 3 random primes, should make the spawning/deleting more unpredictable
     if a == 79 || a == 149 || a == 211 {
-        push8(x);
+        push8(y);
         entities.spawn_entity(a = 128, a = 112, a = 0);
-        x = pop8();
+        y = pop8();
     }
     else if a == 251 {
         globalCounter = 0;
@@ -98,6 +98,7 @@ func process(entityId : u8 in x) : bool in carry {
     {
         mem16();
         #[mem16] {
+            x = y;
             SoA_counter[unaligned x]--;
         }
         mem8();
