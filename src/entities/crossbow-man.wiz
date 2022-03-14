@@ -286,10 +286,13 @@ func process__walk_west(entityId : u8 in y) : bool in carry {
 func _update_walk_animation(entityId : u8 in y) : bool in carry {
 let _tmp = <:dpTmp0;
 
-    x = y;
-    SoA_animationCounter[x]--;
-    if negative {
-        SoA_animationCounter[y] = a = ANIMATION_DELAY - 1;
+    a = SoA_animationCounter[y];
+    if !zero {
+        a--;
+        SoA_animationCounter[y] = a;
+    }
+    else {
+        SoA_animationCounter[y] = a = ANIMATION_DELAY;
 
         // Increment animation Frame
         a = SoA.metaSpriteFrame[y];
