@@ -44,7 +44,12 @@ let ATTACK_ANIMATION_FRAME_DELAY = 4;
 
 
 // (frames)
-let HURT_STATE_DURATION     = 6;
+let HURT_STATE_DURATION             = 6;
+
+
+// Number of iframes to give player after the hurt push-back ends
+// SHOULD BE < HURT_STATE_DURATION.
+let N_IFRAMES_AFTER_HURT_PUSHBACK   = 3;
 
 
 let N_WALK_FRAMES           = 4;
@@ -369,47 +374,62 @@ inline func _update_player_hitbox(msFrameAddr : u16 in xx) {
 #[mem8, idx16]
 inline func _update_player_hurtbox(msFrameAddr : u16 in xx) {
 
-    // Add i8 signed offset to player's u8 unsigned position (with clamping)
 
-    a = metasprites.MsDataFormat.hurtbox_left[xx] as u8;
-    if negative {
-        // Putting the no-hurtbox test here as it is faster.
-        if a == metasprites.MsDataFormat.NO_AABB_VALUE {
-            // MS frame has no hurtbox
-            a = 0xff;
-            playerHurtbox.top = a;
-            playerHurtbox.bottom = 0;
-            playerHurtbox.left = a;
-            playerHurtbox.right = 0;
-            return;
-        }
+    a = SoA.iframeCounter[PLAYER_ENTITY_ID];
+    if !zero {
+        a--;
+        SoA.iframeCounter[PLAYER_ENTITY_ID] = a;
 
-        a += xPos.px;
-        if !carry {
-            a = 0;
-        }
+        // player has no hurtbox
+        a = 0xff;
+        playerHurtbox.top = a;
+        playerHurtbox.bottom = 0;
+        playerHurtbox.left = a;
+        playerHurtbox.right = 0;
     }
     else {
-        a += xPos.px;
-        if carry {
-            a = 0xff;
+        // Add i8 signed offset to player's u8 unsigned position (with clamping)
+
+        a = metasprites.MsDataFormat.hurtbox_left[xx] as u8;
+        if negative {
+            // Putting the no-hurtbox test here as it is faster.
+            if a == metasprites.MsDataFormat.NO_AABB_VALUE {
+                // MS frame has no hurtbox
+                a = 0xff;
+                playerHurtbox.top = a;
+                playerHurtbox.bottom = 0;
+                playerHurtbox.left = a;
+                playerHurtbox.right = 0;
+                return;
+            }
+
+            a += xPos.px;
+            if !carry {
+                a = 0;
+            }
         }
+        else {
+            a += xPos.px;
+            if carry {
+                a = 0xff;
+            }
+        }
+        playerHurtbox.left = a;
+
+
+        a = metasprites.MsDataFormat.hurtbox_right[xx] as u8;
+        __add_xPos_to_i8a_clamp(a, negative);
+        playerHurtbox.right = a;
+
+
+        a = metasprites.MsDataFormat.hurtbox_top[xx] as u8;
+        __add_yPos_to_i8a_clamp(a, negative);
+        playerHurtbox.top = a;
+
+        a = metasprites.MsDataFormat.hurtbox_bottom[xx] as u8;
+        __add_yPos_to_i8a_clamp(a, negative);
+        playerHurtbox.bottom = a;
     }
-    playerHurtbox.left = a;
-
-
-    a = metasprites.MsDataFormat.hurtbox_right[xx] as u8;
-    __add_xPos_to_i8a_clamp(a, negative);
-    playerHurtbox.right = a;
-
-
-    a = metasprites.MsDataFormat.hurtbox_top[xx] as u8;
-    __add_yPos_to_i8a_clamp(a, negative);
-    playerHurtbox.top = a;
-
-    a = metasprites.MsDataFormat.hurtbox_bottom[xx] as u8;
-    __add_yPos_to_i8a_clamp(a, negative);
-    playerHurtbox.bottom = a;
 }
 
 
@@ -843,9 +863,15 @@ func _set_state__hurt(entityId : u8 in y, oldState : u8 in a) {
 #[mem8, idx8]
 func process__hurt() {
     // Frozen until `animationFrameDelay` ends
-    (<:animationFrameDelay)--;
-    if negative {
-        set_state__walking();
+    a = <:animationFrameDelay;
+    if !zero {
+        a--;
+        <:animationFrameDelay = a;
+    }
+    else {
+        SoA.iframeCounter[PLAYER_ENTITY_ID] = a = N_IFRAMES_AFTER_HURT_PUSHBACK;
+
+        ^return set_state__walking();
     }
 }
 
