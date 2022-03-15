@@ -50,6 +50,7 @@ let ANIMATION_DELAY = 12;
 let ANIMATION_FRAME_MASK = 0x3;
 
 
+let HURT_KNOCKBACK_TIME_IN_FRAMES = 10;
 let RECOIL_TIME_IN_FRAMES = 8;
 
 
@@ -135,6 +136,31 @@ func change_to_swarming_entity(entityId : u8 in y) : bool in carry {
 }
 
 
+// Transforms an entity into a spawning entity.
+//
+// ASSUMES: entity collided with sword hitbox and `collisionCentre` is valid.
+//
+// ASSUMES: entityId is an active entity.
+//
+// Always returns true.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func change_to_swarming_entity__player_sword_collision(entityId : u8 in y) : bool in carry {
+
+    mem16();
+    #[mem16] {
+        (&SoA.process_function[0] as *u16)[unaligned y] = aa = &process as u16;
+    }
+    mem8();
+
+    // `process__hurt` will call `_reset` when the countdown timer ends.
+    set_state__hurt(y);
+
+    return true;
+}
+
+
 
 // (`init` function does not use a parameter)
 let init = _reset as func(entityId : u8 in y, parameter : u8 in x);
@@ -208,7 +234,7 @@ func process(entityId : u8 in y) : bool in carry {
 
 
     if collisionState $ CollisionState.PLAYER_WEAPON_BIT {
-        y = set_state__hurt(y);
+        set_state__hurt(y);
     }
 
     if collisionState $ CollisionState.PLAYER_HURTBOX_BIT {
@@ -603,14 +629,18 @@ func set_direction_east_or_west(entityId : u8 in y) : bool in carry {
 // Hurt
 // ====
 
+// ASSUMES: entity collided with sword hitbox and `collisionCentre` is valid.
+//
 // KEEP: Y
 // DB = 0x7e
 #[mem8, idx8]
-func set_state__hurt(entityId : u8 in y) : u8 in y {
+func set_state__hurt(entityId : u8 in y) {
     a = State.HURT as u8;
     SoA_state[y] = a as State;
 
-    return y;
+    SoA_countdownTimer[y] = a = HURT_KNOCKBACK_TIME_IN_FRAMES;
+
+    ^return base.set_velocity_after_player_sword_collision(y, base.SwordCollisionSpeed.FAST);
 }
 
 
@@ -619,15 +649,14 @@ func set_state__hurt(entityId : u8 in y) : u8 in y {
 #[mem8, idx8]
 func process__hurt(entityId : u8 in y) : bool in carry {
 
-    // ::TODO add reaction ::
-
-    mem16();
-    #[mem16] {
-        aa = 0;
-        entities.SoA.xVelocity[unaligned y] = aa;
-        entities.SoA.yVelocity[unaligned y] = aa;
+    a = SoA_countdownTimer[y];
+    if !zero {
+        a--;
+        SoA_countdownTimer[y] = a;
     }
-    mem8();
+    else {
+        ^return _reset(y);
+    }
 
     return true;
 }
@@ -660,22 +689,7 @@ inline func set_state__recoil__inline(entityId : u8 in y) {
 }
 
 
-
-#[mem8, idx8]
-func process__recoil(entityId : u8 in y) : bool in carry {
-
-    a = SoA_countdownTimer[y];
-    if !zero {
-        a--;
-        SoA_countdownTimer[y] = a;
-    }
-    else {
-        ^return _reset(y);
-    }
-
-    return true;
-}
-
+let process__recoil = process__hurt;
 
 
 }

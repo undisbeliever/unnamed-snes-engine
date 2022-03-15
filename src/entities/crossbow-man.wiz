@@ -28,6 +28,12 @@ let ATTACK_DELAY          = 10;
 // Delay between firing bolt and the next action in frames
 let ATTACK_RECOVERY_DELAY = 30;
 
+let HURT_KNOCKBACK_TIME_IN_FRAMES = 10;
+let BLOCKING_KNOCKBACK_TIME_IN_FRAMES = 12;
+
+let HURT_COOLDOWN_DELAY = 40;
+
+
 
 
 // State must be in the same order as the MetaSprite frames
@@ -39,6 +45,8 @@ enum State : u8 {
     ATTACKING       =  8,
     ATTACK_RECOVERY = 10,
     HURT            = 12,
+    BLOCKING        = 14,
+    HURT_COOLDOWN   = 16,
 };
 
 
@@ -65,10 +73,15 @@ let SoA_facingDirection  = SoA.state_1_l as *Direction;
 
 let SoA_animationCounter = SoA.state_1_h;
 
+
 // Countdown timer until the next action when attacking
 // (display frame countdown timer)
 let SoA_boltTimer        = SoA.state_2_l;
 
+
+// Countdown timer (when not attacking)
+// (display frame countdown timer)
+let SoA_countdownTimer   = SoA.state_2_h;
 
 
 in code {
@@ -100,7 +113,7 @@ func process(entityId : u8 in y) : bool in carry {
 
 
     if collisionState $ CollisionState.PLAYER_WEAPON_BIT {
-        collided_with_player_weapon__inline(y);
+        collided_with_player_weapon(y);
     }
 
 
@@ -121,6 +134,8 @@ const process__state_functions = [
     process__attacking,
     process__attack_recovery,
     process__hurt,
+    process__blocking,
+    process__hurt_cooldown,
 ];
 
 
@@ -589,7 +604,7 @@ func _attack_recovery_ended(enttyId : u8 in y) : bool in carry {
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func collided_with_player_weapon__inline(entityId : u8 in y) {
+func collided_with_player_weapon(entityId : u8 in y) {
     // Change state to HURT if player is not facing the enemy's shield.
 
     x = player.facingDirection;
@@ -597,29 +612,33 @@ inline func collided_with_player_weapon__inline(entityId : u8 in y) {
     a = SoA_facingDirection[y] as u8;
     if a == Direction.EAST as u8 {
         if x != player.FacingDirection.LEFT as u8 {
-            set_state__hurt(y);
+            return set_state__hurt(y);
         }
     }
     else if a == Direction.WEST as u8 {
         if x != player.FacingDirection.RIGHT as u8 {
-            set_state__hurt(y);
+            return set_state__hurt(y);
         }
     }
     else if a == Direction.NORTH as u8 {
         if x != player.FacingDirection.DOWN as u8 {
-            set_state__hurt(y);
+            return set_state__hurt(y);
         }
     }
     else {
         // Direction.SOUTH
         if x != player.FacingDirection.UP as u8 {
-            set_state__hurt(y);
+            return set_state__hurt(y);
         }
     }
+
+    return set_state__blocking(y);
 }
 
 
 
+// ASSUMES: entity collided with sword hitbox and `collisionCentre` is valid.
+//
 // KEEP: Y
 //
 // DB = 0x7e
@@ -627,6 +646,10 @@ inline func collided_with_player_weapon__inline(entityId : u8 in y) {
 func set_state__hurt(entityId : u8 in y) {
     a = State.HURT as u8;
     SoA_state[y] = a as State;
+
+    SoA_countdownTimer[y] = a = HURT_KNOCKBACK_TIME_IN_FRAMES;
+
+    ^return base.set_velocity_after_player_sword_collision(y, base.SwordCollisionSpeed.EXTRA_FAST);
 }
 
 
@@ -635,18 +658,87 @@ func set_state__hurt(entityId : u8 in y) {
 #[mem8, idx8]
 func process__hurt(entityId : u8 in y) : bool in carry {
 
-    // ::TODO add reaction ::
+    a = SoA_countdownTimer[y];
+    if !zero {
+        a--;
+        SoA_countdownTimer[y] = a;
+    }
+    else {
+        ^return set_state__hurt_cooldown(y);
+    }
+
+    return true;
+}
+
+
+
+// Blocking
+// ========
+
+
+
+// ASSUMES: entity collided with sword hitbox and `collisionCentre` is valid.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_state__blocking(entityId : u8 in y) {
+    a = State.BLOCKING as u8;
+    SoA_state[y] = a as State;
+
+    SoA_countdownTimer[y] = a = BLOCKING_KNOCKBACK_TIME_IN_FRAMES;
+
+    ^return base.set_velocity_after_player_sword_collision(y, base.SwordCollisionSpeed.SLOWER);
+}
+
+
+let process__blocking = process__hurt;
+
+
+
+// Hurt Cool-down
+// ==============
+
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+func set_state__hurt_cooldown(entityId : u8 in y) : bool in carry {
+    a = State.HURT_COOLDOWN as u8;
+    SoA_state[y] = a as State;
 
     mem16();
     #[mem16] {
         x = y;
-        entities.SoA.xVelocity[unaligned x] = 0;
-        entities.SoA.yVelocity[unaligned x] = 0;
+        SoA.xVelocity[unaligned x] = 0;
+        SoA.yVelocity[unaligned x] = 0;
     }
     mem8();
 
+    SoA_countdownTimer[y] = a = HURT_COOLDOWN_DELAY;
+
     return true;
 }
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__hurt_cooldown(entityId : u8 in y) : bool in carry {
+
+    a = SoA_countdownTimer[y];
+    if !zero {
+        a--;
+        SoA_countdownTimer[y] = a;
+    }
+    else {
+
+        ^return set_state__walk(y, SoA_walkingDirection[y] as u8);
+    }
+
+    return true;
+}
+
 
 
 }

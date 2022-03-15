@@ -14,12 +14,20 @@ namespace entities {
 namespace bouncing_off_walls {
 
 
+// (animation frames)
 let SoA_animationCounter = SoA.state_0_l;
 
 
-let SPEED          = 0x0120;
-let SPEED_INCREASE = 0x0085;
-let MAX_SPEED      = 0x0380;
+// The speed of the entity after being struck by the player's sword.
+// (index increment by 2 into `set_velocity_after_player_sword_collision` collisionSpeed parameter)
+let SoA_hurtSpeed = SoA.state_0_h;
+
+
+
+let INITIAL_SPEED     = 0x0120;
+
+let FIRST_SWORD_SPEED = base.SwordCollisionSpeed.SLOW;
+let MAX_SWORD_SPEED   = base.SwordCollisionSpeed.FAST_FAST_FAST;
 
 
 let ANIMATION_DELAY = 4;
@@ -42,23 +50,25 @@ func init(entityId : u8 in y, parameter : u8 in x) {
 
         aa = 0;
         if x < init_parameter.up as u8 || x == init_parameter.down_right as u8 {
-            aa = SPEED;
+            aa = INITIAL_SPEED;
         }
         else if x >= init_parameter.up_left as u8 && x < init_parameter.down as u8 {
-            aa = -SPEED as u16;
+            aa = -INITIAL_SPEED as u16;
         }
         SoA.xVelocity[unaligned y] = aa;
 
         aa = 0;
         if x >= init_parameter.down_left as u8 {
-            aa = SPEED;
+            aa = INITIAL_SPEED;
         }
         else if x >= init_parameter.up_right as u8 && x < init_parameter.left as u8 {
-            aa = -SPEED as u16;
+            aa = -INITIAL_SPEED as u16;
         }
         SoA.yVelocity[unaligned y] = aa;
     }
     mem8();
+
+    SoA_hurtSpeed[unaligned y] = a = FIRST_SWORD_SPEED - 2;
 
     SoA.metaSpriteFrame[unaligned y] = a = ms_frames.frame0;
 }
@@ -134,47 +144,23 @@ func process(entityId : u8 in y) : bool in carry {
 //
 // The collision centre is used to determine the new direction of the entity.
 //
-// ASSUMES: `collisionCentre` is valid.
+// ASSUMES: entity collided with sword hitbox and `collisionCentre` is valid.
 //
 // KEEP: Y
 //
 // DB = 0x7e
 #[mem8, idx8]
 inline func collided_with_player_hitbox(entityId : u8 in y) {
-    mem16();
-    #[mem16] {
-        aa = SoA.xVelocity[unaligned y];
-        if negative {
-            aa = negate16(aa);
-        }
-        aa += SPEED_INCREASE;
-        if aa >= MAX_SPEED + 1 {
-            aa = MAX_SPEED;
-        }
 
-        x = SoA.xPos_px[unaligned y];
-        if x < base.collisionCentre_x {
-            aa = negate16(aa);
-        }
-        SoA.xVelocity[unaligned y] = aa;
-
-
-        aa = SoA.yVelocity[unaligned y];
-        if negative {
-            aa = negate16(aa);
-        }
-        aa += SPEED_INCREASE;
-        if aa >= MAX_SPEED + 1 {
-            aa = MAX_SPEED;
-        }
-
-        x = SoA.yPos_px[unaligned y];
-        if x < base.collisionCentre_y {
-            aa = negate16(aa);
-        }
-        SoA.yVelocity[unaligned y] = aa;
+    x = SoA_hurtSpeed[y];
+    if x < MAX_SWORD_SPEED {
+        x++;
+        x++;
+        SoA_hurtSpeed[y] = a = x;
     }
-    mem8();
+
+    // ::SHOULDO adjust velocity based on previous velocity and collisionCentre::
+    base.set_velocity_after_player_sword_collision(y, x);
 }
 
 

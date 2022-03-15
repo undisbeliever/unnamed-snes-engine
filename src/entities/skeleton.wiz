@@ -80,7 +80,7 @@ func process(entityId : u8 in y) : bool in carry {
 
 
     if collisionState $ CollisionState.PLAYER_WEAPON_BIT {
-        ^return swarming.change_to_swarming_entity(y);
+        ^return swarming.change_to_swarming_entity__player_sword_collision(y);
     }
 
 
@@ -107,7 +107,6 @@ func process__walk_south(entityId : u8 in y) : bool in carry {
 
     carry = vision_cone.test_down(y);
     if carry {
-        // ::TODO add change_to_swarming_entity_in_hurt_state ::
         ^return swarming.change_to_swarming_entity(y);
     }
 

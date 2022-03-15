@@ -15,6 +15,13 @@ N_ANGLES = 32
 COSINE_TABLES = (
     ('PlayerHurtVelocity',  0x0200),
     ('CalcAngleTest',       0x2000),
+
+    ('SwordStrike_Slower',       0x0100),
+    ('SwordStrike_Slow',         0x0180),
+    ('SwordStrike_Medium',       0x0200),
+    ('SwordStrike_Fast',         0x0280),
+    ('SwordStrike_ExtraFast',    0x0300),
+    ('SwordStrike_FastFastFast', 0x0380),
 )
 
 
