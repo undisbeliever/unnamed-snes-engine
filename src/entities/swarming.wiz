@@ -640,7 +640,7 @@ func set_state__hurt(entityId : u8 in y) {
 
     SoA_countdownTimer[y] = a = HURT_KNOCKBACK_TIME_IN_FRAMES;
 
-    ^return base.set_velocity_after_player_sword_collision(y, base.SwordCollisionSpeed.FAST);
+    ^return base.take_damage_from_player_sword_with_knockback(y, base.SwordCollisionSpeed.FAST);
 }
 
 

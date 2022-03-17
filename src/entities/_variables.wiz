@@ -160,21 +160,21 @@ namespace entities {
             let tileHitbox_halfHeight = &tileHitbox[0].second as *u8;
 
 
-            var _movementStateAndBlank : [ u16 ; N_ENTITIES ];
+            var _movementStateAndIframeCounter : [ _u8pair ; N_ENTITIES ];
 
             // Updated by `metatiles.move_entity_and_collision_test` or `entities.base.process_collisions`
             // (bitfield of `entities.MovementState`)
-            let movementState = &<:_movementStateAndBlank[0] as *u8;
-
-
-            var _healthAndIframeCounter : [ _u8pair ; N_ENTITIES ];
-
-            // Entity health
-            let health = &_healthAndIframeCounter[0].first as *u8;
+            let movementState = &<:_movementStateAndIframeCounter[0].first as *u8;
 
             // Updated by `base.process_collisions`
             // Invincibility frames counter
-            let iframeCounter = &_healthAndIframeCounter[0].second as *u8;
+            let iframeCounter = &_movementStateAndIframeCounter[0].second as *u8;
+
+
+            var _healthAndBlank : [ _u8pair ; N_ENTITIES ];
+
+            // Entity health
+            let health = &_healthAndBlank[0].first as *u8;
 
 
             // Vision parameters

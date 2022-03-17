@@ -160,7 +160,7 @@ inline func collided_with_player_hitbox(entityId : u8 in y) {
     }
 
     // ::SHOULDO adjust velocity based on previous velocity and collisionCentre::
-    base.set_velocity_after_player_sword_collision(y, x);
+    base.take_damage_from_player_sword_with_knockback(y, x);
 }
 
 

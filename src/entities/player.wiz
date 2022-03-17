@@ -32,6 +32,11 @@ let PLAYER_ENTITY_ID = 0;
 let ATTACK_BUTTON_H = snes.joy.mask_h.Y;
 
 
+
+let INITIAL_SWORD_ATTACK_POWER = 2;
+
+
+
 // (8:8 unsigned fixed point)
 let WALK_VELOCITY = 0x0160;
 
@@ -111,6 +116,9 @@ let animationFrame        = <:entities.SoA.state_1[0];
 let animationFrameDelay = entities.SoA.state_2[0];
 
 
+let swordAttackPower = entities.SoA.state_3_l[PLAYER_ENTITY_ID];
+
+
 
 // CODE
 // ====
@@ -147,6 +155,9 @@ inline func init() {
 
 
     facingDirection = a = FacingDirection.UP as u8;
+
+    swordAttackPower = a = INITIAL_SWORD_ATTACK_POWER;
+
 
     set_state__walking();
 

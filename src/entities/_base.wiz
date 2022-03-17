@@ -7,6 +7,8 @@ import "../memmap";
 import "_variables";
 import "_common";
 
+import "dead";
+
 
 import "../metatiles";
 import "../metasprites";
@@ -58,6 +60,65 @@ namespace SwordCollisionSpeed {
 
 
 in code {
+
+
+// Take damage from the player's sword.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func take_damage_from_player_sword(entityId : u8 in y) {
+
+    // ::TODO add different types of attacks and defences::
+
+    // NOTE: If I change this function I MUST also change `take_damage_from_player_sword_with_knockback`
+
+    a = SoA.health[y] - entities.player.swordAttackPower;
+    if !carry {
+        a = 0;
+    }
+
+    if zero {
+        ^return entities.dead.change_to_dead_entity(y);
+    }
+
+    SoA.health[y] = a;
+}
+
+
+
+// Take damage from the player's sword and then call `set_velocity_after_player_sword_collision`.
+//
+// ASSUMES: entity collided with sword hitbox and `collisionCentre` is valid.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8, fallthrough]
+func take_damage_from_player_sword_with_knockback(entityId : u8 in y, collisionSpeed : u8 in x) {
+
+    // ::TODO add different types of attacks and defences::
+
+
+    // NOTE: If I change this function I MUST also change `take_damage_from_player_sword`
+
+    // MUST NOT modify X
+
+    a = SoA.health[y] - entities.player.swordAttackPower;
+    if !carry {
+        a = 0;
+    }
+
+    if zero {
+        ^return entities.dead.change_to_dead_entity(y);
+    }
+
+    SoA.health[y] = a;
+
+    return set_velocity_after_player_sword_collision(y, x);
+}
+
 
 
 // Change velocity of the entity based on the collisionCentre.
