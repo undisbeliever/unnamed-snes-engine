@@ -89,6 +89,8 @@ func process(entityId : u8 in y) : bool in carry {
         SoA_despawnTimer[y] = a = N_FRAMES_IN_SWORD;
     }
     else if collisionState $ CollisionState.PLAYER_HURTBOX_BIT {
+        base.hurt_player__collision(y);
+
         SoA_despawnTimer[y] = a = N_FRAMES_IN_PLAYER;
     }
     else {

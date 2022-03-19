@@ -171,6 +171,9 @@ inline func collided_with_player_hitbox(entityId : u8 in y) {
 //
 // DB = 0x
 inline func collided_with_player_hurtbox(entityId : u8 in y) {
+
+    base.hurt_player__collision(y);
+
     mem16();
     #[mem16] {
         SoA.xVelocity[unaligned y] = aa = 0 - SoA.xVelocity[unaligned y];

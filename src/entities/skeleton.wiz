@@ -83,8 +83,11 @@ func process(entityId : u8 in y) : bool in carry {
         ^return swarming.change_to_swarming_entity__player_sword_collision(y);
     }
 
+    if collisionState $ CollisionState.PLAYER_HURTBOX_BIT {
+        base.hurt_player__collision(y);
 
-    // ::TODO add reaction when colliding with player hurtbox ::
+        // ::TODO add reaction when colliding with player hurtbox ::
+    }
 
 
     x = SoA_state[y] as u8;

@@ -35,6 +35,8 @@ let ATTACK_BUTTON_H = snes.joy.mask_h.Y;
 
 let INITIAL_SWORD_ATTACK_POWER = 2;
 
+let INITIAL_HEALTH = 16;
+
 
 
 // (8:8 unsigned fixed point)
@@ -55,6 +57,11 @@ let HURT_STATE_DURATION             = 6;
 // Number of iframes to give player after the hurt push-back ends
 // SHOULD BE < HURT_STATE_DURATION.
 let N_IFRAMES_AFTER_HURT_PUSHBACK   = 3;
+
+
+// Number of iframes after the player has been attacked
+let N_IFRAMES_AFTER_ATTACKED = 30;
+
 
 
 let N_WALK_FRAMES           = 4;
@@ -116,7 +123,9 @@ let animationFrame        = <:entities.SoA.state_1[0];
 let animationFrameDelay = entities.SoA.state_2[0];
 
 
-let swordAttackPower = entities.SoA.state_3_l[PLAYER_ENTITY_ID];
+let health = entities.SoA.health[PLAYER_ENTITY_ID];
+
+let swordAttackPower = entities.SoA.attackPower[PLAYER_ENTITY_ID];
 
 
 
@@ -156,6 +165,7 @@ inline func init() {
 
     facingDirection = a = FacingDirection.UP as u8;
 
+    health = a = INITIAL_HEALTH;
     swordAttackPower = a = INITIAL_SWORD_ATTACK_POWER;
 
 
@@ -206,28 +216,13 @@ func process(entityId : u8 in y) {
 
 
 
-// Called whenever an entity collides with the player's hurtbox.
-//
-// PARAM: entityId - the entity that collided with `playerHurtbox`.
-//
-// DB = 0x7e
-#[mem8, idx8]
-inline func hurtbox_collided_with_entity__inline(entityId : u8 in y) {
-    a = state as u8;
-    if a != State.HURT as u8 {
-        _set_state__hurt(y, a);
-    }
-}
-
-
-
 // Called whenever an entity collides with the player's hitbox.
 //
 // PARAM: entityId - the entity that collided with `playerHitbox`.
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func hitbox_collided_with_entity__inline(entityId : u8 in y) {
+inline func hitbox_collided_with_entity__inline(enemyEntityId : u8 in y) {
 
     // ::TODO add a has-sword-particle flag to entity::
 
@@ -840,7 +835,18 @@ func process__attack() {
 
 // DB = 0x7e
 #[mem8, idx8]
-func _set_state__hurt(entityId : u8 in y, oldState : u8 in a) {
+inline func set_state_hurt__enemy_collision__inline(enemyEntityId : u8 in y) {
+    a = state as u8;
+    if a != State.HURT as u8 {
+        _set_state__hurt__enemy_collision(y);
+    }
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func _set_state__hurt__enemy_collision(enemyEntityId : u8 in y) {
     state = a = State.HURT as u8;
 
     x = calc_angle_32x2(a = SoA.previousXpos[unaligned y],
@@ -861,6 +867,8 @@ func _set_state__hurt(entityId : u8 in y, oldState : u8 in a) {
     mem8();
 
 
+    SoA.iframeCounter[PLAYER_ENTITY_ID] = a = N_IFRAMES_AFTER_ATTACKED;
+
     <:animationFrameDelay = a = HURT_STATE_DURATION;
 
 
@@ -880,7 +888,10 @@ func process__hurt() {
         <:animationFrameDelay = a;
     }
     else {
-        SoA.iframeCounter[PLAYER_ENTITY_ID] = a = N_IFRAMES_AFTER_HURT_PUSHBACK;
+        a = SoA.iframeCounter[PLAYER_ENTITY_ID];
+        if zero {
+            SoA.iframeCounter[PLAYER_ENTITY_ID] = a = N_IFRAMES_AFTER_HURT_PUSHBACK;
+        }
 
         ^return set_state__walking();
     }

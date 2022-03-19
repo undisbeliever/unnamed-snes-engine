@@ -62,6 +62,50 @@ namespace SwordCollisionSpeed {
 in code {
 
 
+
+// Hurt the player from a collision.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+#[fallthrough]
+func hurt_player__collision(entityId : u8 in y) {
+
+    a = SoA.attackPower[y];
+}
+
+// Hurt the player from a collision with a custom attack power stat.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func hurt_player__collision__attack_power(entityId : u8 in y, attackPower : u8 in a) {
+
+let _tmp = <:dpTmp0;
+
+    x = SoA.iframeCounter[player.PLAYER_ENTITY_ID];
+    if zero {
+        // ::TODO add different types of attacks and defences::
+
+        _tmp = a;
+
+        a = player.health - _tmp;
+        if !carry {
+            a = 0;
+        }
+        player.health = a;
+
+
+        player.set_state_hurt__enemy_collision__inline(y);
+
+        y = currentEntityId;
+    }
+}
+
+
+
 // Take damage from the player's sword.
 //
 // KEEP: Y
@@ -244,9 +288,6 @@ func process_collisions(entityId : u8 in y) : u8 in y {
 
                 mem8_idx8();
                 #[mem8, idx8] {
-                    entities.player.hurtbox_collided_with_entity__inline(y);
-                    y = currentEntityId;
-
                     collisionState = a = CollisionState.PLAYER_HURTBOX;
 
                     return y;

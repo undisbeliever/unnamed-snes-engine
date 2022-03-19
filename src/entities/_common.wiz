@@ -117,7 +117,7 @@ let _init_function_ptr = _init_function_u16 as func(u8 in y, u8 in x);
 
                 (&entities.SoA._zPosAndBlank[0] as *u16)[unaligned y] = aa = entity_rom_data.initial_zpos_and_blank[unaligned x];
 
-                (&entities.SoA._healthAndBlank[0] as *u16)[unaligned y] = aa = entity_rom_data.health_and_blank[unaligned x];
+                (&entities.SoA._healthAndAttackPower[0] as *u16)[unaligned y] = aa = entity_rom_data.health_and_attack_power[unaligned x];
 
                 aa = (far &entity_rom_data.metasprite_framesets as far *u16)[unaligned x];
             }

@@ -63,7 +63,8 @@
       "code": "sword_particles",
       "metasprites": "common.SwordParticles",
       "zpos": "30",
-      "health": "255"
+      "health": 255,
+      "attack": 0
     },
     {
       "name": "crossbow_man",
@@ -71,7 +72,8 @@
       "metasprites": "dungeon.CrossbowMan",
       "zpos": "0",
       "vision": "200 14",
-      "health": "4"
+      "health": 4,
+      "attack": 1
     },
     {
       "name": "skeleton",
@@ -79,35 +81,40 @@
       "metasprites": "dungeon.Skeleton",
       "zpos": "0",
       "vision": "75 28",
-      "health": "6"
+      "health": 6,
+      "attack": 3
     },
     {
       "name": "skull",
       "code": "bouncing_off_walls",
       "metasprites": "dungeon.Skull",
       "zpos": "4",
-      "health": "8"
+      "health": 8,
+      "attack": 3
     },
     {
       "name": "bolt_straight",
       "code": "projectile",
       "metasprites": "common.Bolt",
       "zpos": "4",
-      "health": "255"
+      "health": 255,
+      "attack": 2
     },
     {
       "name": "bolt_angled",
       "code": "projectile_angled",
       "metasprites": "common.Bolt",
       "zpos": "4",
-      "health": "255"
+      "health": 255,
+      "attack": 2
     },
     {
       "name": "test__calc_angle",
       "code": "test__calc_angle",
       "metasprites": "dungeon.Skull",
       "zpos": "0",
-      "health": "255"
+      "health": 255,
+      "attack": 0
     }
   ]
 }

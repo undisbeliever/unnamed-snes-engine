@@ -81,9 +81,9 @@ in rodata0 {
         write_list_u8('initial_zpos_and_blank',
                     [ f"{ e.zpos }" for e in entities ],
                     [ f"0" for e in entities ])
-        write_list_u8('health_and_blank',
+        write_list_u8('health_and_attack_power',
                     [ f"{ e.health }" for e in entities ],
-                    [ f"0" for e in entities ])
+                    [ f"{ e.attack }" for e in entities ])
 
         out.write("""
 }

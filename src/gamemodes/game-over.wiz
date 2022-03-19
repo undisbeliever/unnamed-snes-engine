@@ -1,0 +1,35 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "../wait-frame";
+
+
+namespace gamemodes {
+namespace game_over {
+
+
+in code {
+
+
+// Game Over GameMode
+//
+// DB = 0x7e
+#[mem8, idx8]
+func exec() {
+
+    // ::TODO implement a game over screen::
+
+    while true {
+        wait_frame();
+    }
+
+}
+
+
+}
+
+}
+}
+

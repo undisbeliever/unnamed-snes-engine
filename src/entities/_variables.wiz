@@ -171,10 +171,13 @@ namespace entities {
             let iframeCounter = &_movementStateAndIframeCounter[0].second as *u8;
 
 
-            var _healthAndBlank : [ _u8pair ; N_ENTITIES ];
+            var _healthAndAttackPower : [ _u8pair ; N_ENTITIES ];
 
             // Entity health
-            let health = &_healthAndBlank[0].first as *u8;
+            let health = &_healthAndAttackPower[0].first as *u8;
+
+            // Attack Power stat
+            let attackPower = &_healthAndAttackPower[0].second as *u8;
 
 
             // Vision parameters

@@ -73,7 +73,7 @@ EntityFunction = namedtuple('EntityFunction', ('name', 'id', 'ms_export_order', 
 EfParameter = namedtuple('EfParameter', ('type', 'values'))
 EntityVision = namedtuple('EntityVision', ('a', 'b'))
 
-Entity = namedtuple('Entity', ('name', 'id', 'code', 'metasprites', 'zpos', 'vision', 'health'))
+Entity = namedtuple('Entity', ('name', 'id', 'code', 'metasprites', 'zpos', 'vision', 'health', 'attack'))
 
 
 
@@ -128,6 +128,7 @@ def load_entities_json(filename):
                     zpos = int(e['zpos']),
                     vision = _read_entity_vision_parameter(e.get('vision')),
                     health = int(e['health']),
+                    attack = int(e['attack']),
         )
 
         if entity.name in entities:
