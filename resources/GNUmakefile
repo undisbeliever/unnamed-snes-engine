@@ -2,9 +2,16 @@
 METASPRITES_SRC  := $(wildcard metasprites/*/*.aseprite)
 METASPRITES	 := $(patsubst %.aseprite,%.png,$(METASPRITES_SRC))
 
+IMAGES_SRC       := $(wildcard */*.aseprite)
+IMAGES           := $(patsubst %.aseprite,%.png,$(IMAGES_SRC))
+
 
 .PHONY: all
-all: $(METASPRITES)
+all: $(METASPRITES) $(IMAGES)
+
+
+%.png: %.aseprite
+	aseprite --batch "$<" --save-as "$@"
 
 
 metasprites/%.png: metasprites/%.aseprite
@@ -13,6 +20,6 @@ metasprites/%.png: metasprites/%.aseprite
 
 .PHONY: clean
 clean:
-	$(RM)	$(METASPRITES)
+	$(RM)	$(METASPRITES) $(IMAGES)
 
 

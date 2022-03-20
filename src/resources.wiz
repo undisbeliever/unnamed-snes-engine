@@ -29,6 +29,13 @@ in rodata0 {
 }
 
 
+namespace ui {
+in rodata0 {
+    const tiles = embed "gen/tilesets/ui-2bpp-tiles.tiles";
+}
+}
+
+
 
 // Resource Lists
 // ==============

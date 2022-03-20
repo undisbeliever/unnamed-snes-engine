@@ -1,0 +1,246 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "memmap";
+import "../wiz/common/snes/snes";
+
+import "resources";
+
+import "entities/_variables";
+import "common/dma";
+
+
+namespace ui {
+
+
+let HEALTH_BAR_MAX = 32;
+
+let HEALTH_BAR_TILE_X = 0;
+let HEALTH_BAR_TILE_Y = 1;
+
+let X_BG_OFFSET = -4;
+let Y_BG_OFFSET = -4;
+
+
+let HB_START_TILE               = 1;
+let HB_TWO_BLUE_TILE            = 2;
+let HB_ONE_BLUE_ONE_EMPTY_TILE  = 3;
+let HB_TWO_EMPTY_TILE           = 4;
+let HB_ONE_BLUE_TILE            = 5;
+let HB_ONE_EMPTY_TILE           = 6;
+
+
+
+in wram7e {
+    // Tile buffer
+    var healthBarBuffer : [ u8 ; HEALTH_BAR_MAX / 2 + 1 ];
+
+    // If zero then the health bar is stale and will be redrawn at a later time.
+    // (byte flag)
+    var healthBarValid : u8;
+}
+
+in shadow {
+    // If non-zero then textBuffer will be uploaded to the PPU on the next VBlank.
+    // (byte flag)
+    var healthBarBufferFlag : u8;
+}
+
+
+
+in code {
+
+
+// Initialize the UI variables
+//
+// DB = 0x7e
+inline func init() {
+    redraw_health_bar();
+}
+
+
+
+// Setup the PPU, load tiles into VRAM, clear tilemap
+//
+// REQUIRES: Force-Blank
+// Uses DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func setup_ppu__forceblank() {
+
+    // Transfer UI tiles VRAM
+    {
+        let tile_data = far &resources.ui.tiles as far *u8;
+        let tile_data_size = sizeof(typeof(resources.ui.tiles));
+
+        snes.ppu.vram_address_hl = xx = VRAM_BG3_TILES_WADDR;
+        dma.transfer_to_vram__forceblank(#:tile_data, tile_data as u16, tile_data_size);
+    }
+
+    // Clear BG3 tilemap (with order bit set high)
+    dma.set_tilemap__forceblank(VRAM_BG3_MAP_WADDR, 0x2000);
+
+
+    snes.ppu.bg3_scroll_x = a = <:X_BG_OFFSET;
+    snes.ppu.bg3_scroll_x = a = >:X_BG_OFFSET;
+    // Set Y scroll to -1;
+    snes.ppu.bg3_scroll_y = a = <:(Y_BG_OFFSET - 1);
+    snes.ppu.bg3_scroll_y = a = >:(Y_BG_OFFSET - 1);
+
+
+    healthBarBufferFlag = 0;
+}
+
+
+
+// Transfer the `healthBarBuffer` to VRAM if required.
+//
+// REQUIRES: V-Blank
+// Uses DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func transfer_buffer__vblank() {
+
+    a = healthBarBufferFlag;
+    if zero {
+        snes.ppu.vram_control = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_1;
+
+        snes.ppu.vram_address_hl = xx = VRAM_BG3_MAP_WADDR + HEALTH_BAR_TILE_Y * 32 + HEALTH_BAR_TILE_X;
+
+        snes.dma0.control = a = snes.dma.CONTROL_MODE_A;
+        snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
+
+        snes.dma0.src_address_hl = xx = &healthBarBuffer as u16;
+        snes.dma0.src_address_bank = a = #:far &healthBarBuffer;
+
+        snes.dma0.mdma_size_hl = xx = sizeof(typeof(healthBarBuffer));
+
+        snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+
+        healthBarBufferFlag = a;
+    }
+}
+
+
+// Mark the health bar out of date.
+//
+// Should be called every time the player's health changes.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func mark_healthbar_invalid() {
+    healthBarValid = 0;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+inline func process() {
+
+    a = healthBarValid;
+    if zero {
+        redraw_health_bar();
+    }
+}
+
+
+
+// Redraw the health bar
+//
+// ASSUMES: player max health >= player health
+//
+// DB = 0x7e
+#[mem8, idx8]
+func redraw_health_bar() {
+
+let _tmp = <:dpTmp0;
+
+    healthBarBuffer[0] = a = HB_START_TILE;
+
+    x = 1;
+
+    a = entities.SoA.health[0];
+    if a >= HEALTH_BAR_MAX + 1 {
+        a = HEALTH_BAR_MAX;
+    }
+    a >>>= 1;
+
+    if !zero {
+        y = a;
+        a = HB_TWO_BLUE_TILE;
+        do {
+            healthBarBuffer[x] = a;
+            x++;
+            y--;
+        } while !zero;
+    }
+
+    a = entities.SoA.health[0];
+    if a & 1 != 0 {
+        if a == entities.playerMaxHealth {
+            healthBarBuffer[x] = a = HB_ONE_BLUE_TILE;
+            x++;
+            goto ClearTiles;
+        }
+
+        healthBarBuffer[x] = a = HB_ONE_BLUE_ONE_EMPTY_TILE;
+        x++;
+
+        a = entities.SoA.health[0];
+    }
+
+
+    // Determine number of empty tiles to draw
+    a = entities.playerMaxHealth;
+    if a >= HEALTH_BAR_MAX + 1 {
+        a = HEALTH_BAR_MAX;
+    }
+    a >>>= 1;
+    _tmp = x;
+    a = a - _tmp;
+
+    if carry && !zero {
+        // Draw empty health-bar tiles
+        y = a;
+        a = HB_TWO_EMPTY_TILE;
+        do {
+            healthBarBuffer[x] = a;
+            x++;
+            y--;
+        } while !zero;
+    }
+
+
+    a = entities.playerMaxHealth;
+    if a & 1 != 0 {
+        healthBarBuffer[x] = a = HB_ONE_EMPTY_TILE;
+        x++;
+    }
+
+
+ClearTiles:
+    // Clear tiles after max health
+    if x < sizeof(typeof(healthBarBuffer)) {
+        do {
+            healthBarBuffer[x] = 0;
+            x++;
+        } while x < sizeof(typeof(healthBarBuffer));
+    }
+
+
+    // x is non-zero
+    healthBarValid = x;
+
+    // Upload to VRAM on next VBlank
+    healthBarBufferFlag = 0;
+}
+
+
+}
+
+
+}
+

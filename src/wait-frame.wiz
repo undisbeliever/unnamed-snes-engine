@@ -4,6 +4,7 @@
 import "memmap";
 import "metasprites";
 import "metatiles";
+import "ui";
 import "../wiz/common/snes/snes";
 
 
@@ -52,6 +53,8 @@ func wait_frame() {
 
         metatiles.transitions.transfer_buffer__vblank();
 
+        ui.transfer_buffer__vblank();
+
 
         // Update scroll registers
 
@@ -81,7 +84,7 @@ func wait_frame() {
 func wait_frame_and_change_brightness(new_brightness : u8 in a) {
     _brightness_buffer = a;
 
-    return wait_frame();
+    ^return wait_frame();
 }
 
 

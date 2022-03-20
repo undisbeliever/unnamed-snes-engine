@@ -68,6 +68,13 @@ namespace entities {
     }
 
 
+    in wram7e {
+        // The amount of health on a full HP
+        var playerMaxHealth : u8;
+
+    }
+
+
     // Entity 0 is always the player
     namespace SoA {
         let LAST_INDEX = (N_ENTITIES - 1) * 2;

@@ -8,6 +8,7 @@ import "gamemodes";
 import "metatiles";
 import "metasprites";
 import "resources";
+import "ui";
 import "wait-frame";
 import "common/reset";
 import "entities/_variables";
@@ -87,6 +88,9 @@ in code {
 inline func init() {
 
     entities.player.init();
+
+    ui.init();
+
 
     currentRoom = a = resources.rooms.STARTING_ROOM;
 
@@ -259,6 +263,7 @@ func _spawn_room_entities() {
 #[mem8, idx8]
 inline func _setup_ppu_and_reset_graphics_subsystems() {
 
+
     wait_frame_and_change_brightness(snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK);
 
 
@@ -271,12 +276,14 @@ inline func _setup_ppu_and_reset_graphics_subsystems() {
         reset_registers();
 
         snes.ppu.bg_mode = a = 1 | snes.ppu.BG_MODE_MODE1_BG3_PRIORITY;
-        snes.ppu.bg1_tilemap = a = (VRAM_BG1_MAP_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT) | snes.ppu.BG_TILEMAP_MIRROR_X;
+        snes.ppu.bg1_tilemap = a = (VRAM_BG1_MAP_WADDR >> snes.ppu.BG_TILEMAP_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT) | snes.ppu.BG_TILEMAP_MIRROR_X;
+        snes.ppu.bg3_tilemap = a = (VRAM_BG3_MAP_WADDR >> snes.ppu.BG_TILEMAP_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT);
 
         snes.ppu.bg12_tileset = a = (VRAM_BG1_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG1_SHIFT);
+        snes.ppu.bg34_tileset = a = (VRAM_BG3_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG1_SHIFT);
 
 
-        snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_BG1 | snes.ppu.SCREEN_ENABLE_OBJ;
+        snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_BG1 | snes.ppu.SCREEN_ENABLE_BG3 | snes.ppu.SCREEN_ENABLE_OBJ;
 
 
 
@@ -290,6 +297,8 @@ inline func _setup_ppu_and_reset_graphics_subsystems() {
 
             // ::TODO get spritesheet_id from somewhere::
             metasprites.load_ppu_data__fblank(1);
+
+            ui.setup_ppu__forceblank();
         }
         idx8();
     }
@@ -334,6 +343,9 @@ func run_game {
         entities.sort_active_entities();
 
         draw_entities();
+
+
+        ui.process();
 
 
         _check_for_room_transition();

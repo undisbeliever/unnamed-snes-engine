@@ -165,7 +165,10 @@ inline func init() {
 
     facingDirection = a = FacingDirection.UP as u8;
 
-    health = a = INITIAL_HEALTH;
+    a = INITIAL_HEALTH;
+    health = a;
+    playerMaxHealth = a;
+
     swordAttackPower = a = INITIAL_SWORD_ATTACK_POWER;
 
 

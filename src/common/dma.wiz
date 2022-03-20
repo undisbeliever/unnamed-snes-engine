@@ -37,6 +37,56 @@ func transfer_to_vram__forceblank(data_bank : u8 in a, data_addr : u16 in xx, si
 
 
 
+// Replace all words in a 32x32 tilemap with a given value.
+//
+// Uses DMA channel 0
+// REQUIRES: Force-Blank
+// DB = 0x80
+#[mem8, idx16]
+func set_tilemap__forceblank(vramWaddr : u16 in xx, tilemapEntry : u16 in yy) {
+
+let _tmp = dpTmp0;
+
+    // MUST NOT USE xx
+
+
+    _tmp = yy;
+
+
+    snes.dma.hdma_enable = 0;
+
+    // Ensure we are in force blank;
+    snes.ppu.brightness = a = snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK;
+
+
+    snes.dma0.control = a = snes.dma.CONTROL_MODE_A | snes.dma.CONTROL_MDMA_NO_INCREMENT;
+    snes.dma0.src_address_bank = #:far &_tmp;
+    snes.dma0.src_address_h = >:&_tmp;
+
+    // Transfer low byte
+    snes.ppu.vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_1;
+    snes.ppu.vram_address_hl = xx;
+
+    snes.dma0.src_address_l = <:&_tmp;
+    snes.dma0.mdma_size_hl = yy = 32 * 32;
+    snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
+
+    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+
+
+    // Transfer high byte
+    snes.ppu.vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
+    snes.ppu.vram_address_hl = xx;
+
+    snes.dma0.src_address_l = a = &_tmp as u8 + 1;
+    snes.dma0.mdma_size_hl = yy = 32 * 32;
+    snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_h;
+
+    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+}
+
+
+
 // Transfer data to CGRAM
 // Uses DMA channel 0
 // REQUIRES: Force-Blank
