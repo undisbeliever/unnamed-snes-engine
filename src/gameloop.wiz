@@ -351,7 +351,7 @@ func run_game {
         _check_for_room_transition();
 
 
-        a = entities.player.health;
+        a = ui.healthBarValue;
         if zero {
             a = GameModes.GAME_OVER as u8;
             gameMode = a as GameModes;

@@ -22,6 +22,9 @@ let X_BG_OFFSET = -4;
 let Y_BG_OFFSET = -4;
 
 
+let HB_ANIMATION_TIMER = 3;
+
+
 let HB_PREFIX_TILE  = 1;
 let HB_EMPTY_TILE   = 2;
 let HB_FIRST_TILE   = 3;
@@ -29,7 +32,6 @@ let HB_FULL_TILE    = 6;
 
 
 let HB_SHIFT = 2;
-
 
 let MAX_HB_TILES = HEALTH_BAR_MAX >> HB_SHIFT;
 
@@ -44,14 +46,16 @@ in wram7e {
     var _healthBarBuffer : HealthBarBuffer;
     let healthBarBuffer = *(&_healthBarBuffer);
 
-    // If zero then the health bar is stale and will be redrawn at a later time.
-    // (byte flag)
-    var healthBarValid : u8;
-
     // Number of tiles to show in the health bar.
     // Equal to max player health >> HB_SHIFT.
     // Must be <= MAX_HB_TILES.
     var nHealthBarTiles : u8;
+
+    // Health bar value
+    var healthBarValue : u8;
+
+    // Countdown timer for healthbar increment/decrement animation.
+    var healthBarTimer : i8;
 }
 
 
@@ -75,8 +79,11 @@ inline func init() {
 
     healthBarBuffer.prefix_tile = a = HB_PREFIX_TILE;
 
+    healthBarTimer = 0;
+
     max_player_health_changed();
-    redraw_health_bar();
+
+    _redraw_health_bar(entities.SoA.health[0]);
 }
 
 
@@ -145,21 +152,12 @@ inline func transfer_buffer__vblank() {
 }
 
 
-// Mark the health bar out of date.
-//
-// Should be called every time the player's health changes.
-//
-// DB = 0x7e
-#[mem8, idx8]
-inline func mark_healthbar_invalid() {
-    healthBarValid = 0;
-}
-
-
 
 // Resize health bar.
 //
 // Should be called whenever the player's max health changes.
+//
+// ASSUMES: player's health changes when max health changes.
 //
 // DB = 0x7e
 #[mem8, idx8]
@@ -170,7 +168,8 @@ func max_player_health_changed() {
     }
     nHealthBarTiles = a;
 
-    mark_healthbar_invalid();
+
+    healthBarTimer = 0;
 }
 
 
@@ -179,9 +178,27 @@ func max_player_health_changed() {
 #[mem8, idx8]
 inline func process() {
 
-    a = healthBarValid;
-    if zero {
-        redraw_health_bar();
+    a = healthBarValue;
+    cmp(a, entities.SoA.health[0]);
+    if !zero {
+        healthBarTimer--;
+        if negative {
+            if carry {
+                a--;
+            } else {
+                a++;
+            }
+
+            _redraw_health_bar(a);
+
+            a = healthBarValue;
+            if a == entities.SoA.health[0] {
+                a = 0;
+            } else {
+                a = HB_ANIMATION_TIMER - 1;
+            }
+            healthBarTimer = a as i8;
+        }
     }
 }
 
@@ -193,17 +210,17 @@ inline func process() {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func redraw_health_bar() {
+func _redraw_health_bar(newValue : u8 in a) {
 
     x = 0;
 
-    // Draw full tiles
-    a = entities.SoA.health[0];
-    if a >= HEALTH_BAR_MAX + 1 {
-        a = HEALTH_BAR_MAX;
-    }
-    a >>>= HB_SHIFT;
+    healthBarValue = a;
 
+    // Draw full tiles
+    a >>>= HB_SHIFT;
+    if a >= MAX_HB_TILES + 1 {
+        a = MAX_HB_TILES;
+    }
     if !zero {
         y = a;
         x = a;
@@ -219,7 +236,7 @@ func redraw_health_bar() {
 
 
     // Draw partial tile
-    a = entities.SoA.health[0] & ((1 << HB_SHIFT) - 1);
+    a = healthBarValue & ((1 << HB_SHIFT) - 1);
     if !zero {
         healthBarBuffer.bar[x] = a = a + (HB_FIRST_TILE - 1);
         x++;
@@ -244,9 +261,6 @@ func redraw_health_bar() {
         } while x < MAX_HB_TILES;
     }
 
-
-    // x is non-zero
-    healthBarValid = x;
 
     // Upload to VRAM on next VBlank
     healthBarBufferFlag = 0;

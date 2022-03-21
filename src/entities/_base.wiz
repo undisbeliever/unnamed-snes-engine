@@ -101,8 +101,6 @@ let _tmp = <:dpTmp0;
 
         player.set_state_hurt__enemy_collision__inline(y);
 
-        ui.mark_healthbar_invalid();
-
         y = currentEntityId;
     }
 }
