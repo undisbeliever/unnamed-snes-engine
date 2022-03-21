@@ -15,7 +15,7 @@ namespace ui {
 
 let HEALTH_BAR_MAX = 32;
 
-let HEALTH_BAR_TILE_X = 0;
+let HEALTH_BAR_TILE_X = 1;
 let HEALTH_BAR_TILE_Y = 1;
 
 let X_BG_OFFSET = -4;
