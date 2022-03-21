@@ -70,6 +70,8 @@ namespace entities {
 
     in wram7e {
         // The amount of health on a full HP
+        //
+        // MUST be a multiple of 4
         var playerMaxHealth : u8;
 
     }

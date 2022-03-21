@@ -22,18 +22,24 @@ let X_BG_OFFSET = -4;
 let Y_BG_OFFSET = -4;
 
 
-let HB_START_TILE               = 1;
-let HB_TWO_BLUE_TILE            = 2;
-let HB_ONE_BLUE_ONE_EMPTY_TILE  = 3;
-let HB_TWO_EMPTY_TILE           = 4;
-let HB_ONE_BLUE_TILE            = 5;
-let HB_ONE_EMPTY_TILE           = 6;
+let HB_PREFIX_TILE  = 1;
+let HB_EMPTY_TILE   = 2;
+let HB_FIRST_TILE   = 3;
+let HB_FULL_TILE    = 6;
 
+
+let HB_SHIFT = 2;
 
 
 in wram7e {
+    struct HealthBarBuffer {
+        prefix_tile : u8,
+        bar : [ u8 ; HEALTH_BAR_MAX >> HB_SHIFT ],
+    };
+
     // Tile buffer
-    var healthBarBuffer : [ u8 ; HEALTH_BAR_MAX / 2 + 1 ];
+    var _healthBarBuffer : HealthBarBuffer;
+    let healthBarBuffer = *(&_healthBarBuffer);
 
     // If zero then the health bar is stale and will be redrawn at a later time.
     // (byte flag)
@@ -113,9 +119,9 @@ inline func transfer_buffer__vblank() {
         snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
 
         snes.dma0.src_address_hl = xx = &healthBarBuffer as u16;
-        snes.dma0.src_address_bank = a = #:far &healthBarBuffer;
+        snes.dma0.src_address_bank = a = #:far &_healthBarBuffer;
 
-        snes.dma0.mdma_size_hl = xx = sizeof(typeof(healthBarBuffer));
+        snes.dma0.mdma_size_hl = xx = sizeof(HealthBarBuffer);
 
         snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
 
@@ -158,38 +164,36 @@ func redraw_health_bar() {
 
 let _tmp = <:dpTmp0;
 
-    healthBarBuffer[0] = a = HB_START_TILE;
+    healthBarBuffer.prefix_tile = a = HB_PREFIX_TILE;
 
-    x = 1;
+    x = 0;
 
+    // Draw full tiles
     a = entities.SoA.health[0];
     if a >= HEALTH_BAR_MAX + 1 {
         a = HEALTH_BAR_MAX;
     }
-    a >>>= 1;
+    a >>>= HB_SHIFT;
 
     if !zero {
         y = a;
-        a = HB_TWO_BLUE_TILE;
+        x = a;
+
+        a = HB_FULL_TILE;
         do {
-            healthBarBuffer[x] = a;
-            x++;
-            y--;
-        } while !zero;
+            healthBarBuffer.bar[x] = a;
+            x--;
+        } while !negative;
+
+        x = y;
     }
 
-    a = entities.SoA.health[0];
-    if a & 1 != 0 {
-        if a == entities.playerMaxHealth {
-            healthBarBuffer[x] = a = HB_ONE_BLUE_TILE;
-            x++;
-            goto ClearTiles;
-        }
 
-        healthBarBuffer[x] = a = HB_ONE_BLUE_ONE_EMPTY_TILE;
+    // Draw partial tile
+    a = entities.SoA.health[0] & ((1 << HB_SHIFT) - 1);
+    if !zero {
+        healthBarBuffer.bar[x] = a = a + (HB_FIRST_TILE - 1);
         x++;
-
-        a = entities.SoA.health[0];
     }
 
 
@@ -198,36 +202,25 @@ let _tmp = <:dpTmp0;
     if a >= HEALTH_BAR_MAX + 1 {
         a = HEALTH_BAR_MAX;
     }
-    a >>>= 1;
-    _tmp = x;
-    a = a - _tmp;
+    a >>>= HB_SHIFT;
+    _tmp = a;
 
-    if carry && !zero {
+    if x < _tmp {
         // Draw empty health-bar tiles
-        y = a;
-        a = HB_TWO_EMPTY_TILE;
+        a = HB_EMPTY_TILE;
         do {
-            healthBarBuffer[x] = a;
+            healthBarBuffer.bar[x] = a;
             x++;
-            y--;
-        } while !zero;
+        } while x < _tmp;
     }
 
 
-    a = entities.playerMaxHealth;
-    if a & 1 != 0 {
-        healthBarBuffer[x] = a = HB_ONE_EMPTY_TILE;
-        x++;
-    }
-
-
-ClearTiles:
     // Clear tiles after max health
-    if x < sizeof(typeof(healthBarBuffer)) {
+    if x < sizeof(typeof(healthBarBuffer.bar)) {
         do {
-            healthBarBuffer[x] = 0;
+            healthBarBuffer.bar[x] = 0;
             x++;
-        } while x < sizeof(typeof(healthBarBuffer));
+        } while x < sizeof(typeof(healthBarBuffer.bar));
     }
 
 
