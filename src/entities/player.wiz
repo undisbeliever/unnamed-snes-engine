@@ -47,7 +47,7 @@ let WALK_VELOCITY = 0x0160;
 // (8:8 unsigned fixed point)
 let WALK_ANIMATION_FRAME_DISTANCE = 0x0980;
 
-let ATTACK_ANIMATION_FRAME_DELAY = 4;
+let ATTACK_ANIMATION_FRAME_DELAY = 3;
 
 
 // (frames)
