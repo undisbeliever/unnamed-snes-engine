@@ -40,7 +40,7 @@ let INITIAL_HEALTH = 16;
 
 
 // (8:8 unsigned fixed point)
-let WALK_VELOCITY = 0x0160;
+let WALK_VELOCITY = 0x0180;
 
 
 // Pixels the player is to transverse before incrementing `animationFrame`
