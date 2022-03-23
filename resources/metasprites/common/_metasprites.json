@@ -41,22 +41,22 @@
     "defaultHurtbox":   "12 15    8  8",
 
     "hitboxes": {
-      "attack_north0":  "20  8   11  7",
-      "attack_north1":  "20  6    8  9",
-      "attack_north2":  "14  4    6 12",
-      "attack_north3":  "14  4    5 12",
-      "attack_south0":  " 3 15   11  7",
-      "attack_south1":  " 4 18    8  9",
-      "attack_south2":  "12 20    6 11",
-      "attack_south3":  "13 20    5 11",
-      "attack_east0":   "16 16    5  7",
-      "attack_east1":   "18 16   10  7",
-      "attack_east2":   "18 16   13  7",
-      "attack_east3":   "18 16   13  7",
-      "attack_west0":   "11 16    5  7",
-      "attack_west1":   " 3 16   11  7",
-      "attack_west2":   " 1 16   13  7",
-      "attack_west3":   " 1 16   13  7"
+      "attack_north0":  "19  8   12  8",
+      "attack_north1":  "19  6    9 10",
+      "attack_north2":  "13  3    9 13",
+      "attack_north3":  "13  3    8 14",
+      "attack_south0":  " 3 14   12  8",
+      "attack_south1":  " 4 17    9 10",
+      "attack_south2":  "10 18    9 13",
+      "attack_south3":  "11 17    8 14",
+      "attack_east0":   "14 11    8 11",
+      "attack_east1":   "16 10   12  8",
+      "attack_east2":   "16 14   15  8",
+      "attack_east3":   "16 14   15  8",
+      "attack_west0":   "10 11    8 11",
+      "attack_west1":   " 4 10   12  8",
+      "attack_west2":   " 1 14   15  8",
+      "attack_west3":   " 1 14   15  8"
     }
   },
   {
