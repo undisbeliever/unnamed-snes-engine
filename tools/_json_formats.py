@@ -264,7 +264,7 @@ MsFrameset = namedtuple('MsFrameset', ('name', 'source', 'frame_width', 'frame_h
                                        'shadow_size', 'tilehitbox', 'default_hitbox', 'default_hurtbox',
                                        'pattern', 'ms_export_order', 'order', 'blocks',
                                        'hitbox_overrides', 'hurtbox_overrides'))
-MsBlock = namedtuple('MsBlock', ('pattern', 'start', 'x', 'y', 'frames', 'default_hitbox', 'default_hurtbox'))
+MsBlock = namedtuple('MsBlock', ('pattern', 'start', 'x', 'y', 'flip', 'frames', 'default_hitbox', 'default_hurtbox'))
 
 
 TileHitbox = namedtuple('TileHitbox', ('half_width', 'half_height'))
@@ -291,6 +291,19 @@ def __read_aabb(s):
     if len(v) != 4:
         raise ValueError('Error: Expected a string containing four integers (aabb)')
     return Aabb(int(v[0]), int(v[1]), int(v[2]), int(v[3]))
+
+
+
+_VALID_FLIPS = frozenset(('hflip', 'vflip', 'hvflip'))
+
+def __read_flip(s):
+    if not s:
+        return None
+
+    if s in _VALID_FLIPS:
+        return s
+
+    raise ValueError(f"Error: Unknown flip value: {flip}")
 
 
 
@@ -331,6 +344,7 @@ def __load_ms_blocks(json_input, fs_pattern, fs_default_hitbox, fs_default_hurtb
                 start = int(j['start']),
                 x = x,
                 y = y,
+                flip = __read_flip(j.get('flip', None)),
                 frames = check_name_list(j['frames']),
                 default_hitbox = __read_aabb(j['defaultHitbox']) if 'defaultHitbox' in j else fs_default_hitbox,
                 default_hurtbox = __read_aabb(j['defaultHurtbox']) if 'defaultHurtbox' in j else fs_default_hurtbox,

@@ -21,20 +21,31 @@
 
     "order": 2,
 
+    "defaultHitbox":  "13 12   6  11",
+    "defaultHurtbox": "12 10   8  14",
+
     "blocks": [
       {
         "start": 0,
 
-        "x": 7,
+        "x": 8,
         "y": 0,
-
-        "defaultHitbox":  "13 12   6  11",
-        "defaultHurtbox": "12 10   8  14",
 
         "frames": [
           "south0", "south1", "south2", "south3",
           "north0", "north1", "north2", "north3",
-          "east0",  "east1",  "east2",  "east3",
+          "east0",  "east1",  "east2",  "east3"
+        ]
+      },
+      {
+        "start": 8,
+
+        "flip": "hflip",
+
+        "x": 8,
+        "y": 0,
+
+        "frames": [
           "west0",  "west1",  "west2",  "west3"
         ]
       }

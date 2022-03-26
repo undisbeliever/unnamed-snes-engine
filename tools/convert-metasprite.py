@@ -367,6 +367,11 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparen
 
     image = load_image(ms_dir, fs.source)
 
+    image_hflip = None
+    image_vflip = None
+    image_hvflip = None
+
+
     if image.width % fs.frame_width != 0 or image.height % fs.frame_height != 0:
         raise ValueError(f"Source image is not a multiple of frame size: { fs.name }")
 
@@ -378,7 +383,6 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparen
 
     for block in fs.blocks:
         # ::TODO somehow handle clone blocks::
-        # ::TODO somehow handle flipped blocks::
 
         if block.pattern:
             block_pattern = ms_export_orders.patterns[block.pattern]
@@ -389,6 +393,28 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparen
             block_pattern = base_pattern
 
 
+        if block.flip is None:
+            block_image = image
+
+        elif block.flip == 'hflip':
+            if image_hflip is None:
+                image_hflip = image.transpose(PIL.Image.FLIP_LEFT_RIGHT)
+            block_image = image_hflip
+
+        elif block.flip == 'vflip':
+            if image_vflip is None:
+                image_vflip = image.transpose(PIL.Image.PIL.Image.FLIP_TOP_BOTTOM)
+            block_image = image_vflip
+
+        elif block.flip == 'hvflip':
+            if image_hvflip is None:
+                image_hvflip = image.transpose(PIL.Image.ROTATE_180)
+            block_image = image_hvflip
+
+        else:
+            raise ValueError(f"Unknown flip: { block.flip}")
+
+
         for i, frame_name in enumerate(block.frames):
             if frame_name in frames:
                 raise ValueError(f"Duplicate frame: { frame_name }")
@@ -397,9 +423,16 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparen
             x = (frame_number % frames_per_row) * fs.frame_width
             y = (frame_number // frames_per_row) * fs.frame_height
 
+
+            if block.flip == 'hflip' or block.flip == 'hvflip':
+                x = block_image.width - x - fs.frame_width
+            elif block.flip == 'vflip' or block.flip == 'hvflip':
+                y = block_image.width - y - fs.frame_height
+
+
             try:
                 if block_pattern is None:
-                    pattern, pattern_x, pattern_y = find_best_pattern(image, transparent_color, pattern_grids, x, y, fs.frame_width, fs.frame_height)
+                    pattern, pattern_x, pattern_y = find_best_pattern(block_image, transparent_color, pattern_grids, x, y, fs.frame_width, fs.frame_height)
 
                     x += pattern_x
                     y += pattern_y
@@ -417,7 +450,7 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparen
                 hitbox = fs.hitbox_overrides.get(frame_name, block.default_hitbox)
                 hurtbox = fs.hurtbox_overrides.get(frame_name, block.default_hurtbox)
 
-                frames[frame_name] = extract_frame(image, pattern, palettes_map, tiles, fs, x, y, x_offset, y_offset, hitbox, hurtbox)
+                frames[frame_name] = extract_frame(block_image, pattern, palettes_map, tiles, fs, x, y, x_offset, y_offset, hitbox, hurtbox)
             except Exception as e:
                 raise Exception(f"Error with { fs.name }, { frame_name }: { e }")
 
