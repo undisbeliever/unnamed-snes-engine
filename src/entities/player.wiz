@@ -163,7 +163,7 @@ inline func init() {
     mem8();
 
 
-    facingDirection = a = FacingDirection.UP as u8;
+    facingDirection = a = FacingDirection.DOWN as u8;
 
     a = INITIAL_HEALTH;
     health = a;

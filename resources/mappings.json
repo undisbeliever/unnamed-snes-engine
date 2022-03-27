@@ -9,5 +9,5 @@
  "dungeons": {
    "d1-lv1": { "x_offset": 0, "y_offset": 0 }
  },
- "starting_room": "d1-lv1-2-4"
+ "starting_room": "d1-lv1-2-2"
 }

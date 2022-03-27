@@ -1,0 +1,172 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "_variables";
+import "_base";
+
+import "../../gen/entities";
+
+
+namespace entities {
+namespace slime {
+
+
+let CRAWL_SPEED = 0x0080;
+
+
+let ANIMATION_DELAY = 13;
+let ANIMATION_FRAME_MASK = 0x3;
+let CRAWL_ANIMATION_FRAME_SHIFT = 2;
+
+
+enum Direction : u8 {
+    LEFT,
+    RIGHT,
+    UP,
+    DOWN,
+};
+
+
+enum State : u8 {
+    CRAWL   = 0,
+};
+
+
+let SoA_state            = SoA.state_0_l as *State;
+let SoA_direction        = SoA.state_0_h as *Direction;
+
+let SoA_animationCounter = SoA.state_1_l;
+
+
+
+in code {
+
+
+// Entity process routine.
+//
+// Called when the entity is spawned
+//
+// DB = 0x7e
+#[mem8, idx8]
+func init(entityId : u8 in y, parameter : u8 in x) {
+
+    if x < 4 {
+        set_direction(y, x);
+    }
+
+    x = y;
+    SoA_state[x] = State.CRAWL;
+}
+
+
+
+// Entity process routine.
+//
+// Called once per frame.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process(entityId : u8 in y) : bool in carry {
+
+    y = base.process_collisions(y);
+
+
+    if collisionState $ CollisionState.PLAYER_WEAPON_BIT {
+        // ::TODO add hurt by player state::
+    }
+
+    if collisionState $ CollisionState.PLAYER_HURTBOX_BIT {
+        base.hurt_player__collision(y);
+
+        // ::TODO add reaction when colliding with player hurtbox ::
+    }
+
+
+    x = SoA_state[y] as u8;
+    return process__state_functions[unaligned x](y);
+}
+
+
+const process__state_functions = [
+    process__crawl,
+];
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__crawl(entityId : u8 in y) : bool in carry {
+let _tmp = <:dpTmp0;
+
+
+    // ::TODO randomly change direction::
+
+
+    a = SoA.movementState[y];
+    if a & (MovementState.X_AXIS_COLLISION | MovementState.Y_AXIS_COLLISION) != 0 {
+        // Collided with wall.
+        // 180 degree turn
+        a = (SoA_direction[y] as u8) ^ 1;
+        return set_direction(y, a);
+    }
+
+
+    // Update crawl animation
+    a = SoA_animationCounter[y];
+    if !zero {
+        a--;
+        SoA_animationCounter[y] = a;
+    }
+    else {
+        SoA_animationCounter[y] = a = ANIMATION_DELAY;
+
+        // Increment animation Frame
+        a = SoA.metaSpriteFrame[y];
+        a++;
+        _tmp = a = a & ANIMATION_FRAME_MASK;
+
+        SoA.metaSpriteFrame[y] = a = (SoA.metaSpriteFrame[y] & (ANIMATION_FRAME_MASK ^ 0xff)) | _tmp;
+    }
+
+    return true;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_direction(entityId : u8 in y, direction : u8 in a) : bool in carry {
+    SoA_direction[y] = a as Direction;
+
+    x = a = a <<< 1;
+
+    SoA.metaSpriteFrame[y] = a = a <<< (CRAWL_ANIMATION_FRAME_SHIFT - 1);
+    SoA_animationCounter[y] = a = 0;
+
+    mem16();
+    #[mem16] {
+        SoA.xVelocity[unaligned y] = aa = DirectionCrawlVelocity_X[unaligned x] as u16;
+        SoA.yVelocity[unaligned y] = aa = DirectionCrawlVelocity_Y[unaligned x] as u16;
+    }
+    mem8();
+
+    return true;
+}
+
+}
+
+
+in rodata0 {
+
+    const _DirectionCrawlVelocity_X : [i16 ; 4] = [ -CRAWL_SPEED,  CRAWL_SPEED,            0,            0 ];
+    const _DirectionCrawlVelocity_Y : [i16 ; 4] = [             0,           0, -CRAWL_SPEED,  CRAWL_SPEED ];
+
+    let DirectionCrawlVelocity_X = far &_DirectionCrawlVelocity_X as far *u16;
+    let DirectionCrawlVelocity_Y = far &_DirectionCrawlVelocity_Y as far *i16;
+}
+
+}
+}
+

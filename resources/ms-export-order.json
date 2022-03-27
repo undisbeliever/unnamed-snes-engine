@@ -143,6 +143,26 @@
         "west3"
       ]
     },
+    "slime": {
+      "frames": [
+        "crawl_left_0",
+        "crawl_left_1",
+        "crawl_left_2",
+        "crawl_left_3",
+        "crawl_right_0",
+        "crawl_right_1",
+        "crawl_right_2",
+        "crawl_right_3",
+        "crawl_up_0",
+        "crawl_up_1",
+        "crawl_up_2",
+        "crawl_up_3",
+        "crawl_down_0",
+        "crawl_down_1",
+        "crawl_down_2",
+        "crawl_down_3"
+      ]
+    },
     "crossbow_man": {
       "frames": [
         "south0",

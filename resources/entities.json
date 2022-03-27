@@ -33,6 +33,14 @@
       }
     },
     {
+      "name": "slime",
+      "ms-export-order": "slime",
+      "parameter": {
+        "type": "enum",
+        "values": [ "left", "right", "up", "down" ]
+      }
+    },
+    {
       "name": "swarming",
       "ms-export-order": "skeleton"
     },
@@ -83,6 +91,14 @@
       "vision": "75 28",
       "health": 6,
       "attack": 3
+    },
+    {
+      "name": "slime",
+      "code": "slime",
+      "metasprites": "dungeon.Slime",
+      "zpos": "0",
+      "health": 5,
+      "attack": 4
     },
     {
       "name": "skull",
