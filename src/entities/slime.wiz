@@ -6,6 +6,8 @@ import "../memmap";
 import "_variables";
 import "_base";
 
+import "../rng";
+
 import "../../gen/entities";
 
 
@@ -14,6 +16,13 @@ namespace slime {
 
 
 let CRAWL_SPEED = 0x0080;
+
+
+let STARTING_CHANGE_DIRECTION_DELAY = 60 * 3;
+
+// The sum of these two constants must be <= 0xff
+let MIN_CHANGE_DIRECTION_DELAY = 90;
+let CHANNGE_DIRECTION_DELAY_RANDOM_MASK = 0x7f;
 
 
 let ANIMATION_DELAY = 13;
@@ -28,6 +37,8 @@ enum Direction : u8 {
     DOWN,
 };
 
+let DIRECTION_MASK = 3;
+
 
 enum State : u8 {
     CRAWL   = 0,
@@ -38,6 +49,8 @@ let SoA_state            = SoA.state_0_l as *State;
 let SoA_direction        = SoA.state_0_h as *Direction;
 
 let SoA_animationCounter = SoA.state_1_l;
+
+let SoA_changeDirectionTimer = SoA.state_2_l;
 
 
 
@@ -52,9 +65,13 @@ in code {
 #[mem8, idx8]
 func init(entityId : u8 in y, parameter : u8 in x) {
 
-    if x < 4 {
-        set_direction(y, x);
+    a = x;
+    if a >= 4 {
+        a = rng.random();
     }
+    set_direction(y, a);
+
+    SoA_changeDirectionTimer[y] = a = STARTING_CHANGE_DIRECTION_DELAY;
 
     x = y;
     SoA_state[x] = State.CRAWL;
@@ -101,14 +118,23 @@ func process__crawl(entityId : u8 in y) : bool in carry {
 let _tmp = <:dpTmp0;
 
 
-    // ::TODO randomly change direction::
-
-
     a = SoA.movementState[y];
     if a & (MovementState.X_AXIS_COLLISION | MovementState.Y_AXIS_COLLISION) != 0 {
         // Collided with wall.
         // 180 degree turn
         a = (SoA_direction[y] as u8) ^ 1;
+        return set_direction(y, a);
+    }
+
+
+    // Randomly change direction when changeDirectionTimer reaches zero
+    a = SoA_changeDirectionTimer[y];
+    if !zero {
+        a--;
+        SoA_changeDirectionTimer[y] = a;
+    }
+    else {
+        a = rng.random();
         return set_direction(y, a);
     }
 
@@ -138,6 +164,8 @@ let _tmp = <:dpTmp0;
 // DB = 0x7e
 #[mem8, idx8]
 func set_direction(entityId : u8 in y, direction : u8 in a) : bool in carry {
+    a &= DIRECTION_MASK;
+
     SoA_direction[y] = a as Direction;
 
     x = a = a <<< 1;
@@ -151,6 +179,10 @@ func set_direction(entityId : u8 in y, direction : u8 in a) : bool in carry {
         SoA.yVelocity[unaligned y] = aa = DirectionCrawlVelocity_Y[unaligned x] as u16;
     }
     mem8();
+
+    a = rng.random();
+    a = (a & CHANNGE_DIRECTION_DELAY_RANDOM_MASK) + MIN_CHANGE_DIRECTION_DELAY;
+    SoA_changeDirectionTimer[y] = a;
 
     return true;
 }

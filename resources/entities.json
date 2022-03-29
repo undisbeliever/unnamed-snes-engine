@@ -37,7 +37,7 @@
       "ms-export-order": "slime",
       "parameter": {
         "type": "enum",
-        "values": [ "left", "right", "up", "down" ]
+        "values": [ "left", "right", "up", "down", "random" ]
       }
     },
     {

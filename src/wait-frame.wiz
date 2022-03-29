@@ -5,6 +5,7 @@ import "memmap";
 import "metasprites";
 import "metatiles";
 import "ui";
+import "rng";
 import "../wiz/common/snes/snes";
 
 
@@ -38,8 +39,12 @@ func wait_frame() {
     data_bank = pop8();
 // DB = 0x80
 
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        rng.increment_rng();
+    }
     mem8();
-    idx16();
     #[mem8, idx16] {
         a = _brightness_buffer | snes.ppu.BRIGHTNESS_FORCE_BLANK;
 
