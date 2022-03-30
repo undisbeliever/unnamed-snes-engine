@@ -1,0 +1,107 @@
+// Joypad
+// ======
+//
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+
+import "memmap";
+import "../wiz/common/snes/snes";
+
+
+namespace joypad {
+
+
+namespace JOY {
+    let TYPE_MASK   = 0x000f;
+    let R           = 0x0010;
+    let L           = 0x0020;
+    let X           = 0x0040;
+    let A           = 0x0080;
+    let RIGHT       = 0x0100;
+    let LEFT        = 0x0200;
+    let DOWN        = 0x0400;
+    let UP          = 0x0800;
+    let START       = 0x1000;
+    let SELECT      = 0x2000;
+    let Y           = 0x4000;
+    let B           = 0x8000;
+}
+
+
+let TYPE__CONTROLLER = 0;
+
+
+namespace JOYL {
+    let R       = 0x10;
+    let L       = 0x20;
+    let X       = 0x40;
+    let A       = 0x80;
+}
+
+namespace JOYH {
+    let RIGHT   = 0x01;
+    let LEFT    = 0x02;
+    let DOWN    = 0x04;
+    let UP      = 0x08;
+    let START   = 0x10;
+    let SELECT  = 0x20;
+    let Y       = 0x40;
+    let B       = 0x80;
+}
+
+
+// Joypad buttons
+let ATTACK_BUTTON_H = joypad.JOYH.Y;
+
+
+
+in shadow {
+    // The current state of the joypad
+    // (uint16)
+    var current : u16;
+    let current_l = *(&<:current as *u8);
+    let current_h = *(&>:current as *u8);
+
+
+    // The buttons that were pressed in this frame
+    // (uint16)
+    var pressed : u16;
+    let pressed_l = *(&<:pressed as *u8);
+    let pressed_h = *(&>:pressed as *u8);
+}
+
+
+
+// Update the joypad state
+//
+// DB = 0x80
+#[mem8, idx8]
+inline func update_state__inline() {
+
+    // Wait until AutoJoy is completed
+    a = snes.ppu.HVBJOY_STATUS_AUTOJOY_MASK;
+    do {
+    } while a & snes.ppu.hvbjoy_status != 0;
+
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        aa = snes.joy.pad1_hl;
+        if aa & JOY.TYPE_MASK != TYPE__CONTROLLER {
+            aa = 0;
+        }
+
+        yy = aa;
+
+        aa = (current ^ 0xffff);
+        current = yy;
+        aa &= current;
+        pressed = aa;
+    }
+    mem8_idx8();
+}
+
+
+}
+

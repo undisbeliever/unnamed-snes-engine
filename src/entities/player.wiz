@@ -7,11 +7,10 @@ import "_variables";
 import "_common";
 import "_base";
 
+import "../joypad";
 import "../metatiles";
 import "../metasprites";
 import "../common/math";
-
-import "../../wiz/common/snes/snes";
 
 import "../../gen/metasprites/common";
 import "../../gen/entities";
@@ -27,9 +26,6 @@ let ms_frame_table = ms_framesets.common.Player.frameTable;
 
 
 let PLAYER_ENTITY_ID = 0;
-
-
-let ATTACK_BUTTON_H = snes.joy.mask_h.Y;
 
 
 
@@ -454,34 +450,33 @@ inline func _update_player_hurtbox(msFrameAddr : u16 in xx) {
 #[mem8, idx8]
 func process_dpad_update_velocity() {
 
-    // ::TODO add proper controller support::
-    a = *far &snes.joy.pad1_h;
+    a = joypad.current_h;
 
-    if a & snes.joy.mask_h.UP != 0 {
-        if a & snes.joy.mask_h.LEFT != 0 {
+    if a & joypad.JOYH.UP != 0 {
+        if a & joypad.JOYH.LEFT != 0 {
             ^return process_direction_north_west();
         }
-        if a & snes.joy.mask_h.RIGHT != 0 {
+        if a & joypad.JOYH.RIGHT != 0 {
             ^return process_direction_north_east();
         }
         ^return process_direction_north();
     }
 
-    if a & snes.joy.mask_h.DOWN != 0 {
-        if a & snes.joy.mask_h.LEFT != 0 {
+    if a & joypad.JOYH.DOWN != 0 {
+        if a & joypad.JOYH.LEFT != 0 {
             ^return process_direction_south_west();
         }
-        if a & snes.joy.mask_h.RIGHT != 0{
+        if a & joypad.JOYH.RIGHT != 0{
             ^return process_direction_south_east();
         }
         ^return process_direction_south();
     }
 
-    if a & snes.joy.mask_h.LEFT != 0 {
+    if a & joypad.JOYH.LEFT != 0 {
         ^return process_direction_west();
     }
 
-    if a & snes.joy.mask_h.RIGHT != 0{
+    if a & joypad.JOYH.RIGHT != 0{
         ^return process_direction_east();
     }
 
@@ -703,9 +698,8 @@ func process__walking() {
     process_dpad_update_velocity();
 
 
-    // ::TODO add proper controller support::
-    a = *far &snes.joy.pad1_h;
-    if a & ATTACK_BUTTON_H != 0 {
+    a = joypad.pressed_h;
+    if a & joypad.ATTACK_BUTTON_H != 0 {
         set_state__attacking();
     }
 }
