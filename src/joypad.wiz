@@ -54,6 +54,9 @@ namespace JOYH {
 // Joypad buttons
 let ATTACK_BUTTON_H = joypad.JOYH.Y;
 
+// An attack button press lasts 3 frames.
+let ATTACK_BUFFER_FRAMES = 3;
+
 
 
 in shadow {
@@ -69,6 +72,13 @@ in shadow {
     var pressed : u16;
     let pressed_l = *(&<:pressed as *u8);
     let pressed_h = *(&>:pressed as *u8);
+
+
+    namespace input_buffers {
+        // Input buffer for the attack button.
+        // (byte)
+        var attack : u8;
+    }
 }
 
 
@@ -100,6 +110,21 @@ inline func update_state__inline() {
         pressed = aa;
     }
     mem8_idx8();
+
+
+    swap_bytes(aa);
+    // A = pressed_h
+
+    if a & ATTACK_BUTTON_H != 0 {
+        input_buffers.attack = x = ATTACK_BUFFER_FRAMES;
+    }
+    else {
+        x = input_buffers.attack;
+        if !zero {
+            x--;
+            input_buffers.attack = x;
+        }
+    }
 }
 
 

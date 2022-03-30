@@ -698,8 +698,8 @@ func process__walking() {
     process_dpad_update_velocity();
 
 
-    a = joypad.pressed_h;
-    if a & joypad.ATTACK_BUTTON_H != 0 {
+    a = joypad.input_buffers.attack;
+    if !zero {
         set_state__attacking();
     }
 }
