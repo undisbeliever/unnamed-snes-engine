@@ -7,6 +7,8 @@
 
 import "memmap";
 
+import "joypad";
+
 
 namespace rng {
 
@@ -20,6 +22,7 @@ in shadow {
 
 in code {
 
+
 // Increment the RNG.
 //
 // DB access shadow
@@ -27,6 +30,14 @@ in code {
 inline func increment_rng() {
     aa = rng_table_index;
     aa++;
+
+    // Increment again if a joypad button is pressed.
+    // (Add a bit more randomness to the system)
+    yy = joypad.pressed;
+    if !zero {
+        aa++;
+    }
+
     rng_table_index = aa = aa & TABLE_MASK;
 }
 
