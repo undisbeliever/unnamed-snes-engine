@@ -162,6 +162,11 @@ let _tmp = <:dpTmp0;
         SoA_changeDirectionTimer[y] = a;
     }
     else {
+        // Reset changeDirectionTimer to a random value
+        a = rng.random();
+        a = (a & CHANNGE_DIRECTION_DELAY_RANDOM_MASK) + MIN_CHANGE_DIRECTION_DELAY;
+        SoA_changeDirectionTimer[y] = a;
+
         a = rng.random();
         return set_direction(y, a);
     }
@@ -192,6 +197,12 @@ let _tmp = <:dpTmp0;
 // DB = 0x7e
 #[mem8, idx8]
 func set_direction(entityId : u8 in y, direction : u8 in a) : bool in carry {
+
+    // Do not set `changeDirectionTimer` in this function.
+    // Doing so can cause the slime to get stuck in tight corridors
+    // (forever crawling left-right or up-down in a loop).
+
+
     a &= DIRECTION_MASK;
 
     SoA_direction[y] = a as Direction;
@@ -207,10 +218,6 @@ func set_direction(entityId : u8 in y, direction : u8 in a) : bool in carry {
         SoA.yVelocity[unaligned y] = aa = DirectionCrawlVelocity_Y[unaligned x] as u16;
     }
     mem8();
-
-    a = rng.random();
-    a = (a & CHANNGE_DIRECTION_DELAY_RANDOM_MASK) + MIN_CHANGE_DIRECTION_DELAY;
-    SoA_changeDirectionTimer[y] = a;
 
     return true;
 }
