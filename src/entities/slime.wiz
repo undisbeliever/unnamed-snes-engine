@@ -139,11 +139,19 @@ let _tmp = <:dpTmp0;
 
 
     a = SoA.movementState[y];
-    if a & (MovementState.X_AXIS_COLLISION | MovementState.Y_AXIS_COLLISION) != 0 {
-        // Collided with wall.
-        // 180 degree turn
-        a = (SoA_direction[y] as u8) ^ 1;
-        return set_direction(y, a);
+    if !zero {
+        // Must test for collision in the direction of movement
+        // to prevent the slime getting stuck on corners/walls after a sword collision.
+        x = SoA_direction[y] as u8;
+
+        a = DirectionMovementState[x];
+        a &= SoA.movementState[y];
+        if !zero {
+            // Collided with wall (in the direction of movement)
+            // 180 degree turn
+            a = (SoA_direction[y] as u8) ^ 1;
+            return set_direction(y, a);
+        }
     }
 
 
@@ -256,6 +264,15 @@ in rodata0 {
 
     let DirectionCrawlVelocity_X = far &_DirectionCrawlVelocity_X as far *u16;
     let DirectionCrawlVelocity_Y = far &_DirectionCrawlVelocity_Y as far *i16;
+
+
+    const _DirectionMovementState   : [u8 ; 4] = [
+        MovementState.LEFT_COLLISION,
+        MovementState.RIGHT_COLLISION,
+        MovementState.UP_COLLISION,
+        MovementState.DOWN_COLLISION,
+    ];
+    let DirectionMovementState = far &_DirectionMovementState as far *u8;
 }
 
 }
