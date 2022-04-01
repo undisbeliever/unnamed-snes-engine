@@ -523,17 +523,32 @@ inline func reset_buffer_and_draw_shadows() {
 
 
 
+// Finalise the buffer and hide the unused sprites.
+//
+// DB = 0x7e
 #[mem8, idx16]
 func finalize_buffer() {
     xx = bufferPos;
-    if !negative {
+    if negative {
+        // Required to prevent an underflow in `cmp(xx, oldBufferPos)` below
+        xx = 0;
+    }
+    else {
+        // buffer is not empty.
+        // Hide sprites that were on-screen on the previous frame.
+        //
+
+        // Fix a bug where sprite 0 remains on-screen if the buffer was full on the previous frame.
+        a = OFFSCREEN_YPOS;
+        buffer[0].yPos = a;
+
         // ::ANNOY greater-than comparison `>` operator is not allowed in conditional::
-        // ::: `if xx > oldBufferPos {``
+        // ::: `if xx > oldBufferPos {` ::
         if { cmp(xx, oldBufferPos); } && carry && !zero {
-            // The previous frame had more sprites onscreen the this frame.
-            // Move them offscreen.
+            // The previous frame had more sprites on-screen the this frame.
+            // Move them off-screen.
             do {
-                (&buffer[0].yPos)[unaligned xx] = a = OFFSCREEN_YPOS;
+                (&buffer[0].yPos)[unaligned xx] = a;
 
                 // subtract 4
                 xx = _decrement_buffer_index(xx);
