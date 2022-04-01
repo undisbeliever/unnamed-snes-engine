@@ -379,7 +379,7 @@ func run_game {
 func draw_entities() {
     idx16();
     #[idx16] {
-        metasprites.draw_shadows();
+        metasprites.reset_buffer_and_draw_shadows();
     }
     idx8();
 

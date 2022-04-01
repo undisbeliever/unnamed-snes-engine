@@ -396,11 +396,25 @@ func _hiTableQueue_full() {
 
 
 
+// Reset the buffer
+//
+// DB = 0x7e
+#[mem8, idx16]
+func reset_buffer() {
+    // NOTE: If I modify this function I must also modify `reset_buffer_and_draw_shadows()`
+
+    hiTableQueue = a = HI_TABLE_QUEUE_INIT_VALUE;
+    hiTableBufferPos = xx = sizeof(typeof(hiTableBuffer)) - 1;
+    bufferPos = xx = INITIAL_BUFFER_POS;
+}
+
+
+
 // NOTE: Resets the buffer positions.
 // MUST be called before any MetaSprites are drawn.
 // DB = 0x7e
 #[mem8, idx16]
-inline func draw_shadows() {
+inline func reset_buffer_and_draw_shadows() {
     // KEEP: X and Y
     #[mem8, idx16]
     inline func _update_hi_table_size_small() {
@@ -510,7 +524,7 @@ inline func draw_shadows() {
 
 
 #[mem8, idx16]
-inline func finalize_buffer() {
+func finalize_buffer() {
     xx = bufferPos;
     if !negative {
         // ::ANNOY greater-than comparison `>` operator is not allowed in conditional::
