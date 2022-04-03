@@ -23,9 +23,6 @@ let DISPLAY_WIDTH = 256;
 let DISPLAY_HEIGHT = 224;
 
 
-let FRAMES_PER_SECOND = 60;
-
-
 let PLAYER_MAP_TRANSITION_END_POS = 3;
 
 // Value MUST BE odd
@@ -441,26 +438,6 @@ inline func _check_for_room_transition() {
             gameMode = a as GameModes;
         }
     }
-}
-
-
-
-// Pause the game for a second
-//
-// DB = 0x7e
-#[mem8, idx8]
-func wait_one_second() {
-
-    a = FRAMES_PER_SECOND;
-
-    do {
-        push8(a);
-
-        wait_frame();
-
-        a = pop8();
-        a--;
-    } while !zero;
 }
 
 

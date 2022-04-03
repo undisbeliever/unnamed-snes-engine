@@ -10,6 +10,9 @@ import "rng";
 import "../wiz/common/snes/snes";
 
 
+let FRAMES_PER_SECOND = 60;
+
+
 in shadow {
     // A shadow of the INIDISP register
     var _brightness_buffer : u8;
@@ -24,6 +27,27 @@ in shadow {
 
 
 in code {
+
+
+
+// Pause the game for a second
+//
+// DB = 0x7e
+#[mem8, idx8]
+func wait_one_second() {
+
+    a = FRAMES_PER_SECOND;
+
+    do {
+        push8(a);
+
+        wait_frame();
+
+        a = pop8();
+        a--;
+    } while !zero;
+}
+
 
 
 // Wait until the end of the current frame, process VBlank routines.
