@@ -6,6 +6,7 @@ import "memmap";
 
 import "gameloop";
 import "gamemodes/game-over";
+import "room-transitions";
 
 
 enum GameModes : u8 {
@@ -47,12 +48,12 @@ in code {
 const gamemode_function_table : [func()] = [
     gameloop.run_game,
     gamemodes.game_over.exec,
-    gameloop.load_room__fadein,
-    gameloop.room_transition__fadeout,
-    gameloop.room_transition__scroll_left,
-    gameloop.room_transition__scroll_right,
-    gameloop.room_transition__scroll_up,
-    gameloop.room_transition__scroll_down,
+    room_transitions.load_room__fadein,
+    room_transitions.fadeout,
+    room_transitions.scroll_left,
+    room_transitions.scroll_right,
+    room_transitions.scroll_up,
+    room_transitions.scroll_down,
 ];
 
 let N_GAME_MODES = sizeof(typeof(gamemode_function_table)) / 2;

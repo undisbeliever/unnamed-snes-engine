@@ -1,0 +1,499 @@
+// Copyright (c) 2021-2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "memmap";
+
+import "gameloop";
+import "gamemodes";
+import "metasprites";
+import "metatiles";
+import "wait-frame";
+
+import "entities/_variables";
+import "entities/_common";
+import "entities/player";
+
+
+namespace room_transitions {
+
+let DISPLAY_WIDTH = gameloop.DISPLAY_WIDTH;
+let DISPLAY_HEIGHT = gameloop.DISPLAY_HEIGHT;
+
+
+let PLAYER_MAP_TRANSITION_END_POS = 3;
+
+// Value MUST BE odd
+let H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK = 13;
+let V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK = 11;
+
+
+let PLAYER_XPOS_AFTER_LEFT_TRANSITION  = DISPLAY_WIDTH - 1 - PLAYER_MAP_TRANSITION_END_POS;
+let PLAYER_XPOS_AFTER_RIGHT_TRANSITION = PLAYER_MAP_TRANSITION_END_POS;
+
+let PLAYER_YPOS_AFTER_UP_TRANSITION    = DISPLAY_HEIGHT - 1 - PLAYER_MAP_TRANSITION_END_POS;
+let PLAYER_YPOS_AFTER_DOWN_TRANSITION  = PLAYER_MAP_TRANSITION_END_POS;
+
+
+
+let _load_room_and_check_if_ok_to_scroll = gameloop._load_room_and_check_if_ok_to_scroll;
+let draw_entities = gameloop.draw_entities;
+
+
+
+in code {
+
+// Load the room, fade in the screen
+//
+// ASSUMES: in Force-Blank
+//
+// DB = 0x7e
+#[mem8, idx8]
+func load_room__fadein() {
+
+    _load_room_and_check_if_ok_to_scroll();
+
+    return _fadein__room_in_memory();
+}
+
+
+
+// Blank the screen, load graphics to PPU, fade in the screen, set gameMode to RUN_GAME.
+//
+// ASSUMES: room is loaded in memory
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _fadein__room_in_memory() {
+
+    gameloop._setup_ppu_and_reset_graphics_subsystems();
+
+
+    // Fade in
+    {
+        a = 0 as u8;
+        do {
+            push8(a);
+            wait_frame_and_change_brightness(a);
+
+            a = pop8();
+            a++;
+        } while a != 16;
+    }
+
+
+    // ::TODO how do I handle a fadein to an invalid room::
+
+
+    // ::TODO check if player is on a non-solid tile::
+    // ::: must be done AFTER tileset is loaded into memory::
+    // ::: ::
+    // ::: How do I handle this case? ::
+
+
+    gameMode = GameModes.RUN_GAME;
+}
+
+
+
+// Blank the screen, then load the next room and resources.
+//
+// INPUT: currentRoom is set to room to load
+//
+// DB = 0x7e
+#[mem8, idx8]
+func fadeout() {
+    _load_room_and_check_if_ok_to_scroll();
+
+    return _fadeout__room_in_memory();
+}
+
+
+
+// Blank the screen, then load the next room and resources.
+//
+// ASSUMES: next room is loaded in memory
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _fadeout__room_in_memory() {
+
+    // Fadeout
+    a = 15;
+    do {
+        push8(a);
+        wait_frame_and_change_brightness(a);
+
+        a = pop8();
+        a--;
+    } while !negative;
+
+
+    _fadein__room_in_memory();
+
+
+    // ::TODO how do I handle a fadein to an invalid room::
+
+
+    // ::TODO check if player is on a non-solid tile::
+    // ::: must be done AFTER tileset is loaded into memory::
+    // ::: ::
+    // ::: How do I handle this case? ::
+}
+
+
+
+// Scroll right room transition.
+//
+// ASSUMES: There is a room to the right of this one.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_right() {
+
+let SOLID_CHECK_XPOS = DISPLAY_WIDTH - 1 - H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
+
+    entities.player.xPos.sx = 0;
+
+    gameloop.currentRoom++;
+
+    entities.player.xPos.px = a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION;
+    zero = _load_room_and_check_if_ok_to_scroll();
+    if !zero {
+        return _fadeout__room_in_memory();
+    }
+
+
+    entities.player.xPos.px = a = DISPLAY_WIDTH - 1;
+
+    metatiles.transitions.scroll_right__setup();
+
+    do {
+        wait_frame();
+
+        a = entities.player.xPos.px;
+        if a == SOLID_CHECK_XPOS {
+            negative = metatiles.check_tile_solid(0, entities.player.yPos.px);
+            if negative {
+                // Tile is solid - cannot place player here
+                wait_one_second();
+
+                // Move left one room
+                gameloop.currentRoom--;
+
+                // Rewind room transition
+                entities.player.xPos.px = a = PLAYER_XPOS_AFTER_LEFT_TRANSITION;
+                _load_room_and_check_if_ok_to_scroll();
+                entities.player.xPos.px = a = SOLID_CHECK_XPOS;
+                return _rollback_scroll_right();
+            }
+        }
+
+        a = entities.player.xPos.px - metatiles.transitions.TRANSITION_SPEED;
+        if !carry { a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION; }
+        entities.player.xPos.px = a;
+
+
+        draw_entities();
+
+
+        carry = metatiles.transitions.scroll_right__process();
+    }
+    while !carry;
+
+
+    gameMode = GameModes.RUN_GAME;
+}
+
+
+
+// Rollback a partially completed scroll right room transition.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _rollback_scroll_right() {
+
+    do {
+        wait_frame();
+
+        a = entities.player.xPos.px + metatiles.transitions.TRANSITION_SPEED;
+        if carry { a = PLAYER_XPOS_AFTER_LEFT_TRANSITION; }
+        entities.player.xPos.px = a;
+
+
+        draw_entities();
+
+
+        zero = metatiles.transitions.scroll_right__rollback();
+    } while !zero;
+
+
+    entities.player.xPos.px = a = PLAYER_XPOS_AFTER_LEFT_TRANSITION;
+
+
+    gameMode = GameModes.RUN_GAME;
+}
+
+
+
+// Scroll left room transition.
+//
+// ASSUMES: There is a room to the left of this one.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_left() {
+
+let SOLID_CHECK_XPOS = H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
+
+    entities.player.xPos.sx = 0;
+
+
+    gameloop.currentRoom--;
+
+    entities.player.xPos.px = a = PLAYER_XPOS_AFTER_LEFT_TRANSITION;
+    zero = _load_room_and_check_if_ok_to_scroll();
+    if !zero {
+        ^return _fadeout__room_in_memory();
+    }
+
+
+    entities.player.xPos.px = 0;
+
+    metatiles.transitions.scroll_left__setup();
+
+    do {
+        wait_frame();
+
+
+        a = entities.player.xPos.px;
+        if a == SOLID_CHECK_XPOS {
+            negative = metatiles.check_tile_solid(0xff, entities.player.yPos.px);
+            if negative {
+                // Tile is solid - cannot place player here
+                wait_one_second();
+
+                // Move right one room
+                gameloop.currentRoom++;
+
+                // Rewind room transition
+                entities.player.xPos.px = a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION;
+                _load_room_and_check_if_ok_to_scroll();
+                entities.player.xPos.px = a = SOLID_CHECK_XPOS;
+                return _rollback_scroll_left();
+            }
+        }
+
+
+
+        a = entities.player.xPos.px + metatiles.transitions.TRANSITION_SPEED;
+        if carry { a = PLAYER_XPOS_AFTER_LEFT_TRANSITION; }
+        entities.player.xPos.px = a;
+
+
+        draw_entities();
+
+
+        carry = metatiles.transitions.scroll_left__process();
+    }
+    while !carry;
+
+
+    gameMode = GameModes.RUN_GAME;
+}
+
+
+
+// Rollback a partially completed scroll left room transition.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _rollback_scroll_left() {
+
+    do {
+        wait_frame();
+
+        a = entities.player.xPos.px - metatiles.transitions.TRANSITION_SPEED;
+        if !carry { a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION; }
+        entities.player.xPos.px = a;
+
+
+        draw_entities();
+
+
+        zero = metatiles.transitions.scroll_left__rollback();
+    } while !zero;
+
+
+    entities.player.xPos.px = a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION;
+
+
+    gameMode = GameModes.RUN_GAME;
+}
+
+
+
+// Scroll down room transition.
+//
+// ASSUMES: There is a room below this one.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_down() {
+
+    entities.player.yPos.sx = 0;
+
+
+    gameloop.currentRoom = a = gameloop.currentRoom + 0x10;
+
+    entities.player.yPos.px = a = PLAYER_YPOS_AFTER_DOWN_TRANSITION;
+    zero = _load_room_and_check_if_ok_to_scroll();
+    if !zero {
+        ^return _fadeout__room_in_memory();
+    }
+
+
+    entities.player.yPos.px = a = DISPLAY_HEIGHT - 1;
+
+    metatiles.transitions.scroll_down__setup();
+
+    _scroll_down__loop();
+
+
+    gameMode = GameModes.RUN_GAME;
+}
+
+
+
+// Process a scroll down room transition (or rollback a scroll up room transition)
+//
+// ASSUMES: `metatiles.transitions.scroll_down__setup()` or `metatiles.transitions.scroll_up__setup()` has been called.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _scroll_down__loop() {
+
+let SOLID_CHECK_YPOS = DISPLAY_HEIGHT - 1 - V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
+
+    do {
+        wait_frame();
+
+        a = entities.player.yPos.px;
+        if a == SOLID_CHECK_YPOS {
+            negative = metatiles.check_tile_solid(entities.player.xPos.px, 0);
+            if negative {
+                // Tile is solid - cannot place player here
+                wait_one_second();
+
+                // Move up one room
+                gameloop.currentRoom = a = gameloop.currentRoom - 0x10;
+
+                // Rewind down transition
+                entities.player.yPos.px = a = PLAYER_YPOS_AFTER_UP_TRANSITION;
+                _load_room_and_check_if_ok_to_scroll();
+                entities.player.yPos.px = a = SOLID_CHECK_YPOS;
+                return _scroll_up__loop();
+            }
+        }
+
+        a = entities.player.yPos.px - metatiles.transitions.TRANSITION_SPEED;
+        if !carry { a = PLAYER_YPOS_AFTER_DOWN_TRANSITION; }
+        entities.player.yPos.px = a;
+
+
+        draw_entities();
+
+
+        carry = metatiles.transitions.scroll_down__process();
+    }
+    while !carry;
+
+
+    entities.player.yPos.px = a = PLAYER_YPOS_AFTER_DOWN_TRANSITION;
+}
+
+
+
+// Scroll up room transition.
+//
+// ASSUMES: There is a room above this one.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_up() {
+
+    entities.player.yPos.sx = 0;
+
+
+    gameloop.currentRoom = a = gameloop.currentRoom - 0x10;
+
+    entities.player.yPos.px = a = PLAYER_YPOS_AFTER_UP_TRANSITION;
+    zero = _load_room_and_check_if_ok_to_scroll();
+    if !zero {
+        ^return _fadeout__room_in_memory();
+    }
+
+
+    entities.player.yPos.px = 0;
+
+    metatiles.transitions.scroll_up__setup();
+
+    _scroll_up__loop();
+
+
+    gameMode = GameModes.RUN_GAME;
+}
+
+
+
+// Process a scroll up room transition (or rollback a scroll down room transition)
+//
+// ASSUMES: `metatiles.transitions.scroll_down__setup()` or `metatiles.transitions.scroll_up__setup()` has been called.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _scroll_up__loop() {
+
+let SOLID_CHECK_YPOS = V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
+
+    do {
+        wait_frame();
+
+        a = entities.player.yPos.px;
+        if a == SOLID_CHECK_YPOS {
+            negative = metatiles.check_tile_solid(entities.player.xPos.px, DISPLAY_HEIGHT - 1);
+            if negative {
+                // Tile is solid - cannot place player here
+                wait_one_second();
+
+                // Move down one room
+                gameloop.currentRoom = a = gameloop.currentRoom + 0x10;
+
+                // Rewind up transition
+                entities.player.yPos.px = a = PLAYER_YPOS_AFTER_DOWN_TRANSITION;
+                _load_room_and_check_if_ok_to_scroll();
+                entities.player.yPos.px = a = SOLID_CHECK_YPOS;
+                ^return _scroll_down__loop();
+            }
+        }
+
+
+        a = entities.player.yPos.px + metatiles.transitions.TRANSITION_SPEED;
+        if a >= PLAYER_YPOS_AFTER_UP_TRANSITION + 1 { a = PLAYER_YPOS_AFTER_UP_TRANSITION; }
+        entities.player.yPos.px = a;
+
+        draw_entities();
+
+
+        carry = metatiles.transitions.scroll_up__process();
+    }
+    while !carry;
+
+
+    entities.player.yPos.px = a = PLAYER_YPOS_AFTER_UP_TRANSITION;
+}
+
+}
+
+}
+
+
