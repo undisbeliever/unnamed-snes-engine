@@ -762,32 +762,24 @@ func null_function(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) 
 func square_single8(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
     xx = yy;
 
+    _subtract_ms_offset_from_position(xx, xPos, yPos);
+
     yy = bufferPos;
     if !negative {
-        // size
+        a = <:xPos;
+        (&buffer[ 0].xPos)[unaligned yy] = a;
+
         _update_hi_table_size_small();
-
-        (&buffer[0].xPos)[unaligned yy] = a = <:xPos - MsDataFormat.xOffset[unaligned xx];
-        a = >:xPos -# 0;
-        cmp(a, 1);
-        _update_hi_table_x8(carry);
-
-
-        a = <:yPos - MsDataFormat.yOffset[unaligned xx];
-        if carry {
-            if a >= (256 - 16 - 1) {
-                a = 256 - 16;
-            }
-        }
-        else {
-            if a < (256 - 16) {
-                a = 256 - 16;
-            }
-        }
-        (&buffer[0].yPos)[unaligned yy] = a;
+        _update_hi_table_x8_xPos();
 
         mem16();
         #[mem16] {
+            aa = yPos;
+            if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+                aa = -16 as u16;
+            }
+            (&buffer[ 0].yPos as *u16)[unaligned yy] = aa;
+
             (&buffer[ 0].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr0[unaligned xx];
         }
         mem8();
@@ -814,32 +806,24 @@ func square_single8(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos)
 func square_single16(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
     xx = yy;
 
+    _subtract_ms_offset_from_position(xx, xPos, yPos);
+
     yy = bufferPos;
     if !negative {
-        // size
+        a = <:xPos;
+        (&buffer[ 0].xPos)[unaligned yy] = a;
+
         _update_hi_table_size_large();
-
-        (&buffer[0].xPos)[unaligned yy] = a = <:xPos - MsDataFormat.xOffset[unaligned xx];
-        a = >:xPos -# 0;
-        cmp(a, 1);
-        _update_hi_table_x8(carry);
-
-
-        a = <:yPos - MsDataFormat.yOffset[unaligned xx];
-        if carry {
-            if a >= (256 - 16 - 1) {
-                a = 256 - 16;
-            }
-        }
-        else {
-            if a < (256 - 16) {
-                a = 256 - 16;
-            }
-        }
-        (&buffer[0].yPos)[unaligned yy] = a;
+        _update_hi_table_x8_xPos();
 
         mem16();
         #[mem16] {
+            aa = yPos;
+            if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+                aa = -16 as u16;
+            }
+            (&buffer[ 0].yPos as *u16)[unaligned yy] = aa;
+
             (&buffer[ 0].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr0[unaligned xx];
         }
         mem8();
