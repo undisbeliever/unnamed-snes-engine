@@ -11,6 +11,7 @@ namespace metasprites {
 
 let N_OBJECTS = 128;
 
+let DISPLAY_WIDTH = 256;
 let DISPLAY_HEIGHT = 224;
 
 
@@ -414,7 +415,9 @@ func reset_buffer() {
 // MUST be called before any MetaSprites are drawn.
 // DB = 0x7e
 #[mem8, idx16]
-inline func reset_buffer_and_draw_shadows() {
+inline func reset_buffer_and_draw_entity_shadows() {
+    // NOTE: If I modify this function, also modify `reset_buffer_and_draw_room_transition_shadows`
+
     // KEEP: X and Y
     #[mem8, idx16]
     inline func _update_hi_table_size_small() {
@@ -516,6 +519,145 @@ inline func reset_buffer_and_draw_shadows() {
         yy--;
         yy--;
     } while !negative;
+
+
+    bufferPos = xx;
+}
+
+
+
+// NOTE: Resets the buffer positions.
+// MUST be called before any MetaSprites are drawn.
+//
+// DB = 0x7e
+#[mem8, idx16]
+inline func reset_buffer_and_draw_room_transition_shadows__inline() {
+
+let _shadowX = dpTmp0;
+let _shadowY = <:dpTmp1;
+
+
+    // NOTE: If I modify this function, also modify `reset_buffer_and_draw_entity_shadows`
+
+    // KEEP: X and Y
+    #[mem8, idx16]
+    inline func _update_hi_table_size_small() {
+        hiTableQueue <<= 1;
+    }
+
+
+    // KEEP: X and Y
+    #[mem8, idx16]
+    inline func _update_hi_table_x9(x9 : bool in carry) {
+        hiTableQueue <<<<#= 1;
+        if carry {
+            _hiTableQueue_full();
+        }
+    }
+
+    // yy = room_transitions.SpriteList index
+    idx8();
+    #[idx8] {
+        y = room_transitions.spriteListEnd;
+        y--;
+        y--;
+    }
+    idx16();
+    if negative {
+        ^return;
+    }
+
+
+    // Reset buffer positions
+    hiTableQueue = a = HI_TABLE_QUEUE_INIT_VALUE;
+    hiTableBufferPos = xx = sizeof(typeof(hiTableBuffer)) - 1;
+
+    // xx = bufferPos
+    xx = INITIAL_BUFFER_POS;
+
+
+    mem16();
+    #[mem16] {
+        ^do {
+            aa = room_transitions.SpriteList.xPos[unaligned yy] - room_transitions.camera_x;
+            ^if aa < DISPLAY_WIDTH + 8 || aa >= (-8 as u16) {
+                _shadowX = aa;
+
+                aa = room_transitions.SpriteList.yPos[unaligned yy] - room_transitions.camera_y;
+                ^if aa < DISPLAY_HEIGHT + 8 || aa >= (-8 as u16) {
+                    mem8();
+                    #[mem8, idx16] {
+                        _shadowY = a;
+
+                        a = room_transitions.SpriteList.shadowSize[unaligned yy] as u8;
+                        ^if !zero {
+                            _update_hi_table_size_small();
+
+                            if a == ShadowSize.SMALL as u8 {
+                                // ::ANNOY cannot do `buffer[xx].xPos = a`::
+                                // ::ANNOY cannot do `u8_array[xx + 4] = a`::
+
+                                // yPos
+                                (&buffer[0].yPos as *u8)[xx] = a = _shadowY - 4;
+                                // char
+                                (&buffer[0].char as *u8)[xx] = SHADOW_SMALL_CHAR;
+                                // attr
+                                (&buffer[0].attr as *u8)[xx] = a = SHADOW_ATTR;
+
+                                // xPos
+                                (&buffer[0].xPos as *u8)[xx] = a = <:_shadowX + (-4 as u8);
+                                a = >:_shadowX +# >:(-4 as u16);
+                                cmp(a, 1);
+                                _update_hi_table_x9(carry);
+                            }
+                            else {
+                                if a == ShadowSize.MEDIUM as u8 {
+                                    a = SHADOW_MEDIUM_CHAR;
+                                }
+                                else {
+                                    a = SHADOW_LARGE_CHAR;
+                                }
+                                // char
+                                (&buffer[ 0].char as *u8)[xx] = a;
+                                (&buffer[-1].char as *u8)[xx] = a;
+
+                                // yPos
+                                a = _shadowY - 4;
+                                (&buffer[ 0].yPos as *u8)[xx] = a;
+                                (&buffer[-1].yPos as *u8)[xx] = a;
+
+                                // attr
+                                (&buffer[ 0].attr as *u8)[xx] = a = SHADOW_ATTR | OAM_H_FLIP;
+                                (&buffer[-1].attr as *u8)[xx] = a = SHADOW_ATTR;
+
+                                // xPos
+                                (&buffer[ 0].xPos as *u8)[xx] = a = <:_shadowX;
+                                a = >:_shadowX >>> 1;
+                                _update_hi_table_x9(carry);
+
+                                _update_hi_table_size_small();
+                                // carry clear from shift in _update_hi_table_size_small()
+                                (&buffer[-1].xPos as *u8)[xx] = a = <:_shadowX +# (-8 as u8);
+                                a = >:_shadowX +# >:(-8 as u16);
+                                cmp(a, 1);
+                                _update_hi_table_x9(carry);
+
+
+                                xx = _decrement_buffer_index(xx);
+                            }
+
+                            xx = _decrement_buffer_index(xx);
+                        }
+                    }
+                    mem16();
+                }
+            }
+
+            yy--;
+            yy--;
+        } while !negative;
+    }
+    mem8();
 
 
     bufferPos = xx;
@@ -1345,5 +1487,6 @@ func diag_two_large_overlapping_B(msFrame : u16 in yy, xPos : u16 in xPos, yPos 
 // Moving this here prevents an
 // "encountered a reference to `var metasprites.xPos` before its type was known" error.
 import "entities/_variables";
+import "room-transitions";
 import "../gen/ms-patterns-table";
 

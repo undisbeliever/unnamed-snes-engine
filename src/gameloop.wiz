@@ -160,7 +160,7 @@ func _check_room_exists() : bool in carry {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _load_room_and_check_if_ok_to_scroll() : bool in zero {
+inline func _load_room_and_check_if_ok_to_scroll__inline() : bool in zero {
 
     x = currentRoom;
     x = a = resources.rooms.room_table[x];
@@ -294,8 +294,6 @@ inline func _setup_ppu_and_reset_graphics_subsystems() {
     metatiles.populate_map_tile_properties();
 
     metatiles.draw_map__forceblank();
-
-    draw_entities();
 }
 
 
@@ -362,7 +360,7 @@ func run_game {
 func draw_entities() {
     idx16();
     #[idx16] {
-        metasprites.reset_buffer_and_draw_shadows();
+        metasprites.reset_buffer_and_draw_entity_shadows();
     }
     idx8();
 

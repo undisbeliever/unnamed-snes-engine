@@ -35,12 +35,129 @@ let PLAYER_YPOS_AFTER_DOWN_TRANSITION  = PLAYER_MAP_TRANSITION_END_POS;
 
 
 
-let _load_room_and_check_if_ok_to_scroll = gameloop._load_room_and_check_if_ok_to_scroll;
-let draw_entities = gameloop.draw_entities;
+enum ScrollDirection : u8 {
+    UP    = 0,
+    DOWN  = 2,
+    LEFT  = 4,
+    RIGHT = 6,
+}
+
+
+
+// Sprite list.
+//
+// Contains the position and MetaSprite information for all entities in the previous room and the new room.
+//
+// NOTE: xPos/yPos is offset by CAMERA_ORIGIN.
+//
+// Entry 0 is always the player's MetaSprite.
+//
+// (Structure of Word Arrays)
+namespace SpriteList {
+    in shadow {
+        // Metasprite draw function.
+        //
+        // DB = 0x7e
+        #[mem8, idx8]
+        var ms_draw_function : [func(msFrame : u16 in yy, xPos : u16 in metasprites.xPos, yPos : u16 in metasprites.yPos) ; N_SPRITE_LIST_ELEMENTS];
+    }
+
+    in wram7e {
+        var xPos : [u16 ; N_SPRITE_LIST_ELEMENTS];
+        var yPos : [u16 ; N_SPRITE_LIST_ELEMENTS];
+        var zPos : [u16 ; N_SPRITE_LIST_ELEMENTS];
+        var metaSpriteFrameTable : [u16 ; N_SPRITE_LIST_ELEMENTS];
+
+        var _shadowSizeAndMsFrame : [ entities._u8pair ; N_SPRITE_LIST_ELEMENTS];
+        let shadowSize = &_shadowSizeAndMsFrame[0].first as *metasprites.ShadowSize;
+        let metaSpriteFrame = &_shadowSizeAndMsFrame[0].second as *u8;
+    }
+}
+
+
+let PLAYER_ID = 0;
+
+let N_SPRITE_LIST_ELEMENTS = entities.N_ENTITIES + gameloop.ENTITIES_IN_MAP + 2;
+
+let LAST_SPRITE_LIST_INDEX = (N_SPRITE_LIST_ELEMENTS - 1) * 2;
+
+
+let CAMERA_ORIGIN = 0x100;
+
+
+// Room transition code can directly modify the sprite's position.
+let spriteList_player_xPos = SpriteList.xPos[PLAYER_ID];
+let spriteList_player_yPos = SpriteList.yPos[PLAYER_ID];
+
+
+in wram7e {
+    // The past-the-end index of the sprite list.
+    //
+    // Equivalent to a c++ stl end() iterator.
+    // Equal to `size of list * 2`.
+    //
+    // (byte index)
+    var spriteListEnd : u8;
+
+    // Current index position inside the `SpriteList`.
+    // (word index)
+    var spriteListIndex : u16;
+
+
+    // SpriteList camera position
+    // (2x uint16)
+    var camera_x : u16;
+    var camera_y : u16;
+
+    let camera_x_l = *(&<:camera_x as *u8);
+    let camera_y_l = *(&<:camera_y as *u8);
+
+    let camera_x_h = *(&>:camera_x as *u8);
+    let camera_y_h = *(&>:camera_y as *u8);
+
+
+    // The scroll direction of the current room transition.
+    var scrollDirection : ScrollDirection;
+}
 
 
 
 in code {
+
+
+// Load the room into memory, check if the MetaTile tileset has changed and populates the sprite list.
+//
+// `entities.player.xPos.px` and `entities.player.yPos.px` MUST contain the position of the
+// player AFTER the room transition ends and play resumes (the variables might be used by an
+// entity init routine)
+//
+// Returns zero set if it is OK to preform a scroll transition into the next room without glitches.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _load_room_and_check_if_ok_to_scroll(_scrollDirection_ : u8 in a) : bool in zero {
+
+    scrollDirection = a as ScrollDirection;
+
+
+    _clear_sprite_list();
+    _add_entities_to_sprite_list();
+
+    zero = gameloop._load_room_and_check_if_ok_to_scroll__inline();
+    if !zero {
+        return zero;
+    }
+
+    entities.sort_active_entities();
+
+    _add_entities_to_sprite_list_with_offset(scrollDirection);
+    _sprite_list_set_player_with_offset__inline(scrollDirection);
+
+    a = 0;
+    return zero;
+}
+
+
 
 // Load the room, fade in the screen
 //
@@ -50,7 +167,7 @@ in code {
 #[mem8, idx8]
 func load_room__fadein() {
 
-    _load_room_and_check_if_ok_to_scroll();
+    _load_room_and_check_if_ok_to_scroll(0);
 
     return _fadein__room_in_memory();
 }
@@ -66,6 +183,7 @@ func load_room__fadein() {
 func _fadein__room_in_memory() {
 
     gameloop._setup_ppu_and_reset_graphics_subsystems();
+    gameloop.draw_entities();
 
 
     // Fade in
@@ -102,7 +220,7 @@ func _fadein__room_in_memory() {
 // DB = 0x7e
 #[mem8, idx8]
 func fadeout() {
-    _load_room_and_check_if_ok_to_scroll();
+    _load_room_and_check_if_ok_to_scroll(0);
 
     return _fadeout__room_in_memory();
 }
@@ -150,27 +268,34 @@ func _fadeout__room_in_memory() {
 #[mem8, idx8]
 func scroll_right() {
 
-let SOLID_CHECK_XPOS = DISPLAY_WIDTH - 1 - H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
+let SOLID_CHECK_XPOS = H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
+
+    _reset_camera();
 
     entities.player.xPos.sx = 0;
 
     gameloop.currentRoom++;
 
     entities.player.xPos.px = a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION;
-    zero = _load_room_and_check_if_ok_to_scroll();
+    zero = _load_room_and_check_if_ok_to_scroll(ScrollDirection.RIGHT as u8);
     if !zero {
         return _fadeout__room_in_memory();
     }
 
 
-    entities.player.xPos.px = a = DISPLAY_WIDTH - 1;
+    mem16();
+    #[mem16] {
+        spriteList_player_xPos = aa = CAMERA_ORIGIN + DISPLAY_WIDTH - 1;
+    }
+    mem8();
+
 
     metatiles.transitions.scroll_right__setup();
 
     do {
         wait_frame();
 
-        a = entities.player.xPos.px;
+        a = camera_x_l;
         if a == SOLID_CHECK_XPOS {
             negative = metatiles.check_tile_solid(0, entities.player.yPos.px);
             if negative {
@@ -182,19 +307,15 @@ let SOLID_CHECK_XPOS = DISPLAY_WIDTH - 1 - H_TRANSITION_FRAMES_BEFORE_SOLID_CHEC
 
                 // Rewind room transition
                 entities.player.xPos.px = a = PLAYER_XPOS_AFTER_LEFT_TRANSITION;
-                _load_room_and_check_if_ok_to_scroll();
-                entities.player.xPos.px = a = SOLID_CHECK_XPOS;
+                _load_room_and_check_if_ok_to_scroll(ScrollDirection.LEFT as u8);
+
+                camera_x_h = a = camera_x_h - >:DISPLAY_WIDTH;
+
                 return _rollback_scroll_right();
             }
         }
 
-        a = entities.player.xPos.px - metatiles.transitions.TRANSITION_SPEED;
-        if !carry { a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION; }
-        entities.player.xPos.px = a;
-
-
-        draw_entities();
-
+        move_camera_and_draw_sprite_list();
 
         carry = metatiles.transitions.scroll_right__process();
     }
@@ -215,19 +336,10 @@ func _rollback_scroll_right() {
     do {
         wait_frame();
 
-        a = entities.player.xPos.px + metatiles.transitions.TRANSITION_SPEED;
-        if carry { a = PLAYER_XPOS_AFTER_LEFT_TRANSITION; }
-        entities.player.xPos.px = a;
-
-
-        draw_entities();
-
+        move_camera_and_draw_sprite_list();
 
         zero = metatiles.transitions.scroll_right__rollback();
     } while !zero;
-
-
-    entities.player.xPos.px = a = PLAYER_XPOS_AFTER_LEFT_TRANSITION;
 
 
     gameMode = GameModes.RUN_GAME;
@@ -243,21 +355,27 @@ func _rollback_scroll_right() {
 #[mem8, idx8]
 func scroll_left() {
 
-let SOLID_CHECK_XPOS = H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
+let SOLID_CHECK_XPOS = CAMERA_ORIGIN - H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
+
+    _reset_camera();
 
     entities.player.xPos.sx = 0;
-
 
     gameloop.currentRoom--;
 
     entities.player.xPos.px = a = PLAYER_XPOS_AFTER_LEFT_TRANSITION;
-    zero = _load_room_and_check_if_ok_to_scroll();
+    zero = _load_room_and_check_if_ok_to_scroll(ScrollDirection.LEFT as u8);
     if !zero {
         ^return _fadeout__room_in_memory();
     }
 
 
-    entities.player.xPos.px = 0;
+    mem16();
+    #[mem16] {
+        spriteList_player_xPos = aa = CAMERA_ORIGIN;
+    }
+    mem8();
+
 
     metatiles.transitions.scroll_left__setup();
 
@@ -265,7 +383,7 @@ let SOLID_CHECK_XPOS = H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transi
         wait_frame();
 
 
-        a = entities.player.xPos.px;
+        a = camera_x_l;
         if a == SOLID_CHECK_XPOS {
             negative = metatiles.check_tile_solid(0xff, entities.player.yPos.px);
             if negative {
@@ -277,21 +395,15 @@ let SOLID_CHECK_XPOS = H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transi
 
                 // Rewind room transition
                 entities.player.xPos.px = a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION;
-                _load_room_and_check_if_ok_to_scroll();
-                entities.player.xPos.px = a = SOLID_CHECK_XPOS;
+                _load_room_and_check_if_ok_to_scroll(ScrollDirection.RIGHT as u8);
+
+                camera_x_h = a = camera_x_h + >:DISPLAY_WIDTH;
+
                 return _rollback_scroll_left();
             }
         }
 
-
-
-        a = entities.player.xPos.px + metatiles.transitions.TRANSITION_SPEED;
-        if carry { a = PLAYER_XPOS_AFTER_LEFT_TRANSITION; }
-        entities.player.xPos.px = a;
-
-
-        draw_entities();
-
+        move_camera_and_draw_sprite_list();
 
         carry = metatiles.transitions.scroll_left__process();
     }
@@ -312,19 +424,10 @@ func _rollback_scroll_left() {
     do {
         wait_frame();
 
-        a = entities.player.xPos.px - metatiles.transitions.TRANSITION_SPEED;
-        if !carry { a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION; }
-        entities.player.xPos.px = a;
-
-
-        draw_entities();
-
+        move_camera_and_draw_sprite_list();
 
         zero = metatiles.transitions.scroll_left__rollback();
     } while !zero;
-
-
-    entities.player.xPos.px = a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION;
 
 
     gameMode = GameModes.RUN_GAME;
@@ -340,19 +443,25 @@ func _rollback_scroll_left() {
 #[mem8, idx8]
 func scroll_down() {
 
-    entities.player.yPos.sx = 0;
+    _reset_camera();
 
+    entities.player.yPos.sx = 0;
 
     gameloop.currentRoom = a = gameloop.currentRoom + 0x10;
 
     entities.player.yPos.px = a = PLAYER_YPOS_AFTER_DOWN_TRANSITION;
-    zero = _load_room_and_check_if_ok_to_scroll();
+    zero = _load_room_and_check_if_ok_to_scroll(ScrollDirection.DOWN as u8);
     if !zero {
         ^return _fadeout__room_in_memory();
     }
 
 
-    entities.player.yPos.px = a = DISPLAY_HEIGHT - 1;
+    mem16();
+    #[mem16] {
+        spriteList_player_yPos = aa = CAMERA_ORIGIN + DISPLAY_HEIGHT - 1;
+    }
+    mem8();
+
 
     metatiles.transitions.scroll_down__setup();
 
@@ -372,12 +481,12 @@ func scroll_down() {
 #[mem8, idx8]
 func _scroll_down__loop() {
 
-let SOLID_CHECK_YPOS = DISPLAY_HEIGHT - 1 - V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
+let SOLID_CHECK_YPOS = V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
 
     do {
         wait_frame();
 
-        a = entities.player.yPos.px;
+        a = camera_y_l;
         if a == SOLID_CHECK_YPOS {
             negative = metatiles.check_tile_solid(entities.player.xPos.px, 0);
             if negative {
@@ -389,26 +498,23 @@ let SOLID_CHECK_YPOS = DISPLAY_HEIGHT - 1 - V_TRANSITION_FRAMES_BEFORE_SOLID_CHE
 
                 // Rewind down transition
                 entities.player.yPos.px = a = PLAYER_YPOS_AFTER_UP_TRANSITION;
-                _load_room_and_check_if_ok_to_scroll();
-                entities.player.yPos.px = a = SOLID_CHECK_YPOS;
+                _load_room_and_check_if_ok_to_scroll(ScrollDirection.UP as u8);
+
+                mem16();
+                #[mem16] {
+                    camera_y = aa = camera_y - DISPLAY_HEIGHT;
+                }
+                mem8();
+
                 return _scroll_up__loop();
             }
         }
 
-        a = entities.player.yPos.px - metatiles.transitions.TRANSITION_SPEED;
-        if !carry { a = PLAYER_YPOS_AFTER_DOWN_TRANSITION; }
-        entities.player.yPos.px = a;
-
-
-        draw_entities();
-
+        move_camera_and_draw_sprite_list();
 
         carry = metatiles.transitions.scroll_down__process();
     }
     while !carry;
-
-
-    entities.player.yPos.px = a = PLAYER_YPOS_AFTER_DOWN_TRANSITION;
 }
 
 
@@ -421,19 +527,25 @@ let SOLID_CHECK_YPOS = DISPLAY_HEIGHT - 1 - V_TRANSITION_FRAMES_BEFORE_SOLID_CHE
 #[mem8, idx8]
 func scroll_up() {
 
-    entities.player.yPos.sx = 0;
+    _reset_camera();
 
+    entities.player.yPos.sx = 0;
 
     gameloop.currentRoom = a = gameloop.currentRoom - 0x10;
 
     entities.player.yPos.px = a = PLAYER_YPOS_AFTER_UP_TRANSITION;
-    zero = _load_room_and_check_if_ok_to_scroll();
+    zero = _load_room_and_check_if_ok_to_scroll(ScrollDirection.UP as u8);
     if !zero {
         ^return _fadeout__room_in_memory();
     }
 
 
-    entities.player.yPos.px = 0;
+    mem16();
+    #[mem16] {
+        spriteList_player_yPos = aa = CAMERA_ORIGIN;
+    }
+    mem8();
+
 
     metatiles.transitions.scroll_up__setup();
 
@@ -453,12 +565,12 @@ func scroll_up() {
 #[mem8, idx8]
 func _scroll_up__loop() {
 
-let SOLID_CHECK_YPOS = V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
+let SOLID_CHECK_YPOS = CAMERA_ORIGIN - V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
 
     do {
         wait_frame();
 
-        a = entities.player.yPos.px;
+        a = camera_y_l;
         if a == SOLID_CHECK_YPOS {
             negative = metatiles.check_tile_solid(entities.player.xPos.px, DISPLAY_HEIGHT - 1);
             if negative {
@@ -470,28 +582,242 @@ let SOLID_CHECK_YPOS = V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transi
 
                 // Rewind up transition
                 entities.player.yPos.px = a = PLAYER_YPOS_AFTER_DOWN_TRANSITION;
-                _load_room_and_check_if_ok_to_scroll();
-                entities.player.yPos.px = a = SOLID_CHECK_YPOS;
+                _load_room_and_check_if_ok_to_scroll(ScrollDirection.DOWN as u8);
+
+                mem16();
+                #[mem16] {
+                    camera_y = aa = camera_y + DISPLAY_HEIGHT;
+                }
+                mem8();
+
                 ^return _scroll_down__loop();
             }
         }
 
-
-        a = entities.player.yPos.px + metatiles.transitions.TRANSITION_SPEED;
-        if a >= PLAYER_YPOS_AFTER_UP_TRANSITION + 1 { a = PLAYER_YPOS_AFTER_UP_TRANSITION; }
-        entities.player.yPos.px = a;
-
-        draw_entities();
-
+        move_camera_and_draw_sprite_list();
 
         carry = metatiles.transitions.scroll_up__process();
     }
     while !carry;
-
-
-    entities.player.yPos.px = a = PLAYER_YPOS_AFTER_UP_TRANSITION;
 }
 
+
+
+// Reset the sprite list camera back to the origin point.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _reset_camera() {
+    mem16();
+    #[mem16] {
+        aa = CAMERA_ORIGIN;
+        camera_x = aa;
+        camera_y = aa;
+    }
+    mem8();
+}
+
+
+
+
+// Clear the sprite list.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _clear_sprite_list() {
+    // index 0 is reserved for the player
+    spriteListEnd = x = 2;
+}
+
+
+
+// Add room entities to the sprite list.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _add_entities_to_sprite_list() {
+
+let _activeEntitiesTablePos = <:dpTmp0;
+
+    x = spriteListEnd;
+
+    y = entities.numberOfActiveEntities;
+    if !zero {
+        do {
+            y--;
+            _activeEntitiesTablePos = y;
+
+            y = a = entities.activeEntitiesTable[y];
+            if !zero {
+                mem16();
+                #[mem16] {
+                    SpriteList.xPos[unaligned x] = aa = ((&entities.SoA.xPos[0].px as *u16)[unaligned y] & 0xff) + CAMERA_ORIGIN;
+                    SpriteList.yPos[unaligned x] = aa = ((&entities.SoA.yPos[0].px as *u16)[unaligned y] & 0xff) + CAMERA_ORIGIN;
+                    SpriteList.zPos[unaligned x] = aa = ((&entities.SoA._zPosAndBlank[0].first as *u16)[unaligned y] & 0xff);
+                    (&SpriteList.ms_draw_function[0] as *u16)[unaligned x] = aa = entities.SoA.ms_draw_function[unaligned y] as u16;
+                    SpriteList.metaSpriteFrameTable[unaligned x] = aa = entities.SoA.metaSpriteFrameTable[unaligned y];
+                    (&SpriteList._shadowSizeAndMsFrame[0] as *u16)[unaligned x] = aa = (&entities.SoA._shadowSizeAndMsFrame[0] as *u16)[unaligned y];
+                }
+                mem8();
+
+                x++;
+                x++;
+                break if x >= LAST_SPRITE_LIST_INDEX + 1;
+            }
+
+            y = _activeEntitiesTablePos;
+        } while !zero;
+    }
+    spriteListEnd = x;
+}
+
+
+// Populate the player's sprite list entry, offsetting the player's position based on the scroll direction.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _sprite_list_set_player_with_offset__inline(sd : ScrollDirection in scrollDirection) {
+    mem16();
+    #[mem16] {
+        x = scrollDirection as u8;
+
+        SpriteList.xPos[PLAYER_ID] = aa = ((&entities.SoA.xPos[0].px as *u16)[PLAYER_ID] & 0xff) + CAMERA_ORIGIN + ScrollDirectionTableX[unaligned x] as u16;
+        SpriteList.yPos[PLAYER_ID] = aa = ((&entities.SoA.yPos[0].px as *u16)[PLAYER_ID] & 0xff) + CAMERA_ORIGIN + ScrollDirectionTableY[unaligned x] as u16;
+        SpriteList.zPos[PLAYER_ID] = aa = ((&entities.SoA._zPosAndBlank[0].first as *u16)[PLAYER_ID] & 0xff);
+
+        (&SpriteList.ms_draw_function[0] as *u16)[PLAYER_ID] = aa = entities.SoA.ms_draw_function[PLAYER_ID] as u16;
+        SpriteList.metaSpriteFrameTable[PLAYER_ID] = aa = entities.SoA.metaSpriteFrameTable[PLAYER_ID];
+        (&SpriteList._shadowSizeAndMsFrame[0] as *u16)[PLAYER_ID] = aa = (&entities.SoA._shadowSizeAndMsFrame[0] as *u16)[PLAYER_ID];
+    }
+    mem8();
+}
+
+
+
+// Add room entities to the sprite list, offsetting their position based on the scroll direction.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _add_entities_to_sprite_list_with_offset(sd : ScrollDirection in scrollDirection) {
+
+    x = spriteListEnd;
+    push8(x);
+
+    _add_entities_to_sprite_list();
+
+
+    // Add ScrollDirectionTable offset to the new elements added to the sprite list.
+    y = pop8();
+    x = scrollDirection as u8;
+
+    if y < spriteListEnd {
+        mem16();
+        #[mem16()] {
+            do {
+                SpriteList.xPos[unaligned y] = aa = SpriteList.xPos[unaligned y] + ScrollDirectionTableX[unaligned x] as u16;
+                SpriteList.yPos[unaligned y] = aa = SpriteList.yPos[unaligned y] + ScrollDirectionTableY[unaligned x] as u16;
+
+                y++;
+                y++;
+            } while y < spriteListEnd;
+        }
+        mem8_idx8();
+    }
+}
+
+
+
+// Move spriteList camera based on the scroll direction and draw the sprite list.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func move_camera_and_draw_sprite_list() {
+
+    mem16();
+    #[mem16] {
+        x = scrollDirection as u8;
+
+        camera_x = aa = camera_x + ScrollDirectionVelocityX[unaligned x] as u16;
+        camera_y = aa = camera_y + ScrollDirectionVelocityY[unaligned x] as u16;
+    }
+    mem8();
+
+
+    return draw_sprite_list();
+}
+
+
+
+// Draw the sprite list.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func draw_sprite_list() {
+
+    idx16();
+    #[idx16] {
+        metasprites.reset_buffer_and_draw_room_transition_shadows__inline();
+    }
+    mem8_idx8();
+
+
+    // Draw MetaSprites
+    x = spriteListEnd;
+    if !zero {
+        do {
+            mem16_idx16();
+            #[mem16, idx16] {
+                xx--;
+                xx--;
+                spriteListIndex = xx;
+
+                metasprites.xPos = aa = SpriteList.xPos[unaligned xx] - camera_x;
+                metasprites.yPos = aa = SpriteList.yPos[unaligned xx] - SpriteList.zPos[unaligned xx] - camera_y;
+
+                // aa = metaSpriteFrame
+                aa = (&SpriteList._shadowSizeAndMsFrame[0].second as *u16)[unaligned xx] & 0xff;
+                // Safe: (aa << 1) will never set carry
+                xx = aa = (aa << 1) +# SpriteList.metaSpriteFrameTable[unaligned xx];
+                yy = aa = metasprites.MetaSpriteFrameTableOffset[unaligned xx];
+            }
+            mem8();
+            #[mem8, idx16] {
+                xx = spriteListIndex;
+                SpriteList.ms_draw_function[unaligned xx](yy, metasprites.xPos, metasprites.yPos);
+            }
+            mem8_idx8();
+
+            // ::ANNOY Cant use `<:` - it changes `spriteListIndex` to a long address
+            x = *(&spriteListIndex as *u8);
+        } while !zero;
+    }
+
+
+    idx16();
+    #[idx16] {
+        metasprites.finalize_buffer();
+    }
+    mem8_idx8();
+}
+
+}
+
+in rodata0 {
+    // Order MUST Match ScrollDirection
+    const _ScrollDirectionTableX : [i16 ; 4 ] = [                0,                   0,     -DISPLAY_WIDTH,      DISPLAY_WIDTH ];
+    const _ScrollDirectionTableY : [i16 ; 4 ] = [  -DISPLAY_HEIGHT,      DISPLAY_HEIGHT,                  0,                  0];
+
+    let ScrollDirectionTableX = (far&_ScrollDirectionTableX as far *i16);
+    let ScrollDirectionTableY = (far&_ScrollDirectionTableY as far *i16);
+
+
+    let _TS = metatiles.transitions.TRANSITION_SPEED;
+
+    const _ScrollDirectionVelocityX : [i16 ; 4 ] = [    0,    0, -_TS,  _TS];
+    const _ScrollDirectionVelocityY : [i16 ; 4 ] = [ -_TS,  _TS,    0,    0];
+
+    let ScrollDirectionVelocityX = (far&_ScrollDirectionVelocityX as far *i16);
+    let ScrollDirectionVelocityY = (far&_ScrollDirectionVelocityY as far *i16);
 }
 
 }
