@@ -712,7 +712,7 @@ func process__walking() {
 #[mem8, idx8]
 func update_animation__walking() {
 
-let _tmp = dpTmp0;
+let _tmp = zpTmp_word_0;
 
     mem16();
     #[mem16] {

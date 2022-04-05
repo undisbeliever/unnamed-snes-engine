@@ -88,9 +88,9 @@ func test_right(entityId : u8 in y) : bool in carry {
 #[mem8, idx8]
 func _vertical_test(a_yPos_ : u8 in a, b_yPos_ : u8 in x, entityId : u8 in y) : bool in carry {
 
-let _a_yPos = >:dpTmp0;
-let _b_yPos = <:dpTmp0;
-let _tmp    = <:dpTmp1;
+let _a_yPos = zpTmp_byte_0;
+let _b_yPos = zpTmp_byte_1;
+let _tmp    = zpTmp_byte_2;
 
     // MUST NOT change `x` in this function (used at the bottom).
 
@@ -133,9 +133,9 @@ let _tmp    = <:dpTmp1;
 #[mem8, idx8]
 func _horizontal_test(a_xPos_ : u8 in a, b_xPos_ : u8 in x, entityId : u8 in y) : bool in carry {
 
-let _a_xPos = >:dpTmp0;
-let _b_xPos = <:dpTmp0;
-let _tmp    = <:dpTmp1;
+let _a_xPos = zpTmp_byte_0;
+let _b_xPos = zpTmp_byte_1;
+let _tmp    = zpTmp_byte_2;
 
     // MUST NOT change `x` in this function
 

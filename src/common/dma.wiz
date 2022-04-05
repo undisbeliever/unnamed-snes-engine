@@ -45,7 +45,7 @@ func transfer_to_vram__forceblank(data_bank : u8 in a, data_addr : u16 in xx, si
 #[mem8, idx16]
 func set_tilemap__forceblank(vramWaddr : u16 in xx, tilemapEntry : u16 in yy) {
 
-let _tmp = dpTmp0;
+let _tmp = zpTmp_word_0;
 
     // MUST NOT USE xx
 
@@ -67,7 +67,7 @@ let _tmp = dpTmp0;
     snes.ppu.vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_1;
     snes.ppu.vram_address_hl = xx;
 
-    snes.dma0.src_address_l = <:&_tmp;
+    snes.dma0.src_address_l = a = <:&_tmp;
     snes.dma0.mdma_size_hl = yy = 32 * 32;
     snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
 

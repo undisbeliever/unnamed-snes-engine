@@ -219,7 +219,7 @@ inline func load_ppu_data__fblank(spritesheet_id : u8 in a) {
 // DB = 0x80
 #[mem8, idx16]
 func __load_ppu_data_vram__fblank(spritesheet_id : u8 in a) {
-let _ptr = dpTmp_farPtr;
+let _ptr = zpTmp_farPtr;
 
     snes.dma.hdma_enable = 0;
 
@@ -533,8 +533,8 @@ inline func reset_buffer_and_draw_entity_shadows() {
 #[mem8, idx16]
 inline func reset_buffer_and_draw_room_transition_shadows__inline() {
 
-let _shadowX = dpTmp0;
-let _shadowY = <:dpTmp1;
+let _shadowX = zpTmp_word_0;
+let _shadowY = zpTmp_byte_0;
 
 
     // NOTE: If I modify this function, also modify `reset_buffer_and_draw_entity_shadows`

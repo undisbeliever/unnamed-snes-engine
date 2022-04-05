@@ -91,7 +91,7 @@ inline func init() {
 // DB = 0x7e
 #[mem8, idx8]
 func __copy_room_into_memory(roomListIndex : u8 in x) {
-let _roomPtr = dpTmp_farPtr;
+let _roomPtr = zpTmp_farPtr;
 
     if x >= resources.rooms.N_ROOMS {
         x = 0;

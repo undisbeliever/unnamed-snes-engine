@@ -53,12 +53,17 @@ const @ 0x80FFFE = invalid_handler; // emu irq
 }
 
 in zeropage {
-    var dpTmp0 : u16;
-    var dpTmp1 : u16;
-    var dpTmp2 : u16;
-    var dpTmp3 : u16;
+    var zpTmp_byte_0 : u8;
+    var zpTmp_byte_1 : u8;
+    var zpTmp_byte_2 : u8;
+    var zpTmp_byte_3 : u8;
+    var zpTmp_byte_4 : u8;
+    var zpTmp_byte_5 : u8;
 
-    var dpTmp_farPtr : far *u8;
+    var zpTmp_word_0 : u16;
+    var zpTmp_word_1 : u16;
+
+    var zpTmp_farPtr : far *u8;
 }
 
 

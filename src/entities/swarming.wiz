@@ -82,16 +82,24 @@ let SoA_countdownTimer   = SoA.state_2_l;
 // Will be invalidated on a function call outside this entity.
 //
 // (u8 position)
-let _target_x = <:dpTmp0;
-let _target_y = >:dpTmp0;
+let _target_x = zpTmp_byte_0;
+let _target_y = zpTmp_byte_1;
 
 // Absolute difference between target and entity position.
 //
 // Will be invalidated on a function call outside this entity.
 //
 // (2x u8)
-let _absDifference_x = <:dpTmp1;
-let _absDifference_y = >:dpTmp1;
+let _absDifference_x = zpTmp_byte_2;
+let _absDifference_y = zpTmp_byte_3;
+
+
+// Temporary variable
+//
+// Will be invalidated on a function call outside this entity.
+//
+// Declared here as the other zpTmp variables are declared here
+let _tmp = zpTmp_byte_4;
 
 
 
@@ -492,7 +500,6 @@ func process__facing_west(entityId : u8 in y) : bool in carry {
 // DB = 0x7e
 #[mem8, idx8]
 func _update_walk_animation(entityId : u8 in y) : bool in carry {
-let _tmp = <:dpTmp0;
 
     a = SoA_animationCounter[y];
     if !zero {

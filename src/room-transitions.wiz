@@ -637,7 +637,7 @@ inline func _clear_sprite_list() {
 #[mem8, idx8]
 func _add_entities_to_sprite_list() {
 
-let _activeEntitiesTablePos = <:dpTmp0;
+let _activeEntitiesTablePos = zpTmp_byte_0;
 
     x = spriteListEnd;
 

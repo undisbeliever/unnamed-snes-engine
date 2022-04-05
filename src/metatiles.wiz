@@ -95,7 +95,7 @@ in code {
 // DB = 0x80
 #[mem8, idx16]
 func load_tileset__forceblank(tileset_id : u8 in a) {
-let _tilesetPtr = dpTmp_farPtr;
+let _tilesetPtr = zpTmp_farPtr;
 
     snes.dma.hdma_enable = 0;
 
@@ -169,8 +169,8 @@ let _tilesetPtr = dpTmp_farPtr;
 // DB = 0x7e
 #[mem8, idx8]
 func draw_map__forceblank() {
-let _rowsLeft    = <:dpTmp0;
-let _columnsLeft = >:dpTmp0;
+let _rowsLeft    = zpTmp_byte_0;
+let _columnsLeft = zpTmp_byte_1;
 
     push8(data_bank);
 
@@ -290,7 +290,7 @@ func populate_map_tile_properties() {
 // DB = 0x7e
 #[mem8, idx8]
 func check_tile_solid(xPos : u8 in x, yPos : u8 in y) : bool in negative {
-let _tmp    = <:dpTmp0;
+let _tmp    = zpTmp_byte_0;
 
     _tmp = a = x >>> 4;
     x = a = (y & 0xf0) + _tmp;
@@ -335,10 +335,10 @@ func move_entity_and_collision_test__unbounded(entityId : u8 in y) : u8 in y {
 // KEEP: Y
 #[mem8, idx8]
 inline func _move_entity_and_collision_test__unbounded__x_axis(entityId : u8 in y) : u8 in y {
-let _tmp    = <:dpTmp0;
-let _top    = >:dpTmp0;
-let _left   = <:dpTmp1;
-let _right  = <:dpTmp1;
+let _tmp    = zpTmp_byte_0;
+let _top    = zpTmp_byte_1;
+let _left   = zpTmp_byte_2;
+let _right  = zpTmp_byte_3;
 
     // X Axis
     // ------
@@ -435,10 +435,10 @@ let _right  = <:dpTmp1;
 // DB = 0x7e
 #[mem8, idx8]
 inline func _move_entity_and_collision_test__unbounded__y_axis(entityId : u8 in y) : u8 in y {
-let _tmp    = <:dpTmp0;
-let _left   = >:dpTmp0;
-let _top    = <:dpTmp1;
-let _bottom = <:dpTmp1;
+let _tmp    = zpTmp_byte_0;
+let _left   = zpTmp_byte_1;
+let _top    = zpTmp_byte_2;
+let _bottom = zpTmp_byte_3;
 
     a = entities.SoA.xPos_px[y] - entities.SoA.tileHitbox_halfWidth[y];
     if !carry { a = 0; }
@@ -562,10 +562,10 @@ func move_entity_and_collision_test__bounded(entityId : u8 in y) : u8 in y {
 // KEEP: Y
 #[mem8, idx8]
 inline func _move_entity_and_collision_test__bounded__x_axis(entityId : u8 in y) : u8 in y {
-let _tmp    = <:dpTmp0;
-let _top    = >:dpTmp0;
-let _left   = <:dpTmp1;
-let _right  = <:dpTmp1;
+let _tmp    = zpTmp_byte_0;
+let _top    = zpTmp_byte_1;
+let _left   = zpTmp_byte_2;
+let _right  = zpTmp_byte_3;
 
     // X Axis
     // ------
@@ -672,10 +672,10 @@ let _right  = <:dpTmp1;
 // DB = 0x7e
 #[mem8, idx8]
 inline func _move_entity_and_collision_test__bounded__y_axis(entityId : u8 in y) : u8 in y {
-let _tmp    = <:dpTmp0;
-let _left   = >:dpTmp0;
-let _top    = <:dpTmp1;
-let _bottom = <:dpTmp1;
+let _tmp    = zpTmp_byte_0;
+let _left   = zpTmp_byte_1;
+let _top    = zpTmp_byte_2;
+let _bottom = zpTmp_byte_3;
 
     a = entities.SoA.xPos_px[y] - entities.SoA.tileHitbox_halfWidth[y];
     if !carry { a = 0; }
@@ -919,7 +919,7 @@ inline func swap_currentTilemap() {
 // DB = 0x7e
 #[mem8, idx8]
 func _draw_left_column() {
-let _tmp = <:dpTmp0;
+let _tmp = zpTmp_byte_0;
 
     y = a = (topmostRowInVram & topmostRowInVram_MASK) << 1;
 
@@ -956,7 +956,7 @@ let _tmp = <:dpTmp0;
 // DB = 0x7e
 #[mem8, idx8]
 func _draw_right_column() {
-let _tmp = <:dpTmp0;
+let _tmp = zpTmp_byte_0;
 
     y = a = (topmostRowInVram & topmostRowInVram_MASK) << 1;
 
@@ -1204,7 +1204,7 @@ func _calculate_vram_position_for_row(tilemapRow : u8 in a) {
 // DB = 0x7e
 #[mem8, idx8]
 func _draw_top_row(tilemapRow : u8 in a) {
-let _tmp = <:dpTmp0;
+let _tmp = zpTmp_byte_0;
 
     _calculate_vram_position_for_row(a);
 
@@ -1238,7 +1238,7 @@ let _tmp = <:dpTmp0;
 // DB = 0x7e
 #[mem8, idx8]
 func _draw_bottom_row(tilemapRow : u8 in a) {
-let _tmp = <:dpTmp0;
+let _tmp = zpTmp_byte_0;
 
     _calculate_vram_position_for_row(a);
 

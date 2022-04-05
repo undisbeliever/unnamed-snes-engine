@@ -84,7 +84,7 @@ func hurt_player__collision(entityId : u8 in y) {
 #[mem8, idx8]
 func hurt_player__collision__attack_power(entityId : u8 in y, attackPower : u8 in a) {
 
-let _tmp = <:dpTmp0;
+let _tmp = zpTmp_byte_0;
 
     x = SoA.iframeCounter[player.PLAYER_ENTITY_ID];
     if zero {
@@ -179,7 +179,7 @@ func take_damage_from_player_sword_with_knockback(entityId : u8 in y, collisionS
 // DB = 0x7e
 #[mem8, idx8]
 func set_velocity_after_player_sword_collision(entityId : u8 in y, collisionSpeed : u8 in x) {
-let _farPtr = (*(&dpTmp_farPtr as *far *u16));
+let _farPtr = (*(&zpTmp_farPtr as *far *u16));
 
     mem16();
     #[mem16] {
@@ -375,10 +375,10 @@ inline func __add_yPos_to_i8a_clamp(i8a : u8 in a, n : bool in negative, entityI
 #[mem8, idx16]
 func __test__entity_hitbox__player_hurtbox(entityId : u16 in yy, msFrameAddr : u16 in xx) : bool in carry {
 
-let _hb_left   = <:dpTmp0;
-let _hb_right  = <:dpTmp1;
-let _hb_top    = <:dpTmp2;
-let _tmp       = <:dpTmp3;
+let _hb_left   = zpTmp_byte_0;
+let _hb_right  = zpTmp_byte_1;
+let _hb_top    = zpTmp_byte_2;
+let _tmp       = zpTmp_byte_3;
 
 
     // calculate entity hitbox left
@@ -471,10 +471,10 @@ let _tmp       = <:dpTmp3;
 #[mem8, idx16]
 func __test__entity_hurtbox__player_hitbox(entityId : u16 in yy, msFrameAddr : u16 in xx) : bool in carry {
 
-let _hb_left   = <:dpTmp0;
-let _hb_right  = <:dpTmp1;
-let _hb_top    = <:dpTmp2;
-let _tmp       = <:dpTmp3;
+let _hb_left   = zpTmp_byte_0;
+let _hb_right  = zpTmp_byte_1;
+let _hb_top    = zpTmp_byte_2;
+let _tmp       = zpTmp_byte_3;
 
 
     // calculate entity hurtbox left
