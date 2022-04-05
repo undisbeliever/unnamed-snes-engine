@@ -81,7 +81,7 @@ namespace entities {
     namespace SoA {
         let LAST_INDEX = (N_ENTITIES - 1) * 2;
 
-        in shadow {
+        in shadow_roomstate {
             // Process function for the entity.  Called once per frame by the undo loop.
             //
             // INPUT: entityId: index into `entities.SoA` Structure-of-Arrays.
@@ -106,7 +106,7 @@ namespace entities {
             var ms_draw_function : [func(msFrame : u16 in yy, xPos : u16 in metasprites.xPos, yPos : u16 in metasprites.yPos) ; N_ENTITIES];
         }
 
-        in wram7e {
+        in wram7e_roomstate {
             var xPos : [pos ; N_ENTITIES];
             let xPos_u16 = &xPos[0].sx as *u16;
             let xPos_sx = &xPos[0].sx as *u8;
@@ -228,7 +228,7 @@ namespace entities {
     }
 
 
-    in wram7e {
+    in wram7e_roomstate {
         // Mapping of active and unused entities (including player).
         //
         // indexes 0 to `numberOfActiveEntities - 1` (inclusive) are active entityIds.

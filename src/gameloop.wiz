@@ -47,7 +47,7 @@ in zeropage {
 
 }
 
-in wram7e {
+in wram7e_roomstate {
 
     // This hack is required to access room via addr addressing.
     #[align(256)]
@@ -57,7 +57,6 @@ in wram7e {
 
     // The location of the current room
     var currentRoom : u8;
-
 }
 
 
