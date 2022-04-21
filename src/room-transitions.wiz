@@ -8,6 +8,7 @@ import "gameloop";
 import "gamemodes";
 import "metasprites";
 import "metatiles";
+import "resources";
 import "wait-frame";
 
 import "entities/_variables";
@@ -16,7 +17,7 @@ import "entities/player";
 
 
 // ::TODO figure out how to handle an infinite room transition loop::
-// ::: ie, player hit by arrow into invalid room, transition rolled back, player hit by arrow into invalid room, repeat :::
+// ::: ie, player hit by arrow (or enemy) into invalid room, transition rolled back, player hit by arrow into invalid room, repeat :::
 
 
 namespace room_transitions {
@@ -153,38 +154,69 @@ in code {
 // player AFTER the room transition ends and play resumes (the variables might be used by an
 // entity init routine)
 //
-// Returns zero set if it is OK to preform a scroll transition into the next room without glitches.
+// Returns true if it is OK to preform a scroll transition into the next room without glitches.
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _load_room_and_check_if_ok_to_scroll(roomPosition : u8 in a, _scrollDirection_ : u8 in x) : bool in zero {
+func _load_room_and_check_if_ok_to_scroll(roomPosition : u8 in a, _scrollDirection_ : u8 in x) : bool in carry {
+
+let _roomStateBackup__room_tileset = *(((&room.tileset as u16) - MEMMAP_ROOMSTATE_WRAM7E as u16 + &roomStateBackup_wram7e as u16) as *typeof(room.tileset));
 
     scrollDirection = x as ScrollDirection;
 
     push8(a);
+    {
+        _clear_sprite_list();
+        _add_entities_to_sprite_list();
 
 
-    _clear_sprite_list();
-    _add_entities_to_sprite_list();
+        __backup_room_state();
 
 
-    __backup_room_state();
-
+        // Reset entity subsystem
+        entities.init();
+    }
 
     x = pop8();
+    roomstate.currentRoom = x;
+    x = a = resources.rooms.room_table[x];
+    if !zero && x < resources.rooms.N_ROOMS + 1 {
+        // room is valid
 
-    zero = gameloop._load_room_and_check_if_ok_to_scroll__inline(x);
-    if !zero {
-        return zero;
+        x--;
+        __copy_room_into_memory(x);
+
+        metatiles.populate_map_tile_properties();
+        gameloop._spawn_room_entities();
     }
+    else {
+        // room is missing from map - create an empty dummy map
+        //
+        // `metatiles.populate_map_tile_properties()` will fill the dummy
+        // room's `mapTileProperties` with solid tiles.  This ensures any
+        // scrolling room transition into a missing room will always be rolled
+        // back.
+
+        __clear_room_memory();
+        room.tileset = a = 0xff;
+
+        metatiles.populate_map_tile_properties();
+    }
+
+
+    // Get the tileset id from the backup
+    a = room.tileset;
+    if a != 0xff && a != _roomStateBackup__room_tileset {
+        return false;
+    }
+
 
     entities.sort_active_entities();
 
     _add_entities_to_sprite_list_with_offset(scrollDirection);
     _sprite_list_set_player_with_offset(scrollDirection);
 
-    a = 0;
-    return zero;
+    return true;
 }
 
 
@@ -278,6 +310,57 @@ let _roomstate_wram7e = MEMMAP_ROOMSTATE_WRAM7E as far *u8;
     //       (safe as target is in bank 0x7e)
     }
     mem8_idx8();
+}
+
+
+
+
+// Load the room into memory
+//
+// ASSUMES: roomListIndex is valid
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func __copy_room_into_memory(roomListIndex : u8 in x) {
+let _roomPtr = zpTmp_farPtr;
+
+    if x >= resources.rooms.N_ROOMS {
+        x = 0;
+    }
+
+    <:_roomPtr = a = resources.rooms.room_list_l[x];
+    >:_roomPtr = a = resources.rooms.room_list_h[x];
+    #:_roomPtr = a = resources.rooms.room_list_bank;
+
+
+    idx16();
+    #[idx16] {
+        yy = sizeof(typeof(room)) - 1;
+        do {
+            (&room as *u8)[yy] = a = _roomPtr[yy];
+            yy--;
+        } while !negative;
+    }
+    mem8_idx8();
+}
+
+
+
+// Clear room memory
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func __clear_room_memory() {
+
+    idx16();
+    #[idx16] {
+        xx = sizeof(typeof(room)) - 1;
+        do {
+            (&room as *u8)[xx] = 0;
+            xx--;
+        } while !negative;
+    }
+    idx8();
 }
 
 
@@ -406,8 +489,8 @@ let SOLID_CHECK_XPOS = H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transi
     a = roomstate.currentRoom;
     a++;
 
-    zero = _load_room_and_check_if_ok_to_scroll(a, ScrollDirection.RIGHT as u8);
-    if !zero {
+    carry = _load_room_and_check_if_ok_to_scroll(a, ScrollDirection.RIGHT as u8);
+    if !carry {
         return _fadeout__room_in_memory();
     }
 
@@ -490,8 +573,8 @@ let SOLID_CHECK_XPOS = CAMERA_ORIGIN - H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * 
 
     a = roomstate.currentRoom;
     a--;
-    zero = _load_room_and_check_if_ok_to_scroll(a, ScrollDirection.LEFT as u8);
-    if !zero {
+    carry = _load_room_and_check_if_ok_to_scroll(a, ScrollDirection.LEFT as u8);
+    if !carry {
         ^return _fadeout__room_in_memory();
     }
 
@@ -571,8 +654,8 @@ func scroll_down() {
     entities.player.yPos.sx = 0;
     entities.player.yPos.px = a = PLAYER_YPOS_AFTER_DOWN_TRANSITION;
 
-    zero = _load_room_and_check_if_ok_to_scroll(a = roomstate.currentRoom + 0x10, ScrollDirection.DOWN as u8);
-    if !zero {
+    carry = _load_room_and_check_if_ok_to_scroll(a = roomstate.currentRoom + 0x10, ScrollDirection.DOWN as u8);
+    if !carry {
         ^return _fadeout__room_in_memory();
     }
 
@@ -650,8 +733,8 @@ func scroll_up() {
     entities.player.yPos.sx = 0;
     entities.player.yPos.px = a = PLAYER_YPOS_AFTER_UP_TRANSITION;
 
-    zero = _load_room_and_check_if_ok_to_scroll(a = roomstate.currentRoom - 0x10, ScrollDirection.UP as u8);
-    if !zero {
+    carry = _load_room_and_check_if_ok_to_scroll(a = roomstate.currentRoom - 0x10, ScrollDirection.UP as u8);
+    if !carry {
         ^return _fadeout__room_in_memory();
     }
 
