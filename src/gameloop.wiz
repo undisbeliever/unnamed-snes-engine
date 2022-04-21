@@ -4,6 +4,7 @@
 import "memmap";
 import "../wiz/common/snes/snes";
 
+import "room";
 import "gamemodes";
 import "metatiles";
 import "metasprites";
@@ -25,43 +26,6 @@ let DISPLAY_HEIGHT = 224;
 
 
 
-let ENTITIES_IN_MAP = 8;
-
-// Map data format
-struct RoomData {
-    map         : [u8 ; metatiles.MAP_WIDTH * metatiles.MAP_HEIGHT],
-
-    tileset     : u8,
-
-    // Entities in the map
-    // (Structure of Arrays)
-    // If the entity does not spawn then the array elements MUST be 0xff;
-    entity_xPos      : [u8 ; ENTITIES_IN_MAP],
-    entity_yPos      : [u8 ; ENTITIES_IN_MAP],
-    entity_type      : [u8 ; ENTITIES_IN_MAP],
-    entity_parameter : [u8 ; ENTITIES_IN_MAP],
-};
-
-
-
-in zeropage {
-
-}
-
-in wram7e_roomstate {
-
-    // This hack is required to access room via addr addressing.
-    #[align(256)]
-    var __far_room : RoomData;
-    let room = *(&__far_room as *RoomData);
-
-
-    // The location of the current room
-    var currentRoom : u8;
-}
-
-
-
 in code {
 
 // Initialize the game loop
@@ -76,7 +40,7 @@ inline func init() {
 
 
     a = resources.rooms.STARTING_ROOM;
-    currentRoom = a;
+    roomstate.currentRoom = a;
     room_transitions.roomToLoad = a;
 
 
@@ -141,7 +105,7 @@ func __clear_room_memory() {
 // DB = 0x7e
 #[mem8, idx8]
 func _check_room_exists() : bool in carry {
-    x = currentRoom;
+    x = roomstate.currentRoom;
     a = resources.rooms.room_table[x];
     if !zero && a < resources.rooms.N_ROOMS + 1 {
         return true;
@@ -164,7 +128,7 @@ func _check_room_exists() : bool in carry {
 #[mem8, idx8]
 inline func _load_room_and_check_if_ok_to_scroll__inline(roomPosition : u8 in x) : bool in zero {
 
-    currentRoom = x;
+    roomstate.currentRoom = x;
     x = a = resources.rooms.room_table[x];
     if !zero && x < resources.rooms.N_ROOMS + 1 {
         // room is valid
@@ -214,7 +178,7 @@ func _spawn_room_entities() {
     entities.init();
 
 
-    x = ENTITIES_IN_MAP - 1;
+    x = N_ENTITIES_IN_ROOM_DATA - 1;
     do {
         push8(x);
 
@@ -386,7 +350,7 @@ inline func _check_for_room_transition() {
     a = entities.player.yPos.px;
     if zero {
         // Check if there is a room above this one
-        a = currentRoom - 0x10;
+        a = roomstate.currentRoom - 0x10;
         if carry {
             a = GameModes.ROOM_TRANSITION_SCROLL_UP as u8;
             gameMode = a as GameModes;
@@ -397,7 +361,7 @@ inline func _check_for_room_transition() {
     }
     else if a >= DISPLAY_HEIGHT - 1 {
         // Check if there is a room below this one
-        a = currentRoom + 0x10;
+        a = roomstate.currentRoom + 0x10;
         if !carry {
             a = GameModes.ROOM_TRANSITION_SCROLL_DOWN as u8;
             gameMode = a as GameModes;
@@ -410,7 +374,7 @@ inline func _check_for_room_transition() {
     a = entities.player.xPos.px;
     if zero {
         // Check if there is a room to the left of this one
-        a = currentRoom & 0x0f;
+        a = roomstate.currentRoom & 0x0f;
         if !zero {
             a = GameModes.ROOM_TRANSITION_SCROLL_LEFT as u8;
             gameMode = a as GameModes;
@@ -418,7 +382,7 @@ inline func _check_for_room_transition() {
     }
     else if a >= DISPLAY_WIDTH - 1 {
         // Check if there is a room to the right of this one
-        a = currentRoom & 0x0f;
+        a = roomstate.currentRoom & 0x0f;
         if a != 0x0f {
             a = GameModes.ROOM_TRANSITION_SCROLL_RIGHT as u8;
             gameMode = a as GameModes;

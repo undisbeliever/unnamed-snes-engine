@@ -1,0 +1,49 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "memmap";
+
+
+let N_ENTITIES_IN_ROOM_DATA = 8;
+
+let ROOM_MAP_WIDTH = 16;
+let ROOM_MAP_HEIGHT = 14;
+
+
+
+// Map data format
+struct RoomData {
+    map         : [ u8 ; ROOM_MAP_WIDTH * ROOM_MAP_HEIGHT ],
+
+    tileset     : u8,
+
+    // Entities in the map
+    // (Structure of Arrays)
+    // If the entity does not spawn then the array elements MUST be 0xff;
+    entity_xPos      : [u8 ; N_ENTITIES_IN_ROOM_DATA],
+    entity_yPos      : [u8 ; N_ENTITIES_IN_ROOM_DATA],
+    entity_type      : [u8 ; N_ENTITIES_IN_ROOM_DATA],
+    entity_parameter : [u8 ; N_ENTITIES_IN_ROOM_DATA],
+};
+
+
+in wram7e_roomstate {
+
+    // This hack is required to access room via addr addressing.
+    #[align(256)]
+    var __far_room : RoomData;
+    let room = *(&__far_room as *RoomData);
+}
+
+
+namespace roomstate {
+
+in wram7e_roomstate {
+
+    // The location of the current room
+    var currentRoom : u8;
+}
+
+}
+
+

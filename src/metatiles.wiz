@@ -2,6 +2,8 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "memmap";
+
+import "room";
 import "resources";
 import "gameloop";
 import "wait-frame";
@@ -63,7 +65,7 @@ in wram7e {
     // The map for the current room.
     //
     // NOTE: Whenever the map is updated the corresponding `mapTileProperties` cells must be changed.
-    let map = gameloop.room.map;
+    let map = room.map;
 
 
     // The MetaTile tileset tile properties for each map tile.

@@ -3,6 +3,7 @@
 
 import "memmap";
 
+import "room";
 import "gameloop";
 import "gamemodes";
 import "metasprites";
@@ -81,7 +82,7 @@ namespace SpriteList {
 
 let PLAYER_ID = 0;
 
-let N_SPRITE_LIST_ELEMENTS = entities.N_ENTITIES + gameloop.ENTITIES_IN_MAP + 2;
+let N_SPRITE_LIST_ELEMENTS = entities.N_ENTITIES + N_ENTITIES_IN_ROOM_DATA + 2;
 
 let LAST_SPRITE_LIST_INDEX = (N_SPRITE_LIST_ELEMENTS - 1) * 2;
 
@@ -402,7 +403,7 @@ let SOLID_CHECK_XPOS = H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transi
     entities.player.xPos.sx = 0;
     entities.player.xPos.px = a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION;
 
-    a = gameloop.currentRoom;
+    a = roomstate.currentRoom;
     a++;
 
     zero = _load_room_and_check_if_ok_to_scroll(a, ScrollDirection.RIGHT as u8);
@@ -487,7 +488,7 @@ let SOLID_CHECK_XPOS = CAMERA_ORIGIN - H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * 
     entities.player.xPos.sx = 0;
     entities.player.xPos.px = a = PLAYER_XPOS_AFTER_LEFT_TRANSITION;
 
-    a = gameloop.currentRoom;
+    a = roomstate.currentRoom;
     a--;
     zero = _load_room_and_check_if_ok_to_scroll(a, ScrollDirection.LEFT as u8);
     if !zero {
@@ -570,7 +571,7 @@ func scroll_down() {
     entities.player.yPos.sx = 0;
     entities.player.yPos.px = a = PLAYER_YPOS_AFTER_DOWN_TRANSITION;
 
-    zero = _load_room_and_check_if_ok_to_scroll(a = gameloop.currentRoom + 0x10, ScrollDirection.DOWN as u8);
+    zero = _load_room_and_check_if_ok_to_scroll(a = roomstate.currentRoom + 0x10, ScrollDirection.DOWN as u8);
     if !zero {
         ^return _fadeout__room_in_memory();
     }
@@ -649,7 +650,7 @@ func scroll_up() {
     entities.player.yPos.sx = 0;
     entities.player.yPos.px = a = PLAYER_YPOS_AFTER_UP_TRANSITION;
 
-    zero = _load_room_and_check_if_ok_to_scroll(a = gameloop.currentRoom - 0x10, ScrollDirection.UP as u8);
+    zero = _load_room_and_check_if_ok_to_scroll(a = roomstate.currentRoom - 0x10, ScrollDirection.UP as u8);
     if !zero {
         ^return _fadeout__room_in_memory();
     }
