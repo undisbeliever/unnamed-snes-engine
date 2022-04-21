@@ -50,22 +50,6 @@ inline func init() {
 
 
 
-// Return true if the currentRoom points to a valid room.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func _check_room_exists() : bool in carry {
-    x = roomstate.currentRoom;
-    a = resources.rooms.room_table[x];
-    if !zero && a < resources.rooms.N_ROOMS + 1 {
-        return true;
-    }
-
-    return false;
-}
-
-
-
 // Spawn the room entities
 //
 // ASSUMES: entities subsystem is initialised.

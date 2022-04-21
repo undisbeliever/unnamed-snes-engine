@@ -200,7 +200,7 @@ let _roomStateBackup__room_tileset = *(((&room.tileset as u16) - MEMMAP_ROOMSTAT
         __clear_room_memory();
         room.tileset = a = 0xff;
 
-        metatiles.populate_map_tile_properties();
+        metatiles.populate_map_tile_properties__all_tiles_solid();
     }
 
 
@@ -223,6 +223,7 @@ let _roomStateBackup__room_tileset = *(((&room.tileset as u16) - MEMMAP_ROOMSTAT
 
 // Restore the room state from backup, move the player to a specific location and populate the sprite list.
 //
+// ASSUMES: previous room is valid
 // ASSUMES: player position is value (not stuck inside a solid tile)
 //
 // DB = 0x7e
@@ -241,6 +242,7 @@ func _load_room_from_backup(_scrollDirection_ : u8 in a, playerXpos : u8 in x, p
 
     __restore_room_state_from_backup();
 
+    // Assumes previous room is valid
     metatiles.populate_map_tile_properties();
 
 
