@@ -2,6 +2,7 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "memmap";
+import "../wiz/common/snes/snes";
 
 import "room";
 import "gameloop";
@@ -9,7 +10,9 @@ import "gamemodes";
 import "metasprites";
 import "metatiles";
 import "resources";
+import "ui";
 import "wait-frame";
+import "common/reset";
 
 import "entities/_variables";
 import "entities/_common";
@@ -367,6 +370,74 @@ inline func __clear_room_memory() {
 
 
 
+// Setup PPU, reset graphics subsystems and draw graphics to the screen.
+//
+// This function will restore the following subsystems to a known good state:
+//  * PPU
+//  * MetaTiles
+//  * MetaSprite
+//
+// ASSUMES: room and entities are loaded into memory
+//
+// NOTE: Enables Force-Blank.
+// NOTE: MUST ONLY BE CALLED ONCE IN THE CODE
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func __setup_ppu_and_reset_graphics_subsystems() {
+
+
+    wait_frame_and_change_brightness(snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK);
+
+
+    push8(program_bank);
+    data_bank = pop8();
+// DB = 0x80
+    {
+        // Setup PPU registers
+
+        reset_registers();
+
+        snes.ppu.bg_mode = a = 1 | snes.ppu.BG_MODE_MODE1_BG3_PRIORITY;
+        snes.ppu.bg1_tilemap = a = (VRAM_BG1_MAP_WADDR >> snes.ppu.BG_TILEMAP_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT) | snes.ppu.BG_TILEMAP_MIRROR_X;
+        snes.ppu.bg3_tilemap = a = (VRAM_BG3_MAP_WADDR >> snes.ppu.BG_TILEMAP_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT);
+
+        snes.ppu.bg12_tileset = a = (VRAM_BG1_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG1_SHIFT);
+        snes.ppu.bg34_tileset = a = (VRAM_BG3_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG1_SHIFT);
+
+
+        snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_BG1 | snes.ppu.SCREEN_ENABLE_BG3 | snes.ppu.SCREEN_ENABLE_OBJ;
+
+
+
+        // Load Graphics to PPU
+
+        idx16();
+        #[idx16] {
+            metatiles.load_tileset__forceblank(room.tileset);
+
+            metasprites.setup__fblank();
+
+            // ::TODO get spritesheet_id from somewhere::
+            metasprites.load_ppu_data__fblank(1);
+
+            ui.setup_ppu__forceblank();
+        }
+        idx8();
+    }
+    push8(a = 0x7e);
+    data_bank = pop8();
+// DB = 0x7e
+
+
+    // Tileset may have changed - Need to repopulate map_tile properties
+    metatiles.populate_map_tile_properties();
+
+    metatiles.draw_map__forceblank();
+}
+
+
+
 // Room Transitions
 // ================
 
@@ -395,7 +466,7 @@ func load_room__fadein() {
 #[mem8, idx8]
 func _fadein__room_in_memory() {
 
-    gameloop._setup_ppu_and_reset_graphics_subsystems();
+    __setup_ppu_and_reset_graphics_subsystems();
     gameloop.draw_entities();
 
 
