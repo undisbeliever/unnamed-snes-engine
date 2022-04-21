@@ -8,6 +8,7 @@ import "gamemodes";
 import "metatiles";
 import "metasprites";
 import "resources";
+import "room-transitions";
 import "ui";
 import "wait-frame";
 import "common/reset";
@@ -74,7 +75,9 @@ inline func init() {
     ui.init();
 
 
-    currentRoom = a = resources.rooms.STARTING_ROOM;
+    a = resources.rooms.STARTING_ROOM;
+    currentRoom = a;
+    room_transitions.roomToLoad = a;
 
 
     a = GameModes.LOAD_ROOM_FADEIN as u8;
@@ -159,9 +162,9 @@ func _check_room_exists() : bool in carry {
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func _load_room_and_check_if_ok_to_scroll__inline() : bool in zero {
+inline func _load_room_and_check_if_ok_to_scroll__inline(roomPosition : u8 in x) : bool in zero {
 
-    x = currentRoom;
+    currentRoom = x;
     x = a = resources.rooms.room_table[x];
     if !zero && x < resources.rooms.N_ROOMS + 1 {
         // room is valid

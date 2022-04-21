@@ -35,6 +35,13 @@ bank wram7e             @ 0x7e2800 : [vardata;    0xd800];
 bank wram7f             @ 0x7f0000 : [vardata;   0x10000];
 
 
+let MEMMAP_ROOMSTATE_SHADOW      = 0x7e0100;
+let MEMMAP_ROOMSTATE_SHADOW_SIZE =    0x100;
+
+let MEMMAP_ROOMSTATE_WRAM7E      = 0x7e2000;
+let MEMMAP_ROOMSTATE_WRAM7E_SIZE =    0x800;
+
+
 let STACK_TOP = 0x1fff;
 let STACK_BOTTOM = 0x1f80;
 

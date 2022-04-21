@@ -14,6 +14,10 @@ import "entities/_common";
 import "entities/player";
 
 
+// ::TODO figure out how to handle an infinite room transition loop::
+// ::: ie, player hit by arrow into invalid room, transition rolled back, player hit by arrow into invalid room, repeat :::
+
+
 namespace room_transitions {
 
 let DISPLAY_WIDTH = gameloop.DISPLAY_WIDTH;
@@ -91,6 +95,16 @@ let spriteList_player_yPos = SpriteList.yPos[PLAYER_ID];
 
 
 in wram7e {
+    // The room to load in a non-scrolling room transition.
+    //
+    // Is not used by scrolling room transition.
+    //
+    // Will only be read by the ROOM_TRANSITION_FADEOUT and LOAD_ROOM_FADEIN transitions.
+    //
+    // (byte)
+    var roomToLoad : u8;
+
+
     // The past-the-end index of the sprite list.
     //
     // Equivalent to a c++ stl end() iterator.
@@ -118,6 +132,13 @@ in wram7e {
 
     // The scroll direction of the current room transition.
     var scrollDirection : ScrollDirection;
+
+
+    // Backup of the room state.
+    // Created on room load.
+    // Restored on transition rollback.
+    var roomStateBackup_shadow : [ u8 ; MEMMAP_ROOMSTATE_SHADOW_SIZE ];
+    var roomStateBackup_wram7e : [ u8 ; MEMMAP_ROOMSTATE_SHADOW_SIZE ];
 }
 
 
@@ -135,15 +156,23 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _load_room_and_check_if_ok_to_scroll(_scrollDirection_ : u8 in a) : bool in zero {
+func _load_room_and_check_if_ok_to_scroll(roomPosition : u8 in a, _scrollDirection_ : u8 in x) : bool in zero {
 
-    scrollDirection = a as ScrollDirection;
+    scrollDirection = x as ScrollDirection;
+
+    push8(a);
 
 
     _clear_sprite_list();
     _add_entities_to_sprite_list();
 
-    zero = gameloop._load_room_and_check_if_ok_to_scroll__inline();
+
+    __backup_room_state();
+
+
+    x = pop8();
+
+    zero = gameloop._load_room_and_check_if_ok_to_scroll__inline(x);
     if !zero {
         return zero;
     }
@@ -151,12 +180,109 @@ func _load_room_and_check_if_ok_to_scroll(_scrollDirection_ : u8 in a) : bool in
     entities.sort_active_entities();
 
     _add_entities_to_sprite_list_with_offset(scrollDirection);
-    _sprite_list_set_player_with_offset__inline(scrollDirection);
+    _sprite_list_set_player_with_offset(scrollDirection);
 
     a = 0;
     return zero;
 }
 
+
+
+// Restore the room state from backup, move the player to a specific location and populate the sprite list.
+//
+// ASSUMES: player position is value (not stuck inside a solid tile)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _load_room_from_backup(_scrollDirection_ : u8 in a, playerXpos : u8 in x, playerYpos : u8 in y) {
+
+    scrollDirection = a as ScrollDirection;
+
+    push8(x);
+    push8(y);
+
+
+    _clear_sprite_list();
+    _add_entities_to_sprite_list();
+
+
+    __restore_room_state_from_backup();
+
+    metatiles.populate_map_tile_properties();
+
+
+    y = pop8();
+    x = pop8();
+
+    entities.player.xPos.px = x;
+    entities.player.yPos.px = y;
+
+
+    entities.sort_active_entities();
+
+    _add_entities_to_sprite_list_with_offset(scrollDirection);
+    _sprite_list_set_player_with_offset(scrollDirection);
+}
+
+
+
+// Backup the roomstate variables
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func __backup_room_state() {
+
+let _roomstate_shadow = MEMMAP_ROOMSTATE_SHADOW as far *u8;
+let _roomstate_wram7e = MEMMAP_ROOMSTATE_WRAM7E as far *u8;
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        // Parameter order is destination, source::
+        load_dec_repeat(#:far &roomStateBackup_shadow, yy = &roomStateBackup_shadow as u16,
+                        #:_roomstate_shadow,           xx = _roomstate_shadow as u16,
+                        aa = MEMMAP_ROOMSTATE_SHADOW_SIZE - 1);
+
+        load_dec_repeat(#:far &roomStateBackup_wram7e, yy = &roomStateBackup_wram7e as u16,
+                        #:_roomstate_wram7e,           xx = _roomstate_wram7e as u16,
+                        aa = MEMMAP_ROOMSTATE_WRAM7E_SIZE - 1);
+
+    // NOTE: load_dec_repeat changes the data bank
+    //       (safe as target is in bank 0x7e)
+    }
+    mem8_idx8();
+}
+
+
+// Restore the roomstate variables from backup.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func __restore_room_state_from_backup() {
+
+let _roomstate_shadow = MEMMAP_ROOMSTATE_SHADOW as far *u8;
+let _roomstate_wram7e = MEMMAP_ROOMSTATE_WRAM7E as far *u8;
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        // Parameter order is destination, source::
+        load_dec_repeat(#:_roomstate_shadow,           yy = _roomstate_shadow as u16,
+                        #:far &roomStateBackup_shadow, xx = &roomStateBackup_shadow as u16,
+                        aa = MEMMAP_ROOMSTATE_SHADOW_SIZE - 1);
+
+        load_dec_repeat(#:_roomstate_wram7e,           yy = _roomstate_wram7e as u16,
+                        #:far &roomStateBackup_wram7e, xx = &roomStateBackup_wram7e as u16,
+                        aa = MEMMAP_ROOMSTATE_WRAM7E_SIZE - 1);
+
+    // NOTE: load_dec_repeat changes the data bank
+    //       (safe as target is in bank 0x7e)
+    }
+    mem8_idx8();
+}
+
+
+
+// Room Transitions
+// ================
 
 
 // Load the room, fade in the screen
@@ -167,7 +293,8 @@ func _load_room_and_check_if_ok_to_scroll(_scrollDirection_ : u8 in a) : bool in
 #[mem8, idx8]
 func load_room__fadein() {
 
-    _load_room_and_check_if_ok_to_scroll(0);
+    // ::TODO improve::
+    _load_room_and_check_if_ok_to_scroll(roomToLoad, 0);
 
     return _fadein__room_in_memory();
 }
@@ -220,7 +347,7 @@ func _fadein__room_in_memory() {
 // DB = 0x7e
 #[mem8, idx8]
 func fadeout() {
-    _load_room_and_check_if_ok_to_scroll(0);
+    _load_room_and_check_if_ok_to_scroll(roomToLoad, 0);
 
     return _fadeout__room_in_memory();
 }
@@ -273,11 +400,12 @@ let SOLID_CHECK_XPOS = H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transi
     _reset_camera();
 
     entities.player.xPos.sx = 0;
-
-    gameloop.currentRoom++;
-
     entities.player.xPos.px = a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION;
-    zero = _load_room_and_check_if_ok_to_scroll(ScrollDirection.RIGHT as u8);
+
+    a = gameloop.currentRoom;
+    a++;
+
+    zero = _load_room_and_check_if_ok_to_scroll(a, ScrollDirection.RIGHT as u8);
     if !zero {
         return _fadeout__room_in_memory();
     }
@@ -302,12 +430,9 @@ let SOLID_CHECK_XPOS = H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transi
                 // Tile is solid - cannot place player here
                 wait_one_second();
 
-                // Move left one room
-                gameloop.currentRoom--;
-
                 // Rewind room transition
-                entities.player.xPos.px = a = PLAYER_XPOS_AFTER_LEFT_TRANSITION;
-                _load_room_and_check_if_ok_to_scroll(ScrollDirection.LEFT as u8);
+                _load_room_from_backup(ScrollDirection.LEFT as u8,
+                                       PLAYER_XPOS_AFTER_LEFT_TRANSITION, entities.player.yPos.px);
 
                 camera_x_h = a = camera_x_h - >:DISPLAY_WIDTH;
 
@@ -360,11 +485,11 @@ let SOLID_CHECK_XPOS = CAMERA_ORIGIN - H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * 
     _reset_camera();
 
     entities.player.xPos.sx = 0;
-
-    gameloop.currentRoom--;
-
     entities.player.xPos.px = a = PLAYER_XPOS_AFTER_LEFT_TRANSITION;
-    zero = _load_room_and_check_if_ok_to_scroll(ScrollDirection.LEFT as u8);
+
+    a = gameloop.currentRoom;
+    a--;
+    zero = _load_room_and_check_if_ok_to_scroll(a, ScrollDirection.LEFT as u8);
     if !zero {
         ^return _fadeout__room_in_memory();
     }
@@ -390,12 +515,9 @@ let SOLID_CHECK_XPOS = CAMERA_ORIGIN - H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * 
                 // Tile is solid - cannot place player here
                 wait_one_second();
 
-                // Move right one room
-                gameloop.currentRoom++;
-
                 // Rewind room transition
-                entities.player.xPos.px = a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION;
-                _load_room_and_check_if_ok_to_scroll(ScrollDirection.RIGHT as u8);
+                _load_room_from_backup(ScrollDirection.RIGHT as u8,
+                                       PLAYER_XPOS_AFTER_RIGHT_TRANSITION, entities.player.yPos.px);
 
                 camera_x_h = a = camera_x_h + >:DISPLAY_WIDTH;
 
@@ -446,11 +568,9 @@ func scroll_down() {
     _reset_camera();
 
     entities.player.yPos.sx = 0;
-
-    gameloop.currentRoom = a = gameloop.currentRoom + 0x10;
-
     entities.player.yPos.px = a = PLAYER_YPOS_AFTER_DOWN_TRANSITION;
-    zero = _load_room_and_check_if_ok_to_scroll(ScrollDirection.DOWN as u8);
+
+    zero = _load_room_and_check_if_ok_to_scroll(a = gameloop.currentRoom + 0x10, ScrollDirection.DOWN as u8);
     if !zero {
         ^return _fadeout__room_in_memory();
     }
@@ -493,12 +613,9 @@ let SOLID_CHECK_YPOS = V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transi
                 // Tile is solid - cannot place player here
                 wait_one_second();
 
-                // Move up one room
-                gameloop.currentRoom = a = gameloop.currentRoom - 0x10;
-
                 // Rewind down transition
-                entities.player.yPos.px = a = PLAYER_YPOS_AFTER_UP_TRANSITION;
-                _load_room_and_check_if_ok_to_scroll(ScrollDirection.UP as u8);
+                _load_room_from_backup(ScrollDirection.UP as u8,
+                                       entities.player.xPos.px, PLAYER_YPOS_AFTER_UP_TRANSITION);
 
                 mem16();
                 #[mem16] {
@@ -530,11 +647,9 @@ func scroll_up() {
     _reset_camera();
 
     entities.player.yPos.sx = 0;
-
-    gameloop.currentRoom = a = gameloop.currentRoom - 0x10;
-
     entities.player.yPos.px = a = PLAYER_YPOS_AFTER_UP_TRANSITION;
-    zero = _load_room_and_check_if_ok_to_scroll(ScrollDirection.UP as u8);
+
+    zero = _load_room_and_check_if_ok_to_scroll(a = gameloop.currentRoom - 0x10, ScrollDirection.UP as u8);
     if !zero {
         ^return _fadeout__room_in_memory();
     }
@@ -577,12 +692,9 @@ let SOLID_CHECK_YPOS = CAMERA_ORIGIN - V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * 
                 // Tile is solid - cannot place player here
                 wait_one_second();
 
-                // Move down one room
-                gameloop.currentRoom = a = gameloop.currentRoom + 0x10;
-
                 // Rewind up transition
-                entities.player.yPos.px = a = PLAYER_YPOS_AFTER_DOWN_TRANSITION;
-                _load_room_and_check_if_ok_to_scroll(ScrollDirection.DOWN as u8);
+                _load_room_from_backup(ScrollDirection.DOWN as u8,
+                                       entities.player.xPos.px, PLAYER_YPOS_AFTER_DOWN_TRANSITION);
 
                 mem16();
                 #[mem16] {
@@ -601,6 +713,10 @@ let SOLID_CHECK_YPOS = CAMERA_ORIGIN - V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * 
     while !carry;
 }
 
+
+
+// Sprite List
+// ===========
 
 
 // Reset the sprite list camera back to the origin point.
@@ -676,7 +792,7 @@ let _activeEntitiesTablePos = zpTmp_byte_0;
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func _sprite_list_set_player_with_offset__inline(sd : ScrollDirection in scrollDirection) {
+func _sprite_list_set_player_with_offset(sd : ScrollDirection in scrollDirection) {
     mem16();
     #[mem16] {
         x = scrollDirection as u8;
