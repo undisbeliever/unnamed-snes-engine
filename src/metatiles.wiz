@@ -1071,7 +1071,7 @@ func scroll_right__process() : bool in carry {
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func scroll_right__rollback() : bool in zero {
+func scroll_right__rollback() : bool in carry {
 
     // no need to draw tiles, only need to change scroll.
 
@@ -1080,8 +1080,10 @@ inline func scroll_right__rollback() : bool in zero {
         (*(&>:bg1_scrollX as *u8))--;
     }
 
-    x = a;
-    return zero;
+    if a == 0 {
+        return true;
+    }
+    return false;
 }
 
 
@@ -1162,7 +1164,7 @@ func scroll_left__process() : bool in carry {
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func scroll_left__rollback() : bool in zero {
+func scroll_left__rollback() : bool in carry {
 
     // no need to draw tiles, only need to change scroll.
 
@@ -1171,8 +1173,10 @@ inline func scroll_left__rollback() : bool in zero {
         (*(&>:bg1_scrollX as *u8))++;
     }
 
-    x = a;
-    return zero;
+    if a == 0 {
+        return true;
+    }
+    return false;
 }
 
 

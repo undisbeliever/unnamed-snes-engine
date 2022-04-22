@@ -31,9 +31,9 @@ let DISPLAY_HEIGHT = gameloop.DISPLAY_HEIGHT;
 
 let PLAYER_MAP_TRANSITION_END_POS = 3;
 
-// Value MUST BE odd
-let H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK = 13;
-let V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK = 11;
+
+// Value MUST BE even
+let N_TRANSITION_FRAMES_BEFORE_SOLID_CHECK = 14;
 
 
 let PLAYER_XPOS_AFTER_LEFT_TRANSITION  = DISPLAY_WIDTH - 1 - PLAYER_MAP_TRANSITION_END_POS;
@@ -49,6 +49,8 @@ enum ScrollDirection : u8 {
     DOWN  = 2,
     LEFT  = 4,
     RIGHT = 6,
+    ROLLBACK_LEFT =  8,
+    ROLLBACK_RIGHT = 10,
 }
 
 
@@ -138,6 +140,11 @@ in wram7e {
     // The scroll direction of the current room transition.
     var scrollDirection : ScrollDirection;
 
+    // Countdown timer in a scrolling room transition until the player's tile is checked for solidity.
+    //
+    // (countdown display frame timer)
+    var countdownToSolidCheck : u8;
+
 
     // Backup of the room state.
     // Created on room load.
@@ -161,14 +168,13 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _load_room_and_check_if_ok_to_scroll(roomPosition : u8 in a, _scrollDirection_ : u8 in x) : bool in carry {
+func _load_room_and_check_if_ok_to_scroll(roomPosition : u8 in a) : bool in carry {
 
 let _roomStateBackup__room_tileset = *(((&room.tileset as u16) - MEMMAP_ROOMSTATE_WRAM7E as u16 + &roomStateBackup_wram7e as u16) as *typeof(room.tileset));
 
-    scrollDirection = x as ScrollDirection;
-
     push8(a);
     {
+        _reset_camera();
         _clear_sprite_list();
         _add_entities_to_sprite_list();
 
@@ -231,9 +237,7 @@ let _roomStateBackup__room_tileset = *(((&room.tileset as u16) - MEMMAP_ROOMSTAT
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _load_room_from_backup(_scrollDirection_ : u8 in a, playerXpos : u8 in x, playerYpos : u8 in y) {
-
-    scrollDirection = a as ScrollDirection;
+func _load_room_from_backup(playerXpos : u8 in x, playerYpos : u8 in y) {
 
     push8(x);
     push8(y);
@@ -451,7 +455,7 @@ inline func __setup_ppu_and_reset_graphics_subsystems() {
 func load_room__fadein() {
 
     // ::TODO improve::
-    _load_room_and_check_if_ok_to_scroll(roomToLoad, 0);
+    _load_room_and_check_if_ok_to_scroll(roomToLoad);
 
     return _fadein__room_in_memory();
 }
@@ -504,7 +508,7 @@ func _fadein__room_in_memory() {
 // DB = 0x7e
 #[mem8, idx8]
 func fadeout() {
-    _load_room_and_check_if_ok_to_scroll(roomToLoad, 0);
+    _load_room_and_check_if_ok_to_scroll(roomToLoad);
 
     return _fadeout__room_in_memory();
 }
@@ -544,6 +548,130 @@ func _fadeout__room_in_memory() {
 
 
 
+// Process a scrolling room transition.
+//
+// `entities.player.xPos.px` and `entities.player.yPos.px` MUST contain the position of the
+// player AFTER the room transition ends and play resumes (the variables might be used by an
+// entity init routine)
+//
+// Returns true if the transition completed successfully.
+// Returns false if there is a solid tile at the player's new position.
+//
+// If this function returns false, then `_scrolling_room_transition__rollback` MUST be called.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _scrolling_room_transition(roomPosition : u8 in a, _scrollDirection : u8 in x) : bool in carry {
+
+    scrollDirection = x as ScrollDirection;
+
+    entities.player.xPos.sx = 0;
+    entities.player.yPos.sx = 0;
+
+    carry = _load_room_and_check_if_ok_to_scroll(a);
+    if !carry {
+        _fadeout__room_in_memory();
+        return true;
+    }
+
+    x = scrollDirection as u8;
+    MetaTileTransition_Setup_FunctionTable[unaligned x]();
+
+    countdownToSolidCheck = a = N_TRANSITION_FRAMES_BEFORE_SOLID_CHECK;
+
+    return _scrolling_room_transition__loop();
+}
+
+
+const MetaTileTransition_Setup_FunctionTable : [func ; 6] = [
+    metatiles.transitions.scroll_up__setup,
+    metatiles.transitions.scroll_down__setup,
+    metatiles.transitions.scroll_left__setup,
+    metatiles.transitions.scroll_right__setup,
+    _invalid_setup_function,
+    _invalid_setup_function,
+];
+
+const MetaTileTransition_Process_FunctionTable : [func : bool in carry ; 6] = [
+    metatiles.transitions.scroll_up__process,
+    metatiles.transitions.scroll_down__process,
+    metatiles.transitions.scroll_left__process,
+    metatiles.transitions.scroll_right__process,
+    metatiles.transitions.scroll_left__rollback,
+    metatiles.transitions.scroll_right__rollback,
+];
+
+
+
+// Process a scrolling room transition.
+//
+// ASSUMES: Transition setup by `_scrolling_room_transition` or `_scrolling_room_transition__rollback`.
+//
+// Returns true if the transition completed successfully.
+// Returns false if there is a solid tile at the player's new position.
+//
+// If this function returns false, then `_scrolling_room_transition__rollback` MUST be called.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _scrolling_room_transition__loop() : bool in carry {
+    do {
+        wait_frame();
+
+        x = scrollDirection as u8;
+
+        countdownToSolidCheck--;
+        if zero {
+            negative = metatiles.check_tile_solid(entities.player.xPos.px, entities.player.yPos.px);
+            if negative {
+                // Tile is solid - cannot place player here
+                wait_one_second();
+
+                return false;
+            }
+        }
+
+        move_camera_and_draw_sprite_list();
+
+        x = scrollDirection as u8;
+        MetaTileTransition_Process_FunctionTable[unaligned x]();
+    }
+    while !carry;
+
+    gameMode = GameModes.RUN_GAME;
+
+    return true;
+}
+
+
+
+// Rollback a scrolling room transition.
+//
+// `_scrollDirection_` must be the opposite of the initial ScrollDirection.
+//
+// `playerXpos` and `playerYpos` is the expected location of the player AFTER the room transition is rolled back.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _scrolling_room_transition__rollback(_scrollDirection_ : u8 in a, playerXpos : u8 in x, playerYpos : u8 in y) {
+
+    scrollDirection = a as ScrollDirection;
+
+    _load_room_from_backup(x, y);
+
+    mem16();
+    #[mem16] {
+        x = scrollDirection as u8;
+        camera_x = aa = camera_x + ScrollDirectionTableX[unaligned x] as u16;
+        camera_y = aa = camera_y + ScrollDirectionTableY[unaligned x] as u16;
+    }
+    mem8();
+
+    return _scrolling_room_transition__loop();
+}
+
+
+
 // Scroll right room transition.
 //
 // ASSUMES: There is a room to the right of this one.
@@ -552,79 +680,17 @@ func _fadeout__room_in_memory() {
 #[mem8, idx8]
 func scroll_right() {
 
-let SOLID_CHECK_XPOS = H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
-
-    _reset_camera();
-
-    entities.player.xPos.sx = 0;
     entities.player.xPos.px = a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION;
 
     a = roomstate.currentRoom;
     a++;
 
-    carry = _load_room_and_check_if_ok_to_scroll(a, ScrollDirection.RIGHT as u8);
+    carry = _scrolling_room_transition(a, ScrollDirection.RIGHT as u8);
     if !carry {
-        return _fadeout__room_in_memory();
+        // Transition failed, rollback room transition
+        return _scrolling_room_transition__rollback(ScrollDirection.ROLLBACK_RIGHT as u8,
+                                                    PLAYER_XPOS_AFTER_LEFT_TRANSITION, entities.player.yPos.px);
     }
-
-
-    mem16();
-    #[mem16] {
-        spriteList_player_xPos = aa = CAMERA_ORIGIN + DISPLAY_WIDTH - 1;
-    }
-    mem8();
-
-
-    metatiles.transitions.scroll_right__setup();
-
-    do {
-        wait_frame();
-
-        a = camera_x_l;
-        if a == SOLID_CHECK_XPOS {
-            negative = metatiles.check_tile_solid(0, entities.player.yPos.px);
-            if negative {
-                // Tile is solid - cannot place player here
-                wait_one_second();
-
-                // Rewind room transition
-                _load_room_from_backup(ScrollDirection.LEFT as u8,
-                                       PLAYER_XPOS_AFTER_LEFT_TRANSITION, entities.player.yPos.px);
-
-                camera_x_h = a = camera_x_h - >:DISPLAY_WIDTH;
-
-                return _rollback_scroll_right();
-            }
-        }
-
-        move_camera_and_draw_sprite_list();
-
-        carry = metatiles.transitions.scroll_right__process();
-    }
-    while !carry;
-
-
-    gameMode = GameModes.RUN_GAME;
-}
-
-
-
-// Rollback a partially completed scroll right room transition.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func _rollback_scroll_right() {
-
-    do {
-        wait_frame();
-
-        move_camera_and_draw_sprite_list();
-
-        zero = metatiles.transitions.scroll_right__rollback();
-    } while !zero;
-
-
-    gameMode = GameModes.RUN_GAME;
 }
 
 
@@ -637,79 +703,17 @@ func _rollback_scroll_right() {
 #[mem8, idx8]
 func scroll_left() {
 
-let SOLID_CHECK_XPOS = CAMERA_ORIGIN - H_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
-
-    _reset_camera();
-
-    entities.player.xPos.sx = 0;
     entities.player.xPos.px = a = PLAYER_XPOS_AFTER_LEFT_TRANSITION;
 
     a = roomstate.currentRoom;
     a--;
-    carry = _load_room_and_check_if_ok_to_scroll(a, ScrollDirection.LEFT as u8);
+
+    carry = _scrolling_room_transition(a, ScrollDirection.LEFT as u8);
     if !carry {
-        ^return _fadeout__room_in_memory();
+        // Transition failed, rollback room transition
+        return _scrolling_room_transition__rollback(ScrollDirection.ROLLBACK_LEFT as u8,
+                                                    PLAYER_XPOS_AFTER_RIGHT_TRANSITION, entities.player.yPos.px);
     }
-
-
-    mem16();
-    #[mem16] {
-        spriteList_player_xPos = aa = CAMERA_ORIGIN;
-    }
-    mem8();
-
-
-    metatiles.transitions.scroll_left__setup();
-
-    do {
-        wait_frame();
-
-
-        a = camera_x_l;
-        if a == SOLID_CHECK_XPOS {
-            negative = metatiles.check_tile_solid(0xff, entities.player.yPos.px);
-            if negative {
-                // Tile is solid - cannot place player here
-                wait_one_second();
-
-                // Rewind room transition
-                _load_room_from_backup(ScrollDirection.RIGHT as u8,
-                                       PLAYER_XPOS_AFTER_RIGHT_TRANSITION, entities.player.yPos.px);
-
-                camera_x_h = a = camera_x_h + >:DISPLAY_WIDTH;
-
-                return _rollback_scroll_left();
-            }
-        }
-
-        move_camera_and_draw_sprite_list();
-
-        carry = metatiles.transitions.scroll_left__process();
-    }
-    while !carry;
-
-
-    gameMode = GameModes.RUN_GAME;
-}
-
-
-
-// Rollback a partially completed scroll left room transition.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func _rollback_scroll_left() {
-
-    do {
-        wait_frame();
-
-        move_camera_and_draw_sprite_list();
-
-        zero = metatiles.transitions.scroll_left__rollback();
-    } while !zero;
-
-
-    gameMode = GameModes.RUN_GAME;
 }
 
 
@@ -722,73 +726,14 @@ func _rollback_scroll_left() {
 #[mem8, idx8]
 func scroll_down() {
 
-    _reset_camera();
-
-    entities.player.yPos.sx = 0;
     entities.player.yPos.px = a = PLAYER_YPOS_AFTER_DOWN_TRANSITION;
 
-    carry = _load_room_and_check_if_ok_to_scroll(a = roomstate.currentRoom + 0x10, ScrollDirection.DOWN as u8);
+    carry = _scrolling_room_transition(a = roomstate.currentRoom + 0x10, ScrollDirection.DOWN as u8);
     if !carry {
-        ^return _fadeout__room_in_memory();
+        // Transition failed, rollback room transition
+        ^return _scrolling_room_transition__rollback(ScrollDirection.UP as u8,
+                                                     entities.player.xPos.px, PLAYER_YPOS_AFTER_UP_TRANSITION);
     }
-
-
-    mem16();
-    #[mem16] {
-        spriteList_player_yPos = aa = CAMERA_ORIGIN + DISPLAY_HEIGHT - 1;
-    }
-    mem8();
-
-
-    metatiles.transitions.scroll_down__setup();
-
-    _scroll_down__loop();
-
-
-    gameMode = GameModes.RUN_GAME;
-}
-
-
-
-// Process a scroll down room transition (or rollback a scroll up room transition)
-//
-// ASSUMES: `metatiles.transitions.scroll_down__setup()` or `metatiles.transitions.scroll_up__setup()` has been called.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func _scroll_down__loop() {
-
-let SOLID_CHECK_YPOS = V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
-
-    do {
-        wait_frame();
-
-        a = camera_y_l;
-        if a == SOLID_CHECK_YPOS {
-            negative = metatiles.check_tile_solid(entities.player.xPos.px, 0);
-            if negative {
-                // Tile is solid - cannot place player here
-                wait_one_second();
-
-                // Rewind down transition
-                _load_room_from_backup(ScrollDirection.UP as u8,
-                                       entities.player.xPos.px, PLAYER_YPOS_AFTER_UP_TRANSITION);
-
-                mem16();
-                #[mem16] {
-                    camera_y = aa = camera_y - DISPLAY_HEIGHT;
-                }
-                mem8();
-
-                return _scroll_up__loop();
-            }
-        }
-
-        move_camera_and_draw_sprite_list();
-
-        carry = metatiles.transitions.scroll_down__process();
-    }
-    while !carry;
 }
 
 
@@ -801,75 +746,22 @@ let SOLID_CHECK_YPOS = V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transi
 #[mem8, idx8]
 func scroll_up() {
 
-    _reset_camera();
-
-    entities.player.yPos.sx = 0;
     entities.player.yPos.px = a = PLAYER_YPOS_AFTER_UP_TRANSITION;
 
-    carry = _load_room_and_check_if_ok_to_scroll(a = roomstate.currentRoom - 0x10, ScrollDirection.UP as u8);
+    carry = _scrolling_room_transition(a = roomstate.currentRoom - 0x10, ScrollDirection.UP as u8);
     if !carry {
-        ^return _fadeout__room_in_memory();
+        // Transition failed, rollback room transition
+        ^return _scrolling_room_transition__rollback(ScrollDirection.DOWN as u8,
+                                                     entities.player.xPos.px, PLAYER_YPOS_AFTER_DOWN_TRANSITION);
     }
-
-
-    mem16();
-    #[mem16] {
-        spriteList_player_yPos = aa = CAMERA_ORIGIN;
-    }
-    mem8();
-
-
-    metatiles.transitions.scroll_up__setup();
-
-    _scroll_up__loop();
-
-
-    gameMode = GameModes.RUN_GAME;
 }
 
 
 
-// Process a scroll up room transition (or rollback a scroll down room transition)
-//
-// ASSUMES: `metatiles.transitions.scroll_down__setup()` or `metatiles.transitions.scroll_up__setup()` has been called.
-//
 // DB = 0x7e
 #[mem8, idx8]
-func _scroll_up__loop() {
-
-let SOLID_CHECK_YPOS = CAMERA_ORIGIN - V_TRANSITION_FRAMES_BEFORE_SOLID_CHECK * metatiles.transitions.TRANSITION_SPEED;
-
-    do {
-        wait_frame();
-
-        a = camera_y_l;
-        if a == SOLID_CHECK_YPOS {
-            negative = metatiles.check_tile_solid(entities.player.xPos.px, DISPLAY_HEIGHT - 1);
-            if negative {
-                // Tile is solid - cannot place player here
-                wait_one_second();
-
-                // Rewind up transition
-                _load_room_from_backup(ScrollDirection.DOWN as u8,
-                                       entities.player.xPos.px, PLAYER_YPOS_AFTER_DOWN_TRANSITION);
-
-                mem16();
-                #[mem16] {
-                    camera_y = aa = camera_y + DISPLAY_HEIGHT;
-                }
-                mem8();
-
-                ^return _scroll_down__loop();
-            }
-        }
-
-        move_camera_and_draw_sprite_list();
-
-        carry = metatiles.transitions.scroll_up__process();
-    }
-    while !carry;
+func _invalid_setup_function() {
 }
-
 
 
 // Sprite List
@@ -1077,8 +969,8 @@ func draw_sprite_list() {
 
 in rodata0 {
     // Order MUST Match ScrollDirection
-    const _ScrollDirectionTableX : [i16 ; 4 ] = [                0,                   0,     -DISPLAY_WIDTH,      DISPLAY_WIDTH ];
-    const _ScrollDirectionTableY : [i16 ; 4 ] = [  -DISPLAY_HEIGHT,      DISPLAY_HEIGHT,                  0,                  0];
+    const _ScrollDirectionTableX : [i16 ; 6 ] = [                0,                   0,     -DISPLAY_WIDTH,      DISPLAY_WIDTH,     -DISPLAY_WIDTH,    DISPLAY_WIDTH ];
+    const _ScrollDirectionTableY : [i16 ; 6 ] = [  -DISPLAY_HEIGHT,      DISPLAY_HEIGHT,                  0,                  0,                  0,                0 ];
 
     let ScrollDirectionTableX = (far&_ScrollDirectionTableX as far *i16);
     let ScrollDirectionTableY = (far&_ScrollDirectionTableY as far *i16);
@@ -1086,8 +978,8 @@ in rodata0 {
 
     let _TS = metatiles.transitions.TRANSITION_SPEED;
 
-    const _ScrollDirectionVelocityX : [i16 ; 4 ] = [    0,    0, -_TS,  _TS];
-    const _ScrollDirectionVelocityY : [i16 ; 4 ] = [ -_TS,  _TS,    0,    0];
+    const _ScrollDirectionVelocityX : [i16 ; 6 ] = [    0,    0, -_TS,  _TS,  _TS, -_TS];
+    const _ScrollDirectionVelocityY : [i16 ; 6 ] = [ -_TS,  _TS,    0,    0,    0,    0];
 
     let ScrollDirectionVelocityX = (far&_ScrollDirectionVelocityX as far *i16);
     let ScrollDirectionVelocityY = (far&_ScrollDirectionVelocityY as far *i16);
