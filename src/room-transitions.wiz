@@ -622,7 +622,7 @@ func _scrolling_room_transition__loop() : bool in carry {
 
         countdownToSolidCheck--;
         if zero {
-            negative = metatiles.check_tile_solid(entities.player.xPos.px, entities.player.yPos.px);
+            negative = metatiles.test_if_player_touches_a_solid_tile();
             if negative {
                 // Tile is solid - cannot place player here
                 wait_one_second();

@@ -309,6 +309,70 @@ let _tmp    = zpTmp_byte_0;
 
 
 
+// Tests if the player is touching a solid tile.
+//
+// NOTE: This only checks the four corners of the player's tile hitbox.
+//
+// ASSUMES: The player's tile hitbox's half-width and half-height is <= 8.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func test_if_player_touches_a_solid_tile() : bool in negative {
+
+let _tmp          = zpTmp_byte_0;
+let _topMasked    = zpTmp_byte_1;
+let _bottomMasked = zpTmp_byte_2;
+
+
+    // Left tiles
+    a = entities.SoA.xPos_px[PLAYER_ENTITY_ID] - entities.SoA.tileHitbox_halfWidth[PLAYER_ENTITY_ID];
+    if !carry { a = 0; }
+    _tmp = a = a >>> 4;
+
+
+    // Test Top-left tile
+    a = entities.SoA.yPos_px[PLAYER_ENTITY_ID] - entities.SoA.tileHitbox_halfHeight[PLAYER_ENTITY_ID];
+    if !carry { a = 0; }
+    _topMasked = a = a & 0xf0;
+    x = a = a | _tmp;
+
+    bit(mapTileProperties[x]);
+    goto Return if negative;
+
+
+    // Test bottom-left tile
+    a = entities.SoA.yPos_px[PLAYER_ENTITY_ID] + entities.SoA.tileHitbox_halfHeight[PLAYER_ENTITY_ID];
+    if carry { a = 0xff; }
+    _bottomMasked = a = a & 0xf0;
+    x = a = a | _tmp;
+
+    bit(mapTileProperties[x]);
+    goto Return if negative;
+
+
+    // Right tiles
+    a = entities.SoA.xPos_px[PLAYER_ENTITY_ID] + entities.SoA.tileHitbox_halfWidth[PLAYER_ENTITY_ID];
+    if carry { a = 0xff; }
+    y = a = a >>> 4;
+
+
+    // Test Top-Right tile
+    x = a = a | _topMasked;
+
+    bit(mapTileProperties[x]);
+    goto Return if negative;
+
+
+    // Test bottom-Right tile
+    x = a = y | _bottomMasked;
+
+    bit(mapTileProperties[x]);
+Return:
+    return negative;
+}
+
+
+
 // Unbounded Tile Collisions
 // -------------------------
 

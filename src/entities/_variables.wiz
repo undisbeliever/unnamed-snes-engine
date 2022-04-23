@@ -4,6 +4,8 @@
 import "../memmap";
 import "../metasprites";
 
+let PLAYER_ENTITY_ID = 0;
+
 
 namespace entities {
     let N_ENTITIES = 21;
