@@ -86,7 +86,7 @@ func hurt_player__collision__attack_power(entityId : u8 in y, attackPower : u8 i
 
 let _tmp = zpTmp_byte_0;
 
-    x = SoA.iframeCounter[player.PLAYER_ENTITY_ID];
+    x = SoA.iframeCounter[PLAYER_ENTITY_ID];
     if zero {
         // ::TODO add different types of attacks and defences::
 

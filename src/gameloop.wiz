@@ -19,11 +19,6 @@ import "entities/player";
 namespace gameloop {
 
 
-let DISPLAY_WIDTH = 256;
-let DISPLAY_HEIGHT = 224;
-
-
-
 in code {
 
 // Initialize the game loop

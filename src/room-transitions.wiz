@@ -25,9 +25,6 @@ import "entities/player";
 
 namespace room_transitions {
 
-let DISPLAY_WIDTH = gameloop.DISPLAY_WIDTH;
-let DISPLAY_HEIGHT = gameloop.DISPLAY_HEIGHT;
-
 
 let PLAYER_MAP_TRANSITION_END_POS = 3;
 

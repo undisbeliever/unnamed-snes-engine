@@ -7,12 +7,13 @@ import "common/dma";
 import "../wiz/common/snes/snes";
 
 
+let DISPLAY_WIDTH = 256;
+let DISPLAY_HEIGHT = 224;
+
+
 namespace metasprites {
 
 let N_OBJECTS = 128;
-
-let DISPLAY_WIDTH = 256;
-let DISPLAY_HEIGHT = 224;
 
 
 enum ShadowSize : u8 {

@@ -25,9 +25,6 @@ let ms_draw_function = ms_framesets.common.Player.drawFunction;
 let ms_frame_table = ms_framesets.common.Player.frameTable;
 
 
-let PLAYER_ENTITY_ID = 0;
-
-
 
 let INITIAL_SWORD_ATTACK_POWER = 2;
 
@@ -79,6 +76,16 @@ let HURTBOX_LEFT_OFFSET = 3;
 let HURTBOX_RIGHT_OFFSET = 3;
 let HURTBOX_TOP_OFFSET = 2;
 let HURTBOX_BOTTOM_OFFSET = 2;
+
+
+// Hardcoded tile hitbox
+//
+// NOTE: These values must be <= 8
+//
+// To increase the limit, the `test_if_player_touches_a_solid_tile`, `move_entity_and_collision_test__bounded` and
+// `move_entity_and_collision_test__unbounded` functions will need to be edited.
+let TILE_HITBOX_HALF_WIDTH = 6;
+let TILE_HITBOX_HALF_HEIGHT = 3;
 
 
 // The direction the player is facing
@@ -150,8 +157,8 @@ inline func init() {
     xPos.px = a = 128;
     yPos.px = a = 112;
 
-    SoA.tileHitbox_halfWidth[0] = a = 6;
-    SoA.tileHitbox_halfHeight[0] = a = 3;
+    SoA.tileHitbox_halfWidth[0] = a = TILE_HITBOX_HALF_WIDTH;
+    SoA.tileHitbox_halfHeight[0] = a = TILE_HITBOX_HALF_HEIGHT;
 
 
     mem16();
