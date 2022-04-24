@@ -19,10 +19,6 @@ import "entities/_common";
 import "entities/player";
 
 
-// ::TODO figure out how to handle an infinite room transition loop::
-// ::: ie, player hit by arrow (or enemy) into invalid room, transition rolled back, player hit by arrow into invalid room, repeat :::
-
-
 namespace room_transitions {
 
 
@@ -656,6 +652,9 @@ func _scrolling_room_transition__rollback(_scrollDirection_ : u8 in a, playerXpo
 
     _load_room_from_backup(x, y);
 
+    // Allow the player to escape any entity that may be in front of the player after a rollback.
+    // Minimises the odds of an entity knocking the player back into the invalid room (immediately after rollback)
+    entities.player.zero_velocity();
     entities.player.set_iframes_after_room_transition_rollback();
 
     mem16();

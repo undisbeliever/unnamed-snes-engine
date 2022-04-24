@@ -243,6 +243,21 @@ inline func hitbox_collided_with_entity__inline(enemyEntityId : u8 in y) {
 
 
 
+// Set the player's velocity to zero
+//
+// DB = 0x7e
+#[mem8, idx8]
+func zero_velocity() {
+    mem16();
+    #[mem16] {
+        xVelocity = 0;
+        yVelocity = 0;
+    }
+    mem8();
+}
+
+
+
 // Enable invincibility frames (after rolling back a room transition)
 //
 // DB = 0x7e
