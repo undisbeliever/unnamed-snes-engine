@@ -254,11 +254,23 @@ let _columnsLeft = zpTmp_byte_1;
 // DB = 0x7e
 #[mem8, idx8]
 func populate_map_tile_properties() {
-    x = 0;
+
+    x = sizeof(typeof(map)) - 1;
     do {
         y = map[x];
         mapTileProperties[x] = a = tileset.properties[y];
 
+        x--;
+    } while !zero;
+
+    y = map[0];
+    mapTileProperties[0] = a = tileset.properties[y];
+
+
+    // Clear tiles outside map
+    x = sizeof(typeof(map));
+    do {
+        mapTileProperties[x] = 0;
         x++;
     } while !zero;
 }
