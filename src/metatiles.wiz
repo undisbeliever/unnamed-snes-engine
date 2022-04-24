@@ -439,7 +439,12 @@ let _right  = zpTmp_byte_3;
         a = mapTileProperties[x];
         if negative {
             // solid collision
-            entities.SoA.xPos_px[y] = a = (~_left & 0xf) + 1 + entities.SoA.xPos_px[y];
+            a = (~_left & 0xf);
+            a++;
+            a += entities.SoA.xPos_px[y];
+            if carry { a = 0xff; }
+            entities.SoA.xPos_px[y] = a;
+
             entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.LEFT_COLLISION;
         }
         else {
@@ -448,7 +453,12 @@ let _right  = zpTmp_byte_3;
             if a >= METATILE_SIZE + 1 {
                 a = (&mapTileProperties[MAP_WIDTH])[x];
                 if negative {
-                    entities.SoA.xPos_px[y] = a = (~_left & 0xf) + 1 + entities.SoA.xPos_px[y];
+                    a = (~_left & 0xf);
+                    a++;
+                    a += entities.SoA.xPos_px[y];
+                    if carry { a = 0xff; }
+                    entities.SoA.xPos_px[y] = a;
+
                     entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.LEFT_COLLISION;
                 }
             }
@@ -540,7 +550,12 @@ let _bottom = zpTmp_byte_3;
         a = mapTileProperties[x];
         if negative {
             // solid collision
-            entities.SoA.yPos_px[y] = a = (~_top & 0xf) + 1 + entities.SoA.yPos_px[y];
+            a = (~_top & 0xf);
+            a++;
+            a += entities.SoA.yPos_px[y];
+            if carry { a = 0xff; }
+            entities.SoA.yPos_px[y] = a;
+
             entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.UP_COLLISION;
         }
         else {
@@ -552,7 +567,12 @@ let _bottom = zpTmp_byte_3;
                 if a != 0x0f {
                     a = (&mapTileProperties[1])[x];
                     if negative {
-                        entities.SoA.yPos_px[y] = a = (~_top & 0xf) + 1 + entities.SoA.yPos_px[y];
+                        a = (~_top & 0xf);
+                        a++;
+                        a += entities.SoA.yPos_px[y];
+                        if carry { a = 0xff; }
+                        entities.SoA.yPos_px[y] = a;
+
                         entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.UP_COLLISION;
                     }
                 }
@@ -656,7 +676,7 @@ let _right  = zpTmp_byte_3;
 
     entities.SoA.xPos_sx[y] = a = entities.SoA.xVelocity_sx[y] + entities.SoA.xPos_sx[y];
     a = entities.SoA.xVelocity_px[y];
-    if negative {
+    ^if negative {
         a +#= entities.SoA.xPos_px[y];
         if !carry { a = 0; }
         entities.SoA.xPos_px[y] = a;
@@ -679,7 +699,12 @@ let _right  = zpTmp_byte_3;
         a = mapTileProperties[x];
         if negative {
             // solid collision
-            entities.SoA.xPos_px[y] = a = (~_left & 0xf) + 1 + entities.SoA.xPos_px[y];
+            a = (~_left & 0xf);
+            a++;
+            a += entities.SoA.xPos_px[y];
+            if carry { a = 0xff; }
+            entities.SoA.xPos_px[y] = a;
+
             entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.LEFT_COLLISION;
         }
         else {
@@ -688,7 +713,12 @@ let _right  = zpTmp_byte_3;
             if a >= METATILE_SIZE + 1 {
                 a = (&mapTileProperties[MAP_WIDTH])[x];
                 if negative {
-                    entities.SoA.xPos_px[y] = a = (~_left & 0xf) + 1 + entities.SoA.xPos_px[y];
+                    a = (~_left & 0xf);
+                    a++;
+                    a += entities.SoA.xPos_px[y];
+                    if carry { a = 0xff; }
+                    entities.SoA.xPos_px[y] = a;
+
                     entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.LEFT_COLLISION;
                 }
             }
@@ -790,7 +820,12 @@ let _bottom = zpTmp_byte_3;
         a = mapTileProperties[x];
         if negative {
             // solid collision
-            entities.SoA.yPos_px[y] = a = (~_top & 0xf) + 1 + entities.SoA.yPos_px[y];
+            a = (~_top & 0xf);
+            a++;
+            a += entities.SoA.yPos_px[y];
+            if carry { a = 0xff; }
+            entities.SoA.yPos_px[y] = a;
+
             entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.UP_COLLISION;
         }
         else {
@@ -802,7 +837,12 @@ let _bottom = zpTmp_byte_3;
                 if a != 0x0f {
                     a = (&mapTileProperties[1])[x];
                     if negative {
-                        entities.SoA.yPos_px[y] = a = (~_top & 0xf) + 1 + entities.SoA.yPos_px[y];
+                        a = (~_top & 0xf);
+                        a++;
+                        a += entities.SoA.yPos_px[y];
+                        if carry { a = 0xff; }
+                        entities.SoA.yPos_px[y] = a;
+
                         entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.UP_COLLISION;
                     }
                 }
