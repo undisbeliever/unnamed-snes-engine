@@ -472,7 +472,9 @@ let _right  = zpTmp_byte_3;
         a = mapTileProperties[x];
         if negative {
             // solid collision
-            a = (_right & 0xf0) - entities.SoA.tileHitbox_halfWidth[y];
+            a = (_right & 0xf0);
+            a--;
+            a -= entities.SoA.tileHitbox_halfWidth[y];
             if !carry { a = 1; }
             entities.SoA.xPos_px[y] = a;
             entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.RIGHT_COLLISION;
@@ -484,7 +486,9 @@ let _right  = zpTmp_byte_3;
                 a = (&mapTileProperties[MAP_WIDTH])[x];
                 if negative {
                     // solid collision
-                    a = (_right & 0xf0) - entities.SoA.tileHitbox_halfWidth[y];
+                    a = (_right & 0xf0);
+                    a--;
+                    a -= entities.SoA.tileHitbox_halfWidth[y];
                     if !carry { a = 1; }
                     entities.SoA.xPos_px[y] = a;
                     entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.RIGHT_COLLISION;
@@ -573,7 +577,9 @@ let _bottom = zpTmp_byte_3;
         a = mapTileProperties[x];
         if negative {
             // solid collision
-            a = (_bottom & 0xf0) - entities.SoA.tileHitbox_halfHeight[y];
+            a = (_bottom & 0xf0);
+            a--;
+            a -= entities.SoA.tileHitbox_halfHeight[y];
             if !carry { a = 1; }
             entities.SoA.yPos_px[y] = a;
             entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.DOWN_COLLISION;
@@ -587,7 +593,9 @@ let _bottom = zpTmp_byte_3;
                 if a != 0x0f {
                     a = (&mapTileProperties[1])[x];
                     if negative {
-                        a = (_bottom & 0xf0) - entities.SoA.tileHitbox_halfHeight[y];
+                        a = (_bottom & 0xf0);
+                        a--;
+                        a -= entities.SoA.tileHitbox_halfHeight[y];
                         if !carry { a = 1; }
                         entities.SoA.yPos_px[y] = a;
                         entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.DOWN_COLLISION;
@@ -709,7 +717,9 @@ let _right  = zpTmp_byte_3;
         a = mapTileProperties[x];
         if negative {
             // solid collision
-            a = (_right & 0xf0) - entities.SoA.tileHitbox_halfWidth[y];
+            a = (_right & 0xf0);
+            a--;
+            a -= entities.SoA.tileHitbox_halfWidth[y];
             if !carry { a = 1; }
             entities.SoA.xPos_px[y] = a;
             entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.RIGHT_COLLISION;
@@ -721,7 +731,9 @@ let _right  = zpTmp_byte_3;
                 a = (&mapTileProperties[MAP_WIDTH])[x];
                 if negative {
                     // solid collision
-                    a = (_right & 0xf0) - entities.SoA.tileHitbox_halfWidth[y];
+                    a = (_right & 0xf0);
+                    a--;
+                    a -= entities.SoA.tileHitbox_halfWidth[y];
                     if !carry { a = 1; }
                     entities.SoA.xPos_px[y] = a;
                     entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.RIGHT_COLLISION;
@@ -820,7 +832,9 @@ let _bottom = zpTmp_byte_3;
         a = mapTileProperties[x];
         if negative {
             // solid collision
-            a = (_bottom & 0xf0) - entities.SoA.tileHitbox_halfHeight[y];
+            a = (_bottom & 0xf0);
+            a--;
+            a -= entities.SoA.tileHitbox_halfHeight[y];
             if !carry { a = 1; }
             entities.SoA.yPos_px[y] = a;
             entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.DOWN_COLLISION;
@@ -834,7 +848,9 @@ let _bottom = zpTmp_byte_3;
                 if a != 0x0f {
                     a = (&mapTileProperties[1])[x];
                     if negative {
-                        a = (_bottom & 0xf0) - entities.SoA.tileHitbox_halfHeight[y];
+                        a = (_bottom & 0xf0);
+                        a--;
+                        a -= entities.SoA.tileHitbox_halfHeight[y];
                         if !carry { a = 1; }
                         entities.SoA.yPos_px[y] = a;
                         entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.DOWN_COLLISION;
