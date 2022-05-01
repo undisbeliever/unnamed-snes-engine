@@ -398,17 +398,17 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparen
 
         elif block.flip == 'hflip':
             if image_hflip is None:
-                image_hflip = image.transpose(PIL.Image.FLIP_LEFT_RIGHT)
+                image_hflip = image.transpose(PIL.Image.Transpose.FLIP_LEFT_RIGHT)
             block_image = image_hflip
 
         elif block.flip == 'vflip':
             if image_vflip is None:
-                image_vflip = image.transpose(PIL.Image.PIL.Image.FLIP_TOP_BOTTOM)
+                image_vflip = image.transpose(PIL.Image.Transpose.FLIP_TOP_BOTTOM)
             block_image = image_vflip
 
         elif block.flip == 'hvflip':
             if image_hvflip is None:
-                image_hvflip = image.transpose(PIL.Image.ROTATE_180)
+                image_hvflip = image.transpose(PIL.Image.Transpose.ROTATE_180)
             block_image = image_hvflip
 
         else:
