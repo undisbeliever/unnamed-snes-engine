@@ -17,7 +17,6 @@ def get_metasprite_spritesheets(entities):
     ss = OrderedDict()
 
     for e in entities:
-        print(e)
         ms_ss = e.metasprites.split('.')[0]
         ss[ms_ss] = None
 
