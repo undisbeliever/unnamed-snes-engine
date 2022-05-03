@@ -243,6 +243,8 @@ func process(entityId : u8 in y) {
 
     metatiles.move_entity_and_collision_test__unbounded(PLAYER_ENTITY_ID);
 
+    metatiles.process_interactive_tiles__player();
+
 
     // Update animation
     a = state as u8;

@@ -219,7 +219,7 @@ def load_ms_export_order_json(filename):
 # =============
 
 
-Mappings = namedtuple('Mappings', ('starting_room', 'tilesets', 'metasprite_spritesheets', 'dungeons'))
+Mappings = namedtuple('Mappings', ('starting_room', 'tilesets', 'metasprite_spritesheets', 'interactive_tile_functions', 'dungeons'))
 DungeonMapping = namedtuple('DungeonMapping', ('name', 'x_offset', 'y_offset'))
 
 
@@ -250,6 +250,7 @@ def load_mappings_json(filename):
             starting_room = check_room_name(json_input['starting_room']),
             tilesets = check_name_list(json_input['tilesets']),
             metasprite_spritesheets = check_name_list(json_input['metasprite_spritesheets']),
+            interactive_tile_functions = check_name_list(json_input['interactive_tile_functions']),
             dungeons = __load_dungeons_array(json_input['dungeons']),
     )
 

@@ -32,6 +32,7 @@ RESOURCES  += $(ROOM_BINS)
 METATILE_TILESETS = dungeon
 RESOURCES  += $(patsubst %,gen/metatiles/%.bin, $(METATILE_TILESETS))
 
+RESOURCES  += gen/interactive-tiles.wiz
 RESOURCES  += gen/resource-lists.wiz
 RESOURCES  += gen/entities.wiz
 RESOURCES  += gen/entity-data.wiz
@@ -87,8 +88,11 @@ RESOURCES += $(4BPP_TILES) $(4BPP_PALETTES)
 RESOURCES += $(8BPP_TILES) $(8BPP_PALETTES)
 
 
-gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palette.png resources/metatiles/%.tsx tools/convert-tileset.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/convert-tileset.py -o '$@' 'resources/metatiles/$*-tiles.png' 'resources/metatiles/$*-palette.png' 'resources/metatiles/$*.tsx'
+gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palette.png resources/metatiles/%.tsx resources/mappings.json tools/convert-tileset.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/convert-tileset.py -o '$@' 'resources/mappings.json' 'resources/metatiles/$*-tiles.png' 'resources/metatiles/$*-palette.png' 'resources/metatiles/$*.tsx'
+
+gen/interactive-tiles.wiz: resources/mappings.json tools/generate-interactive-tiles-wiz.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/generate-interactive-tiles-wiz.py -o '$@' 'resources/mappings.json'
 
 
 gen/rooms/%.bin: resources/rooms/%.tmx resources/mappings.json resources/entities.json tools/convert-room.py $(COMMON_PYTHON_SCRIPTS)

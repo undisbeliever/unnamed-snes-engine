@@ -6,6 +6,9 @@
    "common",
    "dungeon"
  ],
+ "interactive_tile_functions": [
+   "heal"
+ ],
  "dungeons": {
    "d1-lv1": { "x_offset": 0, "y_offset": 0 }
  },

@@ -1,0 +1,52 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "memmap";
+
+import "player";
+
+
+in code {
+
+namespace metatiles {
+namespace interactive_tiles {
+
+
+// An empty function that does nothing
+func null_function(tileIndex : u8 in y) { }
+
+
+// heal
+// ====
+namespace heal {
+
+
+// Heal the player when the player stands on the healing tile.
+//
+// Called when the player is touching the tile.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func player_touches_tile(tileIndex : u8 in y) {
+
+    // ::TODO slow down the healing::
+    // ::TODO play sound effect::
+    // ::TODO spawn a particle effect::
+
+    a = player.health;
+    a++;
+    if a >= player.maxHealth {
+        a = player.maxHealth;
+    }
+    player.health = a;
+}
+
+}
+
+
+}
+}
+
+}
+
+

@@ -14,6 +14,8 @@ import "entities/_variables";
 
 import "../wiz/common/snes/snes";
 
+import "../gen/interactive-tiles.wiz";
+
 
 namespace metatiles {
 
@@ -299,6 +301,28 @@ func populate_map_tile_properties__all_tiles_solid() {
 
         x++;
     } while !zero;
+}
+
+
+// Interactive Tiles
+// =================
+
+
+// Process any interactive tiles that the player might be touching.
+//
+// SHOULD ONLY be called inside the player's process function.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process_interactive_tiles__player() {
+let _tmp    = zpTmp_byte_0;
+
+    _tmp = a = player.xPos.px >>> 4;
+    y = a = (player.yPos.px & 0xf0) + _tmp;
+
+    x = a = mapTileProperties[y] & interactive_tiles.FUNCTION_TABLE_MASK;
+
+    return interactive_tiles.player_touches_tile_function_table[unaligned x](y);
 }
 
 

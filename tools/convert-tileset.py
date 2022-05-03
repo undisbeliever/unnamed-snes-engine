@@ -8,6 +8,7 @@ import argparse
 import xml.etree.ElementTree
 
 
+from _json_formats import load_mappings_json
 from _snes import image_to_snes
 
 
@@ -60,15 +61,22 @@ def check_objectgroup_tag(tag):
 
 
 
-def read_tile_tag(tile_tag):
+def read_tile_tag(tile_tag, interactive_tile_functions):
     """ Returns (tile_id, properties_value) """
 
-    tile_id = int(tile_tag.attrib['id']);
+    tile_id = int(tile_tag.attrib['id'])
 
     if tile_id > 255:
         raise ValueError("Invalid tileid")
 
     properties = 0;
+
+    if 'type' in tile_tag.attrib:
+        tile_type = tile_tag.attrib['type']
+        tile_type_id = interactive_tile_functions.index(tile_type) + 1
+        if tile_type_id >= (1 << 5):
+            raise ValueError(f"tile_type_id is invalid: { tile_type_id }")
+        properties |= tile_type_id << 1
 
     for tag in tile_tag:
         if tag.tag == 'objectgroup':
@@ -80,12 +88,12 @@ def read_tile_tag(tile_tag):
 
 
 
-def create_properties_array(tsx_et):
+def create_properties_array(tsx_et, interactive_tile_functions):
     data = bytearray(256)
 
     for tag in tsx_et.getroot():
         if tag.tag == 'tile':
-            tile_id, p = read_tile_tag(tag)
+            tile_id, p = read_tile_tag(tag, interactive_tile_functions)
             data[tile_id] = p
 
     return data
@@ -125,6 +133,8 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output', required=True,
                         help='tileset output file')
+    parser.add_argument('mappings_json_file', action='store',
+                        help='mappings.json file')
     parser.add_argument('image_filename', action='store',
                         help='Indexed png image')
     parser.add_argument('palette_filename', action='store',
@@ -151,8 +161,10 @@ def main():
     with open(args.tsx_filename, 'r') as tsx_fp:
         tsx_et = xml.etree.ElementTree.parse(tsx_fp)
 
+    mappings = load_mappings_json(args.mappings_json_file)
+
     metatile_map = create_metatile_map(tilemap)
-    properties = create_properties_array(tsx_et)
+    properties = create_properties_array(tsx_et, mappings.interactive_tile_functions)
 
     tileset_data = create_tileset_data(palette_data, tile_data, metatile_map, properties)
 

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.5" tiledversion="1.7.2" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="2" nextobjectid="1">
+<map version="1.8" tiledversion="1.8.4" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="2" nextobjectid="1">
  <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
  <layer id="1" name="Tile Layer 1" width="16" height="14">
   <data encoding="base64" compression="gzip">
-   H4sIAAAAAAAAA8XRuxGCQBRG4S0AhQIELECUAngVoGADPhoQaECgAZWSOYHBnRu5AzMGX/af4O46xpgV1kKPAfuvJzq1ceFhAx+B8MEo+hfeahNiix0isf3VAfECvb7Vtte32va23dL9DfcZfYP2j/83t0+QIhP0m1xwVZscBY44oRT0mzxQq02FMyaJsx9MgAMAAA==
+   H4sIAAAAAAAAA8XRyQ2CUBSF4VcAggU4FSBKASAW4LQmcWhAoQGBBhhK9l+8xc1dGF/QuPh25yR38IwxI/hChRor64lSZQKMMcEUM6FDL/oNWpWZY4ElQpH91BrRF/p6V9e+3tW1/y6TWb/sX3EbMH+O4o//G9qPkWAj6JuccVGZFFvssMdB0De546EyR5zwAnLtHU6AAwAA
   </data>
  </layer>
 </map>
