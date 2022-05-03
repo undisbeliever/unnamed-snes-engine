@@ -7,9 +7,12 @@ import "room";
 import "resources";
 import "gameloop";
 import "wait-frame";
-import "../wiz/common/snes/snes";
+
+import "player";
 
 import "entities/_variables";
+
+import "../wiz/common/snes/snes";
 
 
 namespace metatiles {
@@ -337,13 +340,13 @@ let _bottomMasked = zpTmp_byte_2;
 
 
     // Left tiles
-    a = entities.SoA.xPos_px[PLAYER_ENTITY_ID] - entities.SoA.tileHitbox_halfWidth[PLAYER_ENTITY_ID];
+    a = player.xPos.px - player.tileHitbox_halfWidth;
     if !carry { a = 0; }
     _tmp = a = a >>> 4;
 
 
     // Test Top-left tile
-    a = entities.SoA.yPos_px[PLAYER_ENTITY_ID] - entities.SoA.tileHitbox_halfHeight[PLAYER_ENTITY_ID];
+    a = player.yPos.px - player.tileHitbox_halfHeight;
     if !carry { a = 0; }
     _topMasked = a = a & 0xf0;
     x = a = a | _tmp;
@@ -353,7 +356,7 @@ let _bottomMasked = zpTmp_byte_2;
 
 
     // Test bottom-left tile
-    a = entities.SoA.yPos_px[PLAYER_ENTITY_ID] + entities.SoA.tileHitbox_halfHeight[PLAYER_ENTITY_ID];
+    a = player.yPos.px + player.tileHitbox_halfHeight;
     if carry { a = 0xff; }
     _bottomMasked = a = a & 0xf0;
     x = a = a | _tmp;
@@ -363,7 +366,7 @@ let _bottomMasked = zpTmp_byte_2;
 
 
     // Right tiles
-    a = entities.SoA.xPos_px[PLAYER_ENTITY_ID] + entities.SoA.tileHitbox_halfWidth[PLAYER_ENTITY_ID];
+    a = player.xPos.px + player.tileHitbox_halfWidth;
     if carry { a = 0xff; }
     y = a = a >>> 4;
 
