@@ -8,7 +8,7 @@ import "_common";
 import "_base";
 import "_vision_cone";
 
-import "player";
+import "../player";
 
 import "../../gen/entities";
 

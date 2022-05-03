@@ -14,9 +14,9 @@ import "ui";
 import "wait-frame";
 import "common/reset";
 
+import "player";
 import "entities/_variables";
 import "entities/_common";
-import "entities/player";
 
 
 namespace room_transitions {
@@ -153,7 +153,7 @@ in code {
 
 // Load the room into memory, check if the MetaTile tileset has changed and populates the sprite list.
 //
-// `entities.player.xPos.px` and `entities.player.yPos.px` MUST contain the position of the
+// `player.xPos.px` and `player.yPos.px` MUST contain the position of the
 // player AFTER the room transition ends and play resumes (the variables might be used by an
 // entity init routine)
 //
@@ -249,8 +249,8 @@ func _load_room_from_backup(playerXpos : u8 in x, playerYpos : u8 in y) {
     y = pop8();
     x = pop8();
 
-    entities.player.xPos.px = x;
-    entities.player.yPos.px = y;
+    player.xPos.px = x;
+    player.yPos.px = y;
 
 
     entities.sort_active_entities();
@@ -543,7 +543,7 @@ func _fadeout__room_in_memory() {
 
 // Process a scrolling room transition.
 //
-// `entities.player.xPos.px` and `entities.player.yPos.px` MUST contain the position of the
+// `player.xPos.px` and `player.yPos.px` MUST contain the position of the
 // player AFTER the room transition ends and play resumes (the variables might be used by an
 // entity init routine)
 //
@@ -558,8 +558,8 @@ func _scrolling_room_transition(roomPosition : u8 in a, _scrollDirection : u8 in
 
     scrollDirection = x as ScrollDirection;
 
-    entities.player.xPos.sx = 0;
-    entities.player.yPos.sx = 0;
+    player.xPos.sx = 0;
+    player.yPos.sx = 0;
 
     carry = _load_room_and_check_if_ok_to_scroll(a);
     if !carry {
@@ -654,8 +654,8 @@ func _scrolling_room_transition__rollback(_scrollDirection_ : u8 in a, playerXpo
 
     // Allow the player to escape any entity that may be in front of the player after a rollback.
     // Minimises the odds of an entity knocking the player back into the invalid room (immediately after rollback)
-    entities.player.zero_velocity();
-    entities.player.set_iframes_after_room_transition_rollback();
+    player.zero_velocity();
+    player.set_iframes_after_room_transition_rollback();
 
     mem16();
     #[mem16] {
@@ -678,7 +678,7 @@ func _scrolling_room_transition__rollback(_scrollDirection_ : u8 in a, playerXpo
 #[mem8, idx8]
 func scroll_right() {
 
-    entities.player.xPos.px = a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION;
+    player.xPos.px = a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION;
 
     a = roomstate.currentRoom;
     a++;
@@ -687,7 +687,7 @@ func scroll_right() {
     if !carry {
         // Transition failed, rollback room transition
         return _scrolling_room_transition__rollback(ScrollDirection.ROLLBACK_RIGHT as u8,
-                                                    PLAYER_XPOS_AFTER_LEFT_TRANSITION, entities.player.yPos.px);
+                                                    PLAYER_XPOS_AFTER_LEFT_TRANSITION, player.yPos.px);
     }
 }
 
@@ -701,7 +701,7 @@ func scroll_right() {
 #[mem8, idx8]
 func scroll_left() {
 
-    entities.player.xPos.px = a = PLAYER_XPOS_AFTER_LEFT_TRANSITION;
+    player.xPos.px = a = PLAYER_XPOS_AFTER_LEFT_TRANSITION;
 
     a = roomstate.currentRoom;
     a--;
@@ -710,7 +710,7 @@ func scroll_left() {
     if !carry {
         // Transition failed, rollback room transition
         return _scrolling_room_transition__rollback(ScrollDirection.ROLLBACK_LEFT as u8,
-                                                    PLAYER_XPOS_AFTER_RIGHT_TRANSITION, entities.player.yPos.px);
+                                                    PLAYER_XPOS_AFTER_RIGHT_TRANSITION, player.yPos.px);
     }
 }
 
@@ -724,13 +724,13 @@ func scroll_left() {
 #[mem8, idx8]
 func scroll_down() {
 
-    entities.player.yPos.px = a = PLAYER_YPOS_AFTER_DOWN_TRANSITION;
+    player.yPos.px = a = PLAYER_YPOS_AFTER_DOWN_TRANSITION;
 
     carry = _scrolling_room_transition(a = roomstate.currentRoom + 0x10, ScrollDirection.DOWN as u8);
     if !carry {
         // Transition failed, rollback room transition
         ^return _scrolling_room_transition__rollback(ScrollDirection.UP as u8,
-                                                     entities.player.xPos.px, PLAYER_YPOS_AFTER_UP_TRANSITION);
+                                                     player.xPos.px, PLAYER_YPOS_AFTER_UP_TRANSITION);
     }
 }
 
@@ -744,13 +744,13 @@ func scroll_down() {
 #[mem8, idx8]
 func scroll_up() {
 
-    entities.player.yPos.px = a = PLAYER_YPOS_AFTER_UP_TRANSITION;
+    player.yPos.px = a = PLAYER_YPOS_AFTER_UP_TRANSITION;
 
     carry = _scrolling_room_transition(a = roomstate.currentRoom - 0x10, ScrollDirection.UP as u8);
     if !carry {
         // Transition failed, rollback room transition
         ^return _scrolling_room_transition__rollback(ScrollDirection.DOWN as u8,
-                                                     entities.player.xPos.px, PLAYER_YPOS_AFTER_DOWN_TRANSITION);
+                                                     player.xPos.px, PLAYER_YPOS_AFTER_DOWN_TRANSITION);
     }
 }
 

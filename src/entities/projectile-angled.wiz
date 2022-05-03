@@ -4,8 +4,9 @@
 import "../memmap";
 
 import "_variables";
-import "player";
 import "projectile";
+
+import "../player";
 
 import "../common/math";
 import "../../wiz/common/snes/snes";

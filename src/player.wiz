@@ -1,23 +1,22 @@
 // Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
 // Distributed under The MIT License, see the LICENSE file for more details.
 
-import "../memmap";
+import "memmap";
 
-import "_variables";
-import "_common";
-import "_base";
+import "entities/_variables";
+import "entities/_common";
+import "entities/_base";
 
-import "../joypad";
-import "../metatiles";
-import "../metasprites";
-import "../common/math";
+import "joypad";
+import "metatiles";
+import "metasprites";
+import "common/math";
 
-import "../../gen/metasprites/common";
-import "../../gen/entities";
-import "../../gen/cosine-tables";
+import "../gen/metasprites/common";
+import "../gen/entities";
+import "../gen/cosine-tables";
 
 
-namespace entities {
 namespace player {
 
 
@@ -157,8 +156,8 @@ inline func init() {
     xPos.px = a = 128;
     yPos.px = a = 112;
 
-    SoA.tileHitbox_halfWidth[0] = a = TILE_HITBOX_HALF_WIDTH;
-    SoA.tileHitbox_halfHeight[0] = a = TILE_HITBOX_HALF_HEIGHT;
+    entities.SoA.tileHitbox_halfWidth[0] = a = TILE_HITBOX_HALF_WIDTH;
+    entities.SoA.tileHitbox_halfHeight[0] = a = TILE_HITBOX_HALF_HEIGHT;
 
 
     mem16();
@@ -173,7 +172,7 @@ inline func init() {
 
     a = INITIAL_HEALTH;
     health = a;
-    playerMaxHealth = a;
+    entities.playerMaxHealth = a;
 
     swordAttackPower = a = INITIAL_SWORD_ATTACK_POWER;
 
@@ -235,9 +234,9 @@ inline func hitbox_collided_with_entity__inline(enemyEntityId : u8 in y) {
 
     // ::TODO add a has-sword-particle flag to entity::
 
-    entities.spawn_entity(a = base.collisionCentre_x,
-                          a = base.collisionCentre_y,
-                          a = EntityTypes.sword_particles as u8,
+    entities.spawn_entity(a = entities.base.collisionCentre_x,
+                          a = entities.base.collisionCentre_y,
+                          a = entities.EntityTypes.sword_particles as u8,
                           y = 0);
 }
 
@@ -263,7 +262,7 @@ func zero_velocity() {
 // DB = 0x7e
 #[mem8, idx8]
 inline func set_iframes_after_room_transition_rollback() {
-    SoA.iframeCounter[PLAYER_ENTITY_ID] = a = N_IFRAMES_AFTER_ROOM_TRANSITION_ROLLBACK;
+    entities.SoA.iframeCounter[PLAYER_ENTITY_ID] = a = N_IFRAMES_AFTER_ROOM_TRANSITION_ROLLBACK;
 }
 
 
@@ -368,10 +367,10 @@ inline func _update_player_hitbox(msFrameAddr : u16 in xx) {
         if a == metasprites.MsDataFormat.NO_AABB_VALUE {
             // MS frame has no hitbox
             a = 0xff;
-            playerHitbox.top = a;
-            playerHitbox.bottom = 0;
-            playerHitbox.left = a;
-            playerHitbox.right = 0;
+            entities.playerHitbox.top = a;
+            entities.playerHitbox.bottom = 0;
+            entities.playerHitbox.left = a;
+            entities.playerHitbox.right = 0;
             return;
         }
 
@@ -386,22 +385,22 @@ inline func _update_player_hitbox(msFrameAddr : u16 in xx) {
             a = 0xff;
         }
     }
-    playerHitbox.left = a;
+    entities.playerHitbox.left = a;
 
 
     a = metasprites.MsDataFormat.hitbox_right[xx] as u8;
     __add_xPos_to_i8a_clamp(a, negative);
-    playerHitbox.right = a;
+    entities.playerHitbox.right = a;
 
 
     a = metasprites.MsDataFormat.hitbox_top[xx] as u8;
     __add_yPos_to_i8a_clamp(a, negative);
-    playerHitbox.top = a;
+    entities.playerHitbox.top = a;
 
 
     a = metasprites.MsDataFormat.hitbox_bottom[xx] as u8;
     __add_yPos_to_i8a_clamp(a, negative);
-    playerHitbox.bottom = a;
+    entities.playerHitbox.bottom = a;
 }
 
 
@@ -415,17 +414,17 @@ inline func _update_player_hitbox(msFrameAddr : u16 in xx) {
 inline func _update_player_hurtbox(msFrameAddr : u16 in xx) {
 
 
-    a = SoA.iframeCounter[PLAYER_ENTITY_ID];
+    a = entities.SoA.iframeCounter[PLAYER_ENTITY_ID];
     if !zero {
         a--;
-        SoA.iframeCounter[PLAYER_ENTITY_ID] = a;
+        entities.SoA.iframeCounter[PLAYER_ENTITY_ID] = a;
 
         // player has no hurtbox
         a = 0xff;
-        playerHurtbox.top = a;
-        playerHurtbox.bottom = 0;
-        playerHurtbox.left = a;
-        playerHurtbox.right = 0;
+        entities.playerHurtbox.top = a;
+        entities.playerHurtbox.bottom = 0;
+        entities.playerHurtbox.left = a;
+        entities.playerHurtbox.right = 0;
     }
     else {
         // Add i8 signed offset to player's u8 unsigned position (with clamping)
@@ -436,10 +435,10 @@ inline func _update_player_hurtbox(msFrameAddr : u16 in xx) {
             if a == metasprites.MsDataFormat.NO_AABB_VALUE {
                 // MS frame has no hurtbox
                 a = 0xff;
-                playerHurtbox.top = a;
-                playerHurtbox.bottom = 0;
-                playerHurtbox.left = a;
-                playerHurtbox.right = 0;
+                entities.playerHurtbox.top = a;
+                entities.playerHurtbox.bottom = 0;
+                entities.playerHurtbox.left = a;
+                entities.playerHurtbox.right = 0;
                 return;
             }
 
@@ -454,21 +453,21 @@ inline func _update_player_hurtbox(msFrameAddr : u16 in xx) {
                 a = 0xff;
             }
         }
-        playerHurtbox.left = a;
+        entities.playerHurtbox.left = a;
 
 
         a = metasprites.MsDataFormat.hurtbox_right[xx] as u8;
         __add_xPos_to_i8a_clamp(a, negative);
-        playerHurtbox.right = a;
+        entities.playerHurtbox.right = a;
 
 
         a = metasprites.MsDataFormat.hurtbox_top[xx] as u8;
         __add_yPos_to_i8a_clamp(a, negative);
-        playerHurtbox.top = a;
+        entities.playerHurtbox.top = a;
 
         a = metasprites.MsDataFormat.hurtbox_bottom[xx] as u8;
         __add_yPos_to_i8a_clamp(a, negative);
-        playerHurtbox.bottom = a;
+        entities.playerHurtbox.bottom = a;
     }
 }
 
@@ -881,10 +880,10 @@ inline func set_state_hurt__enemy_collision__inline(enemyEntityId : u8 in y) {
 func _set_state__hurt__enemy_collision(enemyEntityId : u8 in y) {
     state = a = State.HURT as u8;
 
-    x = calc_angle_32x2(a = SoA.previousXpos[unaligned y],
-                        a = SoA.previousYpos[unaligned y],
-                        SoA.previousXpos[PLAYER_ENTITY_ID],
-                        SoA.previousYpos[PLAYER_ENTITY_ID]);
+    x = calc_angle_32x2(a = entities.SoA.previousXpos[unaligned y],
+                        a = entities.SoA.previousYpos[unaligned y],
+                        entities.SoA.previousXpos[PLAYER_ENTITY_ID],
+                        entities.SoA.previousYpos[PLAYER_ENTITY_ID]);
 
     mem16();
     #[mem16] {
@@ -899,7 +898,7 @@ func _set_state__hurt__enemy_collision(enemyEntityId : u8 in y) {
     mem8();
 
 
-    SoA.iframeCounter[PLAYER_ENTITY_ID] = a = N_IFRAMES_AFTER_ATTACKED;
+    entities.SoA.iframeCounter[PLAYER_ENTITY_ID] = a = N_IFRAMES_AFTER_ATTACKED;
 
     <:animationFrameDelay = a = HURT_STATE_DURATION;
 
@@ -920,9 +919,9 @@ func process__hurt() {
         <:animationFrameDelay = a;
     }
     else {
-        a = SoA.iframeCounter[PLAYER_ENTITY_ID];
+        a = entities.SoA.iframeCounter[PLAYER_ENTITY_ID];
         if zero {
-            SoA.iframeCounter[PLAYER_ENTITY_ID] = a = N_IFRAMES_AFTER_HURT_PUSHBACK;
+            entities.SoA.iframeCounter[PLAYER_ENTITY_ID] = a = N_IFRAMES_AFTER_HURT_PUSHBACK;
         }
 
         ^return set_state__walking();
@@ -939,6 +938,5 @@ func update_animation__hurt() {
 
 }
 
-}
 }
 

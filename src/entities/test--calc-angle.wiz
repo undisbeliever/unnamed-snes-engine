@@ -6,7 +6,8 @@ import "../memmap";
 
 import "_variables";
 import "_common";
-import "player";
+
+import "../player";
 
 import "../common/math";
 

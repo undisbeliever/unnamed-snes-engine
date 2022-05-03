@@ -9,6 +9,7 @@ import "_common";
 
 import "dead";
 
+import "../player";
 
 import "../ui";
 import "../metatiles";
@@ -119,7 +120,7 @@ func take_damage_from_player_sword(entityId : u8 in y) {
 
     // NOTE: If I change this function I MUST also change `take_damage_from_player_sword_with_knockback`
 
-    a = SoA.health[y] - entities.player.swordAttackPower;
+    a = SoA.health[y] - player.swordAttackPower;
     if !carry {
         a = 0;
     }
@@ -150,7 +151,7 @@ func take_damage_from_player_sword_with_knockback(entityId : u8 in y, collisionS
 
     // MUST NOT modify X
 
-    a = SoA.health[y] - entities.player.swordAttackPower;
+    a = SoA.health[y] - player.swordAttackPower;
     if !carry {
         a = 0;
     }
@@ -218,8 +219,8 @@ let _farPtr = (*(&zpTmp_farPtr as *far *u16));
 //
 // The results of the collision tests will be stored in `collisionState`.
 //
-// If there is a player collision, the `entities.player.hitbox_collided_with_entity__inline()`
-// or `entities.player.hurtbox_collided_with_entity__inline()` function will be called.
+// If there is a player collision, the `player.hitbox_collided_with_entity__inline()`
+// or `player.hurtbox_collided_with_entity__inline()` function will be called.
 //
 // Also updates `SoA.movementState`, `SoA.iframeCounter` and `SoA.health`.
 //
@@ -266,7 +267,7 @@ func process_collisions(entityId : u8 in y) : u8 in y {
 
                 mem8_idx8();
                 #[mem8, idx8] {
-                    entities.player.hitbox_collided_with_entity__inline(y);
+                    player.hitbox_collided_with_entity__inline(y);
                     y = currentEntityId;
 
                     // ::TODO Different iframe intervals for different entities::
@@ -556,8 +557,4 @@ let _tmp       = zpTmp_byte_3;
 
 }
 }
-
-
-// Fix circular import
-import "player";
 

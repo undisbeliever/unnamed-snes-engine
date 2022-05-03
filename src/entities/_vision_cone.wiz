@@ -4,7 +4,8 @@
 import "../memmap";
 
 import "_variables";
-import "player";
+
+import "../player";
 import "../common/math";
 
 

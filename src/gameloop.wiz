@@ -11,9 +11,10 @@ import "resources";
 import "room-transitions";
 import "ui";
 import "wait-frame";
+
+import "player";
 import "entities/_variables";
 import "entities/_common";
-import "entities/player";
 
 
 namespace gameloop {
@@ -27,7 +28,7 @@ in code {
 #[mem8, idx8]
 inline func init() {
 
-    entities.player.init();
+    player.init();
 
     ui.init();
 
@@ -82,11 +83,11 @@ func run_game {
         // Always process player entity first
         x = 0;
         entities.currentEntityId = 0;
-        entities.player.process(x);
+        player.process(x);
 
         idx16();
         #[mem8, idx16] {
-            entities.player.update_collision_boxes__inline();
+            player.update_collision_boxes__inline();
         }
         mem8_idx8();
 
@@ -153,7 +154,7 @@ func draw_entities() {
 #[mem8, idx8]
 inline func _check_for_room_transition() {
 
-    a = entities.player.yPos.px;
+    a = player.yPos.px;
     if zero {
         // Check if there is a room above this one
         a = roomstate.currentRoom - 0x10;
@@ -177,7 +178,7 @@ inline func _check_for_room_transition() {
         return;
     }
 
-    a = entities.player.xPos.px;
+    a = player.xPos.px;
     if zero {
         // Check if there is a room to the left of this one
         a = roomstate.currentRoom & 0x0f;
