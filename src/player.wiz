@@ -108,6 +108,24 @@ enum State : u8 {
 
 
 
+in zeropage {
+    // The player's hurtbox
+    var playerHurtbox : entities.U8Aabb;
+
+    // The player's hitbox
+    var playerHitbox : entities.U8Aabb;
+}
+
+
+in wram7e {
+    // The amount of health on a full HP
+    //
+    // MUST be a multiple of 4
+    var maxHealth : u8;
+}
+
+
+
 let xPos = entities.SoA.xPos[0];
 let yPos = entities.SoA.yPos[0];
 
@@ -172,7 +190,7 @@ inline func init() {
 
     a = INITIAL_HEALTH;
     health = a;
-    entities.playerMaxHealth = a;
+    maxHealth = a;
 
     swordAttackPower = a = INITIAL_SWORD_ATTACK_POWER;
 
@@ -367,10 +385,10 @@ inline func _update_player_hitbox(msFrameAddr : u16 in xx) {
         if a == metasprites.MsDataFormat.NO_AABB_VALUE {
             // MS frame has no hitbox
             a = 0xff;
-            entities.playerHitbox.top = a;
-            entities.playerHitbox.bottom = 0;
-            entities.playerHitbox.left = a;
-            entities.playerHitbox.right = 0;
+            playerHitbox.top = a;
+            playerHitbox.bottom = 0;
+            playerHitbox.left = a;
+            playerHitbox.right = 0;
             return;
         }
 
@@ -385,22 +403,22 @@ inline func _update_player_hitbox(msFrameAddr : u16 in xx) {
             a = 0xff;
         }
     }
-    entities.playerHitbox.left = a;
+    playerHitbox.left = a;
 
 
     a = metasprites.MsDataFormat.hitbox_right[xx] as u8;
     __add_xPos_to_i8a_clamp(a, negative);
-    entities.playerHitbox.right = a;
+    playerHitbox.right = a;
 
 
     a = metasprites.MsDataFormat.hitbox_top[xx] as u8;
     __add_yPos_to_i8a_clamp(a, negative);
-    entities.playerHitbox.top = a;
+    playerHitbox.top = a;
 
 
     a = metasprites.MsDataFormat.hitbox_bottom[xx] as u8;
     __add_yPos_to_i8a_clamp(a, negative);
-    entities.playerHitbox.bottom = a;
+    playerHitbox.bottom = a;
 }
 
 
@@ -421,10 +439,10 @@ inline func _update_player_hurtbox(msFrameAddr : u16 in xx) {
 
         // player has no hurtbox
         a = 0xff;
-        entities.playerHurtbox.top = a;
-        entities.playerHurtbox.bottom = 0;
-        entities.playerHurtbox.left = a;
-        entities.playerHurtbox.right = 0;
+        playerHurtbox.top = a;
+        playerHurtbox.bottom = 0;
+        playerHurtbox.left = a;
+        playerHurtbox.right = 0;
     }
     else {
         // Add i8 signed offset to player's u8 unsigned position (with clamping)
@@ -435,10 +453,10 @@ inline func _update_player_hurtbox(msFrameAddr : u16 in xx) {
             if a == metasprites.MsDataFormat.NO_AABB_VALUE {
                 // MS frame has no hurtbox
                 a = 0xff;
-                entities.playerHurtbox.top = a;
-                entities.playerHurtbox.bottom = 0;
-                entities.playerHurtbox.left = a;
-                entities.playerHurtbox.right = 0;
+                playerHurtbox.top = a;
+                playerHurtbox.bottom = 0;
+                playerHurtbox.left = a;
+                playerHurtbox.right = 0;
                 return;
             }
 
@@ -453,21 +471,21 @@ inline func _update_player_hurtbox(msFrameAddr : u16 in xx) {
                 a = 0xff;
             }
         }
-        entities.playerHurtbox.left = a;
+        playerHurtbox.left = a;
 
 
         a = metasprites.MsDataFormat.hurtbox_right[xx] as u8;
         __add_xPos_to_i8a_clamp(a, negative);
-        entities.playerHurtbox.right = a;
+        playerHurtbox.right = a;
 
 
         a = metasprites.MsDataFormat.hurtbox_top[xx] as u8;
         __add_yPos_to_i8a_clamp(a, negative);
-        entities.playerHurtbox.top = a;
+        playerHurtbox.top = a;
 
         a = metasprites.MsDataFormat.hurtbox_bottom[xx] as u8;
         __add_yPos_to_i8a_clamp(a, negative);
-        entities.playerHurtbox.bottom = a;
+        playerHurtbox.bottom = a;
     }
 }
 

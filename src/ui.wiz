@@ -6,7 +6,7 @@ import "../wiz/common/snes/snes";
 
 import "resources";
 
-import "entities/_variables";
+import "player";
 import "common/dma";
 
 
@@ -83,7 +83,7 @@ inline func init() {
 
     max_player_health_changed();
 
-    _redraw_health_bar(entities.SoA.health[0]);
+    _redraw_health_bar(player.health);
 }
 
 
@@ -162,7 +162,7 @@ inline func transfer_buffer__vblank() {
 // DB = 0x7e
 #[mem8, idx8]
 func max_player_health_changed() {
-    a = entities.playerMaxHealth >>> HB_SHIFT;
+    a = player.maxHealth >>> HB_SHIFT;
     if a >= MAX_HB_TILES + 1 {
         a = MAX_HB_TILES;
     }
@@ -179,7 +179,7 @@ func max_player_health_changed() {
 inline func process() {
 
     a = healthBarValue;
-    cmp(a, entities.SoA.health[0]);
+    cmp(a, player.health);
     if !zero {
         healthBarTimer--;
         if negative {
@@ -192,7 +192,7 @@ inline func process() {
             _redraw_health_bar(a);
 
             a = healthBarValue;
-            if a == entities.SoA.health[0] {
+            if a == player.health {
                 a = 0;
             } else {
                 a = HB_ANIMATION_TIMER - 1;

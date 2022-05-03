@@ -56,26 +56,9 @@ namespace entities {
         var currentEntityId : u8;
 
 
-        // The player's hurtbox
-        var playerHurtbox : U8Aabb;
-
-        // The player's hitbox
-        var playerHitbox : U8Aabb;
-
-
-
         // Collision flags
         // (bitfield of `entities.CollisionState`)
         var collisionState : u8;
-    }
-
-
-    in wram7e {
-        // The amount of health on a full HP
-        //
-        // MUST be a multiple of 4
-        var playerMaxHealth : u8;
-
     }
 
 

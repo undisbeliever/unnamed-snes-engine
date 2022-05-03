@@ -404,47 +404,47 @@ let _tmp       = zpTmp_byte_3;
         }
     }
 
-    ^if a < playerHurtbox.right {
+    ^if a < player.playerHurtbox.right {
         _hb_left = a;
 
         a = metasprites.MsDataFormat.hitbox_right[xx] as u8;
         a = __add_xPos_to_i8a_clamp(a, negative, yy);
-        if a >= playerHurtbox.left {
+        if a >= player.playerHurtbox.left {
             _hb_right = a;
 
             a = metasprites.MsDataFormat.hitbox_top[xx] as u8;
             a = __add_yPos_to_i8a_clamp(a, negative, yy);
-            if a < playerHurtbox.bottom {
+            if a < player.playerHurtbox.bottom {
                 _hb_top = a;
 
                 a = metasprites.MsDataFormat.hitbox_bottom[xx] as u8;
                 a = __add_yPos_to_i8a_clamp(a, negative, yy);
-                if a >= playerHurtbox.top {
+                if a >= player.playerHurtbox.top {
                     // Calculate collision centre and return true
                     //   centre_y = avg(min(hb_bottom, player_bottom), max(hb_top, player_top))
                     //   centre_x = avg(min(hb_right, player_right), max(hb_left, player_left))
 
                     // a = _hb_bottom;
-                    if a >= playerHurtbox.bottom {
-                        a = playerHurtbox.bottom;
+                    if a >= player.playerHurtbox.bottom {
+                        a = player.playerHurtbox.bottom;
                     }
                     _tmp = a;
 
                     a = _hb_top;
-                    if a < playerHurtbox.top {
-                        a = playerHurtbox.top;
+                    if a < player.playerHurtbox.top {
+                        a = player.playerHurtbox.top;
                     }
                     collisionCentre_y = a = (a + _tmp) >>>># 1;
 
                     a = _hb_right;
-                    if a >= playerHurtbox.right {
-                        a = playerHurtbox.right;
+                    if a >= player.playerHurtbox.right {
+                        a = player.playerHurtbox.right;
                     }
                     _tmp = a;
 
                     a = _hb_left;
-                    if a < playerHurtbox.left {
-                        a = playerHurtbox.left;
+                    if a < player.playerHurtbox.left {
+                        a = player.playerHurtbox.left;
                     }
                     collisionCentre_x = a = (a + _tmp) >>>># 1;
 
@@ -500,47 +500,47 @@ let _tmp       = zpTmp_byte_3;
         }
     }
 
-    ^if a < playerHitbox.right {
+    ^if a < player.playerHitbox.right {
         _hb_left = a;
 
         a = metasprites.MsDataFormat.hurtbox_right[xx] as u8;
         a = __add_xPos_to_i8a_clamp(a, negative, yy);
-        if a >= playerHitbox.left {
+        if a >= player.playerHitbox.left {
             _hb_right = a;
 
             a = metasprites.MsDataFormat.hurtbox_top[xx] as u8;
             a = __add_yPos_to_i8a_clamp(a, negative, yy);
-            if a < playerHitbox.bottom {
+            if a < player.playerHitbox.bottom {
                 _hb_top = a;
 
                 a = metasprites.MsDataFormat.hurtbox_bottom[xx] as u8;
                 a = __add_yPos_to_i8a_clamp(a, negative, yy);
-                if a >= playerHitbox.top {
+                if a >= player.playerHitbox.top {
                     // Calculate collision centre and return true
                     //   centre_y = avg(min(hb_bottom, player_bottom), max(hb_top, player_top))
                     //   centre_x = avg(min(hb_right, player_right), max(hb_left, player_left))
 
                     // a = _hb_bottom;
-                    if a >= playerHitbox.bottom {
-                        a = playerHitbox.bottom;
+                    if a >= player.playerHitbox.bottom {
+                        a = player.playerHitbox.bottom;
                     }
                     _tmp = a;
 
                     a = _hb_top;
-                    if a < playerHitbox.top {
-                        a = playerHitbox.top;
+                    if a < player.playerHitbox.top {
+                        a = player.playerHitbox.top;
                     }
                     collisionCentre_y = a = (a + _tmp) >>>># 1;
 
                     a = _hb_right;
-                    if a >= playerHitbox.right {
-                        a = playerHitbox.right;
+                    if a >= player.playerHitbox.right {
+                        a = player.playerHitbox.right;
                     }
                     _tmp = a;
 
                     a = _hb_left;
-                    if a < playerHitbox.left {
-                        a = playerHitbox.left;
+                    if a < player.playerHitbox.left {
+                        a = player.playerHitbox.left;
                     }
                     collisionCentre_x = a = (a + _tmp) >>>># 1;
 
