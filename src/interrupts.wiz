@@ -4,11 +4,33 @@
 import "memmap";
 
 
+in shadow {
+
+// Number of NMI interrupts processed between wait_frame calls.
+// (byte)
+var nmiCounter : u8;
+
+}
+
+
 in code {
 
 
 #[nmi]
 func nmi_handler() {
+    mem8();
+    #[mem8] {
+        push8(a);
+
+        a = *(far &nmiCounter as far *u8);
+        a++;
+        *(far &nmiCounter as far *u8) = a;
+
+        // ::TODO add watchdog timer that activates when nmiCounter is negative::
+
+        a = pop8();
+    }
+
     nmireturn;
 }
 

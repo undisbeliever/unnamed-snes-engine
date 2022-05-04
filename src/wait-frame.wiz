@@ -7,6 +7,8 @@ import "metasprites";
 import "metatiles";
 import "ui";
 import "rng";
+import "interrupts";
+import "gamestate";
 import "../wiz/common/snes/snes";
 
 
@@ -97,8 +99,20 @@ func wait_frame() {
         snes.ppu.brightness = a = _brightness_buffer;
     }
 
+    mem16_idx16();
+    #[mem16, idx16] {
+        aa = *(&nmiCounter as *u16) & 0xff;
+
+        frameCounter_loword = aa = aa + frameCounter_loword;
+        if zero {
+            frameCounter_hiword++;
+        }
+    }
+
     mem8_idx8();
     #[mem8, idx8] {
+        nmiCounter = 0;
+
         joypad.update_state__inline();
     }
 

@@ -3,6 +3,8 @@
 
 import "memmap";
 
+import "gamestate";
+
 import "player";
 
 

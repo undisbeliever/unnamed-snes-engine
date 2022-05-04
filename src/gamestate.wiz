@@ -1,0 +1,26 @@
+// Gamestate variables
+//
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+
+import "memmap";
+
+
+in shadow {
+    // Number of frames processed.
+    // (incremented every `WaitFrame` call)
+    //
+    // MUST be in the `shadow` bank to work correctly.
+    //
+    // (u32)
+    var frameCounter : u32;
+
+    let frameCounter_lobyte = (&frameCounter as *u8)[0];
+
+    let frameCounter_loword = (&frameCounter as *u16)[0];
+    let frameCounter_hiword = (&frameCounter as *u16)[1];
+}
+
+
+
