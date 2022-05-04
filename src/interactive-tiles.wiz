@@ -31,16 +31,20 @@ namespace heal {
 #[mem8, idx8]
 func player_touches_tile(tileIndex : u8 in y) {
 
-    // ::TODO slow down the healing::
     // ::TODO play sound effect::
     // ::TODO spawn a particle effect::
 
-    a = player.health;
-    a++;
-    if a >= player.maxHealth {
-        a = player.maxHealth;
+    // Heal 1HP every 8 frames
+    a = frameCounter_lobyte;
+    if a & 0x7 == 0 {
+
+        a = player.health;
+        a++;
+        if a >= player.maxHealth {
+            a = player.maxHealth;
+        }
+        player.health = a;
     }
-    player.health = a;
 }
 
 }
