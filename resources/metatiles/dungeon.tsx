@@ -171,6 +171,11 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
+ <tile id="88" type="player_tile_collision_test">
+  <objectgroup draworder="index" id="2">
+   <object id="1" x="0" y="0" width="16" height="16"/>
+  </objectgroup>
+ </tile>
  <tile id="89" type="heal"/>
  <tile id="92">
   <objectgroup draworder="index" id="2">

@@ -18,9 +18,43 @@ namespace interactive_tiles {
 func null_function(tileIndex : u8 in y) { }
 
 
+
+// player_tile_collision_test
+// ==========================
+//
+// ::TODO replace with something more useful::
+namespace player_tile_collision_test {
+
+
+let player_touches_tile = null_function;
+
+
+// Called when the player is touching a solid tile.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func player_tile_collision(tileIndex : u8 in y) {
+
+import "ui";
+
+    // A very quick way to determine if this function is called.
+    player.health = a = 4;
+
+    // Ensure changes to health are displayed immediately
+    ui.healthBarValue = a = 5;
+    ui.healthBarTimer = 0;
+}
+
+}
+
+
+
 // heal
 // ====
 namespace heal {
+
+
+let player_tile_collision = null_function;
 
 
 // Heal the player when the player stands on the healing tile.

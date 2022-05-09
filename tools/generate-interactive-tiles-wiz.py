@@ -54,6 +54,7 @@ in code {
             out.write('];\n\n')
 
         generate_table('player_touches_tile_function_table', 'func(u8 in y)', 'player_touches_tile')
+        generate_table('player_tile_collision_function_table', 'func(u8 in y)', 'player_tile_collision')
 
 
         out.write("""

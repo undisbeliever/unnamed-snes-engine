@@ -304,6 +304,7 @@ func populate_map_tile_properties__all_tiles_solid() {
 }
 
 
+
 // Interactive Tiles
 // =================
 
@@ -322,7 +323,93 @@ let _tmp    = zpTmp_byte_0;
 
     x = a = mapTileProperties[y] & interactive_tiles.FUNCTION_TABLE_MASK;
 
-    return interactive_tiles.player_touches_tile_function_table[unaligned x](y);
+    interactive_tiles.player_touches_tile_function_table[unaligned x](y);
+
+
+    // Interactions with solid tiles are only preformed on the tile at the player's
+    // origin point.  The tile (if any) to the left or right will not be interacted with.
+    //
+    // ::TODO throughly test if this works as expected::
+
+    a = player.movementState;
+    if a & entities.MovementState.LEFT_COLLISION != 0 {
+        // left = xPos - 1 - tileHitbox_halfWidth (with clamping)
+        a = player.xPos.px;
+        if !zero {
+            a--;
+            a -= player.tileHitbox_halfWidth;
+            if !carry { a = 0; }
+        }
+
+        _tmp = a = a >>> 4;
+        y = a = (player.yPos.px & 0xf0) + _tmp;
+
+        x = a = mapTileProperties[y] & interactive_tiles.FUNCTION_TABLE_MASK;
+        return interactive_tiles.player_tile_collision_function_table[unaligned x](y);
+
+        a = player.movementState;
+
+    }
+    else if a & entities.MovementState.RIGHT_COLLISION != 0 {
+        // right = xPos + 1 + tileHitbox_halfWidth (with clamping)
+
+        a = player.xPos.px;
+        a++;
+        if zero {
+            a = 0xff;
+        }
+        else {
+            a += player.tileHitbox_halfWidth;
+            if carry { a = 0xff; }
+        }
+
+        _tmp = a = a >>> 4;
+        y = a = (player.yPos.px & 0xf0) + _tmp;
+
+        x = a = mapTileProperties[y] & interactive_tiles.FUNCTION_TABLE_MASK;
+        return interactive_tiles.player_tile_collision_function_table[unaligned x](y);
+
+        a = player.movementState;
+    }
+
+
+    // A is player.movementState
+    if a & entities.MovementState.UP_COLLISION != 0 {
+        _tmp = a = player.xPos.px >>> 4;
+
+        // top = yPos - 1 - tileHitbox_halfHeight (with clamping)
+        a = player.yPos.px;
+        if !zero {
+            a--;
+            a -= player.tileHitbox_halfHeight;
+            if !carry { a = 0; }
+        }
+
+        y = a = (a & 0xf0) + _tmp;
+
+        x = a = mapTileProperties[y] & interactive_tiles.FUNCTION_TABLE_MASK;
+        return interactive_tiles.player_tile_collision_function_table[unaligned x](y);
+
+    }
+    else if a & entities.MovementState.DOWN_COLLISION != 0 {
+        _tmp = a = player.xPos.px >>> 4;
+
+        // bottom = yPos + 1 + tileHitbox_halfHeight (with clamping)
+        a = player.yPos.px;
+        a++;
+        if zero {
+            a = 0xff;
+        }
+        else {
+            a += player.tileHitbox_halfHeight;
+            if carry { a = 0xff; }
+        }
+
+        y = a = (a & 0xf0) + _tmp;
+
+        x = a = mapTileProperties[y] & interactive_tiles.FUNCTION_TABLE_MASK;
+        return interactive_tiles.player_tile_collision_function_table[unaligned x](y);
+    }
 }
 
 
