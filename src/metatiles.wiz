@@ -1046,16 +1046,17 @@ in wram7e {
     var mapPos : u8;
 
 
-    // Variable to determine which of the two tilemaps the current map is drawn to.
+    // The VRAM word address of the tilemap the map is drawn to.
     //
-    //  * zero value = VRAM_BG1_MAP_WADDR
-    //  * non-zero value = VRAM_BG1_MAP_WADDR + 0x400
+    // This variable contains one of two possible values:
+    //  * VRAM_BG1_MAP_WADDR
+    //  * VRAM_BG1_MAP_WADDR + 0x400
     //
+    // This variable MUST only be changed by `_reset_state()` and `swap_currentTilemap()`.
     //
-    // This flag MUST only be changed by `_reset_state()` and `swap_currentTilemap()`.
-    //
-    // (byte flag)
-    var currentTilemap : u8;
+    // (VRAM word address)
+    var currentTilemap_vramWaddr : u16;
+
 
 
     // The tilemap row (within VRAM) that matches the top row of the room map.
@@ -1138,16 +1139,17 @@ func transfer_buffer__vblank() {
 // DB = 0x7e
 #[mem8, idx8]
 inline func _reset_state() {
-    transitions.currentTilemap = 0;
     transitions.topmostRowInVram = 0;
 
-    // Reset BG1 scroll
-    *(&<:bg1_scrollX as *u8) = 0;
-    *(&>:bg1_scrollX as *u8) = 0;
+    mem16();
+    #[mem16] {
+        currentTilemap_vramWaddr = VRAM_BG1_MAP_WADDR;
 
-    a = 0xff;
-    *(&<:bg1_scrollY as *u8) = a;
-    *(&>:bg1_scrollY as *u8) = a;
+        // Reset BG1 scroll
+        bg1_scrollX = 0;
+        bg1_scrollY = aa = 0xffff;
+    }
+    mem8();
 }
 
 
@@ -1156,12 +1158,20 @@ inline func _reset_state() {
 // ----------------------
 
 
-// Invert the `currentTilemap` flag.
+// Swap the currentTilemap.
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func swap_currentTilemap() {
-    currentTilemap = a = currentTilemap ^ 0xff;
+func swap_currentTilemap() {
+    a = *(&>:currentTilemap_vramWaddr as *u8);
+    if a == >:VRAM_BG1_MAP_WADDR {
+        a = >:(VRAM_BG1_MAP_WADDR + 0x400);
+    }
+    else {
+        a = >:VRAM_BG1_MAP_WADDR;
+    }
+
+    *(&>:currentTilemap_vramWaddr as *u8) = a;
 }
 
 
@@ -1246,6 +1256,8 @@ let _tmp = zpTmp_byte_0;
 #[mem8, idx8]
 func scroll_right__setup() {
 
+    swap_currentTilemap();
+
     mapPos = 0;
 
 
@@ -1255,14 +1267,7 @@ func scroll_right__setup() {
     // Subtract one to counter the +1 at the start of `right__process()`
     *(&<:buffer_vramWordPos as *u8) = a = <:(VRAM_BG1_MAP_WADDR + VRAM_OFFSET - 1);
 
-    a = currentTilemap;
-    if !zero {
-        a = >:(VRAM_BG1_MAP_WADDR + VRAM_OFFSET);
-    }
-    else {
-        a = >:(VRAM_BG1_MAP_WADDR + VRAM_OFFSET + 0x400);
-    }
-    *(&>:buffer_vramWordPos as *u8) = a;
+    *(&>:buffer_vramWordPos as *u8) = a = *(&>:currentTilemap_vramWaddr as *u8);
 }
 
 
@@ -1299,8 +1304,6 @@ func scroll_right__process() : bool in carry {
 
     a = mapPos;
     if a == MAP_WIDTH {
-        swap_currentTilemap();
-
         return true;
     }
 
@@ -1327,6 +1330,7 @@ func scroll_right__rollback() : bool in carry {
     }
 
     if a == 0 {
+        swap_currentTilemap();
         return true;
     }
     return false;
@@ -1340,6 +1344,8 @@ func scroll_right__rollback() : bool in carry {
 #[mem8, idx8]
 func scroll_left__setup() {
 
+    swap_currentTilemap();
+
     mapPos = a = 0xf;
 
     // Determine the next VRAM position
@@ -1348,14 +1354,7 @@ func scroll_left__setup() {
     // Add one to counter the -1 at the start of `left__process()`
     *(&<:buffer_vramWordPos as *u8) = a = <:(VRAM_BG1_MAP_WADDR + VRAM_OFFSET + 1);
 
-    a = currentTilemap;
-    if !zero {
-        a = >:(VRAM_BG1_MAP_WADDR + VRAM_OFFSET);
-    }
-    else {
-        a = >:(VRAM_BG1_MAP_WADDR + VRAM_OFFSET + 0x400);
-    }
-    *(&>:buffer_vramWordPos as *u8) = a;
+    *(&>:buffer_vramWordPos as *u8) = a = *(&>:currentTilemap_vramWaddr as *u8);
 }
 
 
@@ -1392,8 +1391,6 @@ func scroll_left__process() : bool in carry {
 
     a = mapPos;
     if negative {
-        swap_currentTilemap();
-
         return true;
     }
 
@@ -1420,6 +1417,7 @@ func scroll_left__rollback() : bool in carry {
     }
 
     if a == 0 {
+        swap_currentTilemap();
         return true;
     }
     return false;
@@ -1440,15 +1438,7 @@ func _calculate_vram_position_for_row(tilemapRow : u8 in a) {
     mem16();
     #[mem16] {
         aa = (aa & topmostRowInVram_MASK) << 5;
-
-        #[compile_if(VRAM_BG1_MAP_WADDR != 0)] {
-            aa += VRAM_BG1_MAP_WADDR;
-        }
-
-        x = currentTilemap;
-        if !zero {
-            aa += 0x400;
-        }
+        aa += currentTilemap_vramWaddr;
 
         buffer_vramWordPos = aa;
     }
