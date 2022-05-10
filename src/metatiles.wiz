@@ -1058,15 +1058,15 @@ in wram7e {
     var currentTilemap_vramWaddr : u16;
 
 
-
-    // The tilemap row (within VRAM) that matches the top row of the room map.
+    // The offset between the top of the tilemap and the top of the room map in tiles.
     //
-    // This value should be masked by `topmostRowInVram_MASK` whenever it is used to calculate a VRAM address.
+    // This value should be masked by `topmostRowOffset_MASK` whenever it is used to
+    // calculate a VRAM address or buffer index.
     //
     // (byte)
-    var topmostRowInVram : u8;
+    var topmostRowOffset : u8;
 
-    let topmostRowInVram_MASK = 0x1f;
+    let topmostRowOffset_MASK = 0x1f;
 
 
     // A buffer containing a single row/column to transfer to VRAM.
@@ -1139,7 +1139,7 @@ func transfer_buffer__vblank() {
 // DB = 0x7e
 #[mem8, idx8]
 inline func _reset_state() {
-    transitions.topmostRowInVram = 0;
+    transitions.topmostRowOffset = 0;
 
     mem16();
     #[mem16] {
@@ -1185,7 +1185,7 @@ func swap_currentTilemap() {
 func _draw_left_column() {
 let _tmp = zpTmp_byte_0;
 
-    y = a = (topmostRowInVram & topmostRowInVram_MASK) << 1;
+    y = a = (topmostRowOffset & topmostRowOffset_MASK) << 1;
 
     a = mapPos;
 
@@ -1222,7 +1222,7 @@ let _tmp = zpTmp_byte_0;
 func _draw_right_column() {
 let _tmp = zpTmp_byte_0;
 
-    y = a = (topmostRowInVram & topmostRowInVram_MASK) << 1;
+    y = a = (topmostRowOffset & topmostRowOffset_MASK) << 1;
 
     a = mapPos;
 
@@ -1437,7 +1437,7 @@ func scroll_left__rollback() : bool in carry {
 func _calculate_vram_position_for_row(tilemapRow : u8 in a) {
     mem16();
     #[mem16] {
-        aa = (aa & topmostRowInVram_MASK) << 5;
+        aa = (aa & topmostRowOffset_MASK) << 5;
         aa += currentTilemap_vramWaddr;
 
         buffer_vramWordPos = aa;
@@ -1539,9 +1539,9 @@ func scroll_down__process() : bool in carry {
     *(&<:bg1_scrollY as *u8) = a = *(&<:bg1_scrollY as *u8) + TRANSITION_SPEED;
 
 
-    a = topmostRowInVram;
+    a = topmostRowOffset;
     a++;
-    topmostRowInVram = a;
+    topmostRowOffset = a;
 
     if a & 1 != 0 {
         _draw_top_row(a + MAP_HEIGHT * 2 - 1);
@@ -1586,9 +1586,9 @@ func scroll_up__process() : bool in carry {
     *(&<:bg1_scrollY as *u8) = a = *(&<:bg1_scrollY as *u8) - TRANSITION_SPEED;
 
 
-    a = topmostRowInVram;
+    a = topmostRowOffset;
     a--;
-    topmostRowInVram = a;
+    topmostRowOffset = a;
 
     if a & 1 != 0 {
         _draw_bottom_row(a);
