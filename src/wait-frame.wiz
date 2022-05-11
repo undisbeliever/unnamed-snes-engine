@@ -99,6 +99,12 @@ func wait_frame() {
         snes.ppu.brightness = a = _brightness_buffer;
     }
 
+    idx8();
+    mem16();
+    #[mem16, idx8] {
+        metatiles.process_draw_tile_buffer__vblank();
+    }
+
     mem16_idx16();
     #[mem16, idx16] {
         aa = *(&nmiCounter as *u16) & 0xff;

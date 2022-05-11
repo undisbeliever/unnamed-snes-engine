@@ -66,6 +66,28 @@ in zeropage {
 }
 
 
+in shadow {
+    // MetaTiles to draw on the next VBlank.
+    //
+    // Array of word structures
+    namespace DrawTileBuffer {
+        let BUFFER_SIZE = 8;
+
+
+        var vramWordAddr : [u16 ; BUFFER_SIZE];
+
+        var topLeft     : [u16 ; BUFFER_SIZE];
+        var topRight    : [u16 ; BUFFER_SIZE];
+        var bottomLeft  : [u16 ; BUFFER_SIZE];
+        var bottomRight : [u16 ; BUFFER_SIZE];
+    }
+
+    // Current position with `DrawTileBuffer`.
+    // (byte index, increment by 2)
+    var drawTileBufferIndex : u8;
+}
+
+
 in wram7e {
     // The map for the current room.
     //
@@ -246,6 +268,8 @@ let _columnsLeft = zpTmp_byte_1;
 
 
     transitions._reset_state();
+
+    drawTileBufferIndex = 0;
 }
 
 
@@ -302,6 +326,123 @@ func populate_map_tile_properties__all_tiles_solid() {
         x++;
     } while !zero;
 }
+
+
+
+// DrawTileBuffer functions
+// ========================
+
+
+// Update the tiles in VRAM that were changed by `set_tile`.
+//
+// REQUIRES: V-Blank
+//
+// DB = shadow
+//
+// DB = 0x7e
+#[mem16, idx8]
+inline func process_draw_tile_buffer__vblank() {
+    x = drawTileBufferIndex;
+    if !zero {
+        snes.ppu.vram_control = y = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
+
+        x--;
+        x--;
+
+        do {
+            snes.ppu.vram_address_hl = aa = DrawTileBuffer.vramWordAddr[unaligned x];
+
+            snes.ppu.vram_write_data_hl = aa = DrawTileBuffer.topLeft[unaligned x];
+            snes.ppu.vram_write_data_hl = aa = DrawTileBuffer.topRight[unaligned x];
+
+
+            snes.ppu.vram_address_hl = aa = DrawTileBuffer.vramWordAddr[unaligned x] | 32;
+
+            snes.ppu.vram_write_data_hl = aa = DrawTileBuffer.bottomLeft[unaligned x];
+            snes.ppu.vram_write_data_hl = aa = DrawTileBuffer.bottomRight[unaligned x];
+
+            x--;
+            x--;
+        } while !negative;
+
+        drawTileBufferIndex = x = 0;
+    }
+}
+
+
+
+// Set a tile within the map.
+//
+// Also updates `mapTileProperties` and queues a new entry in the DrawTileBuffer.
+//
+// NOTE: This function may fail if the DrawTileBuffer is full
+//
+// NOTE: This function returns true if `tileIndex` is out of bounds.
+//       The map will remain unchanged.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_tile(tileIndex : u8 in y, tile : u8 in a) : bool in carry {
+let _tmp    = zpTmp_word_0;
+
+    if y < sizeof(typeof(map)) {
+
+        x = drawTileBufferIndex;
+        if x < sizeof(typeof(DrawTileBuffer.vramWordAddr)) {
+
+            map[y] = a;
+
+            // Calculate VRAM word address
+            mem16();
+            #[mem16] {
+                #[idx16] { aa = yy; }
+                _tmp = aa = (aa & 0x0f) << 1;
+
+                #[idx16] { aa = yy; }
+                aa = ((aa & 0xf0) << 2) | _tmp;
+                aa = (aa + transitions.vramVerticalWoffset) & 0x3ff;
+                aa |= transitions.currentTilemap_vramWaddr;
+
+                // X = drawTileBufferIndex
+                DrawTileBuffer.vramWordAddr[unaligned x] = aa;
+            }
+            mem8_idx8();
+
+
+            // Update mapTileProperties
+            x = map[y];
+            mapTileProperties[y] = a = tileset.properties[x];
+
+
+            y = drawTileBufferIndex;
+
+            (&<:DrawTileBuffer.topLeft[0] as *u8)[unaligned y] = a = tileset.topLeft_low[x];
+            (&>:DrawTileBuffer.topLeft[0] as *u8)[unaligned y] = a = tileset.topLeft_high[x];
+            (&<:DrawTileBuffer.topRight[0] as *u8)[unaligned y] = a = tileset.topRight_low[x];
+            (&>:DrawTileBuffer.topRight[0] as *u8)[unaligned y] = a = tileset.topRight_high[x];
+            (&<:DrawTileBuffer.bottomLeft[0] as *u8)[unaligned y] = a = tileset.bottomLeft_low[x];
+            (&>:DrawTileBuffer.bottomLeft[0] as *u8)[unaligned y] = a = tileset.bottomLeft_high[x];
+            (&<:DrawTileBuffer.bottomRight[0] as *u8)[unaligned y] = a = tileset.bottomRight_low[x];
+            (&>:DrawTileBuffer.bottomRight[0] as *u8)[unaligned y] = a = tileset.bottomRight_high[x];
+
+            y++;
+            y++;
+            drawTileBufferIndex = y;
+
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    // Ignore all out of bounds writes.
+    return true;
+}
+
+
+
+// ::TODO add set_tile_4by4(tileIndex : y) ::
 
 
 
@@ -1065,8 +1206,16 @@ in wram7e {
     //
     // (byte)
     var topmostRowOffset : u8;
-
     let topmostRowOffset_MASK = 0x1f;
+
+
+    // The offset between the top of the tilemap and the top row of the room map.
+    //
+    // NOTE: This variable only holds a vertical offset,  it does NOT contain
+    //       the horizontal offset (`currentTilemap_vramWaddr`).
+    //
+    // (word - VRAM word offset)
+    var vramVerticalWoffset : u16;
 
 
     // A buffer containing a single row/column to transfer to VRAM.
@@ -1143,6 +1292,7 @@ inline func _reset_state() {
 
     mem16();
     #[mem16] {
+        vramVerticalWoffset = 0;
         currentTilemap_vramWaddr = VRAM_BG1_MAP_WADDR;
 
         // Reset BG1 scroll
@@ -1552,7 +1702,7 @@ func scroll_down__process() : bool in carry {
         mapPos = a = mapPos + MAP_WIDTH;
 
         if a >= MAP_WIDTH * MAP_HEIGHT {
-            return true;
+            return _update_vram_vertical_woffset__and_return_true();
         }
     }
 
@@ -1599,12 +1749,31 @@ func scroll_up__process() : bool in carry {
         mapPos = a = mapPos - 0x10;
 
         if a >= MAP_WIDTH * MAP_HEIGHT{
-            return true;
+            return _update_vram_vertical_woffset__and_return_true();
         }
     }
 
     return false;
 }
+
+
+
+// Calculates the new value of the `vramVerticalWoffset`.
+//
+// NOTE: Always returns true
+#[mem8, idx8]
+func _update_vram_vertical_woffset__and_return_true() : bool in carry {
+    a = topmostRowOffset;
+
+    mem16();
+    #[mem16] {
+        vramVerticalWoffset = aa = (aa & topmostRowOffset_MASK) << 5;
+    }
+    mem8();
+
+    return true;
+}
+
 
 }
 

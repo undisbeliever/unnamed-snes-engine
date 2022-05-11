@@ -6,6 +6,8 @@ import "memmap";
 import "gamestate";
 
 import "player";
+import "metatiles";
+import "entities/_variables";
 
 
 in code {
@@ -25,6 +27,10 @@ func null_function(tileIndex : u8 in y) { }
 // ::TODO replace with something more useful::
 namespace player_tile_collision_test {
 
+in wram7e {
+    var _tileIndex : u8;
+}
+
 
 let player_touches_tile = null_function;
 
@@ -35,14 +41,39 @@ let player_touches_tile = null_function;
 #[mem8, idx8]
 func player_tile_collision(tileIndex : u8 in y) {
 
-import "ui";
+    _tileIndex = y;
 
-    // A very quick way to determine if this function is called.
-    player.health = a = 4;
+    a = player.movementState;
+    if a & entities.MovementState.Y_AXIS_COLLISION != 0 {
+        // Y axis collision
 
-    // Ensure changes to health are displayed immediately
-    ui.healthBarValue = a = 5;
-    ui.healthBarTimer = 0;
+        a = y & 0xf;
+        if !zero && a != 0xf {
+            y--;
+            metatiles.set_tile(y, 0x11);
+
+            y = _tileIndex;
+            metatiles.set_tile(y, 0x12);
+
+            y = _tileIndex;
+            y++;
+            metatiles.set_tile(y, 0x13);
+        }
+    }
+    else {
+        // X axis collision
+
+        // No need for bounds checking.
+        // `metaSprites.set_tile()` does the bounds checking for me.
+
+        metatiles.set_tile(y, 0x30);
+
+        y = a = _tileIndex - 0x10;
+        metatiles.set_tile(y, 0x20);
+
+        y = a = _tileIndex + 0x10;
+        metatiles.set_tile(y, 0x40);
+    }
 }
 
 }
