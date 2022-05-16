@@ -8,6 +8,7 @@
  ],
  "interactive_tile_functions": [
    "player_tile_collision_test",
+   "doorway",
    "heal"
  ],
  "dungeons": {

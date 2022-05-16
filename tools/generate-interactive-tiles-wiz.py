@@ -25,10 +25,14 @@ def generate_wiz_code(interactive_tile_functions):
         raise ValueError("Too many interactive tile types: { len(interactive_tile_functions) }")
 
 
+    doorway_index = interactive_tile_functions.index('doorway') + 1;
+
+
     with StringIO() as out:
         out.write("""
 import "../src/memmap";
 import "../src/interactive-tiles";
+import "../src/metatiles";
 """)
 
         out.write("""
@@ -38,23 +42,27 @@ namespace interactive_tiles {
 in code {
 
 """)
+        out.write(f"let DOORWAY_FUNCTION_TABLE_INDEX = 0x{ doorway_index * 2 :02x};\n\n")
+
         out.write(f"let FUNCTION_TABLE_MASK = 0x{ (table_size - 1) * 2 :02x};\n\n")
 
 
         def generate_table(table_name, fn_type, fn_name):
+            null_line = f"  metatiles.interactive_tiles.null_function as {fn_type},\n"
+
             out.write(f"const { table_name } : [ { fn_type } ; { table_size } ] = [\n")
-            out.write("  metatiles.interactive_tiles.null_function,\n")
+            out.write(null_line)
 
             for it in interactive_tile_functions:
                 out.write(f"  metatiles.interactive_tiles.{ it }.{ fn_name },\n")
 
             for i in range(table_size - n_functions):
-                out.write("  metatiles.interactive_tiles.null_function,\n")
+                out.write(null_line)
 
             out.write('];\n\n')
 
         generate_table('player_touches_tile_function_table', 'func(u8 in y)', 'player_touches_tile')
-        generate_table('player_tile_collision_function_table', 'func(u8 in y)', 'player_tile_collision')
+        generate_table('player_tile_collision_function_table', 'func(u8 in y, metatiles.CollisionDirection in a)', 'player_tile_collision')
 
 
         out.write("""

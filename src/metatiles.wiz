@@ -61,6 +61,22 @@ struct _DataFormat {
 };
 
 
+// player_tile_collision direction
+//
+// Cannot use MovementState enum as I need separate directions.
+enum CollisionDirection : u8 {
+    DOWN    = 0,
+    UP      = 2,
+    RIGHT   = 4,
+    LEFT    = 6,
+};
+let CollisionDirection_MASK = 0b110;
+
+// Used to determine if CollisionDirection is X-axis or Y-axis collision
+let CollisionDirection_LEFT_RIGHT_BIT_TEST = 4;
+
+
+
 in zeropage {
 
 }
@@ -486,7 +502,7 @@ let _tmp    = zpTmp_byte_0;
         y = a = (player.yPos.px & 0xf0) | _tmp;
 
         x = a = mapTileProperties[y] & interactive_tiles.FUNCTION_TABLE_MASK;
-        return interactive_tiles.player_tile_collision_function_table[unaligned x](y);
+        return interactive_tiles.player_tile_collision_function_table[unaligned x](y, CollisionDirection.LEFT);
 
         a = player.movementState;
 
@@ -508,7 +524,7 @@ let _tmp    = zpTmp_byte_0;
         y = a = (player.yPos.px & 0xf0) | _tmp;
 
         x = a = mapTileProperties[y] & interactive_tiles.FUNCTION_TABLE_MASK;
-        return interactive_tiles.player_tile_collision_function_table[unaligned x](y);
+        return interactive_tiles.player_tile_collision_function_table[unaligned x](y, CollisionDirection.RIGHT);
 
         a = player.movementState;
     }
@@ -529,7 +545,7 @@ let _tmp    = zpTmp_byte_0;
         y = a = (a & 0xf0) | _tmp;
 
         x = a = mapTileProperties[y] & interactive_tiles.FUNCTION_TABLE_MASK;
-        return interactive_tiles.player_tile_collision_function_table[unaligned x](y);
+        return interactive_tiles.player_tile_collision_function_table[unaligned x](y, CollisionDirection.UP);
 
     }
     else if a & entities.MovementState.DOWN_COLLISION != 0 {
@@ -549,7 +565,7 @@ let _tmp    = zpTmp_byte_0;
         y = a = (a & 0xf0) | _tmp;
 
         x = a = mapTileProperties[y] & interactive_tiles.FUNCTION_TABLE_MASK;
-        return interactive_tiles.player_tile_collision_function_table[unaligned x](y);
+        return interactive_tiles.player_tile_collision_function_table[unaligned x](y, CollisionDirection.DOWN);
     }
 }
 
@@ -636,6 +652,25 @@ let _bottomMasked = zpTmp_byte_2;
     bit(mapTileProperties[x]);
 Return:
     return negative;
+}
+
+
+
+// Tests if the player is standing on a doorway tile
+//
+// DB = 0x7e
+#[mem8, idx8]
+func test_if_player_touches_a_doorway_tile() : bool in zero {
+let _tmp = zpTmp_byte_0;
+
+    _tmp = a = player.xPos.px >>> 4;
+    y = a = (player.yPos.px & 0xf0) | _tmp;
+
+    a = mapTileProperties[y] & interactive_tiles.FUNCTION_TABLE_MASK;
+
+    // return a == DOORWAY_FUNCTION_TABLE_INDEX;
+    cmp(a, interactive_tiles.DOORWAY_FUNCTION_TABLE_INDEX);
+    return zero;
 }
 
 

@@ -617,10 +617,16 @@ func _scrolling_room_transition__loop() : bool in carry {
         if zero {
             negative = metatiles.test_if_player_touches_a_solid_tile();
             if negative {
-                // Tile is solid - cannot place player here
-                wait_one_second();
+                // Tile is solid
 
-                return false;
+                // Check if it is a doorway tile
+                zero = metatiles.test_if_player_touches_a_doorway_tile();
+                if !zero {
+                    // Tile is solid - cannot place player here
+                    wait_one_second();
+
+                    return false;
+                }
             }
         }
 

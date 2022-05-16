@@ -30,9 +30,23 @@ let INITIAL_SWORD_ATTACK_POWER = 2;
 let INITIAL_HEALTH = 16;
 
 
+// How far the player can enter a doorway before the game prevents the player from
+// leaving by pressing an off-axis direction (ie, pressing left in an up doorway).
+let DOORWAY_LEAVE_DISTANCE = 14;
+
+// Offset to add to the `altAxisTarget` when entering a door from the left or right.
+let DOORWAY_X_DIRECTION_OFFSET = 4;
+
+
 
 // (8:8 unsigned fixed point)
 let WALK_VELOCITY = 0x0180;
+
+
+// (8:8 unsigned fixed point)
+let DOORWAY_VELOCITY               = 0x0180;
+let DOORWAY_DIAGONAL_MAIN_VELOCITY = 0x0040;
+let DOORWAY_DIAGONAL_ALT_VELOCITY  = 0x00D0;
 
 
 // Pixels the player is to transverse before incrementing `animationFrame`
@@ -104,6 +118,7 @@ enum State : u8 {
     WALKING,
     ATTACKING,
     HURT,
+    WALK_THROUGH_DOORWAY,
 };
 
 
@@ -236,6 +251,9 @@ func process(entityId : u8 in y) {
     else if a == State.HURT as u8 {
         process__hurt();
     }
+    else if a == State.WALK_THROUGH_DOORWAY as u8 {
+        ^return process__walk_through_doorway();
+    }
     else {
         // state == WALKING
         process__walking();
@@ -290,6 +308,45 @@ func zero_velocity() {
         yVelocity = 0;
     }
     mem8();
+}
+
+
+
+// Add the player's velocity to the player's position (with bounds checking)
+//
+// NOTE: This function will not preform any collision checks.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func add_velocity_to_positon_without_collsion_checks() {
+    let MAX_Y_POS = DISPLAY_HEIGHT << 8;
+
+    mem16();
+    #[mem16] {
+        aa = xVelocity;
+        if negative {
+            aa += entities.SoA.xPos_u16[PLAYER_ENTITY_ID];
+            if !carry { aa = 0; }
+        }
+        else {
+            aa += entities.SoA.xPos_u16[PLAYER_ENTITY_ID];
+            if carry { aa = 0xff00; }
+        }
+        entities.SoA.xPos_u16[PLAYER_ENTITY_ID] = aa;
+
+
+        aa = yVelocity;
+        if negative {
+            aa += entities.SoA.yPos_u16[PLAYER_ENTITY_ID];
+            if !carry { aa = 0; }
+        }
+        else {
+            aa += entities.SoA.yPos_u16[PLAYER_ENTITY_ID];
+            if carry || aa >= MAX_Y_POS { aa = MAX_Y_POS; }
+        }
+        entities.SoA.yPos_u16[PLAYER_ENTITY_ID] = aa;
+    }
+    mem8_idx8();
 }
 
 
@@ -970,6 +1027,241 @@ func process__hurt() {
 // DB = 0x7e
 #[mem8, idx8]
 func update_animation__hurt() {
+}
+
+
+
+// WALK_THROUGH_DOORWAY state
+// ==========================
+
+
+in wram7e_roomstate {
+    // The direction of the player when they entered the door
+    var walkThroughDoorway_direction : metatiles.CollisionDirection;
+
+    // The position (on the main axis) of the player at the start of the WALK_THROUGH_DOORWAY state.
+    var walkThroughDoorway_mainAxisStart : u8;
+
+    // The target position (on the alt axis) the player needs to be to enter to door.
+    var walkThroughDoorway_altAxisTarget : u8;
+}
+
+
+
+// Called when the player is touching a solid tile.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func set_state__walk_through_doorway__inline(direction : metatiles.CollisionDirection in x, mainAxisStart : u8 in y, altAxisTarget : u8 in a) {
+    walkThroughDoorway_direction = direction;
+    walkThroughDoorway_mainAxisStart = mainAxisStart;
+    walkThroughDoorway_altAxisTarget = altAxisTarget;
+
+    state = a = State.WALK_THROUGH_DOORWAY as u8;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__walk_through_doorway() {
+
+let _mainAxisOffset = zpTmp_byte_0;
+
+    idx16();
+    #[idx16] {
+        xx = 0;
+        yy = 0;
+
+        a = walkThroughDoorway_direction as u8;
+        ^if a & metatiles.CollisionDirection_LEFT_RIGHT_BIT_TEST != 0 {
+            // X axis doorway
+
+            a = xPos.px - walkThroughDoorway_mainAxisStart;
+            if !carry {
+                a = negate8(a);
+            }
+            _mainAxisOffset = a;
+
+
+            // Calculate Y axis velocity to reach `walkThroughDoorway_altAxisTarget`.
+            a = yPos.px;
+            if a < walkThroughDoorway_altAxisTarget {
+                yy = DOORWAY_DIAGONAL_ALT_VELOCITY;
+            }
+            else if !zero {
+                yy = -DOORWAY_DIAGONAL_ALT_VELOCITY as u16;
+            }
+
+
+            a = walkThroughDoorway_direction as u8;
+            if a == metatiles.CollisionDirection.LEFT as u8 {
+                // direction = LEFT
+
+                a = joypad.current_h;
+                if a & joypad.JOYH.LEFT != 0 {
+                    facingDirection = a = FacingDirection.LEFT as u8;
+
+                    if yy == 0 {
+                        xx = -DOORWAY_VELOCITY as u16;
+                    }
+                    else {
+                        xx = -DOORWAY_DIAGONAL_MAIN_VELOCITY as u16;
+                    }
+                }
+                else if a & joypad.JOYH.RIGHT != 0 {
+                    facingDirection = a = FacingDirection.RIGHT as u8;
+
+                    xx = DOORWAY_VELOCITY;
+                    yy = 0;
+                }
+                else if a & (joypad.JOYH.UP | joypad.JOYH.DOWN) != 0 {
+                    // Leave door by pressing UP/DOWN if the player is near the door entrance
+                    a = _mainAxisOffset;
+                    if a < DOORWAY_LEAVE_DISTANCE {
+                        facingDirection = a = FacingDirection.RIGHT as u8;
+                        xx = DOORWAY_VELOCITY;
+                        yy = 0;
+                    }
+                }
+            }
+            else {
+                // direction = RIGHT
+
+                a = joypad.current_h;
+                if a & joypad.JOYH.RIGHT != 0 {
+                    facingDirection = a = FacingDirection.RIGHT as u8;
+
+                    if yy == 0 {
+                        xx = DOORWAY_VELOCITY;
+                    }
+                    else {
+                        xx = DOORWAY_DIAGONAL_MAIN_VELOCITY;
+                    }
+                }
+                else if a & joypad.JOYH.LEFT != 0 {
+                    facingDirection = a = FacingDirection.LEFT as u8;
+
+                    xx = -DOORWAY_VELOCITY as u16;
+                    yy = 0;
+                }
+                else if a & (joypad.JOYH.UP | joypad.JOYH.DOWN) != 0 {
+                    // Leave door by pressing UP/DOWN if the player is near the door entrance
+                    a = _mainAxisOffset;
+                    if a < DOORWAY_LEAVE_DISTANCE {
+                        facingDirection = a = FacingDirection.LEFT as u8;
+                        xx = -DOORWAY_VELOCITY as u16;
+                        yy = 0;
+                    }
+                }
+            }
+        }
+        else {
+            // Y axis doorway
+
+            a = yPos.px - walkThroughDoorway_mainAxisStart;
+            if !carry {
+                a = negate8(a);
+            }
+            _mainAxisOffset = a;
+
+
+            // Calculate X velocity to reach `walkThroughDoorway_altAxisTarget`.
+            a = xPos.px;
+            if a < walkThroughDoorway_altAxisTarget {
+                xx = DOORWAY_DIAGONAL_ALT_VELOCITY;
+            }
+            else if !zero {
+                xx = -DOORWAY_DIAGONAL_ALT_VELOCITY as u16;
+            }
+
+
+            a = walkThroughDoorway_direction as u8;
+            if !zero {
+                // direction = UP
+
+                a = joypad.current_h;
+                if a & joypad.JOYH.UP != 0 {
+                    facingDirection = a = FacingDirection.UP as u8;
+
+                    if xx == 0 {
+                        yy = -DOORWAY_VELOCITY as u16;
+                    }
+                    else {
+                        yy = -DOORWAY_DIAGONAL_MAIN_VELOCITY as u16;
+                    }
+                }
+                else if a & joypad.JOYH.DOWN != 0 {
+                    facingDirection = a = FacingDirection.DOWN as u8;
+
+                    xx = 0;
+                    yy = DOORWAY_VELOCITY;
+                }
+                else if a & (joypad.JOYH.LEFT | joypad.JOYH.RIGHT) != 0 {
+                    // Leave door by pressing LEFT/RIGHT if the player is near the door entrance
+                    a = _mainAxisOffset;
+                    if a < DOORWAY_LEAVE_DISTANCE {
+                        facingDirection = a = FacingDirection.DOWN as u8;
+                        xx = 0;
+                        yy = DOORWAY_VELOCITY;
+                    }
+                }
+            }
+            else {
+                // direction = DOWN
+
+                a = joypad.current_h;
+                if a & joypad.JOYH.DOWN != 0 {
+                    facingDirection = a = FacingDirection.DOWN as u8;
+
+                    if yy == 0 {
+                        yy = DOORWAY_VELOCITY;
+                    }
+                    else {
+                        yy = DOORWAY_DIAGONAL_MAIN_VELOCITY;
+                    }
+                }
+                else if a & joypad.JOYH.UP != 0 {
+                    facingDirection = a = FacingDirection.UP as u8;
+
+                    xx = 0;
+                    yy = -DOORWAY_VELOCITY as u16;
+                }
+                else if a & (joypad.JOYH.LEFT | joypad.JOYH.RIGHT) != 0 {
+                    // Leave door by pressing LEFT/RIGHT if the player is near the door entrance
+                    a = _mainAxisOffset;
+                    if a < DOORWAY_LEAVE_DISTANCE {
+                        facingDirection = a = FacingDirection.UP as u8;
+                        xx = 0;
+                        yy = -DOORWAY_VELOCITY as u16;
+                    }
+                }
+            }
+        }
+
+        xVelocity = xx;
+        yVelocity = yy;
+    }
+    mem8_idx8();
+
+
+    add_velocity_to_positon_without_collsion_checks();
+
+
+    // Do not test for solid tile if main axis position is unchanged.
+    //
+    //  * Prevents `set_state__walking()` from repeatedly resetting the walking animation frame to 0.
+    //  * Ensures player can enter the doorway tile as soon as possible.
+    a = _mainAxisOffset;
+    if !zero {
+        negative = metatiles.test_if_player_touches_a_solid_tile();
+        if !negative {
+            set_state__walking();
+        }
+    }
+
+
+    ^return update_animation__walking();
 }
 
 

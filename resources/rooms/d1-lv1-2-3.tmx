@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="3" nextobjectid="9">
+<map version="1.8" tiledversion="1.8.4" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="3" nextobjectid="9">
  <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
  <layer id="1" name="Tile Layer 1" width="16" height="14">
   <data encoding="base64" compression="gzip">
-   H4sIAAAAAAAAA+3LzRFDQABA4S1AIgUEKUBQgL8CBA0kNEA0gDQQlOwd9rBjdsbB1eG7vWcIIS64SiN+8DZ6DEpn4oY7LNjSjEXz/zEpnYMHXDw1/R4fwfmf/8E/RIRYqlBr+jc+SpcgRYYXcumLTvM3aJWuQIkVIutaz4ADAAA=
+   H4sIAAAAAAAAA+3LsQ2CYBRF4X8AUAcAdQAUBwB0AAUXEFwAdQHARFqVBAbmFK94BQUJLcVX3XssY4yNhVLhjb0oUMr2QY0lVnDgYq380aj+i59sLTpssIWHnfqO5eMw93M/sQ8QIhIZ7gP/G1L1O+KEMy6IxROvgT7HQ/0SXNED7pUKIoADAAA=
   </data>
  </layer>
  <objectgroup id="2" name="Enemies">
