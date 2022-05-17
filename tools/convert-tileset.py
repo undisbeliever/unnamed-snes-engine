@@ -6,26 +6,36 @@
 import PIL.Image
 import argparse
 import xml.etree.ElementTree
+from collections import namedtuple
 
 
 from _json_formats import load_mappings_json
 from _snes import image_to_snes
 
 
+TileProperty = namedtuple('TileProperty', ('solid', 'type', 'priority'))
+
+
+N_TILES = 256
+
 TILE_DATA_BPP = 4
 
-DEFAULT_ORDER_BIT = 0
+DEFAULT_PRIORITY = 0
 
 
 TILE_PROPERTY_SOLID_BIT = 7
 
 
 
-def create_metatile_map(tilemap):
+def create_metatile_map(tilemap, tile_properties):
     data = bytearray()
+
+    priotity_bit = 1 << 4
 
     assert(len(tilemap) == 32 * 32)
     for xoffset, yoffset in ((0, 0), (1, 0), (0, 1), (1, 1)):
+        priotity_bit >>= 1
+
         for y in range(yoffset, 32, 2):
             for x in range(xoffset, 32, 2):
                 tm = tilemap[x + y * 32]
@@ -33,11 +43,14 @@ def create_metatile_map(tilemap):
 
         for y in range(yoffset, 32, 2):
             for x in range(xoffset, 32, 2):
+                tile_id = (y // 2) * 16 + (x // 2)
+                priority = tile_properties[tile_id].priority & priotity_bit;
+
                 tm = tilemap[x + y * 32]
                 # This should never happen
                 assert(tm.tile_id <= 0x3ff)
                 assert(tm.palette_id <= 7)
-                data.append((tm.tile_id >> 8) | (tm.palette_id << 2) | (bool(DEFAULT_ORDER_BIT) << 5)
+                data.append((tm.tile_id >> 8) | (tm.palette_id << 2) | (bool(priority) << 5)
                             | (bool(tm.hflip) << 6) | (bool(tm.vflip) << 7))
 
     return data
@@ -61,40 +74,81 @@ def check_objectgroup_tag(tag):
 
 
 
-def read_tile_tag(tile_tag, interactive_tile_functions):
-    """ Returns (tile_id, properties_value) """
+def read_tile_priority_value(value, tile_id):
+    if not isinstance(value, str):
+        raise ValueError('Unknown type, expected string')
+
+    if value == '0':
+        return 0
+    if value == '1':
+        return 0xf
+
+    if len(value) != 4:
+        raise ValueError(f"Unknown priority value (tile { tile_id }: { value }")
+
+    return int(value, 2)
+
+
+
+def read_tile_tag(tile_tag):
+    """ Returns (tile_id, TileProperty) """
 
     tile_id = int(tile_tag.attrib['id'])
 
     if tile_id > 255:
         raise ValueError("Invalid tileid")
 
-    properties = 0;
+    tile_solid = False
+    tile_type = None
+    tile_priority = 0
 
     if 'type' in tile_tag.attrib:
         tile_type = tile_tag.attrib['type']
-        tile_type_id = interactive_tile_functions.index(tile_type) + 1
-        if tile_type_id >= (1 << 5):
-            raise ValueError(f"tile_type_id is invalid: { tile_type_id }")
-        properties |= tile_type_id << 1
 
     for tag in tile_tag:
         if tag.tag == 'objectgroup':
             if not check_objectgroup_tag(tag):
-                raise ValueError('Tile collision MUST cover the whole tile in a single rectangle')
-            properties |= 1 << TILE_PROPERTY_SOLID_BIT
+                raise ValueError('Tile collision MUST cover the whole tile in a single rectangle (tile { tile_id }')
+            tile_solid = True
 
-    return tile_id, properties
+        elif tag.tag == 'properties':
+            for ptag in tag:
+                if ptag.tag == 'property':
+                    if ptag.attrib['name'] == 'priority':
+                        tile_priority = read_tile_priority_value(ptag.attrib['value'], tile_id)
+
+    return tile_id, TileProperty(solid=tile_solid, type=tile_type, priority=tile_priority)
 
 
 
-def create_properties_array(tsx_et, interactive_tile_functions):
-    data = bytearray(256)
+def read_tile_properties(tsx_et):
+
+    out = [ TileProperty(solid=False, type=None, priority=DEFAULT_PRIORITY) ] * N_TILES
 
     for tag in tsx_et.getroot():
         if tag.tag == 'tile':
-            tile_id, p = read_tile_tag(tag, interactive_tile_functions)
-            data[tile_id] = p
+            tile_id, t = read_tile_tag(tag)
+
+            out[tile_id] = t;
+
+    return out
+
+
+
+def create_properties_array(tile_properties, interactive_tile_functions):
+    data = bytearray(256)
+
+    for i, tile in enumerate(tile_properties):
+        p = 0
+
+        if tile.type:
+            tile_type_id = interactive_tile_functions.index(tile.type) + 1
+            p |= tile_type_id << 1
+
+        if tile.solid:
+            p |= 1 << TILE_PROPERTY_SOLID_BIT
+
+        data[i] = p
 
     return data
 
@@ -161,10 +215,12 @@ def main():
     with open(args.tsx_filename, 'r') as tsx_fp:
         tsx_et = xml.etree.ElementTree.parse(tsx_fp)
 
+    tile_properties = read_tile_properties(tsx_et)
+
     mappings = load_mappings_json(args.mappings_json_file)
 
-    metatile_map = create_metatile_map(tilemap)
-    properties = create_properties_array(tsx_et, mappings.interactive_tile_functions)
+    metatile_map = create_metatile_map(tilemap, tile_properties)
+    properties = create_properties_array(tile_properties, mappings.interactive_tile_functions)
 
     tileset_data = create_tileset_data(palette_data, tile_data, metatile_map, properties)
 
