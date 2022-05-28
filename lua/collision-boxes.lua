@@ -11,8 +11,8 @@ tile_hitbox_color       = 0x80ffff00
 Y_OFFSET = 7
 
 
-player_hitbox_addr      = emu.getLabelAddress("entities_playerHitbox")
-player_hurtbox_addr     = emu.getLabelAddress("entities_playerHurtbox")
+player_hitbox_addr      = emu.getLabelAddress("player_playerHitbox")
+player_hurtbox_addr     = emu.getLabelAddress("player_playerHurtbox")
 
 
 function draw_u8rect(addr, color)
@@ -39,7 +39,7 @@ entity_ypos_px_addr                 = emu.getLabelAddress("entities_SoA_yPos") +
 entity_tile_hitbox_half_width_addr  = emu.getLabelAddress("entities_SoA_tileHitbox")
 entity_tile_hitbox_half_height_addr = entity_tile_hitbox_half_width_addr + 1
 
-entity_metasprite_frame_addr        = emu.getLabelAddress("entities_SoA___msFrameAndBlank") + 0
+entity_metasprite_frame_addr        = emu.getLabelAddress("entities_SoA__shadowSizeAndMsFrame") + 1
 entity_metasprite_frame_table_addr  = emu.getLabelAddress("entities_SoA_metaSpriteFrameTable")
 
 
