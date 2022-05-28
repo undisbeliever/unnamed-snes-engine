@@ -48,6 +48,10 @@ let DOORWAY_VELOCITY               = 0x0180;
 let DOORWAY_DIAGONAL_MAIN_VELOCITY = 0x0040;
 let DOORWAY_DIAGONAL_ALT_VELOCITY  = 0x00D0;
 
+// Ensures player cannot spam attack inside a doorway and remain unhurt.
+// (8:8 unsigned fixed point)
+let ATTACKING_IN_DOORWAY_VELOCITY  = 0x0110 / (N_ATTACK_FRAMES * ATTACK_ANIMATION_FRAME_DELAY);
+
 
 // Pixels the player is to transverse before incrementing `animationFrame`
 // (8:8 unsigned fixed point)
@@ -119,6 +123,7 @@ enum State : u8 {
     ATTACKING               = 2,
     HURT                    = 4,
     WALK_THROUGH_DOORWAY    = 6,
+    ATTACKING_IN_DOORWAY    = 8,
 };
 
 
@@ -254,6 +259,7 @@ const process__state_functions = [
     process__attacking,
     process__hurt,
     process__walk_through_doorway,
+    process__attacking_in_doorway,
 ];
 
 
@@ -1056,6 +1062,16 @@ inline func set_state__walk_through_doorway__inline(direction : metatiles.Collis
 
 
 
+// Called after the player is attacking in a doorway
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func set_state__walk_through_doorway__after_attacking_in_doorway() {
+    state = a = State.WALK_THROUGH_DOORWAY as u8;
+}
+
+
+
 // DB = 0x7e
 #[mem8, idx8]
 func process__walk_through_doorway() {
@@ -1251,15 +1267,87 @@ let _mainAxisOffset = zpTmp_byte_0;
         negative = metatiles.test_if_player_touches_a_solid_tile();
         if !negative {
             set_state__walking();
+            return;
         }
     }
+
+
+    // Must be after solid tile test to prevent a clip
+    a = joypad.input_buffers.attack;
+    goto set_state__attacking_in_doorway if !zero;
 
 
     ^return update_animation__walking();
 }
 
 
+
+// ATTACKING IN DOORWAY STATE
+// ==========================
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_state__attacking_in_doorway() {
+    state = a = State.ATTACKING_IN_DOORWAY as u8;
+
+    animationFrame = a = FIRST_ATTACK_FRAME;
+    <:animationFrameDelay = a = ATTACK_ANIMATION_FRAME_DELAY - 1;
+
+
+    // Player moves forward a bit when attacking.
+    //
+    // Prevents player from finding a pixel-perfect position where they can attack inside
+    // a doorway and not get hurt by an enemy.
+    //
+    // Should not cause any issues with collisions.
+    x = a = (facingDirection as u8) << 1;
+    mem16();
+    #[mem16] {
+        xVelocity = aa = AttackingInDoorwayVelocity_X[unaligned x] as u16;
+        yVelocity = aa = AttackingInDoorwayVelocity_Y[unaligned x] as u16;
+    }
+    mem8_idx8();
 }
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__attacking_in_doorway() {
+
+    add_velocity_to_positon_without_collsion_checks();
+
+    // Update animation
+    (<:animationFrameDelay)--;
+    if negative {
+        <:animationFrameDelay = a = ATTACK_ANIMATION_FRAME_DELAY - 1;
+
+        a = animationFrame;
+        a++;
+        if a == FIRST_ATTACK_FRAME + N_ATTACK_FRAMES {
+            return set_state__walk_through_doorway__after_attacking_in_doorway();
+        }
+        animationFrame = a;
+    }
+
+    update_metasprite_frame();
+}
+
+
+}
+
+
+in rodata0 {
+    let __AIDV = ATTACKING_IN_DOORWAY_VELOCITY;
+
+    const _AttackingInDoorwayVelocity_X : [i16 ; 4] = [       0,       0,  __AIDV, -__AIDV ];
+    const _AttackingInDoorwayVelocity_Y : [i16 ; 4] = [  __AIDV, -__AIDV,       0,       0 ];
+
+    let AttackingInDoorwayVelocity_X = far &_AttackingInDoorwayVelocity_X as far *i16;
+    let AttackingInDoorwayVelocity_Y = far &_AttackingInDoorwayVelocity_Y as far *i16;
+}
+
 
 }
 
