@@ -115,10 +115,10 @@ let FACING_DIRECTION_SHIFT = 3;
 
 
 enum State : u8 {
-    WALKING,
-    ATTACKING,
-    HURT,
-    WALK_THROUGH_DOORWAY,
+    WALKING                 = 0,
+    ATTACKING               = 2,
+    HURT                    = 4,
+    WALK_THROUGH_DOORWAY    = 6,
 };
 
 
@@ -238,44 +238,23 @@ inline func init() {
 //
 // Called once per frame.
 //
-// INPUT: entityId (Y) is always 0
+// REQUIRES: entities.currentEntityId = PLAYER_ENTITY_ID;
 //
 // DB = 0x7e
 #[mem8, idx8]
-func process(entityId : u8 in y) {
+inline func process() {
 
-    a = state as u8;
-    if a == State.ATTACKING as u8 {
-        process__attack();
-    }
-    else if a == State.HURT as u8 {
-        process__hurt();
-    }
-    else if a == State.WALK_THROUGH_DOORWAY as u8 {
-        ^return process__walk_through_doorway();
-    }
-    else {
-        // state == WALKING
-        process__walking();
-    }
-
-    metatiles.move_entity_and_collision_test__unbounded(PLAYER_ENTITY_ID);
-
-    metatiles.process_interactive_tiles__player();
-
-
-    // Update animation
-    a = state as u8;
-    if a == State.ATTACKING as u8 {
-    }
-    else if a == State.HURT as u8 {
-        update_animation__hurt();
-    }
-    else {
-        // state == WALKING
-        update_animation__walking();
-    }
+    x = state as u8;
+    process__state_functions[unaligned x]();
 }
+
+
+const process__state_functions = [
+    process__walking,
+    process__attacking,
+    process__hurt,
+    process__walk_through_doorway,
+];
 
 
 
@@ -312,9 +291,20 @@ func zero_velocity() {
 
 
 
+// Move the player and process any tile collisions and interactive tiles.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func move_player_with_tile_tests() {
+    metatiles.move_entity_and_collision_test__unbounded(PLAYER_ENTITY_ID);
+    metatiles.process_interactive_tiles__player();
+}
+
+
+
 // Add the player's velocity to the player's position (with bounds checking)
 //
-// NOTE: This function will not preform any collision checks.
+// NOTE: This function will not preform any collision checks or interactive tile tests.
 //
 // DB = 0x7e
 #[mem8, idx8]
@@ -825,10 +815,14 @@ func set_state__walking() {
 func process__walking() {
     process_dpad_update_velocity();
 
+    move_player_with_tile_tests();
 
     a = joypad.input_buffers.attack;
     if !zero {
         set_state__attacking();
+    }
+    else {
+        update_animation__walking();
     }
 }
 
@@ -935,8 +929,11 @@ func set_state__attacking() {
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__attack() {
+func process__attacking() {
 
+    move_player_with_tile_tests();
+
+    // Update animation
     (<:animationFrameDelay)--;
     if negative {
         <:animationFrameDelay = a = ATTACK_ANIMATION_FRAME_DELAY - 1;
@@ -1006,6 +1003,10 @@ func _set_state__hurt__enemy_collision(enemyEntityId : u8 in y) {
 // DB = 0x7e
 #[mem8, idx8]
 func process__hurt() {
+
+    move_player_with_tile_tests();
+
+
     // Frozen until `animationFrameDelay` ends
     a = <:animationFrameDelay;
     if !zero {
@@ -1020,13 +1021,6 @@ func process__hurt() {
 
         ^return set_state__walking();
     }
-}
-
-
-
-// DB = 0x7e
-#[mem8, idx8]
-func update_animation__hurt() {
 }
 
 

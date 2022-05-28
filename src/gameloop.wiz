@@ -81,9 +81,8 @@ func run_game {
 
     ^do {
         // Always process player entity first
-        x = 0;
-        entities.currentEntityId = 0;
-        player.process(x);
+        entities.currentEntityId = PLAYER_ENTITY_ID;
+        player.process();
 
         idx16();
         #[mem8, idx16] {
