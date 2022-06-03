@@ -70,11 +70,10 @@ namespace SpriteList {
         var xPos : [u16 ; N_SPRITE_LIST_ELEMENTS];
         var yPos : [u16 ; N_SPRITE_LIST_ELEMENTS];
         var zPos : [u16 ; N_SPRITE_LIST_ELEMENTS];
-        var metaSpriteFrameTable : [u16 ; N_SPRITE_LIST_ELEMENTS];
+        var msFrameAddr : [u16 ; N_SPRITE_LIST_ELEMENTS];
 
-        var _shadowSizeAndMsFrame : [ entities._u8pair ; N_SPRITE_LIST_ELEMENTS];
-        let shadowSize = &_shadowSizeAndMsFrame[0].first as *metasprites.ShadowSize;
-        let metaSpriteFrame = &_shadowSizeAndMsFrame[0].second as *u8;
+        var _shadowSizeAndBlank : [ entities._u8pair ; N_SPRITE_LIST_ELEMENTS];
+        let shadowSize = &_shadowSizeAndBlank[0].first as *metasprites.ShadowSize;
     }
 }
 
@@ -824,8 +823,8 @@ let _activeEntitiesTablePos = zpTmp_byte_0;
                     SpriteList.yPos[unaligned x] = aa = ((&entities.SoA.yPos[0].px as *u16)[unaligned y] & 0xff) + CAMERA_ORIGIN;
                     SpriteList.zPos[unaligned x] = aa = ((&entities.SoA._zPosAndBlank[0].first as *u16)[unaligned y] & 0xff);
                     (&SpriteList.ms_draw_function[0] as *u16)[unaligned x] = aa = entities.SoA.ms_draw_function[unaligned y] as u16;
-                    SpriteList.metaSpriteFrameTable[unaligned x] = aa = entities.SoA.metaSpriteFrameTable[unaligned y];
-                    (&SpriteList._shadowSizeAndMsFrame[0] as *u16)[unaligned x] = aa = (&entities.SoA._shadowSizeAndMsFrame[0] as *u16)[unaligned y];
+                    SpriteList.msFrameAddr[unaligned x] = aa = entities.SoA.msFrameAddr[unaligned y];
+                    (&SpriteList._shadowSizeAndBlank[0] as *u16)[unaligned x] = aa = (&entities.SoA._shadowSizeAndBlank[0] as *u16)[unaligned y];
                 }
                 mem8();
 
@@ -855,8 +854,8 @@ func _sprite_list_set_player_with_offset(sd : ScrollDirection in scrollDirection
         SpriteList.zPos[PLAYER_ID] = aa = ((&entities.SoA._zPosAndBlank[0].first as *u16)[PLAYER_ID] & 0xff);
 
         (&SpriteList.ms_draw_function[0] as *u16)[PLAYER_ID] = aa = entities.SoA.ms_draw_function[PLAYER_ID] as u16;
-        SpriteList.metaSpriteFrameTable[PLAYER_ID] = aa = entities.SoA.metaSpriteFrameTable[PLAYER_ID];
-        (&SpriteList._shadowSizeAndMsFrame[0] as *u16)[PLAYER_ID] = aa = (&entities.SoA._shadowSizeAndMsFrame[0] as *u16)[PLAYER_ID];
+        SpriteList.msFrameAddr[PLAYER_ID] = aa = entities.SoA.msFrameAddr[PLAYER_ID];
+        (&SpriteList._shadowSizeAndBlank[0] as *u16)[PLAYER_ID] = aa = (&entities.SoA._shadowSizeAndBlank[0] as *u16)[PLAYER_ID];
     }
     mem8();
 }
@@ -942,16 +941,10 @@ func draw_sprite_list() {
 
                 metasprites.xPos = aa = SpriteList.xPos[unaligned xx] - camera_x;
                 metasprites.yPos = aa = SpriteList.yPos[unaligned xx] - SpriteList.zPos[unaligned xx] - camera_y;
-
-                // aa = metaSpriteFrame
-                aa = (&SpriteList._shadowSizeAndMsFrame[0].second as *u16)[unaligned xx] & 0xff;
-                // Safe: (aa << 1) will never set carry
-                xx = aa = (aa << 1) +# SpriteList.metaSpriteFrameTable[unaligned xx];
-                yy = aa = metasprites.MetaSpriteFrameTableOffset[unaligned xx];
             }
             mem8();
             #[mem8, idx16] {
-                xx = spriteListIndex;
+                yy = SpriteList.msFrameAddr[unaligned xx];
                 SpriteList.ms_draw_function[unaligned xx](yy, metasprites.xPos, metasprites.yPos);
             }
             mem8_idx8();

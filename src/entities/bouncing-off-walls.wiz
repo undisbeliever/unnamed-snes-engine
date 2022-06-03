@@ -14,10 +14,6 @@ namespace entities {
 namespace bouncing_off_walls {
 
 
-// (animation frames)
-let SoA_animationCounter = SoA.state_0_l;
-
-
 // The speed of the entity after being struck by the player's sword.
 // (index increment by 2 into `set_velocity_after_player_sword_collision` collisionSpeed parameter)
 let SoA_hurtSpeed = SoA.state_0_h;
@@ -28,10 +24,6 @@ let INITIAL_SPEED     = 0x0120;
 
 let FIRST_SWORD_SPEED = base.SwordCollisionSpeed.SLOW;
 let MAX_SWORD_SPEED   = base.SwordCollisionSpeed.FAST_FAST_FAST;
-
-
-let ANIMATION_DELAY = 4;
-let ANIMATION_FRAME_MASK = 0x7;
 
 
 in code {
@@ -69,8 +61,6 @@ func init(entityId : u8 in y, parameter : u8 in x) {
     mem8();
 
     SoA_hurtSpeed[unaligned y] = a = FIRST_SWORD_SPEED - 2;
-
-    SoA.metaSpriteFrame[unaligned y] = a = ms_frames.frame0;
 }
 
 
@@ -118,23 +108,6 @@ func process(entityId : u8 in y) : bool in carry {
         mem8();
     }
 
-
-    // Process animation
-    a = SoA_animationCounter[y];
-    if !zero {
-        a--;
-        SoA_animationCounter[y] = a;
-    }
-    else {
-        SoA_animationCounter[y] = a = ANIMATION_DELAY;
-
-        // Increment animation Frame
-        a = SoA.metaSpriteFrame[y];
-        a++;
-        SoA.metaSpriteFrame[y] = a = a & ANIMATION_FRAME_MASK;
-    }
-
-
     return true;
 }
 
@@ -159,8 +132,10 @@ inline func collided_with_player_hitbox(entityId : u8 in y) {
         SoA_hurtSpeed[y] = a = x;
     }
 
-    // ::SHOULDO adjust velocity based on previous velocity and collisionCentre::
+    // ::SHOULDDO adjust velocity based on previous velocity and collisionCentre::
     base.take_damage_from_player_sword_with_knockback(y, x);
+
+    // ::SHOULDDO speed up MS animation on every 2nd bit::
 }
 
 

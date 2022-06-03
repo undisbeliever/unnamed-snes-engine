@@ -83,6 +83,7 @@ func run_game {
         // Always process player entity first
         entities.currentEntityId = PLAYER_ENTITY_ID;
         player.process();
+        metasprites.process_entity_animation(PLAYER_ENTITY_ID);
 
         idx16();
         #[mem8, idx16] {

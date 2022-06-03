@@ -19,11 +19,6 @@ namespace skeleton {
 let SPEED = 0x0115;
 
 
-let ANIMATION_DELAY = 12;
-let ANIMATION_FRAME_MASK = 0x3;
-
-
-// State must be in the same order as the MetaSprite frames
 enum State : u8 {
     WALK_SOUTH = 0,
     WALK_NORTH = 2,
@@ -33,7 +28,6 @@ enum State : u8 {
 
 
 let SoA_state            = SoA.state_0_l as *State;
-let SoA_animationCounter = SoA.state_0_h;
 
 
 
@@ -127,7 +121,7 @@ func process__walk_south(entityId : u8 in y) : bool in carry {
     // ::TODO check for solid tile 2 tiles below the entity ::
 
 
-    return _update_walk_animation(y);
+    return true;
 }
 
 
@@ -155,7 +149,7 @@ func process__walk_north(entityId : u8 in y) : bool in carry {
     // ::TODO check for solid tile 2 tiles above the entity ::
 
 
-    return _update_walk_animation(y);
+    return true;
 }
 
 
@@ -183,7 +177,7 @@ func process__walk_east(entityId : u8 in y) : bool in carry {
     // ::TODO check for solid tile 2 tiles to the right of the entity ::
 
 
-    return _update_walk_animation(y);
+    return true;
 }
 
 
@@ -211,40 +205,8 @@ func process__walk_west(entityId : u8 in y) : bool in carry {
     // ::TODO check for solid tile 2 tiles to the left of the entity ::
 
 
-    return _update_walk_animation(y);
-}
-
-
-
-
-
-// returns true
-//
-// DB = 0x7e
-#[mem8, idx8]
-func _update_walk_animation(entityId : u8 in y) : bool in carry {
-let _tmp = zpTmp_byte_0;
-
-    a = SoA_animationCounter[y];
-    if !zero {
-        a--;
-        SoA_animationCounter[y] = a;
-    }
-    else {
-        SoA_animationCounter[y] = a = ANIMATION_DELAY;
-
-        // Increment animation Frame
-        a = SoA.metaSpriteFrame[y];
-        a++;
-        _tmp = a = a & ANIMATION_FRAME_MASK;
-
-        SoA.metaSpriteFrame[y] = a = (SoA.metaSpriteFrame[y] & (ANIMATION_FRAME_MASK ^ 0xff)) | _tmp;
-    }
-
     return true;
 }
-
-
 
 
 
@@ -255,9 +217,6 @@ func set_direction_south(entityId : u8 in y) : bool in carry {
 
     SoA_state[x] = State.WALK_SOUTH;
 
-    SoA.metaSpriteFrame[x] = ms_frames.south0;
-    SoA_animationCounter[x] = 0;
-
     mem16();
     #[mem16] {
         SoA.xVelocity[unaligned x] = 0;
@@ -265,7 +224,7 @@ func set_direction_south(entityId : u8 in y) : bool in carry {
     }
     mem8();
 
-    return true;
+    ^return set_ms_animation_and_return_true(y, ms_animations.walk_south);
 }
 
 
@@ -278,9 +237,6 @@ func set_direction_north(entityId : u8 in y) : bool in carry {
     a = State.WALK_NORTH as u8;
     SoA_state[x] = a as State;
 
-    SoA.metaSpriteFrame[x] = a = ms_frames.north0;
-    SoA_animationCounter[x] = 0;
-
     mem16();
     #[mem16] {
         SoA.xVelocity[unaligned x] = 0;
@@ -288,7 +244,7 @@ func set_direction_north(entityId : u8 in y) : bool in carry {
     }
     mem8();
 
-    return true;
+    ^return set_ms_animation_and_return_true(y, ms_animations.walk_north);
 }
 
 
@@ -301,9 +257,6 @@ func set_direction_east(entityId : u8 in y) : bool in carry {
     a = State.WALK_EAST as u8;
     SoA_state[x] = a as State;
 
-    SoA.metaSpriteFrame[x] = a = ms_frames.east0;
-    SoA_animationCounter[x] = 0;
-
     mem16();
     #[mem16] {
         SoA.xVelocity[unaligned x] = aa = SPEED;
@@ -311,7 +264,7 @@ func set_direction_east(entityId : u8 in y) : bool in carry {
     }
     mem8();
 
-    return true;
+    ^return set_ms_animation_and_return_true(y, ms_animations.walk_east);
 }
 
 
@@ -324,9 +277,6 @@ func set_direction_west(entityId : u8 in y) : bool in carry {
     a = State.WALK_WEST as u8;
     SoA_state[x] = a as State;
 
-    SoA.metaSpriteFrame[x] = a = ms_frames.west0;
-    SoA_animationCounter[x] = 0;
-
     mem16();
     #[mem16] {
         SoA.xVelocity[unaligned x] = aa = -SPEED as u16;
@@ -334,7 +284,7 @@ func set_direction_west(entityId : u8 in y) : bool in carry {
     }
     mem8();
 
-    return true;
+    ^return set_ms_animation_and_return_true(y, ms_animations.walk_west);
 }
 
 

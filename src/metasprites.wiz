@@ -4,6 +4,7 @@
 import "memmap";
 import "resources";
 import "common/dma";
+import "common/math";
 import "../wiz/common/snes/snes";
 
 
@@ -34,8 +35,11 @@ struct MsFramesetFormat {
     // func(msFrame : u16 in yy, xPos : u16 in metasprites.xPos, yPos : u16 in metasprites.yPos)
     drawFunction : func,
 
-    // List of pointers to `MsFramesetFormat` entries
+    // List of pointers to `MsDataFormat` entries
     frameTable : *const *const u8,
+
+    // List of pointers to `AnimationDataFormat` entries
+    animationTable : *const *const u8,
 };
 
 // ::HACK manually create accessors to MsFramesetFormat data ::
@@ -46,12 +50,18 @@ namespace MsFsData {
     let tileHitbox      = 0xc10001 as far *u16;
     let drawFunction    = 0xc10003 as far *u16;
     let frameTable      = 0xc10005 as far *u16;
+    let animationTable  = 0xc10007 as far *u16;
 };
 
 
 // MetaSprite Frame Table Data offset in ROM
 // (word addr table)
 let MetaSpriteFrameTableOffset = 0xc10000 as far *u16;
+
+
+// MetaSprite Animation Table Data offset in ROM
+// (word addr table)
+let MetaSpriteAnimationTableOffset = 0xc10000 as far *u16;
 
 
 // MetaSprite Data in ROM
@@ -94,6 +104,50 @@ namespace MsDataFormat {
     let charAttr1 = 0xc1000d as far *u16;
     let charAttr2 = 0xc1000f as far *u16;
     let charAttr3 = 0xc10011 as far *u16;
+}
+
+
+
+// MetaSprite Animation Data in ROM
+namespace AnimationDataFormat {
+
+    // AnimationData is stored in bank c1
+    let _base = 0xc10000;
+
+
+    // Animation delay format.  First byte of an animation.
+    // (index into `metasprites.animations.AnimationDelayTypeFunctions`)
+    let delayType  = (_base + 0) as far *u8;
+
+
+    // Each animation frame is two bytes in size.
+
+        // MetaSprite FrameId to show.
+        //
+        // If this value is `END_OF_LOOPING_ANIMATION_BYTE` or `END_OF_ANIMATION_BYTE`
+        // then the animation is over and there is no `delay` byte
+        //
+        // (element position in MsFramesetFormat.frameTable)
+        let frame       = (_base + 1) as far *u8;
+
+        // Animation delay.
+        //
+        //  * If `delayType` is `frame`, this byte is number of display frames.
+        //  * If `delayType` is `distance_*`, this value is a distance in 4.4 unsigned fixed point.
+        //
+        // (u8 byte or 4.4 unsigned fixed point)
+        let delay       = (_base + 2) as far *u8;
+
+
+    // After the last frame, the Animation Data ends in one of these two bytes.
+    //
+    // If frame is one of these values, then the animation is over.
+    let END_OF_LOOPING_ANIMATION_BYTE = 0xff;
+    let END_OF_ANIMATION_BYTE = 0xfe;
+
+
+    // The shift between a 4.4 unsigned fixed point animation delay byte and a 8:8 unsigned fixed point distance
+    let DISTANCE_DELAY_SHIFT = 4;
 }
 
 
@@ -744,28 +798,529 @@ inline func _draw_entity__inline(entityId : u8 in y) {
     >:yPos = a = a -# 0;
 
 
-    a = entities.SoA.metaSpriteFrame[unaligned y];
+    idx16();
+    #[mem8, idx16] {
+        xx = yy;
+        yy = entities.SoA.msFrameAddr[unaligned xx];
+        entities.SoA.ms_draw_function[unaligned xx](yy, xPos, yPos);
+    }
+    mem8_idx8();
+}
+
+
+
+// MetaSprite Animations
+// ---------------------
+
+
+
+// Initialise the MetaSprite Animation for the player entity.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem16, idx8]
+inline func init_player_metasprite_animation__inline() {
+
+    (&entities.SoA._msAnimationIdAndPfIndex as *u16)[PLAYER_ENTITY_ID] = aa = (animations.NEW_ANIMATION__FUNCTION_ID << 8);
+}
+
+
+
+// Initialise the MetaSprite Animation for an entity.
+//
+// This function MUST be called before the entity's `init` function.
+//
+// NOTE: This function will not populate all of the animation fields,
+//       `init_entity_metasprite_animation__after_init` must be called after entity `init` routine
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem16, idx8]
+inline func init_entity_metasprite_animation__inline(entityId : u8 in y) {
+
+    (&entities.SoA._msAnimationIdAndPfIndex as *u16)[unaligned y] = aa = (animations.NEW_ANIMATION__FUNCTION_ID << 8);
+}
+
+
+
+// Finish initialising an entity's MetaSprite Animation.
+//
+// This function MUST be called AFTER the entity's `init` function.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem16, idx8]
+let init_entity_metasprite_animation__after_init = metasprites.animations._new_animation;
+
+
+
+// Set the entity's MetaSprite animation.
+//
+// NOTE: This function will always restart the animation.
+// NOTE: This function will not immediately change the MetaSprite animation state.
+//
+// KEEP: X and Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+#[fallthrough]
+func set_entity_animation_x(entityId : u8 in y, animationId : u8 in x) {
+    a = x;
+// fallthrough
+}
+
+// Set the entity's MetaSprite animation.
+//
+// NOTE: This function will always restart the animation.
+// NOTE: This function will not immediately change the MetaSprite animation state.
+//
+// KEEP: X and Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_entity_animation(entityId : u8 in y, animationId : u8 in a) {
+    entities.SoA.msAnimationId[unaligned y] = a;
+    entities.SoA.msAnimationProcessFunctionIndex[unaligned y] = a = animations.NEW_ANIMATION__FUNCTION_ID;
+}
+
+
+// Set the entity's MetaSprite animation if entity's `msAnimationId` is not `animationId`.
+//
+// If the entity's `msAnimationId` is equal to `animationId` then the animation is unchanged.
+//
+// NOTE: This function will not immediately change the MetaSprite animation state.
+//
+// KEEP: X and Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_entity_animation_if_changed(entityId : u8 in y, animationId : u8 in a) {
+    if a != entities.SoA.msAnimationId[y] {
+        entities.SoA.msAnimationId[unaligned y] = a;
+        entities.SoA.msAnimationProcessFunctionIndex[unaligned y] = a = metasprites.animations.NEW_ANIMATION__FUNCTION_ID;
+    }
+}
+
+
+
+// Set the entity's MetaSprite animation and return true.
+//
+// NOTE: This function will always restart the animation.
+// NOTE: This function will not immediately change the MetaSprite animation state.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_entity_animation_and_return_true(entityId : u8 in y, animationId : u8 in a) : bool in carry {
+    entities.SoA.msAnimationId[unaligned y] = a;
+    entities.SoA.msAnimationProcessFunctionIndex[unaligned y] = a = metasprites.animations.NEW_ANIMATION__FUNCTION_ID;
+
+    return true;
+}
+
+
+
+// Set the player's MetaSprite animation.
+//
+// NOTE: This function will always restart the animation.
+// NOTE: This function will not immediately change the MetaSprite animation state.
+//
+// KEEP: X and Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_player_animation(animationId : u8 in a) {
+    entities.SoA.msAnimationId[PLAYER_ENTITY_ID] = a;
+    entities.SoA.msAnimationProcessFunctionIndex[PLAYER_ENTITY_ID] = a = metasprites.animations.NEW_ANIMATION__FUNCTION_ID;
+}
+
+
+
+// Set the player's MetaSprite animation if the player's `msAnimationId` is not `animationId`.
+//
+// If the player's `msAnimationId` is equal to `animationId` then the animation is unchanged.
+//
+// NOTE: This function will not immediately change the MetaSprite animation state.
+//
+// KEEP: X and Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_player_animation_if_changed(animationId : u8 in a) {
+    if a != entities.SoA.msAnimationId[PLAYER_ENTITY_ID] {
+        entities.SoA.msAnimationId[PLAYER_ENTITY_ID] = a;
+        entities.SoA.msAnimationProcessFunctionIndex[PLAYER_ENTITY_ID] = a = metasprites.animations.NEW_ANIMATION__FUNCTION_ID;
+    }
+}
+
+
+
+// Stop the entity's MetaSprite animation.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func stop_entity_animation(entityId : u8 in y) {
+    x = y;
+    entities.SoA.msAnimationProcessFunctionIndex[unaligned x] = animations.DISABLED_FUNCTION_ID;
+}
+
+
+
+// Tests if the entity's MetaSprite animation is stopped or ended.
+//
+// Returns true if a non-looping animation ends or `stop_entity_animation()` has been called.
+//
+// KEEP: Y
+// KEEP: X
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func is_entity_animation_over(entityId : u8 in y) : bool in zero {
+    // assumes DISABLED_FUNCTION_ID == 0
+
+    a = entities.SoA.msAnimationProcessFunctionIndex[unaligned y];
+    return zero;
+}
+
+
+
+// Tests if the player's MetaSprite animation is stopped or ended.
+//
+// Returns true if a non-looping animation ends or `stop_entity_animation()` has been called.
+//
+// KEEP: Y
+// KEEP: X
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func is_player_animation_over() : bool in zero {
+    // assumes DISABLED_FUNCTION_ID == 0
+
+    a = entities.SoA.msAnimationProcessFunctionIndex[PLAYER_ENTITY_ID];
+    return zero;
+}
+
+
+
+// Process the entity's MetaSprite animation.
+//
+// This function MUST be called after the entity's process routine.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func process_entity_animation(entityId : u8 in y) {
+    x = entities.SoA.msAnimationProcessFunctionIndex[unaligned y];
+
+    animations.AnimationProcessFunctions[unaligned x](y);
+}
+
+
+namespace animations {
+
+
+// Order MUST match `ANIMATION_DELAY_IDS` in `tools/convert-metasprite.py`
+const AnimationProcessFunctions = [
+    disabled,
+    frame_count,
+    distance_x,
+    distance_y,
+    distance_xy,
+
+    // Unused delay types
+    disabled,
+    disabled,
+    disabled,
+
+    // A special animation process function to setup the animation in memory
+    _new_animation,
+];
+
+let DELAY_TYPE_MASK = 0b00001110;
+
+let FRAME_COUNT__FUNCTION_ID = 2;
+
+let DISABLED_FUNCTION_ID = 0;
+let NEW_ANIMATION__FUNCTION_ID = DELAY_TYPE_MASK + 2;
+
+let entities_SoA_msAnimationCounter_u8 = &<:entities.SoA.msAnimationCounter[0] as *u8;
+
+
+// Animation Process Routine: Start a new animation.
+//
+// This function is called after entity `init` or after the animation
+// has been changed by a previous `set_player_animation` call.
+//
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _new_animation(entityId : u8 in y) {
+    // Assumes all animation state (except `msAnimationId`, `msAnimationTable` and `metaSpriteFrameTable`) is invalid.
+    // This function is part of an entity's init routine.
 
     mem16_idx16();
     #[mem16, idx16] {
+        aa = (entities.SoA.msAnimationId as *u16)[unaligned yy];
+        xx = aa = ((aa & 0xff) << 1) + entities.SoA.msAnimationTable[unaligned yy];
+        aa = MetaSpriteAnimationTableOffset[unaligned xx];
 
-        // Calculate MetaSprite Frame Address
-        aa = aa & 0xff;
+        entities.SoA.msAnimationAddr[unaligned yy] = aa;
+        entities.SoA.msAnimationPos[unaligned yy] = aa;
+        xx = aa;
 
-        // Safe: (aa << 1) will never set carry
-        xx = aa = (aa << 1) +# entities.SoA.metaSpriteFrameTable[unaligned yy];
-        aa = MetaSpriteFrameTableOffset[unaligned xx];
-
-        xx = yy;
-        yy = aa;
-
+        // Calculate metasprite frame address
+        aa = (AnimationDataFormat.frame as far *u16)[unaligned xx];
+        xx = aa = ((aa & 0xff) << 1) +# entities.SoA.metaSpriteFrameTable[unaligned yy];
+        entities.SoA.msFrameAddr[unaligned yy] = aa = MetaSpriteFrameTableOffset[unaligned xx];
 
         mem8();
-        #[mem8, idx16] {
-            entities.SoA.ms_draw_function[unaligned xx](yy, xPos, yPos);
+        #[mem8] {
+            xx = entities.SoA.msAnimationAddr[unaligned yy];
+
+            entities.SoA.msAnimationProcessFunctionIndex[unaligned yy] = a = AnimationDataFormat.delayType[xx] & DELAY_TYPE_MASK;
+
+            if a == FRAME_COUNT__FUNCTION_ID {
+                entities_SoA_msAnimationCounter_u8[unaligned yy] = a = AnimationDataFormat.delay[xx];
+            }
+            else {
+                mem16();
+                #[mem16] {
+                    aa = (AnimationDataFormat.delay as far *u16)[unaligned xx];
+                    entities.SoA.msAnimationCounter[unaligned yy] = aa = (aa & 0xff) <<< AnimationDataFormat.DISTANCE_DELAY_SHIFT;
+                }
+            }
+            // A size is unknown
         }
     }
     mem8_idx8();
+}
+
+
+
+// Animation Process Routine:  Does nothing.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func disabled(entityId : u8 in y) {
+}
+
+
+
+// Animation Process Routine:  Delay byte measures display frames.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func frame_count(entityId : u8 in y) {
+
+    a = entities_SoA_msAnimationCounter_u8[unaligned y];
+    if zero {
+        // NOTE: If you modify this code, you MUST ALSO modify `__distance_animation__return_mem8_idx8()`
+
+        // Advance to the next MetaSprite frame
+        idx16();
+        #[idx16] {
+            xx = entities.SoA.msAnimationPos[unaligned yy];
+            xx++;
+            xx++;
+
+            a = AnimationDataFormat.frame[xx];
+            if a == AnimationDataFormat.END_OF_LOOPING_ANIMATION_BYTE {
+                // Restart MetaSprite animation
+                xx = entities.SoA.msAnimationAddr[unaligned yy];
+            }
+            else if a == AnimationDataFormat.END_OF_ANIMATION_BYTE {
+                // Disable MetaSprite animation and return
+                mem8_idx8();
+                #[mem8, idx8] {
+                    x = y;
+                    entities.SoA.msAnimationProcessFunctionIndex[unaligned x] = DISABLED_FUNCTION_ID;
+                    return;
+                }
+            }
+
+            mem16();
+            #[mem16] {
+                entities.SoA.msAnimationPos[unaligned yy] = aa = xx;
+
+                // Delay must be processed first as calculating `msFrameAddr` clobbers xx.
+                // (wasting 2 cycles on the 16 bit load-store is faster then reloading `msAnimationPos` back into xx later)
+                aa = (AnimationDataFormat.delay as far *u16)[unaligned xx];
+                entities.SoA.msAnimationCounter[unaligned yy] = aa;
+
+                aa = (AnimationDataFormat.frame as far *u16)[unaligned xx];
+                xx = aa = ((aa & 0xff) << 1) +# entities.SoA.metaSpriteFrameTable[unaligned yy];
+                entities.SoA.msFrameAddr[unaligned yy] = aa = MetaSpriteFrameTableOffset[unaligned xx];
+            }
+        }
+        mem8_idx8();
+        return;
+    }
+    else {
+        // msAnimationCounter is non-zero
+        a--;
+        entities_SoA_msAnimationCounter_u8[unaligned y] = a;
+    }
+}
+
+
+
+// Animation Process Routine:  Delay byte measures distance in the X-Axis.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func distance_x(entityId : u8 in y) {
+    mem16();
+    #[mem16] {
+        aa = entities.SoA.xVelocity[unaligned y];
+        if !zero {
+            if !negative {
+                aa = negate16(aa);
+            }
+
+            return __distance_animation__return_mem8_idx8(aa as i16, y);
+        }
+    }
+    mem8_idx8();
+}
+
+
+
+// Animation Process Routine:  Delay byte measures distance in the Y-Axis.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func distance_y(entityId : u8 in y) {
+    mem16();
+    #[mem16] {
+        aa = entities.SoA.yVelocity[unaligned y];
+        if !zero {
+            if !negative {
+                aa = negate16(aa);
+            }
+
+            return __distance_animation__return_mem8_idx8(aa as i16, y);
+        }
+    }
+    mem8_idx8();
+}
+
+
+
+// Animation Process Routine:  Delay byte measures distance in the both X and Y Axises.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func distance_xy(entityId : u8 in y) {
+let _tmp = zpTmp_word_0;
+
+    mem16();
+    #[mem16] {
+        aa = entities.SoA.xVelocity[unaligned y];
+        if !negative {
+            aa = negate16(aa);
+        }
+        _tmp = aa;
+
+        aa = entities.SoA.yVelocity[unaligned y];
+        if !negative {
+            aa = negate16(aa);
+        }
+        aa += _tmp;
+
+        return __distance_animation__return_mem8_idx8(aa as i16, y) if !zero;
+    }
+    mem8_idx8();
+}
+
+
+
+// Process a MetaSprite animation with a distance delay variable.
+//
+// ASSUMES: negativeVelocity is negative and non-zero.
+//
+// KEEP: Y
+//
+// RETURNS with mem8, idx8
+//
+// DB = 0x7e
+#[mem16, idx8]
+func __distance_animation__return_mem8_idx8(negativeVelocity : i16 in aa, entityId : u8 in y) {
+    aa += entities.SoA.msAnimationCounter[unaligned y];
+    if !carry {
+        // NOTE: If you modify this code, you MUST ALSO modify `frame_count()`
+
+        // Advance to the next MetaSprite frame
+        idx16();
+        #[idx16] {
+            xx = entities.SoA.msAnimationPos[unaligned yy];
+            xx++;
+            xx++;
+
+            mem8();
+            #[mem8] {
+                a = AnimationDataFormat.frame[unaligned xx];
+                if a == AnimationDataFormat.END_OF_LOOPING_ANIMATION_BYTE {
+                    // Restart MetaSprite animation
+                    xx = entities.SoA.msAnimationAddr[unaligned yy];
+                }
+                else if a == AnimationDataFormat.END_OF_ANIMATION_BYTE {
+                    // Disable MetaSprite animation and return
+                    mem8_idx8();
+                    #[mem8, idx8] {
+                        x = y;
+                        entities.SoA.msAnimationProcessFunctionIndex[unaligned x] = DISABLED_FUNCTION_ID;
+                        return;
+                    }
+                }
+            }
+
+            mem16();
+            #[mem16] {
+                entities.SoA.msAnimationPos[unaligned yy] = aa = xx;
+
+                // Delay must be processed first as calculating `msFrameAddr` clobbers xx.
+                aa = (AnimationDataFormat.delay as far *u16)[unaligned xx];
+                aa = (aa & 0xff) <<< AnimationDataFormat.DISTANCE_DELAY_SHIFT;
+                entities.SoA.msAnimationCounter[unaligned yy] = aa;
+
+                aa = (AnimationDataFormat.frame as far *u16)[unaligned xx];
+                xx = aa = ((aa & 0xff) << 1) +# entities.SoA.metaSpriteFrameTable[unaligned yy];
+                entities.SoA.msFrameAddr[unaligned yy] = aa = MetaSpriteFrameTableOffset[unaligned xx];
+            }
+        }
+        mem8_idx8();
+        return;
+    }
+    else {
+        // msAnimationCounter did not underflow
+
+        entities.SoA.msAnimationCounter[unaligned y] = aa;
+
+        mem8_idx8();
+        return;
+    }
+}
+
+
 }
 
 

@@ -23,8 +23,6 @@ import "../../gen/cosine-tables";
 let N_INVINCIBILITY_FRAMES = 20;
 
 
-
-
 namespace entities {
 namespace base {
 
@@ -62,6 +60,11 @@ namespace SwordCollisionSpeed {
 
 
 in code {
+
+
+
+// Collision functions
+// ===================
 
 
 
@@ -240,26 +243,12 @@ func process_collisions(entityId : u8 in y) : u8 in y {
     if zero {
         // Only test for a player collision if not in iframe
 
-        // Calculate entity's msFrameAddr
-        // Extend 8 bit metaSpriteFrame to 16 bit AA
-        #[mem16] {
-            // DP = 0
-            aa = direct_page;
-        }
-        a = entities.SoA.metaSpriteFrame[y];
-
-        mem16_idx16();
-        #[mem16, idx16] {
-            // Safe: (aa << 1) will never set carry
-            xx = aa = (aa << 1) +# entities.SoA.metaSpriteFrameTable[unaligned yy];
-            xx = aa = metasprites.MetaSpriteFrameTableOffset[unaligned xx];
-        }
-        mem8();
-
-
+        idx16();
         #[mem8, idx16] {
             // xx = msFrameAddr
             // yy = entityId
+
+            xx = entities.SoA.msFrameAddr[unaligned yy];
 
             carry = __test__entity_hurtbox__player_hitbox(yy, xx);
             if carry {
@@ -557,4 +546,25 @@ let _tmp       = zpTmp_byte_3;
 
 }
 }
+
+
+
+// MetaSprite functions
+// ====================
+
+namespace entities {
+
+import "../metasprites";
+
+let set_ms_animation_x               = metasprites.set_entity_animation_x;
+let set_ms_animation                 = metasprites.set_entity_animation;
+let set_ms_animation_if_changed      = metasprites.set_entity_animation_if_changed;
+let set_ms_animation_and_return_true = metasprites.set_entity_animation_and_return_true;
+
+let stop_ms_animation = metasprites.stop_entity_animation;
+
+let is_ms_animation_over = metasprites.is_entity_animation_over;
+
+}
+
 

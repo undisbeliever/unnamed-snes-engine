@@ -27,7 +27,7 @@ ROM_BANK = 'rodata0'
 
 PatternGrid = namedtuple('PatternGrid', ('tile_count', 'width', 'height', 'data', 'pattern'))
 
-FrameSet = namedtuple('FrameSet', ('name', 'shadow_size', 'tile_hitbox', 'pattern', 'ms_export_order', 'frames'))
+FrameSet = namedtuple('FrameSet', ('name', 'shadow_size', 'tile_hitbox', 'pattern', 'ms_export_order', 'frames', 'animations'))
 
 
 
@@ -350,8 +350,70 @@ def extract_frame(image, pattern, palettes_map, tileset, fs, x, y, x_offset, y_o
 
 
 
+def animation_delay__distance(d):
+    if d < 0.0 or d >= 16.0:
+        raise ValueError(f"Invalid animation frame delay (must be between 0 and 16): { d }")
+    return round(d * 16)
+
+
+ANIMATION_DELAY_FUNCTIONS = {
+    'none':         lambda d : 0,
+    'frame':        lambda d : int(d),
+    'distance_x':   animation_delay__distance,
+    'distance_y':   animation_delay__distance,
+    'distance_xy':  animation_delay__distance,
+}
+
+# NOTE: If you modify this map, also modify the `AnimationProcessFunctions` in `metasprites.wiz`
+ANIMATION_DELAY_IDS = {
+    'none':        0,
+    'frame':       2,
+    'distance_x':  4,
+    'distance_y':  6,
+    'distance_xy': 8,
+}
+
+
+END_OF_LOOPING_ANIMATION_BYTE = 0xff
+END_OF_ANIMATION_BYTE = 0xfe
+
+MAX_FRAME_ID = 0xfc
+
+
+def build_animation_data(ani, get_frame_id):
+    if ani.delay_type == 'none' and len(ani.frames) != 1:
+        raise ValueError("A 'none' delay type can only contain a single animation frame")
+
+    ani_delay_converter = ANIMATION_DELAY_FUNCTIONS[ani.delay_type]
+
+    ani_data = bytearray()
+    ani_data.append(ANIMATION_DELAY_IDS[ani.delay_type])
+
+    if ani.fixed_delay is None:
+        for f, d in zip(ani.frames, ani.frame_delays):
+            ani_data.append(get_frame_id(f))
+            ani_data.append(ani_delay_converter(d))
+    else:
+        d = ani_delay_converter(ani.fixed_delay)
+        for f in ani.frames:
+            ani_data.append(get_frame_id(f))
+            ani_data.append(d)
+
+    if len(ani.frames) == 1 or ani.loop == False:
+        ani_data.append(END_OF_ANIMATION_BYTE)
+    else:
+        ani_data.append(END_OF_LOOPING_ANIMATION_BYTE)
+
+    return ani_data
+
+
+
 def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparent_color, pattern_grids):
     frames = dict()
+    animations = dict()
+
+    exported_frames = list()
+    exported_frame_ids = dict()
 
     if fs.pattern:
         base_pattern = ms_export_orders.patterns[fs.pattern]
@@ -452,11 +514,37 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparen
 
                 frames[frame_name] = extract_frame(block_image, pattern, palettes_map, tiles, fs, x, y, x_offset, y_offset, hitbox, hurtbox)
             except Exception as e:
-                raise Exception(f"Error with { fs.name }, { frame_name }: { e }")
+                raise Exception(f"Error with { fs.name }, frame { frame_name }: { e }")
+
+
+    def get_frame_id(frame_name):
+        if frame_name in exported_frame_ids:
+            return exported_frame_ids[frame_name]
+        else:
+            if frame_name not in frames:
+                raise ValueError(f"Cannot find frame: { frame_name }")
+
+            fid = len(exported_frames)
+            if fid > MAX_FRAME_ID:
+                raise ValueError('Cannot add frame to animation, too many frames')
+
+            exported_frame_ids[frame_name] = fid
+            exported_frames.append(frames[frame_name])
+            return fid
+
+
+    for ani in fs.animations.values():
+        assert ani.name not in animations
+
+        try:
+            animations[ani.name] = build_animation_data(ani, get_frame_id)
+        except Exception as e:
+            raise Exception(f"Error with { fs.name }, animation { ani.name }: { e }")
+
 
     try:
-        export_order = ms_export_orders.frame_lists[fs.ms_export_order]
-        eo_frames = [ frames[f] for f in export_order.frames ]
+        export_order = ms_export_orders.animation_lists[fs.ms_export_order]
+        eo_animations = [ animations[a] for a in export_order.animations ]
     except Exception as e:
         raise Exception(f"Error with { fs.name }: { e }")
 
@@ -467,7 +555,16 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparen
         pattern_name = "dynamic_pattern"
 
 
-    return FrameSet(fs.name, shadow_size, tile_hitbox, pattern_name, fs.ms_export_order, eo_frames)
+    unused_frames = frames.keys() - exported_frame_ids.keys()
+    if unused_frames:
+        print(f"WARNING: Unused MetaSprite frames in { fs.name }: { unused_frames }")
+
+    unused_animations = fs.animations.keys() - export_order.animations
+    if unused_animations:
+        print(f"WARNING: Unused MetaSprite animations in { fs.name }: { unused_animations }")
+
+
+    return FrameSet(fs.name, shadow_size, tile_hitbox, pattern_name, fs.ms_export_order, exported_frames, eo_animations)
 
 
 
@@ -532,12 +629,17 @@ namespace ms_framesets {
                 out.write(f"    shadowSize = metasprites.ShadowSize.{ fs.shadow_size },\n")
                 out.write(f"    tileHitbox = [ { to_csv(fs.tile_hitbox) } ],\n")
                 out.write(f"    drawFunction = metasprites.drawing_functions.{ fs.pattern } as func,\n")
-                out.write(f"    frameTable = @[\n")
 
+                out.write(f"    frameTable = @[\n")
                 for frame_data in fs.frames:
                     out.write(f"      @[ { frame_data[0] }u8, { to_csv(frame_data[1:]) } ],\n")
+                out.write( '    ],\n')
 
+                out.write(f"    animationTable = @[\n")
+                for animation_data in fs.animations:
+                    out.write(f"      @[ { animation_data[0] }u8, { to_csv(animation_data[1:]) } ],\n")
                 out.write( '    ]\n')
+
                 out.write( '  };\n')
 
             else:
@@ -547,12 +649,17 @@ namespace ms_framesets {
                 out.write(f"    let shadowSize = metasprites.ShadowSize.{ fs.shadow_size };\n")
                 out.write(f"    let tileHitbox = [ { to_csv(fs.tile_hitbox) } ];\n")
                 out.write(f"    let drawFunction = metasprites.drawing_functions.{ fs.pattern };\n")
-                out.write(f"    const frameTable : [*const u8] = [\n")
 
+                out.write(f"    const frameTable : [*const u8] = [\n")
                 for frame_data in fs.frames:
                     out.write(f"      @[ { frame_data[0] }u8, { to_csv(frame_data[1:]) } ],\n")
-
                 out.write( '    ];\n')
+
+                out.write(f"    const animationTable : [*const u8] = [\n")
+                for animation_data in fs.animations:
+                    out.write(f"      @[ { animation_data[0] }u8, { to_csv(animation_data[1:]) } ],\n")
+                out.write( '    ];\n')
+
                 out.write( '  }\n')
 
 

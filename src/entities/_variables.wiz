@@ -122,20 +122,52 @@ namespace entities {
             let zPos = &_zPosAndBlank[0].first as *u8;
 
 
+            // ------------------------------------------------------------------------------------
+            // IMPORTANT NOTE: MetaSprite variables should not be directly modified by entity code.
+            //                 Please use the provided functions instead.
+            // ------------------------------------------------------------------------------------
+
+            var _msAnimationIdAndPfIndex : [_u8pair ; N_ENTITIES];
+
+            // The id of the MetaSprite animation.
+            // NOTE: This variable might not be the current animation.
+            let msAnimationId = &_msAnimationIdAndPfIndex[0].first as *u8;
+
+            // Index into the MetaSprite animation process function table.
+            //
+            // (byte index into function table)
+            let msAnimationProcessFunctionIndex = &_msAnimationIdAndPfIndex[0].second as *u8;
+
             // MetaSprite frame table address.
             // Points to a addr table of `metasprites.MsDataFormat` data structure
             var metaSpriteFrameTable : [u16 ; N_ENTITIES];
 
+            // MetaSprite animation table address.
+            // Points to a addr table of `metasprites.AnimationDataFormat` data structure
+            var msAnimationTable : [u16 ; N_ENTITIES];
 
-            var _shadowSizeAndMsFrame : [ _u8pair ; N_ENTITIES];
+            // Address of the start of the current MetaSprite animation.
+            // (word address pointing to `metasprites.AnimationDataFormat` data)
+            var msAnimationAddr : [u16 ; N_ENTITIES];
+
+            // Current position within the MetaSprite animation
+            // (word address pointing into the middle of `metasprites.AnimationDataFormat` data)
+            var msAnimationPos : [u16 ; N_ENTITIES];
+
+            // Address of the current MetaSprite Frame.
+            // (word address pointing to a `metasprites.MsDataFormat` data structure)
+            var msFrameAddr : [u16 ; N_ENTITIES];
+
+            // Counter value until the next animation frame.
+            // Data format depends on the animation's process function.
+            var msAnimationCounter : [u16 ; N_ENTITIES];
+
+
+
+            var _shadowSizeAndBlank : [ _u8pair ; N_ENTITIES];
 
             // The size of the shadow underneath the entity
-            let shadowSize = &_shadowSizeAndMsFrame[0].first as *metasprites.ShadowSize;
-
-            // Current MetaSprite frame.
-            //
-            // (byte)
-            let metaSpriteFrame = &_shadowSizeAndMsFrame[0].second as *u8;
+            let shadowSize = &_shadowSizeAndBlank[0].first as *metasprites.ShadowSize;
 
 
             // Signed 16 bit X velocity

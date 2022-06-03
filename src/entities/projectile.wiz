@@ -54,7 +54,7 @@ func init(entityId : u8 in y, parameter : u8 in x) {
     }
     mem8();
 
-    SoA.metaSpriteFrame[unaligned y] = a = x;
+    ^return set_ms_animation_x(y, x);
 }
 
 

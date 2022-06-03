@@ -4,6 +4,7 @@
 import "../memmap";
 
 import "_variables";
+import "_base";
 import "projectile";
 
 import "../player";
@@ -41,7 +42,7 @@ let process = entities.projectile.process;
 #[mem8, idx8]
 func init(entityId : u8 in y, parameter : u8 in x) {
 
-    SoA.metaSpriteFrame[unaligned y] = a = x;
+    set_ms_animation_x(y, x);
 
     mem16();
     #[mem16] {

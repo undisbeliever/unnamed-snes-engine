@@ -25,9 +25,9 @@ let MIN_CHANGE_DIRECTION_DELAY = 90;
 let CHANNGE_DIRECTION_DELAY_RANDOM_MASK = 0x7f;
 
 
-let ANIMATION_DELAY = 13;
-let ANIMATION_FRAME_MASK = 0x3;
-let CRAWL_ANIMATION_FRAME_SHIFT = 2;
+let CRAWL_MS_ANIMATION_OFFSET   = 0;
+let HURT_MS_ANIMATION_OFFSET    = ms_animations.hurt_left;
+
 
 let HURT_KNOCKBACK_TIME_IN_FRAMES = 30;
 let KNOCKBACK_POWER = base.SwordCollisionSpeed.MEDIUM; // 4x CRAWL_SPEED (0x0200)
@@ -52,9 +52,8 @@ enum State : u8 {
 let SoA_state            = SoA.state_0_l as *State;
 let SoA_direction        = SoA.state_0_h as *Direction;
 
-let SoA_animationCounter = SoA.state_1_l;
-
-let SoA_changeDirectionTimer = SoA.state_2_l;
+let SoA_changeDirectionTimer = SoA.state_1_l;
+let SoA_hurtTimer            = SoA.state_1_h;
 
 
 
@@ -73,7 +72,7 @@ func init(entityId : u8 in y, parameter : u8 in x) {
     if a >= 4 {
         a = rng.random();
     }
-    set_direction(y, a);
+    set_direction__crawling(y, a);
 
     SoA_changeDirectionTimer[y] = a = STARTING_CHANGE_DIRECTION_DELAY;
 
@@ -150,7 +149,7 @@ let _tmp = zpTmp_byte_0;
             // Collided with wall (in the direction of movement)
             // 180 degree turn
             a = (SoA_direction[y] as u8) ^ 1;
-            return set_direction(y, a);
+            return set_direction__crawling(y, a);
         }
     }
 
@@ -168,25 +167,7 @@ let _tmp = zpTmp_byte_0;
         SoA_changeDirectionTimer[y] = a;
 
         a = rng.random();
-        return set_direction(y, a);
-    }
-
-
-    // Update crawl animation
-    a = SoA_animationCounter[y];
-    if !zero {
-        a--;
-        SoA_animationCounter[y] = a;
-    }
-    else {
-        SoA_animationCounter[y] = a = ANIMATION_DELAY;
-
-        // Increment animation Frame
-        a = SoA.metaSpriteFrame[y];
-        a++;
-        _tmp = a = a & ANIMATION_FRAME_MASK;
-
-        SoA.metaSpriteFrame[y] = a = (SoA.metaSpriteFrame[y] & (ANIMATION_FRAME_MASK ^ 0xff)) | _tmp;
+        return set_direction__crawling(y, a);
     }
 
     return true;
@@ -194,9 +175,11 @@ let _tmp = zpTmp_byte_0;
 
 
 
+// ASSUMES: in CRAWL state
+//
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction(entityId : u8 in y, direction : u8 in a) : bool in carry {
+func set_direction__crawling(entityId : u8 in y, direction : u8 in a) : bool in carry {
 
     // Do not set `changeDirectionTimer` in this function.
     // Doing so can cause the slime to get stuck in tight corridors
@@ -207,10 +190,11 @@ func set_direction(entityId : u8 in y, direction : u8 in a) : bool in carry {
 
     SoA_direction[y] = a as Direction;
 
-    x = a = a <<< 1;
+    // assumes CRAWL_MS_ANIMATION_OFFSET == 0
+    set_ms_animation_if_changed(y, a);
 
-    SoA.metaSpriteFrame[y] = a = a <<< (CRAWL_ANIMATION_FRAME_SHIFT - 1);
-    SoA_animationCounter[y] = a = 0;
+
+    x = a = SoA_direction[y] as u8 <<< 1;
 
     mem16();
     #[mem16] {
@@ -237,8 +221,10 @@ func set_state__hurt(entityId : u8 in y) {
     SoA_state[y] = a as State;
 
     a = HURT_KNOCKBACK_TIME_IN_FRAMES;
-    SoA_animationCounter[y] = a;
+    SoA_hurtTimer[y] = a;
     SoA.iframeCounter[y] = a;
+
+    set_ms_animation(y, (SoA.msAnimationId[y] & DIRECTION_MASK) | HURT_MS_ANIMATION_OFFSET);
 
     ^return base.take_damage_from_player_sword_with_knockback(y, KNOCKBACK_POWER);
 }
@@ -249,10 +235,10 @@ func set_state__hurt(entityId : u8 in y) {
 #[mem8, idx8]
 func process__hurt(entityId : u8 in y) : bool in carry {
 
-    a = SoA_animationCounter[y];
+    a = SoA_hurtTimer[y];
     if !zero {
         a--;
-        SoA_animationCounter[y] = a;
+        SoA_hurtTimer[y] = a;
     }
     else {
         ^return set_state__crawl(y);

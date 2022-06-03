@@ -57,6 +57,67 @@
       "attack_west1":   " 4 10   12  8",
       "attack_west2":   " 1 14   15  8",
       "attack_west3":   " 1 14   15  8"
+    },
+
+    "animations": {
+      "walk_north": {
+         "delay-type": "distance_y",
+         "frames": [ "north0", 9.5, "north1", 9.5, "north2", 9.5, "north3", 9.5 ]
+      },
+      "walk_south": {
+         "delay-type": "distance_y",
+         "frames": [ "south0", 9.5, "south1", 9.5, "south2", 9.5, "south3", 9.5 ]
+      },
+      "walk_east": {
+         "delay-type": "distance_x",
+         "frames": [ "east0", 9.5, "east1", 9.5, "east2", 9.5, "east3", 9.5 ]
+      },
+      "walk_west": {
+         "delay-type": "distance_x",
+         "frames": [ "west0", 9.5, "west1", 9.5, "west2", 9.5, "west3", 9.5 ]
+      },
+
+      "attack_north": {
+         "delay-type": "frame",
+         "loop": false,
+         "frames": [ "attack_north0", 3, "attack_north1", 3, "attack_north2", 3, "attack_north3", 3 ]
+      },
+      "attack_south": {
+         "delay-type": "frame",
+         "loop": false,
+         "frames": [ "attack_south0", 3, "attack_south1", 3, "attack_south2", 3, "attack_south3", 3 ]
+      },
+      "attack_east": {
+         "delay-type": "frame",
+         "loop": false,
+         "frames": [ "attack_east0", 3, "attack_east1", 3, "attack_east2", 3, "attack_east3", 3 ]
+      },
+      "attack_west": {
+         "delay-type": "frame",
+         "loop": false,
+         "frames": [ "attack_west0", 3, "attack_west1", 3, "attack_west2", 3, "attack_west3", 3 ]
+      },
+
+      "hurt_north": {
+         "delay-type": "frame",
+         "loop": false,
+         "frames": [ "north0", 6 ]
+      },
+      "hurt_south": {
+         "delay-type": "frame",
+         "loop": false,
+         "frames": [ "south0", 6 ]
+      },
+      "hurt_east": {
+         "delay-type": "frame",
+         "loop": false,
+         "frames": [ "east0", 6 ]
+      },
+      "hurt_west": {
+         "delay-type": "frame",
+         "loop": false,
+         "frames": [ "west0", 6 ]
+      }
     }
   },
   {
@@ -84,7 +145,16 @@
 
         "frames": [ "collision0", "collision1", "collision2" ]
       }
-    ]
+    ],
+
+    "animations": {
+      "animation": {
+        "loop": false,
+        "delay-type": "frame",
+        "fixed-delay": 6,
+        "frames": [ "collision0", "collision1", "collision2" ]
+      }
+    }
   },
   {
     "name": "Bomb",
@@ -112,7 +182,22 @@
 
         "frames": [ "frame0", "frame1" ]
       }
-    ]
+    ],
+
+    "animations": {
+      "stationary": {
+        "loop": false,
+        "delay-type": "frame",
+        "fixed-delay": 0,
+        "frames": [ "frame0" ]
+      },
+      "active": {
+        "loop": true,
+        "delay-type": "frame",
+        "fixed-delay": 40,
+        "frames": [ "frame0", "frame1" ]
+      }
+    }
   },
   {
     "name": "Bolt",
@@ -164,6 +249,33 @@
       "south":  " 7  6    3 10",
       "east":   " 6  7   10  3",
       "west":   " 0  7   10  3"
+    },
+
+    "animations": {
+      "north": {
+        "loop": false,
+        "delay-type": "frame",
+        "fixed-delay": 0,
+        "frames": [ "north" ]
+      },
+      "south": {
+        "loop": false,
+        "delay-type": "frame",
+        "fixed-delay": 0,
+        "frames": [ "south" ]
+      },
+      "east": {
+        "loop": false,
+        "delay-type": "frame",
+        "fixed-delay": 0,
+        "frames": [ "east" ]
+      },
+      "west": {
+        "loop": false,
+        "delay-type": "frame",
+        "fixed-delay": 0,
+        "frames": [ "west" ]
+      }
     }
   },
   {
@@ -216,6 +328,33 @@
       "south":  " 5  8    6  8",
       "east":   " 8  5    8  6",
       "west":   " 0  5    8  6"
+    },
+
+    "animations": {
+      "north": {
+        "loop": false,
+        "delay-type": "frame",
+        "fixed-delay": 0,
+        "frames": [ "north" ]
+      },
+      "south": {
+        "loop": false,
+        "delay-type": "frame",
+        "fixed-delay": 0,
+        "frames": [ "south" ]
+      },
+      "east": {
+        "loop": false,
+        "delay-type": "frame",
+        "fixed-delay": 0,
+        "frames": [ "east" ]
+      },
+      "west": {
+        "loop": false,
+        "delay-type": "frame",
+        "fixed-delay": 0,
+        "frames": [ "west" ]
+      }
     }
   }
 ]

@@ -61,6 +61,27 @@ def optional_int(v):
         return None
 
 
+def check_bool(v):
+    if v is None:
+        return False
+
+    if isinstance(v,str):
+        if v == '0':
+            return False
+
+        if v == '1':
+            return True
+
+        raise ValueError(f"Invalid bool value: Expected \"1\" or \"0\": { v }")
+
+    return bool(v)
+
+
+def check_float(v):
+    if not isinstance(v, float) and not isinstance(v, int):
+        raise ValueError(f"Invalid float value: { v }")
+    return v
+
 
 
 
@@ -148,10 +169,10 @@ def load_entities_json(filename):
 # ms-export-order.json
 # ====================
 
-MsPatternObject = namedtuple('MsPatternObject', ('xpos', 'ypos', 'size'))
-MsPattern       = namedtuple('MsPattern', ('name', 'id', 'objects'))
-MsFrameOrder    = namedtuple('MsFrameOrder', ('name', 'frames'))
-MsExportOrder   = namedtuple('MsExportOrder', ('patterns', 'shadow_sizes', 'frame_lists'))
+MsPatternObject         = namedtuple('MsPatternObject', ('xpos', 'ypos', 'size'))
+MsPattern               = namedtuple('MsPattern', ('name', 'id', 'objects'))
+MsAnimationExportOrder  = namedtuple('MsAnimationExportOrder', ('name', 'animations'))
+MsExportOrder           = namedtuple('MsExportOrder', ('patterns', 'shadow_sizes', 'animation_lists'))
 
 
 def _load_pattern_objects(json_list):
@@ -199,19 +220,19 @@ def load_ms_export_order_json(filename):
         raise ValueError('Too many MetaSprite patterns')
 
 
-    frame_lists = dict()
-    for name, m in mseo_input['frame_lists'].items():
-        eo = MsFrameOrder(
+    animation_lists = OrderedDict()
+    for name, al in mseo_input['animation_lists'].items():
+        eo = MsAnimationExportOrder(
                 name = check_name(name),
-                frames = check_name_list(m['frames']),
+                animations = check_name_list(al),
         )
 
-        if eo.name in frame_lists:
+        if eo.name in animation_lists:
             raise ValueError(f"Duplicate MetaSprite Export Order Name: { eo.name }")
-        frame_lists[eo.name] = eo
+        animation_lists[eo.name] = eo
 
 
-    return MsExportOrder(patterns=patterns, shadow_sizes=shadow_sizes, frame_lists=frame_lists)
+    return MsExportOrder(patterns=patterns, shadow_sizes=shadow_sizes, animation_lists=animation_lists)
 
 
 
@@ -264,8 +285,12 @@ MsSpritesheet = namedtuple('MsSpritesheet', ('name', 'palette', 'first_tile', 'e
 MsFrameset = namedtuple('MsFrameset', ('name', 'source', 'frame_width', 'frame_height', 'x_origin', 'y_origin',
                                        'shadow_size', 'tilehitbox', 'default_hitbox', 'default_hurtbox',
                                        'pattern', 'ms_export_order', 'order', 'blocks',
-                                       'hitbox_overrides', 'hurtbox_overrides'))
+                                       'hitbox_overrides', 'hurtbox_overrides', 'animations'))
 MsBlock = namedtuple('MsBlock', ('pattern', 'start', 'x', 'y', 'flip', 'frames', 'default_hitbox', 'default_hurtbox'))
+
+# fixed_delay is optional
+# if fixed_delay is None, frames contains an interleaved list of `frame_name` and `frame_delay`
+MsAnimation = namedtuple('MsAnimation', ('name', 'loop', 'delay_type', 'fixed_delay', 'frames', 'frame_delays'))
 
 
 TileHitbox = namedtuple('TileHitbox', ('half_width', 'half_height'))
@@ -279,6 +304,24 @@ def __read_tilehitbox(s):
     if len(v) != 2:
         raise ValueError('Error: Expected a string containing two integers (tilehitbox)')
     return TileHitbox(int(v[0]), int(v[1]))
+
+
+
+def __read_animation_frames__no_fixed_delay(l):
+    if not isinstance(l, list):
+        raise ValueError('ERROR: Expected a list (animation frame list)')
+    if len(l) % 2 != 0:
+        raise ValueError('ERROR: Expected a list of `frame, delay` (animation frame list)')
+
+    # off indexes
+    frames = check_name_list(l[0::2])
+    frame_delays = l[1::2]
+
+    for i in frame_delays:
+        if not isinstance(i, float) and not isinstance(i, int):
+            raise ValueError('Error: Expected a float containing the delay time (animation frames list, even indexes)')
+
+    return frames, frame_delays
 
 
 
@@ -356,6 +399,37 @@ def __load_ms_blocks(json_input, fs_pattern, fs_default_hitbox, fs_default_hurtb
 
 
 
+def __load_ms_animations(json_input):
+    animations = OrderedDict()
+
+    for name, a in json_input.items():
+        name = check_name(name)
+
+        if name in animations:
+            raise ValueError(f"Duplicate MS animation name: { name }")
+
+        if 'fixed-delay' in a:
+            fixed_delay = check_float(a['fixed-delay'])
+            frames = check_name_list(a['frames'])
+            frame_delays = None
+        else:
+            fixed_delay = None
+            frames, frame_delays = __read_animation_frames__no_fixed_delay(a['frames'])
+
+
+        animations[name] = MsAnimation(
+                name = name,
+                loop = check_bool(a.get('loop', True)),
+                delay_type = check_name(a['delay-type']),
+                fixed_delay = fixed_delay,
+                frames = frames,
+                frame_delays = frame_delays,
+        )
+
+    return animations
+
+
+
 def __load_ms_framesets(json_input):
     framesets = OrderedDict()
 
@@ -381,6 +455,7 @@ def __load_ms_framesets(json_input):
                 blocks = __load_ms_blocks(f['blocks'], fs_pattern, fs_default_hitbox, fs_default_hurtbox),
                 hitbox_overrides = __load_aabb_overrides(f.get('hitboxes')),
                 hurtbox_overrides = __load_aabb_overrides(f.get('hurtboxes')),
+                animations = __load_ms_animations(f['animations']),
         )
 
         if fs.name in framesets:

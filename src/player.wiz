@@ -22,7 +22,13 @@ namespace player {
 
 let ms_draw_function = ms_framesets.common.Player.drawFunction;
 let ms_frame_table = ms_framesets.common.Player.frameTable;
+let ms_animation_table = ms_framesets.common.Player.animationTable;
 
+
+
+let _set_ms_animation = metasprites.set_player_animation;
+let _set_ms_animation_if_changed = metasprites.set_player_animation_if_changed;
+let _is_ms_animation_over = metasprites.is_player_animation_over;
 
 
 let INITIAL_SWORD_ATTACK_POWER = 2;
@@ -50,18 +56,7 @@ let DOORWAY_DIAGONAL_ALT_VELOCITY  = 0x00D0;
 
 // Ensures player cannot spam attack inside a doorway and remain unhurt.
 // (8:8 unsigned fixed point)
-let ATTACKING_IN_DOORWAY_VELOCITY  = 0x0110 / (N_ATTACK_FRAMES * ATTACK_ANIMATION_FRAME_DELAY);
-
-
-// Pixels the player is to transverse before incrementing `animationFrame`
-// (8:8 unsigned fixed point)
-let WALK_ANIMATION_FRAME_DISTANCE = 0x0980;
-
-let ATTACK_ANIMATION_FRAME_DELAY = 3;
-
-
-// (frames)
-let HURT_STATE_DURATION             = 6;
+let ATTACKING_IN_DOORWAY_VELOCITY  = 0x0110 / 12;
 
 
 // Number of iframes to give player after rolling back a room transition.
@@ -76,15 +71,11 @@ let N_IFRAMES_AFTER_HURT_PUSHBACK   = 3;
 let N_IFRAMES_AFTER_ATTACKED = 30;
 
 
+// ::TODO draw hurt animation ::
 
-let N_WALK_FRAMES           = 4;
-
-let FIRST_ATTACK_FRAME      = 4;
-let N_ATTACK_FRAMES         = 4;
-
-
-// ::TODO draw hurt frame ::
-let HURT_ANIMATION_FRAME    = 0;
+let WALKING_MS_ANIMATION_OFFSET     = 0;
+let ATTACKING_MS_ANIMATION_OFFSET   = 4;
+let HURT_MS_ANIMATION_OFFSET        = 8;
 
 
 
@@ -106,7 +97,6 @@ let TILE_HITBOX_HALF_HEIGHT = 3;
 
 
 // The direction the player is facing
-// (used to calculate `metaSpriteFrame`)
 enum FacingDirection : u8 {
     DOWN,
     UP,
@@ -162,7 +152,6 @@ let tileHitbox_halfHeight = entities.SoA.tileHitbox_halfHeight[0];
 let shadowSize = entities.SoA.shadowSize[0];
 
 let metaSpriteFrameTable = entities.SoA.metaSpriteFrameTable[0];
-let metaSpriteFrame = entities.SoA.metaSpriteFrame[0];
 
 let movementState = entities.SoA.movementState[0];
 let iframeCounter = entities.SoA.iframeCounter[0];
@@ -177,13 +166,6 @@ let visionB = entities.SoA.visionB[0];
 
 let state                 = <:entities.SoA.state_0[0];
 let facingDirection       = >:entities.SoA.state_0[0];
-
-// Current animation frame
-let animationFrame        = <:entities.SoA.state_1[0];
-
-// Timer used to delay the next animation frame
-// (0:8:8 fixed point)
-let animationFrameDelay = entities.SoA.state_2[0];
 
 
 
@@ -233,8 +215,6 @@ inline func init() {
 
 
     set_state__walking();
-
-    update_metasprite_frame();
 }
 
 
@@ -367,22 +347,7 @@ inline func set_iframes_after_room_transition_rollback() {
 // DB = 0x7e
 #[mem8, idx16]
 inline func update_collision_boxes__inline() {
-    // Extend 8 bit metaSpriteFrame to 16 bit AA
-    #[mem16] {
-        // DP = 0
-        aa = direct_page;
-    }
-    a = metaSpriteFrame;
-
-    mem16_idx16();
-    #[mem16, idx16] {
-        // Safe: (aa << 1) will never set carry
-        xx = aa = (aa << 1) +# metaSpriteFrameTable;
-        xx = aa = metasprites.MetaSpriteFrameTableOffset[unaligned xx];
-    }
-    mem8();
-
-    // xx = msFrameAddr
+    xx = entities.SoA.msFrameAddr[PLAYER_ENTITY_ID];
 
     _update_player_hitbox(xx);
     _update_player_hurtbox(xx);
@@ -806,12 +771,6 @@ func increment_y_velocity() {
 #[mem8, idx8]
 func set_state__walking() {
     state = State.WALKING as u8;
-
-
-    animationFrame = 0;
-
-    <:animationFrameDelay = 0;
-    >:animationFrameDelay = 0;
 }
 
 
@@ -828,86 +787,9 @@ func process__walking() {
         set_state__attacking();
     }
     else {
-        update_animation__walking();
+        // ASSUMES WALKING_MS_ANIMATION_OFFSET == 0
+        ^return _set_ms_animation_if_changed(facingDirection);
     }
-}
-
-
-
-// Update animation frame for WALKING state.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func update_animation__walking() {
-
-let _tmp = zpTmp_word_0;
-
-    mem16();
-    #[mem16] {
-
-        // aa = max(abs(xVelocity), abs(yVelocity))
-        {
-            aa = xVelocity;
-            if negative {
-                // negate
-                aa ^= 0xffff;
-                aa++;
-            }
-            _tmp = aa;
-
-            aa = yVelocity;
-            if negative {
-                // negate
-                aa ^= 0xffff;
-                aa++;
-            }
-
-            if aa < _tmp {
-                aa = _tmp;
-            }
-        }
-
-        if aa == 0 {
-            // No movement: force standing frame
-
-            animationFrame = y = 0;
-            animationFrameDelay = 0;
-        }
-        else {
-            // Movement
-
-            aa += animationFrameDelay;
-            if aa >= WALK_ANIMATION_FRAME_DISTANCE {
-                aa = 0;
-
-                // increment animationFrame (with wrapping)
-                y = animationFrame;
-                y++;
-                if y >= N_WALK_FRAMES {
-                    y = 0;
-                }
-                animationFrame = y;
-            }
-
-            animationFrameDelay = aa;
-        }
-    }
-    mem8();
-
-    return update_metasprite_frame();
-}
-
-
-
-// Calculate metaSpriteFrame value
-//
-// DB = 0x7e
-#[mem8, idx8]
-func update_metasprite_frame() {
-
-    a = ((facingDirection as u8) <<< FACING_DIRECTION_SHIFT) | animationFrame;
-
-    metaSpriteFrame = a;
 }
 
 
@@ -927,8 +809,7 @@ func set_state__attacking() {
     <:yVelocity = 0;
     >:yVelocity = 0;
 
-    animationFrame = a = FIRST_ATTACK_FRAME;
-    <:animationFrameDelay = a = ATTACK_ANIMATION_FRAME_DELAY - 1;
+    ^return _set_ms_animation(facingDirection | ATTACKING_MS_ANIMATION_OFFSET);
 }
 
 
@@ -939,20 +820,10 @@ func process__attacking() {
 
     move_player_with_tile_tests();
 
-    // Update animation
-    (<:animationFrameDelay)--;
-    if negative {
-        <:animationFrameDelay = a = ATTACK_ANIMATION_FRAME_DELAY - 1;
-
-        a = animationFrame;
-        a++;
-        if a == FIRST_ATTACK_FRAME + N_ATTACK_FRAMES {
-            ^return set_state__walking();
-        }
-        animationFrame = a;
+    zero = _is_ms_animation_over();
+    if zero {
+        return set_state__walking();
     }
-
-    update_metasprite_frame();
 }
 
 
@@ -997,11 +868,7 @@ func _set_state__hurt__enemy_collision(enemyEntityId : u8 in y) {
 
     iframeCounter = a = N_IFRAMES_AFTER_ATTACKED;
 
-    <:animationFrameDelay = a = HURT_STATE_DURATION;
-
-
-    animationFrame = a = HURT_ANIMATION_FRAME;
-    ^return update_metasprite_frame();
+    ^return _set_ms_animation(facingDirection | HURT_MS_ANIMATION_OFFSET);
 }
 
 
@@ -1012,19 +879,9 @@ func process__hurt() {
 
     move_player_with_tile_tests();
 
-
-    // Frozen until `animationFrameDelay` ends
-    a = <:animationFrameDelay;
-    if !zero {
-        a--;
-        <:animationFrameDelay = a;
-    }
-    else {
-        a = iframeCounter;
-        if zero {
-            iframeCounter = a = N_IFRAMES_AFTER_HURT_PUSHBACK;
-        }
-
+    // Frozen until animation ends
+    zero = _is_ms_animation_over();
+    if zero {
         ^return set_state__walking();
     }
 }
@@ -1068,6 +925,9 @@ inline func set_state__walk_through_doorway__inline(direction : metatiles.Collis
 #[mem8, idx8]
 inline func set_state__walk_through_doorway__after_attacking_in_doorway() {
     state = a = State.WALK_THROUGH_DOORWAY as u8;
+
+    // ASSUMES WALKING_MS_ANIMATION_OFFSET == 0
+    _set_ms_animation(facingDirection);
 }
 
 
@@ -1277,7 +1137,8 @@ let _mainAxisOffset = zpTmp_byte_0;
     goto set_state__attacking_in_doorway if !zero;
 
 
-    ^return update_animation__walking();
+    // ASSUMES WALKING_MS_ANIMATION_OFFSET == 0
+    ^return _set_ms_animation_if_changed(facingDirection);
 }
 
 
@@ -1290,10 +1151,6 @@ let _mainAxisOffset = zpTmp_byte_0;
 #[mem8, idx8]
 func set_state__attacking_in_doorway() {
     state = a = State.ATTACKING_IN_DOORWAY as u8;
-
-    animationFrame = a = FIRST_ATTACK_FRAME;
-    <:animationFrameDelay = a = ATTACK_ANIMATION_FRAME_DELAY - 1;
-
 
     // Player moves forward a bit when attacking.
     //
@@ -1308,6 +1165,8 @@ func set_state__attacking_in_doorway() {
         yVelocity = aa = AttackingInDoorwayVelocity_Y[unaligned x] as u16;
     }
     mem8_idx8();
+
+    ^return _set_ms_animation(facingDirection | ATTACKING_MS_ANIMATION_OFFSET);
 }
 
 
@@ -1318,20 +1177,11 @@ func process__attacking_in_doorway() {
 
     add_velocity_to_positon_without_collsion_checks();
 
-    // Update animation
-    (<:animationFrameDelay)--;
-    if negative {
-        <:animationFrameDelay = a = ATTACK_ANIMATION_FRAME_DELAY - 1;
-
-        a = animationFrame;
-        a++;
-        if a == FIRST_ATTACK_FRAME + N_ATTACK_FRAMES {
-            return set_state__walk_through_doorway__after_attacking_in_doorway();
-        }
-        animationFrame = a;
+    // wait until animation is over
+    zero = _is_ms_animation_over();
+    if zero {
+        set_state__walk_through_doorway__after_attacking_in_doorway();
     }
-
-    update_metasprite_frame();
 }
 
 
