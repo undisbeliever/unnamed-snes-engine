@@ -363,7 +363,7 @@ inline func update_collision_boxes__inline() {
 //
 // DB = 0x7e
 #[mem8, idx16]
-inline func __add_xPos_to_i8a_clamp(a : u8 in a, n : bool in negative) : u8 in a {
+inline func __add_xPos_to_i8a_clamp(i8a : u8 in a, n : bool in negative) : u8 in a {
     if negative {
         a += xPos.px;
         return a if carry;
@@ -387,7 +387,7 @@ inline func __add_xPos_to_i8a_clamp(a : u8 in a, n : bool in negative) : u8 in a
 //
 // DB = 0x7e
 #[mem8, idx16]
-inline func __add_yPos_to_i8a_clamp(a : u8 in a, n : bool in negative) : u8 in a {
+inline func __add_yPos_to_i8a_clamp(i8a : u8 in a, n : bool in negative) : u8 in a {
     if negative {
         a += yPos.px;
         return a if carry;

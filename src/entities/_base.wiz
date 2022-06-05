@@ -311,7 +311,7 @@ func process_collisions(entityId : u8 in y) : u8 in y {
 //
 // DB = 0x7e
 #[mem8, idx16]
-inline func __add_xPos_to_i8a_clamp(a : u8 in a, n : bool in negative, entityId : u16 in yy) : u8 in a {
+inline func __add_xPos_to_i8a_clamp(ia8 : u8 in a, n : bool in negative, entityId : u16 in yy) : u8 in a {
     if negative {
         a += entities.SoA.xPos_px[yy];
         return a if carry;

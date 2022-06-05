@@ -1338,7 +1338,7 @@ namespace drawing_functions {
 // KEEP: X and Y
 // DB = 0x7e
 #[mem8, idx16]
-inline func _subtract_ms_offset_from_position(msFrame : u16 in xx, xPos : u16 in xPos, yPos : u16 in yPos) {
+inline func _subtract_ms_offset_from_position(msFrame : u16 in xx, xPos : u16 in metasprites.xPos, yPos : u16 in metasprites.yPos) {
 
     <:xPos = a = <:xPos - MsDataFormat.xOffset[unaligned xx];
     if !carry {
