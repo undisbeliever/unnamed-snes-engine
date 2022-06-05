@@ -66,6 +66,10 @@ namespace entities {
     namespace SoA {
         let LAST_INDEX = (N_ENTITIES - 1) * 2;
 
+        // Byte access size
+        let BA_SIZE = N_ENTITIES * 2 - 1;
+
+
         in shadow_roomstate {
             // Process function for the entity.  Called once per frame by the undo loop.
             //
@@ -93,14 +97,14 @@ namespace entities {
 
         in wram7e_roomstate {
             var xPos : [pos ; N_ENTITIES];
-            let xPos_u16 = &xPos[0].sx as *u16;
-            let xPos_sx = &xPos[0].sx as *u8;
-            let xPos_px = &xPos[0].px as *u8;
+                var xPos_u16 @ &xPos[0]    : [u16 ; N_ENTITIES];
+                var xPos_sx  @ &xPos[0].sx : [u8  ; BA_SIZE];
+                var xPos_px  @ &xPos[0].px : [u8  ; BA_SIZE];
 
             var yPos : [pos ; N_ENTITIES];
-            let yPos_u16 = &yPos[0].sx as *u16;
-            let yPos_sx = &yPos[0].sx as *u8;
-            let yPos_px = &yPos[0].px as *u8;
+                var yPos_u16 @ &yPos[0]    : [u16 ; N_ENTITIES];
+                var yPos_sx  @ &yPos[0].sx : [u8  ; BA_SIZE];
+                var yPos_px  @ &yPos[0].px : [u8  ; BA_SIZE];
 
 
             // Previous position of the entity
@@ -109,17 +113,16 @@ namespace entities {
             // They will be automatically updated in the MetaSprite draw function
             //
             // (2x uint8)
-            var _previousPosition : [_u8pair ; N_ENTITIES];
-
-            let previousXpos = &_previousPosition[0].first as *u8;
-            let previousYpos = &_previousPosition[0].second as *u8;
+            var _previousPosition : [ _u8pair ; N_ENTITIES];
+                var previousXpos @ &_previousPosition[0].first  : [u8 ; BA_SIZE];
+                var previousYpos @ &_previousPosition[0].second : [u8 ; BA_SIZE];
 
 
             var _zPosAndBlank : [_u8pair ; N_ENTITIES];
 
-            // Z position of the entity
-            // (byte)
-            let zPos = &_zPosAndBlank[0].first as *u8;
+                // Z position of the entity
+                // (byte)
+                var zPos @ &_zPosAndBlank[0].first : [u8 ; N_ENTITIES * 2];
 
 
             // ------------------------------------------------------------------------------------
@@ -129,14 +132,14 @@ namespace entities {
 
             var _msAnimationIdAndPfIndex : [_u8pair ; N_ENTITIES];
 
-            // The id of the MetaSprite animation.
-            // NOTE: This variable might not be the current animation.
-            let msAnimationId = &_msAnimationIdAndPfIndex[0].first as *u8;
+                // The id of the MetaSprite animation.
+                // NOTE: This variable might not be the current animation.
+                var msAnimationId                   @ &_msAnimationIdAndPfIndex[0].first : [ u8 ; BA_SIZE];
 
-            // Index into the MetaSprite animation process function table.
-            //
-            // (byte index into function table)
-            let msAnimationProcessFunctionIndex = &_msAnimationIdAndPfIndex[0].second as *u8;
+                // Index into the MetaSprite animation process function table.
+                //
+                // (byte index into function table)
+                var msAnimationProcessFunctionIndex @ &_msAnimationIdAndPfIndex[0].second : [u8 ; BA_SIZE];
 
             // MetaSprite frame table address.
             // Points to a addr table of `metasprites.MsDataFormat` data structure
@@ -165,52 +168,53 @@ namespace entities {
 
 
             var _shadowSizeAndBlank : [ _u8pair ; N_ENTITIES];
-
-            // The size of the shadow underneath the entity
-            let shadowSize = &_shadowSizeAndBlank[0].first as *metasprites.ShadowSize;
+                // The size of the shadow underneath the entity
+                var shadowSize @ &_shadowSizeAndBlank[0].first : [ metasprites.ShadowSize ; BA_SIZE ];
 
 
             // Signed 16 bit X velocity
             var xVelocity : [ u16 ; N_ENTITIES ];
-            let xVelocity_sx = &<:xVelocity[0] as *u8;
-            let xVelocity_px = &>:xVelocity[0] as *u8;
+                var xVelocity_sx @ &<:xVelocity[0] : [u8 ; BA_SIZE];
+                var xVelocity_px @ &>:xVelocity[0] : [u8 ; BA_SIZE];
 
             // Signed 16 bit Y velocity
             var yVelocity : [ u16 ; N_ENTITIES ];
-            let yVelocity_sx = &<:yVelocity[0] as *u8;
-            let yVelocity_px = &>:yVelocity[0] as *u8;
+                var yVelocity_sx @ &<:yVelocity[0] : [u8 ; BA_SIZE];
+                var yVelocity_px @ &>:yVelocity[0] : [u8 ; BA_SIZE];
 
 
             var tileHitbox : [ _u8pair ; N_ENTITIES ];
-            let tileHitbox_halfWidth  = &tileHitbox[0].first as *u8;
-            let tileHitbox_halfHeight = &tileHitbox[0].second as *u8;
+                var tileHitbox_halfWidth  @ &tileHitbox[0].first  : [u8 ; BA_SIZE];
+                var tileHitbox_halfHeight @ &tileHitbox[0].second : [u8 ; BA_SIZE];
+
 
 
             var _movementStateAndIframeCounter : [ _u8pair ; N_ENTITIES ];
 
-            // Updated by `metatiles.move_entity_and_collision_test` or `entities.base.process_collisions`
-            // (bitfield of `entities.MovementState`)
-            let movementState = &<:_movementStateAndIframeCounter[0].first as *u8;
+                // Updated by `metatiles.move_entity_and_collision_test` or `entities.base.process_collisions`
+                // (bitfield of `entities.MovementState`)
+                var movementState @ &_movementStateAndIframeCounter[0].first : [u8 ; BA_SIZE];
 
-            // Updated by `base.process_collisions`
-            // Invincibility frames counter
-            let iframeCounter = &_movementStateAndIframeCounter[0].second as *u8;
+                // Updated by `base.process_collisions`
+                // Invincibility frames counter
+                var iframeCounter @ &_movementStateAndIframeCounter[0].second : [u8 ; BA_SIZE];
 
 
             var _healthAndAttackPower : [ _u8pair ; N_ENTITIES ];
 
-            // Entity health
-            let health = &_healthAndAttackPower[0].first as *u8;
+                // Entity health
+                var health @ &_healthAndAttackPower[0].first : [u8 ; BA_SIZE];
 
-            // Attack Power stat
-            let attackPower = &_healthAndAttackPower[0].second as *u8;
+                // Attack Power stat
+                var attackPower @ &_healthAndAttackPower[0].second : [u8 ; BA_SIZE];
 
 
             // Vision parameters
             // (two bytes, depends on the vision system used)
             var _visionAB : [ _u8pair ; N_ENTITIES ];
-            let visionA = &_visionAB[0].first as *u8;
-            let visionB = &_visionAB[0].second as *u8;
+                var visionA @ &_visionAB[0].first : [u8 ; BA_SIZE];
+                var visionB @ &_visionAB[0].second : [u8 ; BA_SIZE];
+
 
             // ::TODO should I add a third vision variable?::
             // ::: Currently small end of vision_cone is constant::
@@ -230,17 +234,17 @@ namespace entities {
 
 
             // Split state variables into low/high pairs (to easily allocate a byte variable)
-            let state_0_l = &<:state_0[0] as *u8;
-            let state_0_h = &>:state_0[0] as *u8;
+                var state_0_l @ &<:state_0[0] : [u8 ; BA_SIZE];
+                var state_0_h @ &>:state_0[0] : [u8 ; BA_SIZE];
 
-            let state_1_l = &<:state_1[0] as *u8;
-            let state_1_h = &>:state_1[0] as *u8;
+                var state_1_l @ &<:state_1[0] : [u8 ; BA_SIZE];
+                var state_1_h @ &>:state_1[0] : [u8 ; BA_SIZE];
 
-            let state_2_l = &<:state_2[0] as *u8;
-            let state_2_h = &>:state_2[0] as *u8;
+                var state_2_l @ &<:state_2[0] : [u8 ; BA_SIZE];
+                var state_2_h @ &>:state_2[0] : [u8 ; BA_SIZE];
 
-            let state_3_l = &<:state_3[0] as *u8;
-            let state_3_h = &>:state_3[0] as *u8;
+                var state_3_l @ &<:state_3[0] : [u8 ; BA_SIZE];
+                var state_3_h @ &>:state_3[0] : [u8 ; BA_SIZE];
         }
     }
 

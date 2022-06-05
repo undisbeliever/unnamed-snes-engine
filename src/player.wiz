@@ -132,41 +132,40 @@ in wram7e {
     //
     // MUST be a multiple of 4
     var maxHealth : u8;
+
+
+var xVelocity @ &entities.SoA.xVelocity[0] : u16;
+var yVelocity @ &entities.SoA.yVelocity[0] : u16;
+
+var xPos      @ &entities.SoA.xPos[0] : entities.pos;
+var yPos      @ &entities.SoA.yPos[0] : entities.pos;
+
+
+var zPos                    : u8 in entities.SoA.zPos[0];
+
+var previousXpos            : u8 in entities.SoA.previousXpos[0];
+var previousYpos            : u8 in entities.SoA.previousYpos[0];
+
+var tileHitbox_halfWidth    : u8 in entities.SoA.tileHitbox_halfWidth[0];
+var tileHitbox_halfHeight   : u8 in entities.SoA.tileHitbox_halfHeight[0];
+
+var shadowSize              : metasprites.ShadowSize in entities.SoA.shadowSize[0];
+
+var metaSpriteFrameTable    : u16 in entities.SoA.metaSpriteFrameTable[0];
+
+var movementState           : u8 in entities.SoA.movementState[0];
+var iframeCounter           : u8 in entities.SoA.iframeCounter[0];
+
+var health                  : u8 in entities.SoA.health[0];
+var swordAttackPower        : u8 in entities.SoA.attackPower[0];
+
+var visionA                 : u8 in entities.SoA.visionA[0];
+var visionB                 : u8 in entities.SoA.visionB[0];
+
+var state                   : u8 in entities.SoA.state_0_l[0];
+var facingDirection         : u8 in entities.SoA.state_0_h[0];
+
 }
-
-
-
-let xPos = entities.SoA.xPos[0];
-let yPos = entities.SoA.yPos[0];
-let zPos = entities.SoA.zPos[0];
-
-let previousXpos = entities.SoA.previousXpos[0];
-let previousYpos = entities.SoA.previousYpos[0];
-
-let xVelocity = entities.SoA.xVelocity[0];
-let yVelocity = entities.SoA.yVelocity[0];
-
-let tileHitbox_halfWidth = entities.SoA.tileHitbox_halfWidth[0];
-let tileHitbox_halfHeight = entities.SoA.tileHitbox_halfHeight[0];
-
-let shadowSize = entities.SoA.shadowSize[0];
-
-let metaSpriteFrameTable = entities.SoA.metaSpriteFrameTable[0];
-
-let movementState = entities.SoA.movementState[0];
-let iframeCounter = entities.SoA.iframeCounter[0];
-
-let health = entities.SoA.health[0];
-let swordAttackPower = entities.SoA.attackPower[0];
-
-let visionA = entities.SoA.visionA[0];
-let visionB = entities.SoA.visionB[0];
-
-
-
-let state                 = <:entities.SoA.state_0[0];
-let facingDirection       = >:entities.SoA.state_0[0];
-
 
 
 
@@ -936,7 +935,7 @@ inline func set_state__walk_through_doorway__after_attacking_in_doorway() {
 #[mem8, idx8]
 func process__walk_through_doorway() {
 
-let _mainAxisOffset = zpTmp_byte_0;
+var _mainAxisOffset : u8 in zpTmp_byte_0;
 
     idx16();
     #[idx16] {

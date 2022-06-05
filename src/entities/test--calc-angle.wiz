@@ -18,15 +18,17 @@ import "../../gen/cosine-tables";
 namespace entities {
 namespace test__calc_angle {
 
+in wram7e {
 
-let SoA_startX      = entities.SoA.state_0;
-let SoA_startX_px   = entities.SoA.state_0_h;
+var SoA_startX      : [ u16 ; N_ENTITIES  ] in SoA.state_0;
+var SoA_startX_px   : [ u8  ; SoA.BA_SIZE ] in SoA.state_0_h;
 
-let SoA_startY      = entities.SoA.state_1;
-let SoA_startY_px   = entities.SoA.state_1_h;
+var SoA_startY      : [ u16 ; N_ENTITIES  ] in SoA.state_1;
+var SoA_startY_px   : [ u8  ; SoA.BA_SIZE ] in SoA.state_1_h;
 
-let SoA_parameter   = entities.SoA.state_2_l;
+var SoA_parameter   : [ u8  ; SoA.BA_SIZE ] in SoA.state_2_l;
 
+}
 
 
 in code {

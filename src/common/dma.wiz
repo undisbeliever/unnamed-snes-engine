@@ -45,7 +45,7 @@ func transfer_to_vram__forceblank(data_bank : u8 in a, data_addr : u16 in xx, si
 #[mem8, idx16]
 func set_tilemap__forceblank(vramWaddr : u16 in xx, tilemapEntry : u16 in yy) {
 
-let _tmp = zpTmp_word_0;
+var _tmp : u16 in zpTmp_word_0;
 
     // MUST NOT USE xx
 

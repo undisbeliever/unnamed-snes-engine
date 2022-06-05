@@ -20,13 +20,17 @@ let CONE_SHORT_HALF_WIDTH = 4;
 
 
 
+in wram7e {
+
 // Length of the vision cone.
-let SoA_visionCone_length    = SoA.visionA;
+var SoA_visionCone_length    : [ u8 ; SoA.BA_SIZE ] in SoA.visionA;
 
 // The half-width of the wide end of the vision code.
 //
 // Value SHOULD be > 4
-let SoA_visionCone_halfWidth = SoA.visionB;
+var SoA_visionCone_halfWidth : [ u8 ; SoA.BA_SIZE ] in SoA.visionB;
+
+}
 
 
 
@@ -89,9 +93,9 @@ func test_right(entityId : u8 in y) : bool in carry {
 #[mem8, idx8]
 func _vertical_test(a_yPos_ : u8 in a, b_yPos_ : u8 in x, entityId : u8 in y) : bool in carry {
 
-let _a_yPos = zpTmp_byte_0;
-let _b_yPos = zpTmp_byte_1;
-let _tmp    = zpTmp_byte_2;
+var _a_yPos : u8 in zpTmp_byte_0;
+var _b_yPos : u8 in zpTmp_byte_1;
+var _tmp    : u8 in zpTmp_byte_2;
 
     // MUST NOT change `x` in this function (used at the bottom).
 
@@ -134,9 +138,9 @@ let _tmp    = zpTmp_byte_2;
 #[mem8, idx8]
 func _horizontal_test(a_xPos_ : u8 in a, b_xPos_ : u8 in x, entityId : u8 in y) : bool in carry {
 
-let _a_xPos = zpTmp_byte_0;
-let _b_xPos = zpTmp_byte_1;
-let _tmp    = zpTmp_byte_2;
+var _a_xPos : u8 in zpTmp_byte_0;
+var _b_xPos : u8 in zpTmp_byte_1;
+var _tmp    : u8 in zpTmp_byte_2;
 
     // MUST NOT change `x` in this function
 

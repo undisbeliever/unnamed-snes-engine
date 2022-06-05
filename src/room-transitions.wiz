@@ -73,7 +73,7 @@ namespace SpriteList {
         var msFrameAddr : [u16 ; N_SPRITE_LIST_ELEMENTS];
 
         var _shadowSizeAndBlank : [ entities._u8pair ; N_SPRITE_LIST_ELEMENTS];
-        let shadowSize = &_shadowSizeAndBlank[0].first as *metasprites.ShadowSize;
+            var shadowSize @ &_shadowSizeAndBlank[0].first : [ metasprites.ShadowSize ; N_SPRITE_LIST_ELEMENTS * 2 - 1];
     }
 }
 
@@ -89,8 +89,10 @@ let CAMERA_ORIGIN = 0x100;
 
 
 // Room transition code can directly modify the sprite's position.
-let spriteList_player_xPos = SpriteList.xPos[PLAYER_ID];
-let spriteList_player_yPos = SpriteList.yPos[PLAYER_ID];
+in wram7e {
+    var spriteList_player_xPos : u16 in SpriteList.xPos[PLAYER_ID];
+    var spriteList_player_yPos : u16 in SpriteList.yPos[PLAYER_ID];
+}
 
 
 in wram7e {
@@ -122,11 +124,11 @@ in wram7e {
     var camera_x : u16;
     var camera_y : u16;
 
-    let camera_x_l = *(&<:camera_x as *u8);
-    let camera_y_l = *(&<:camera_y as *u8);
+        var camera_x_l : u8 in <:camera_x;
+        var camera_y_l : u8 in <:camera_y;
 
-    let camera_x_h = *(&>:camera_x as *u8);
-    let camera_y_h = *(&>:camera_y as *u8);
+        var camera_x_h : u8 in >:camera_x;
+        var camera_y_h : u8 in >:camera_y;
 
 
     // The scroll direction of the current room transition.
@@ -162,7 +164,7 @@ in code {
 #[mem8, idx8]
 func _load_room_and_check_if_ok_to_scroll(roomPosition : u8 in a) : bool in carry {
 
-let _roomStateBackup__room_tileset = *(((&room.tileset as u16) - MEMMAP_ROOMSTATE_WRAM7E as u16 + &roomStateBackup_wram7e as u16) as *typeof(room.tileset));
+var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u16 - MEMMAP_ROOMSTATE_WRAM7E as u16] : typeof(room.tileset);
 
     push8(a);
     {
@@ -323,7 +325,7 @@ let _roomstate_wram7e = MEMMAP_ROOMSTATE_WRAM7E as far *u8;
 // DB = 0x7e
 #[mem8, idx8]
 inline func __copy_room_into_memory(roomListIndex : u8 in x) {
-let _roomPtr = zpTmp_farPtr;
+var _roomPtr : far *u8 in zpTmp_farPtr;
 
     if x >= resources.rooms.N_ROOMS {
         x = 0;
@@ -805,7 +807,7 @@ inline func _clear_sprite_list() {
 #[mem8, idx8]
 func _add_entities_to_sprite_list() {
 
-let _activeEntitiesTablePos = zpTmp_byte_0;
+var _activeEntitiesTablePos : u8 in zpTmp_byte_0;
 
     x = spriteListEnd;
 

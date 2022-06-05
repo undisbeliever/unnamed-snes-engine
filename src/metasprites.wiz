@@ -274,7 +274,7 @@ inline func load_ppu_data__fblank(spritesheet_id : u8 in a) {
 // DB = 0x80
 #[mem8, idx16]
 func __load_ppu_data_vram__fblank(spritesheet_id : u8 in a) {
-let _ptr = zpTmp_farPtr;
+var _ptr : far *u8 in zpTmp_farPtr;
 
     snes.dma.hdma_enable = 0;
 
@@ -588,8 +588,8 @@ inline func reset_buffer_and_draw_entity_shadows() {
 #[mem8, idx16]
 inline func reset_buffer_and_draw_room_transition_shadows__inline() {
 
-let _shadowX = zpTmp_word_0;
-let _shadowY = zpTmp_byte_0;
+var _shadowX : u16 in zpTmp_word_0;
+var _shadowY : u8 in zpTmp_byte_0;
 
 
     // NOTE: If I modify this function, also modify `reset_buffer_and_draw_entity_shadows`
@@ -1069,7 +1069,7 @@ func _new_animation(entityId : u8 in y) {
 
     mem16_idx16();
     #[mem16, idx16] {
-        aa = (entities.SoA.msAnimationId as *u16)[unaligned yy];
+        aa = (&entities.SoA.msAnimationId as *u16)[unaligned yy];
         xx = aa = ((aa & 0xff) << 1) + entities.SoA.msAnimationTable[unaligned yy];
         aa = MetaSpriteAnimationTableOffset[unaligned xx];
 
@@ -1230,7 +1230,7 @@ func distance_y(entityId : u8 in y) {
 // DB = 0x7e
 #[mem8, idx8]
 func distance_xy(entityId : u8 in y) {
-let _tmp = zpTmp_word_0;
+var _tmp : u16 in zpTmp_word_0;
 
     mem16();
     #[mem16] {

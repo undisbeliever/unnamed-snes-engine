@@ -27,7 +27,11 @@ enum State : u8 {
 };
 
 
-let SoA_state            = SoA.state_0_l as *State;
+in wram7e {
+
+var SoA_state            : [ State     ; SoA.BA_SIZE ] in SoA.state_0_l;
+
+}
 
 
 

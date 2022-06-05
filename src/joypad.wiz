@@ -63,15 +63,15 @@ in shadow {
     // The current state of the joypad
     // (uint16)
     var current : u16;
-    let current_l = *(&<:current as *u8);
-    let current_h = *(&>:current as *u8);
+        var current_l : u8 in <:current;
+        var current_h : u8 in >:current;
 
 
     // The buttons that were pressed in this frame
     // (uint16)
     var pressed : u16;
-    let pressed_l = *(&<:pressed as *u8);
-    let pressed_h = *(&>:pressed as *u8);
+        var pressed_l : u8 in <:pressed;
+        var pressed_h : u8 in >:pressed;
 
 
     namespace input_buffers {

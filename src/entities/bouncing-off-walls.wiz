@@ -14,9 +14,13 @@ namespace entities {
 namespace bouncing_off_walls {
 
 
+in wram7e {
+
 // The speed of the entity after being struck by the player's sword.
 // (index increment by 2 into `set_velocity_after_player_sword_collision` collisionSpeed parameter)
-let SoA_hurtSpeed = SoA.state_0_h;
+var SoA_hurtSpeed : [ u8 ; SoA.BA_SIZE ] in SoA.state_0_h;
+
+}
 
 
 

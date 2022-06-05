@@ -61,16 +61,20 @@ enum State : u8 {
 };
 
 
-let SoA_state            = SoA.state_0_l as *State;
+
+in wram7e {
+
+
+var SoA_state            : [ State     ; SoA.BA_SIZE ] in SoA.state_0_l;
 
 
 // Offset between player's position and the entity's target.
-let SoA_targetOffset_x   = SoA.state_1_l as *i8;
-let SoA_targetOffset_y   = SoA.state_1_h as *i8;
+var SoA_targetOffset_x   : [ i8 ; SoA.BA_SIZE ] in SoA.state_1_l;
+var SoA_targetOffset_y   : [ i8 ; SoA.BA_SIZE ] in SoA.state_1_h;
 
 // Countdown timer for RECOIL state
 // (time remaining in frames)
-let SoA_countdownTimer   = SoA.state_2_l;
+var SoA_countdownTimer   : [ u8 ; SoA.BA_SIZE ] in SoA.state_2_l;
 
 
 // Location to swarm to.
@@ -78,16 +82,16 @@ let SoA_countdownTimer   = SoA.state_2_l;
 // Will be invalidated on a function call outside this entity.
 //
 // (u8 position)
-let _target_x = zpTmp_byte_0;
-let _target_y = zpTmp_byte_1;
+var _target_x : u8 in zpTmp_byte_0;
+var _target_y : u8 in zpTmp_byte_1;
 
 // Absolute difference between target and entity position.
 //
 // Will be invalidated on a function call outside this entity.
 //
 // (2x u8)
-let _absDifference_x = zpTmp_byte_2;
-let _absDifference_y = zpTmp_byte_3;
+var _absDifference_x : u8 in zpTmp_byte_2;
+var _absDifference_y : u8 in zpTmp_byte_3;
 
 
 // Temporary variable
@@ -95,14 +99,14 @@ let _absDifference_y = zpTmp_byte_3;
 // Will be invalidated on a function call outside this entity.
 //
 // Declared here as the other zpTmp variables are declared here
-let _tmp = zpTmp_byte_4;
+var _tmp : u8 in zpTmp_byte_4;
 
 
+// Index into the last entry read in `OffsetTable_x` and `OffsetTable_y`.
+var offsetTableIndex : u8;
 
-in wram7e {
-    // Index into the last entry read in `OffsetTable_x` and `OffsetTable_y`.
-    var offsetTableIndex : u8;
 }
+
 
 
 in rodata0 {

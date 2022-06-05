@@ -123,7 +123,7 @@ in wram7e {
     // this hack allows me to write `tileset.topLeft[y]` without a compile error.
     #[align(256)]
     var __far_tileset : _Tileset;
-    let tileset = *(&__far_tileset as *_Tileset);
+        var tileset @ &__far_tileset : _Tileset;
 }
 
 
@@ -140,7 +140,7 @@ in code {
 // DB = 0x80
 #[mem8, idx16]
 func load_tileset__forceblank(tileset_id : u8 in a) {
-let _tilesetPtr = zpTmp_farPtr;
+var _tilesetPtr : far *u8 in zpTmp_farPtr;
 
     snes.dma.hdma_enable = 0;
 
@@ -214,8 +214,8 @@ let _tilesetPtr = zpTmp_farPtr;
 // DB = 0x7e
 #[mem8, idx8]
 func draw_map__forceblank() {
-let _rowsLeft    = zpTmp_byte_0;
-let _columnsLeft = zpTmp_byte_1;
+var _rowsLeft    : u8 in zpTmp_byte_0;
+var _columnsLeft : u8 in zpTmp_byte_1;
 
     push8(data_bank);
 
@@ -399,7 +399,7 @@ inline func process_draw_tile_buffer__vblank() {
 // DB = 0x7e
 #[mem8, idx8]
 func set_tile(tileIndex : u8 in y, tile : u8 in a) : bool in carry {
-let _tmp    = zpTmp_word_0;
+var _tmp : u16 in zpTmp_word_0;
 
     if y < sizeof(typeof(map)) {
 
@@ -473,7 +473,7 @@ let _tmp    = zpTmp_word_0;
 // DB = 0x7e
 #[mem8, idx8]
 func process_interactive_tiles__player() {
-let _tmp    = zpTmp_byte_0;
+var _tmp : u8 in zpTmp_byte_0;
 
     _tmp = a = player.xPos.px >>> 4;
     y = a = (player.yPos.px & 0xf0) | _tmp;
@@ -581,7 +581,7 @@ let _tmp    = zpTmp_byte_0;
 // DB = 0x7e
 #[mem8, idx8]
 func check_tile_solid(xPos : u8 in x, yPos : u8 in y) : bool in negative {
-let _tmp    = zpTmp_byte_0;
+var _tmp : u8 in zpTmp_byte_0;
 
     _tmp = a = x >>> 4;
     x = a = (y & 0xf0) | _tmp;
@@ -602,9 +602,9 @@ let _tmp    = zpTmp_byte_0;
 #[mem8, idx8]
 func test_if_player_touches_a_solid_tile() : bool in negative {
 
-let _tmp          = zpTmp_byte_0;
-let _topMasked    = zpTmp_byte_1;
-let _bottomMasked = zpTmp_byte_2;
+var _tmp          : u8 in zpTmp_byte_0;
+var _topMasked    : u8 in zpTmp_byte_1;
+var _bottomMasked : u8 in zpTmp_byte_2;
 
 
     // Left tiles
@@ -661,7 +661,7 @@ Return:
 // DB = 0x7e
 #[mem8, idx8]
 func test_if_player_touches_a_doorway_tile() : bool in zero {
-let _tmp = zpTmp_byte_0;
+var _tmp : u8 in zpTmp_byte_0;
 
     _tmp = a = player.xPos.px >>> 4;
     y = a = (player.yPos.px & 0xf0) | _tmp;
@@ -709,10 +709,10 @@ func move_entity_and_collision_test__unbounded(entityId : u8 in y) : u8 in y {
 // KEEP: Y
 #[mem8, idx8]
 inline func _move_entity_and_collision_test__unbounded__x_axis(entityId : u8 in y) : u8 in y {
-let _tmp    = zpTmp_byte_0;
-let _top    = zpTmp_byte_1;
-let _left   = zpTmp_byte_2;
-let _right  = zpTmp_byte_3;
+var _tmp    : u8 in zpTmp_byte_0;
+var _top    : u8 in zpTmp_byte_1;
+var _left   : u8 in zpTmp_byte_2;
+var _right  : u8 in zpTmp_byte_3;
 
     // X Axis
     // ------
@@ -823,10 +823,10 @@ let _right  = zpTmp_byte_3;
 // DB = 0x7e
 #[mem8, idx8]
 inline func _move_entity_and_collision_test__unbounded__y_axis(entityId : u8 in y) : u8 in y {
-let _tmp    = zpTmp_byte_0;
-let _left   = zpTmp_byte_1;
-let _top    = zpTmp_byte_2;
-let _bottom = zpTmp_byte_3;
+var _tmp    : u8 in zpTmp_byte_0;
+var _left   : u8 in zpTmp_byte_1;
+var _top    : u8 in zpTmp_byte_2;
+var _bottom : u8 in zpTmp_byte_3;
 
     a = entities.SoA.xPos_px[y] - entities.SoA.tileHitbox_halfWidth[y];
     if !carry { a = 0; }
@@ -964,10 +964,10 @@ func move_entity_and_collision_test__bounded(entityId : u8 in y) : u8 in y {
 // KEEP: Y
 #[mem8, idx8]
 inline func _move_entity_and_collision_test__bounded__x_axis(entityId : u8 in y) : u8 in y {
-let _tmp    = zpTmp_byte_0;
-let _top    = zpTmp_byte_1;
-let _left   = zpTmp_byte_2;
-let _right  = zpTmp_byte_3;
+var _tmp    : u8 in zpTmp_byte_0;
+var _top    : u8 in zpTmp_byte_1;
+var _left   : u8 in zpTmp_byte_2;
+var _right  : u8 in zpTmp_byte_3;
 
     // X Axis
     // ------
@@ -1088,10 +1088,10 @@ let _right  = zpTmp_byte_3;
 // DB = 0x7e
 #[mem8, idx8]
 inline func _move_entity_and_collision_test__bounded__y_axis(entityId : u8 in y) : u8 in y {
-let _tmp    = zpTmp_byte_0;
-let _left   = zpTmp_byte_1;
-let _top    = zpTmp_byte_2;
-let _bottom = zpTmp_byte_3;
+var _tmp    : u8 in zpTmp_byte_0;
+var _left   : u8 in zpTmp_byte_1;
+var _top    : u8 in zpTmp_byte_2;
+var _bottom : u8 in zpTmp_byte_3;
 
     a = entities.SoA.xPos_px[y] - entities.SoA.tileHitbox_halfWidth[y];
     if !carry { a = 0; }
@@ -1276,8 +1276,8 @@ in shadow {
 
     // ::ANNOY why do I have to do this?::
     // ::: Used to work around a "could not generate code for assignment `=` (got: `a = *(8269313 as *u8)` (mem8, idx8))" error::
-    let buffer_vramWordPos_l = *(&<:buffer_vramWordPos as *u8);
-    let buffer_vramWordPos_h = *(&>:buffer_vramWordPos as *u8);
+        var buffer_vramWordPos_l : u8 in <:buffer_vramWordPos;
+        var buffer_vramWordPos_h : u8 in >:buffer_vramWordPos;
 }
 
 
@@ -1368,7 +1368,7 @@ func swap_currentTilemap() {
 // DB = 0x7e
 #[mem8, idx8]
 func _draw_left_column() {
-let _tmp = zpTmp_byte_0;
+var _tmp : u8 in zpTmp_byte_0;
 
     y = a = (topmostRowOffset & topmostRowOffset_MASK) << 1;
 
@@ -1405,7 +1405,7 @@ let _tmp = zpTmp_byte_0;
 // DB = 0x7e
 #[mem8, idx8]
 func _draw_right_column() {
-let _tmp = zpTmp_byte_0;
+var _tmp : u8 in zpTmp_byte_0;
 
     y = a = (topmostRowOffset & topmostRowOffset_MASK) << 1;
 
@@ -1637,7 +1637,7 @@ func _calculate_vram_position_for_row(tilemapRow : u8 in a) {
 // DB = 0x7e
 #[mem8, idx8]
 func _draw_top_row(tilemapRow : u8 in a) {
-let _tmp = zpTmp_byte_0;
+var _tmp : u8 in zpTmp_byte_0;
 
     _calculate_vram_position_for_row(a);
 
@@ -1671,7 +1671,7 @@ let _tmp = zpTmp_byte_0;
 // DB = 0x7e
 #[mem8, idx8]
 func _draw_bottom_row(tilemapRow : u8 in a) {
-let _tmp = zpTmp_byte_0;
+var _tmp : u8 in zpTmp_byte_0;
 
     _calculate_vram_position_for_row(a);
 

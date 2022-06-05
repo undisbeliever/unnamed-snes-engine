@@ -43,8 +43,9 @@ in wram7e {
     };
 
     // Tile buffer
-    var _healthBarBuffer : HealthBarBuffer;
-    let healthBarBuffer = *(&_healthBarBuffer);
+    var __far_healthBarBuffer : HealthBarBuffer;
+        // (This hack is required to access `healthBarBuffer` via addr addressing.)
+        var healthBarBuffer @ &__far_healthBarBuffer : HealthBarBuffer;
 
     // Number of tiles to show in the health bar.
     // Equal to max player health >> HB_SHIFT.
@@ -141,7 +142,7 @@ inline func transfer_buffer__vblank() {
         snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
 
         snes.dma0.src_address_hl = xx = &healthBarBuffer as u16;
-        snes.dma0.src_address_bank = a = #:far &_healthBarBuffer;
+        snes.dma0.src_address_bank = a = #:far &__far_healthBarBuffer;
 
         snes.dma0.mdma_size_hl = xx = sizeof(HealthBarBuffer);
 

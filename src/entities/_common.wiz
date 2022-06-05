@@ -102,7 +102,7 @@ func init() {
 // DB = 0x7e
 #[mem8, idx8]
 func spawn_entity(xPos : u8 in zpTmp_byte_0, yPos : u8 in zpTmp_byte_1, entityType : u8 in a, initParameter : u8 in y) {
-let _init_function_u16 = zpTmp_word_0;
+var _init_function_u16 : u16 in zpTmp_word_0;
 
     ^if a < N_ENTITY_TYPES {
 
@@ -206,9 +206,9 @@ let _init_function_u16 = zpTmp_word_0;
 // DB = 0x7e
 #[mem8, idx8]
 func __spawn_entity__call_init_function_ptr(entityId : u8 in y, parameter : u8 in x, init_function_u16 : u16 in zpTmp_word_0) {
-let _init_function_ptr = init_function_u16 as func(u8 in y, u8 in x);
+var _init_function_ptr : func(u8 in y, u8 in x) in init_function_u16;
 
-    return _init_function_ptr(y, x);
+    return (*&_init_function_ptr)(y, x);
 }
 
 
@@ -330,8 +330,8 @@ func sort_active_entities()
     // (accessed October 16, 2021).
 
 
-let _entityId      = zpTmp_byte_0;
-let _yPosToCompare = zpTmp_byte_1;
+var _entityId      : u8 in zpTmp_byte_0;
+var _yPosToCompare : u8 in zpTmp_byte_1;
 
 
     // A = yPos to compare

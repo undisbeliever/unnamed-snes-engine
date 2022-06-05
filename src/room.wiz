@@ -32,7 +32,7 @@ in wram7e_roomstate {
     // This hack is required to access room via addr addressing.
     #[align(256)]
     var __far_room : RoomData;
-    let room = *(&__far_room as *RoomData);
+        var room @ &__far_room : RoomData;
 }
 
 

@@ -21,10 +21,16 @@ let N_FRAMES_IN_PLAYER = 10;
 let N_FRAMES_IN_SWORD  = 10;
 
 
-in code {
+in wram7e {
 
 // If non-zero then the projectile is inactive and will despawn when timer reaches 0.
-let SoA_despawnTimer = SoA.state_0_l;
+var SoA_despawnTimer : [ u8 ; SoA.BA_SIZE] in SoA.state_0_l;
+
+}
+
+
+
+in code {
 
 
 // Entity process routine.
