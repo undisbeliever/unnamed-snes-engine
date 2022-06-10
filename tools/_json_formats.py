@@ -83,6 +83,14 @@ def check_float(v):
     return v
 
 
+def check_hex_or_int(v):
+    if isinstance(v, int):
+        return v
+    if isinstance(v, str):
+        return int(v, 16)
+
+    raise ValueError(f"Invalid type: expected int or hex string")
+
 
 
 # entities.json
@@ -240,8 +248,13 @@ def load_ms_export_order_json(filename):
 # =============
 
 
-Mappings = namedtuple('Mappings', ('starting_room', 'tilesets', 'metasprite_spritesheets', 'interactive_tile_functions', 'dungeons'))
+Mappings = namedtuple('Mappings', ('starting_room', 'tilesets', 'metasprite_spritesheets', 'interactive_tile_functions', 'dungeons', 'memory_map'))
+MemoryMap = namedtuple('MemoryMap', ('mode', 'first_resource_bank', 'n_resource_banks'))
 DungeonMapping = namedtuple('DungeonMapping', ('name', 'x_offset', 'y_offset'))
+
+
+VALID_MEMORY_MAP_MODES = ('hirom', 'lorom')
+
 
 
 def __load_dungeons_array(json_map):
@@ -263,6 +276,19 @@ def __load_dungeons_array(json_map):
 
 
 
+def __load_memory_map(json_map):
+    mode = json_map['mode']
+    if mode not in VALID_MEMORY_MAP_MODES:
+        raise ValueError(f"Unknown memory mapping mode: { mode }")
+
+    return MemoryMap(
+            mode = mode,
+            first_resource_bank = check_hex_or_int(json_map['first_resource_bank']),
+            n_resource_banks = int(json_map['n_resource_banks'])
+    )
+
+
+
 def load_mappings_json(filename):
     with open(filename, 'r') as fp:
         json_input = json.load(fp)
@@ -273,6 +299,7 @@ def load_mappings_json(filename):
             metasprite_spritesheets = check_name_list(json_input['metasprite_spritesheets']),
             interactive_tile_functions = check_name_list(json_input['interactive_tile_functions']),
             dungeons = __load_dungeons_array(json_input['dungeons']),
+            memory_map = __load_memory_map(json_input['memory_map'])
     )
 
 

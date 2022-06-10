@@ -274,41 +274,33 @@ inline func load_ppu_data__fblank(spritesheet_id : u8 in a) {
 // DB = 0x80
 #[mem8, idx16]
 func __load_ppu_data_vram__fblank(spritesheet_id : u8 in a) {
-var _ptr : far *u8 in zpTmp_farPtr;
+var _res : resources.ResourceEntry in resources.res;
 
     snes.dma.hdma_enable = 0;
 
 
     idx8();
     #[idx8] {
-        x = a;
-        if x >= resources.metasprites.N_SPRITESHEETS {
-            x = 0;
-        }
-
-        <:_ptr = a = resources.metasprites.spritesheet_list_l[x];
-        >:_ptr = a = resources.metasprites.spritesheet_list_h[x];
-        #:_ptr = a = resources.metasprites.spritesheet_list_b[x];
+        _res = resources.load_resource(resources.ResourceType.ms_spritesheet, a);
     }
     idx16();
 
-    // A = _ptr bank
-    snes.dma0.src_address_bank = a;
+    snes.dma0.src_address_bank = a = #:_res.farPtr;
 
     mem16();
     #[mem16] {
-        snes.dma0.src_address_hl = aa = *(&_ptr as *u16) + sizeof(_PpuDataFormat);
+        snes.dma0.src_address_hl = aa = *(&_res.farPtr as *u16) + sizeof(_PpuDataFormat);
 
 
         // _PpuDataFormat.first_tile;
-        aa = **(&_ptr as *far *u16);
+        aa = **(&_res.farPtr as *far *u16);
 
         // +# safe, carry will never be set
         snes.ppu.vram_address_hl = aa = ((aa & 0x1ff) << 4) +# VRAM_OBJ_WADDR;
 
 
         // _PpuDataFormat.tile_data_size;
-        snes.dma0.mdma_size_hl = aa = (*(&_ptr as *far *u16))[unaligned yy = 2];
+        snes.dma0.mdma_size_hl = aa = (*(&_res.farPtr as *far *u16))[unaligned yy = 2];
     }
     mem8();
 

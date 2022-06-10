@@ -1,6 +1,8 @@
 
 BINARY := game.sfc
 
+INTERMEDIATE_BINARY := game-no-resources.sfc
+
 
 .DELETE_ON_ERROR:
 .SUFFIXES:
@@ -32,14 +34,14 @@ RESOURCES  += $(ROOM_BINS)
 METATILE_TILESETS = dungeon
 RESOURCES  += $(patsubst %,gen/metatiles/%.bin, $(METATILE_TILESETS))
 
-RESOURCES  += gen/interactive-tiles.wiz
-RESOURCES  += gen/resource-lists.wiz
-RESOURCES  += gen/entities.wiz
-RESOURCES  += gen/entity-data.wiz
-RESOURCES  += gen/ms-patterns-table.wiz
-RESOURCES  += gen/rooms.wiz
-RESOURCES  += gen/arctan-table.wiz
-RESOURCES  += gen/cosine-tables.wiz
+GEN_SOURCES  := gen/resources.wiz
+GEN_SOURCES  += gen/interactive-tiles.wiz
+GEN_SOURCES  += gen/entities.wiz
+GEN_SOURCES  += gen/entity-data.wiz
+GEN_SOURCES  += gen/ms-patterns-table.wiz
+GEN_SOURCES  += gen/rooms.wiz
+GEN_SOURCES  += gen/arctan-table.wiz
+GEN_SOURCES  += gen/cosine-tables.wiz
 
 
 METASPRITE_SPRITESETS = common dungeon
@@ -57,8 +59,14 @@ PYTHON3  := python3 -bb
 .PHONY: all
 all: $(BINARY)
 
-$(BINARY): wiz/bin/wiz $(SOURCES)
-	wiz/bin/wiz -s wla -I src src/main.wiz -o $(BINARY)
+
+$(BINARY): $(INTERMEDIATE_BINARY) tools/insert-resources.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/insert-resources.py -o $(BINARY) resources/mappings.json $(INTERMEDIATE_BINARY:.sfc=.sym) $(INTERMEDIATE_BINARY)
+	cp $(INTERMEDIATE_BINARY:.sfc=.sym) $(BINARY:.sfc=.sym)
+
+
+$(INTERMEDIATE_BINARY): wiz/bin/wiz $(SOURCES) $(GEN_SOURCES) $(RESOURCES)
+	wiz/bin/wiz -s wla -I src src/main.wiz -o $(INTERMEDIATE_BINARY)
 
 
 .PHONY: wiz
@@ -99,8 +107,8 @@ gen/rooms/%.bin: resources/rooms/%.tmx resources/mappings.json resources/entitie
 	$(PYTHON3) tools/convert-room.py -o '$@' 'resources/rooms/$*.tmx' 'resources/mappings.json' 'resources/entities.json'
 
 
-gen/resource-lists.wiz: resources/mappings.json tools/generate-resource-lists.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/generate-resource-lists.py -o '$@' 'resources/mappings.json'
+gen/resources.wiz: resources/mappings.json tools/generate-resources-wiz.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/generate-resources-wiz.py -o '$@' 'resources/mappings.json'
 
 gen/rooms.wiz: resources/mappings.json $(ROOM_BINS) tools/generate-rooms-table.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate-rooms-table.py -o '$@' 'resources/mappings.json' $(ROOM_BINS)
@@ -153,7 +161,8 @@ $(DIRS):
 
 .PHONY: clean
 clean:
-	$(RM) $(BINARY)
+	$(RM) $(BINARY) $(INTERMEDIATE_BINARY)
+	$(RM) $(GEN_SOURCES)
 	$(RM) $(RESOURCES)
 
 

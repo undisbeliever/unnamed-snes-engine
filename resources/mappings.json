@@ -1,4 +1,10 @@
 {
+ "memory_map": {
+   "mode": "hirom",
+   "first_resource_bank": "c3",
+   "n_resource_banks": 1
+ },
+
  "tilesets": [
    "dungeon"
  ],

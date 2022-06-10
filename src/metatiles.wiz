@@ -140,33 +140,25 @@ in code {
 // DB = 0x80
 #[mem8, idx16]
 func load_tileset__forceblank(tileset_id : u8 in a) {
-var _tilesetPtr : far *u8 in zpTmp_farPtr;
+var _res : resources.ResourceEntry in resources.res;
 
     snes.dma.hdma_enable = 0;
 
+
     idx8();
     #[idx8] {
-        x = a;
-        if x >= resources.metatile_tilesets.N_TILESETS {
-            x = 0;
-        }
-
-        <:_tilesetPtr = a = resources.metatile_tilesets.tileset_list_l[x];
-        >:_tilesetPtr = a = resources.metatile_tilesets.tileset_list_h[x];
-        #:_tilesetPtr = a = resources.metatile_tilesets.tileset_list_b[x];
+        _res = resources.load_resource(resources.ResourceType.mt_tileset, a);
     }
     idx16();
 
-
-    // A = _tilesetPtr bank
-    xx = *(&_tilesetPtr as *u16);
+    xx = *(&_res.farPtr as *u16);
 
     // Skip _DataFormat.tile_data_size in DMA's below
     xx++;
     xx++;
 
-    snes.dma0.src_address_bank = a;
     snes.dma0.src_address_hl = xx;
+    snes.dma0.src_address_bank = a = #:_res.farPtr;
 
 
     // Copy first data block (tileset) into RAM
@@ -198,7 +190,7 @@ var _tilesetPtr : far *u8 in zpTmp_farPtr;
 
     mem16();
     #[mem16] {
-        snes.dma0.mdma_size_hl = aa = **(&_tilesetPtr as *far *u16);
+        snes.dma0.mdma_size_hl = aa = **(&_res.farPtr as *far *u16);
     }
     mem8();
 

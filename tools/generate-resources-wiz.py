@@ -9,57 +9,37 @@ from io import StringIO
 from _json_formats import load_mappings_json
 
 
-
-def _write_byte_array(out, name, prefix, items):
-    out.write(f"const { name } : [ u8 ] = [ ")
-
-    for i in items:
-        out.write(f"{ prefix }{ i }, ")
-
-    out.write("];\n")
-
-
-
-def write_resource_lists(out, name, prefix, items):
-    _write_byte_array(out, name + '_l', '<:&' + prefix, items)
-    _write_byte_array(out, name + '_h', '>:&' + prefix, items)
-    _write_byte_array(out, name + '_b', '#:far &' + prefix, items)
+# order MUST match `ResourceType` enum in `src/metasprites.wiz`
+#        and match `RESOURCE_TYPES` in `tools/insert-resources.py`
+RESOURCE_TYPES = (
+    # enum name,        mappings name
+    ('mt_tilesets',     'tilesets'),
+    ('ms_spritesheets', 'metasprite_spritesheets')
+)
 
 
 
 def generate_wiz_code(mappings):
 
     with StringIO() as out:
-        out.write("""
-import "../src/memmap";
-import "../src/resources";
-""")
+        out.write('namespace resources {\n\n')
 
-        out.write("""
-in rodata0 {
-
-namespace resources {
-namespace metatile_tilesets {
-
-""")
-
-        write_resource_lists(out, '_tileset_list', '', mappings.tilesets)
-
-        out.write("""
-}
-
-namespace metasprites {
-""")
+        out.write('let n_resources_per_type = [')
+        for enum_name, mapping_name in RESOURCE_TYPES:
+            l = len(getattr(mappings, mapping_name))
+            out.write(f"{ l }, ")
+        out.write('];\n\n')
 
 
-        write_resource_lists(out, '_spritesheet_list', 'ms_ppu_data.', mappings.metasprite_spritesheets)
+        for enum_name, mapping_name in RESOURCE_TYPES:
+            out.write(f"enum { enum_name } : u8 {{\n")
 
-        out.write("""
-}
-}
-}
+            for i in getattr(mappings, mapping_name):
+                out.write(f"  { i },\n")
 
-""")
+            out.write('};\n\n')
+
+        out.write('}')
 
         return out.getvalue()
 
@@ -92,4 +72,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
