@@ -3,6 +3,7 @@
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
 
+import re
 import argparse
 from io import StringIO
 
@@ -19,10 +20,22 @@ RESOURCE_TYPES = (
 
 
 
+def room_id_for_name(room_name):
+    m = re.match(r'(\d+)-(\d+)-.+$', room_name)
+
+    if not m:
+        raise ValueError("Invalid room name")
+
+    return int(m.group(1), 10) + 16 * int(m.group(2), 10)
+
+
+
 def generate_wiz_code(mappings):
 
     with StringIO() as out:
         out.write('namespace resources {\n\n')
+
+        out.write(f"let _STARTING_ROOM = { room_id_for_name(mappings.starting_room) };\n\n")
 
         out.write('let n_resources_per_type = [')
         for enum_name, mapping_name in RESOURCE_TYPES:

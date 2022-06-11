@@ -1,8 +1,8 @@
 {
  "memory_map": {
    "mode": "hirom",
-   "first_resource_bank": "c3",
-   "n_resource_banks": 1
+   "first_resource_bank": "c2",
+   "n_resource_banks": 2
  },
 
  "tilesets": [

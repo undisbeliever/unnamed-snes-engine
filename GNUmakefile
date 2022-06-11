@@ -26,9 +26,9 @@ RESOURCES  += $(patsubst resources/%.png,gen/%.pal, $(4BPP_TILES_SRC))
 RESOURCES  += $(patsubst resources/%.png,gen/%.pal, $(2BPP_TILES_SRC))
 
 
-ROOM_SRC   := $(wildcard resources/rooms/*.tmx)
-ROOM_BINS  := $(sort $(patsubst resources/rooms/%.tmx,gen/rooms/%.bin, $(ROOM_SRC)))
-RESOURCES  += $(ROOM_BINS)
+ROOMS_DIR  := resources/rooms
+ROOMS_SRC  := $(wildcard $(ROOMS_DIR)/*.tmx)
+RESOURCES  += gen/rooms.bin
 
 
 METATILE_TILESETS = dungeon
@@ -39,7 +39,6 @@ GEN_SOURCES  += gen/interactive-tiles.wiz
 GEN_SOURCES  += gen/entities.wiz
 GEN_SOURCES  += gen/entity-data.wiz
 GEN_SOURCES  += gen/ms-patterns-table.wiz
-GEN_SOURCES  += gen/rooms.wiz
 GEN_SOURCES  += gen/arctan-table.wiz
 GEN_SOURCES  += gen/cosine-tables.wiz
 
@@ -103,15 +102,12 @@ gen/interactive-tiles.wiz: resources/mappings.json tools/generate-interactive-ti
 	$(PYTHON3) tools/generate-interactive-tiles-wiz.py -o '$@' 'resources/mappings.json'
 
 
-gen/rooms/%.bin: resources/rooms/%.tmx resources/mappings.json resources/entities.json tools/convert-room.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/convert-room.py -o '$@' 'resources/rooms/$*.tmx' 'resources/mappings.json' 'resources/entities.json'
+gen/rooms.bin: $(ROOMS_DIR) resources/mappings.json resources/entities.json tools/convert-rooms.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/convert-rooms.py -o '$@' 'resources/mappings.json' 'resources/entities.json' '$(ROOMS_DIR)'
 
 
 gen/resources.wiz: resources/mappings.json tools/generate-resources-wiz.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate-resources-wiz.py -o '$@' 'resources/mappings.json'
-
-gen/rooms.wiz: resources/mappings.json $(ROOM_BINS) tools/generate-rooms-table.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/generate-rooms-table.py -o '$@' 'resources/mappings.json' $(ROOM_BINS)
 
 gen/entity-data.wiz: resources/entities.json tools/generate-entity-data.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate-entity-data.py -o '$@' 'resources/entities.json'

@@ -180,15 +180,11 @@ var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u1
         entities.init();
     }
 
-    x = pop8();
-    roomstate.currentRoom = x;
-    x = a = resources.rooms.room_table[x];
-    if !zero && x < resources.rooms.N_ROOMS + 1 {
-        // room is valid
+    a = pop8();
+    roomstate.currentRoom = a;
 
-        x--;
-        __copy_room_into_memory(x);
-
+    carry = resources.load_room(a);
+    if carry {
         metatiles.populate_map_tile_properties();
         gameloop._spawn_room_entities();
     }
@@ -311,38 +307,6 @@ let _roomstate_wram7e = MEMMAP_ROOMSTATE_WRAM7E as far *u8;
 
     // NOTE: load_dec_repeat changes the data bank
     //       (safe as target is in bank 0x7e)
-    }
-    mem8_idx8();
-}
-
-
-
-
-// Load the room into memory
-//
-// ASSUMES: roomListIndex is valid
-//
-// DB = 0x7e
-#[mem8, idx8]
-inline func __copy_room_into_memory(roomListIndex : u8 in x) {
-var _roomPtr : far *u8 in zpTmp_farPtr;
-
-    if x >= resources.rooms.N_ROOMS {
-        x = 0;
-    }
-
-    <:_roomPtr = a = resources.rooms.room_list_l[x];
-    >:_roomPtr = a = resources.rooms.room_list_h[x];
-    #:_roomPtr = a = resources.rooms.room_list_bank;
-
-
-    idx16();
-    #[idx16] {
-        yy = sizeof(typeof(room)) - 1;
-        do {
-            (&room as *u8)[yy] = a = _roomPtr[yy];
-            yy--;
-        } while !negative;
     }
     mem8_idx8();
 }

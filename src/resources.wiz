@@ -2,8 +2,8 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "memmap";
+import "room";
 
-import "gen/rooms";
 import "gen/resources";
 
 
@@ -48,6 +48,21 @@ in rodata0 {
         @[ 0u8 ; sizeof(ResourceEntry) * i ] for let i in resources.n_resources_per_type
     ];
     let ResourceEntryTable = far &__ResourceEntryTable as far * const *ResourceEntry;
+
+
+    // Table of room addresses.
+    //
+    // If a room address is `INVALID_ROOM_ADDR` the room does not exist.
+    //
+    // (256 word address, pointing to RoomData)
+    const __RoomData = embed "gen/rooms.bin";
+    let RoomsTable = far &__RoomData as far * const * RoomData;
+
+    let ROOM_DATA_BANK = #:far &__RoomData;
+
+    let INVALID_ROOM_ADDR = 0xffff;
+
+    let ROOMS_TABLE_OFFSET = (&__RoomData as u16) + 256 * 2;
 }
 
 
@@ -105,6 +120,46 @@ func load_resource(type : ResourceType in x, resourceId : u8 in a) : ResourceEnt
 }
 
 
+
+// Load a room into memory
+//
+// DB = 0x7e
+#[mem8, idx8]
+func load_room(roomId : u8 in a) : bool in carry {
+
+    debug_break();
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        xx = aa = (aa & 0xff) << 1;
+
+        aa = RoomsTable[unaligned xx] as u16;
+        if aa == INVALID_ROOM_ADDR {
+            mem8_idx8();
+            return false;
+        }
+        aa += ROOMS_TABLE_OFFSET;
+
+        *(&res.farPtr as *u16) = aa;
+    }
+    mem8();
+
+    #[idx16] {
+        #:res.farPtr = a = ROOM_DATA_BANK;
+
+        // Copy room into memory.
+        yy = sizeof(typeof(room)) - 1;
+        do {
+            (&room as *u8)[yy] = a = res.farPtr[yy];
+            yy--;
+        } while !negative;
+    }
+    mem8_idx8();
+
+    return true;
+}
+
+
 }
 
 
@@ -133,20 +188,6 @@ in rodata0 {
 // =====
 
 namespace rooms {
-    let N_ROOMS = sizeof(typeof(_rooms)) / sizeof(typeof(_rooms[0]));
-
-in rodata0 {
-    const _room_list_l : [u8] = [<:&_rooms[i] for let i in 0..N_ROOMS];
-    const _room_list_h : [u8] = [>:&_rooms[i] for let i in 0..N_ROOMS];
-}
-
-    let room_list_l = far &_room_list_l as far *const u8;
-    let room_list_h = far &_room_list_h as far *const u8;
-    let room_list_bank = #:far &_rooms;
-
-
-    let room_table = far &_room_table as far *const u8;
-
     let STARTING_ROOM = _STARTING_ROOM;
 }
 

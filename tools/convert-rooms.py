@@ -3,12 +3,16 @@
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
 
+import re
+import os
+
 import gzip
 import base64
 import struct
 import argparse
 import xml.etree.ElementTree
 import posixpath
+
 from collections import namedtuple
 
 from _json_formats import load_entities_json, load_mappings_json
@@ -209,16 +213,88 @@ def create_map_data(tmx_map, mapping, entities):
 
 
 
+def compile_room(filename, entities, mapping):
+    with open(filename, 'r') as fp:
+        tmx_et = xml.etree.ElementTree.parse(fp)
+
+    tmx_map = parse_tmx_map(tmx_et)
+
+    # ::TODO compress room data with lz4::
+
+    return create_map_data(tmx_map, mapping, entities.entities)
+
+
+
+def get_list_of_tmx_files(directory):
+    tmx_files = list()
+
+    for e in os.scandir(directory):
+        if e.is_file() and e.name.startswith('_') is False:
+            ext = os.path.splitext(e.name)[1]
+            if ext == '.tmx':
+                tmx_files.append(e.name)
+
+    tmx_files.sort()
+
+    return tmx_files
+
+
+
+ROOM_LOCATION_REGEX = re.compile(r'(\d+)-(\d+)-.+.tmx$')
+
+def extract_room_id(basename):
+    m = ROOM_LOCATION_REGEX.match(basename)
+    if not m:
+        raise ValueError("Invalid room filename")
+
+    return int(m.group(1), 10) + 16 * int(m.group(2), 10)
+
+
+
+def compile_rooms(rooms_directory, entities, mapping):
+
+    tmx_files = get_list_of_tmx_files(rooms_directory)
+
+    # First 256 words: index of each room in the binary
+    # If a value is 0xffff, then there is no room that location
+    out = bytearray([0xff, 0xff]) * 256
+
+    room_id_set = set()
+
+    room_addr = 0
+
+    for basename in tmx_files:
+        room_data = compile_room(os.path.join(rooms_directory, basename), entities, mapping)
+
+        room_id = extract_room_id(basename)
+
+        if room_id in room_id_set:
+            raise RuntimeError(f"Two rooms have the same location: { basename }")
+        room_id_set.add(room_id)
+
+        if room_addr >= 0x10000:
+            raise RuntimeError("Output too large.  Maximum rooms binary is 64KiB.")
+
+        out[room_id * 2 + 0] = room_addr & 0xff
+        out[room_id * 2 + 1] = room_addr >> 8
+        out += room_data
+
+        room_addr += len(room_data)
+
+    return out
+
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output', required=True,
-                        help='map output file')
-    parser.add_argument('tmx_filename', action='store',
-                        help='tmx file input')
+                        help='output file')
     parser.add_argument('mapping_filename', action='store',
                         help='mapping json file input')
     parser.add_argument('entities_json_file', action='store',
                         help='entities JSON file input')
+    parser.add_argument('rooms_directory', action='store',
+                        help='rooms directory (containing tmx files)')
 
     args = parser.parse_args()
 
@@ -229,18 +305,13 @@ def parse_arguments():
 def main():
     args = parse_arguments()
 
-    with open(args.tmx_filename, 'r') as fp:
-        tmx_et = xml.etree.ElementTree.parse(fp)
-
     entities = load_entities_json(args.entities_json_file)
     mapping = load_mappings_json(args.mapping_filename)
 
-    tmx_map = parse_tmx_map(tmx_et)
-
-    map_data = create_map_data(tmx_map, mapping, entities.entities)
+    rooms_bin = compile_rooms(args.rooms_directory, entities, mapping)
 
     with open(args.output, 'wb') as fp:
-        fp.write(map_data)
+        fp.write(rooms_bin)
 
 
 
