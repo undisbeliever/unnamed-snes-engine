@@ -15,13 +15,13 @@ from _json_formats import load_mappings_json
 
 
 def extract_locations(room_filenames):
-    room_regex = re.compile(r'((.+)-(\d+)-(\d+)).bin$')
+    room_regex = re.compile(r'((\d+)-(\d+)-.+).bin$')
 
     for f in room_filenames:
         bn = os.path.basename(f)
         if not bn.startswith('_'):
             m = room_regex.match(bn)
-            yield m.group(1), m.group(2), int(m.group(3), 10), int(m.group(4), 10)
+            yield m.group(1), int(m.group(2), 10), int(m.group(3), 10)
 
 
 
@@ -31,12 +31,7 @@ def build_room_table(room_filenames, mappings):
         table.append([ None ] * 16 )
 
 
-    for name, d, x, y in extract_locations(room_filenames):
-        dp = mappings.dungeons[d]
-
-        x += int(dp.x_offset)
-        y += int(dp.y_offset)
-
+    for name, x, y in extract_locations(room_filenames):
         if table[y][x] is not None:
             raise RuntimeError(f"Overlapping room: cannot place { name } at position ({ x }, { y }), it is occupied by { table[y][x] }")
 

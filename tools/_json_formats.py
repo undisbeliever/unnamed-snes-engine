@@ -248,31 +248,11 @@ def load_ms_export_order_json(filename):
 # =============
 
 
-Mappings = namedtuple('Mappings', ('starting_room', 'tilesets', 'metasprite_spritesheets', 'interactive_tile_functions', 'dungeons', 'memory_map'))
+Mappings = namedtuple('Mappings', ('starting_room', 'tilesets', 'metasprite_spritesheets', 'interactive_tile_functions', 'memory_map'))
 MemoryMap = namedtuple('MemoryMap', ('mode', 'first_resource_bank', 'n_resource_banks'))
-DungeonMapping = namedtuple('DungeonMapping', ('name', 'x_offset', 'y_offset'))
 
 
 VALID_MEMORY_MAP_MODES = ('hirom', 'lorom')
-
-
-
-def __load_dungeons_array(json_map):
-    dungeons = dict()
-
-    for name, v in json_map.items():
-        d = DungeonMapping(
-                name = check_room_name(name),
-                x_offset = int(v['x_offset']),
-                y_offset = int(v['y_offset'])
-            )
-
-        if d.name in dungeons:
-            raise ValueError(f"Duplicate dungeon mapping: { d.name }")
-        dungeons[d.name] = d
-
-
-    return dungeons
 
 
 
@@ -298,7 +278,6 @@ def load_mappings_json(filename):
             tilesets = check_name_list(json_input['tilesets']),
             metasprite_spritesheets = check_name_list(json_input['metasprite_spritesheets']),
             interactive_tile_functions = check_name_list(json_input['interactive_tile_functions']),
-            dungeons = __load_dungeons_array(json_input['dungeons']),
             memory_map = __load_memory_map(json_input['memory_map'])
     )
 
