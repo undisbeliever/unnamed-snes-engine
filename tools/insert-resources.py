@@ -9,6 +9,8 @@ import argparse
 
 from _json_formats import load_mappings_json
 
+ROOM_DATA_BANK_OFFSET = __import__('generate-resources-wiz').ROOM_DATA_BANK_OFFSET
+
 
 # order MUST match `ResourceType` enum in `src/metasprites.wiz`
 # and match `RESOURCE_TYPES` in `tools/generate-resources-wiz.py`
@@ -78,15 +80,15 @@ class ResourceInserter:
         # Assume HiRom mapping
         if memory_map.mode == 'hirom':
             self.address_to_rom_offset = hirom_address_to_rom_offset
+            self.bank_start = 0
             self.bank_size = 64 * 1024
-            bank_start = 0
         else:
             raise ValueError(f"Invalid mapping mode: { mapping.mode }")
 
 
         self.bank_offset = memory_map.first_resource_bank
         self.n_resource_banks = memory_map.n_resource_banks
-        self.bank_positions = [ bank_start ] * memory_map.n_resource_banks
+        self.bank_positions = [ self.bank_start ] * memory_map.n_resource_banks
 
 
         last_symbol_bank = get_largest_rom_address(symbols) >> 16
@@ -98,6 +100,9 @@ class ResourceInserter:
         if len(sfc_view) != expected_size:
             raise RuntimeError(f"ERROR:  Expected a sfc file that is { expected_size // 1024 } bytes in size")
 
+
+    def label_offset(self, label):
+        return self.address_to_rom_offset(self.symbols[label])
 
 
     def read_u8(self, addr):
@@ -130,6 +135,29 @@ class ResourceInserter:
                 return addr
 
         raise RuntimeError(f"Cannot fit blob of size { blob_size } into binary")
+
+
+
+    def insert_blob_into_start_of_bank(self, bank_id, blob):
+        blob_size = len(blob)
+        assert blob_size > 0
+
+        u16_addr = self.bank_positions[bank_id]
+
+        if u16_addr != self.bank_start:
+            raise RuntimeError("Bank is not empty")
+
+        if blob_size > self.BANK_END:
+            raise RuntimeError("Cannot fit blob of size { blob_size } into binary")
+
+        addr = ((self.bank_offset + bank_id) << 16) + u16_addr
+        rom_offset = self.address_to_rom_offset(addr)
+
+        self.view[rom_offset : rom_offset+blob_size] = blob
+
+        self.bank_positions[bank_id] += blob_size
+
+        return addr
 
 
 
@@ -172,6 +200,21 @@ class ResourceInserter:
             table_pos += 5
 
 
+    def insert_room_data(self, bank_offset, room_bin):
+        ROOM_TABLE_SIZE = 0x100 * 2
+
+        room_view = memoryview(room_bin)
+
+        room_table     = room_view[0:ROOM_TABLE_SIZE]
+        room_data_blob = room_view[ROOM_TABLE_SIZE:]
+
+        room_table_offset = self.label_offset('resources.__RoomsTable')
+
+        self.view[room_table_offset:room_table_offset+ROOM_TABLE_SIZE] = room_table
+
+        self.insert_blob_into_start_of_bank(bank_offset, room_data_blob)
+
+
 
 def insert_resources(sfc_view, symbols, mappings):
     # sfc_view is a memoryview of a bytearray containing the SFC file
@@ -179,6 +222,9 @@ def insert_resources(sfc_view, symbols, mappings):
     # ::TODO confirm sfc_view is the correct file::
 
     ri = ResourceInserter(sfc_view, symbols, mappings.memory_map)
+
+    ri.insert_room_data(ROOM_DATA_BANK_OFFSET,
+                        read_binary_file('gen/rooms.bin', ri.bank_size))
 
     ri.insert_binary_resources('mt_tileset', mappings.tilesets,
                                lambda resource_name : read_binary_file(f"gen/metatiles/{ resource_name }.bin", ri.bank_size)

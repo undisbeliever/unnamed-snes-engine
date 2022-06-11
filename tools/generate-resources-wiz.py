@@ -19,6 +19,10 @@ RESOURCE_TYPES = (
 )
 
 
+# Offset between the first_resource_bank and the ROOM_DATA_BANK
+ROOM_DATA_BANK_OFFSET = 0
+
+
 
 def room_id_for_name(room_name):
     m = re.match(r'(\d+)-(\d+)-.+$', room_name)
@@ -35,6 +39,7 @@ def generate_wiz_code(mappings):
     with StringIO() as out:
         out.write('namespace resources {\n\n')
 
+        out.write(f"let ROOM_DATA_BANK = { mappings.memory_map.first_resource_bank + ROOM_DATA_BANK_OFFSET };\n")
         out.write(f"let _STARTING_ROOM = { room_id_for_name(mappings.starting_room) };\n\n")
 
         out.write('let n_resources_per_type = [')

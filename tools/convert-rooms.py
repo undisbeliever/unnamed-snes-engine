@@ -261,7 +261,12 @@ def compile_rooms(rooms_directory, entities, mapping):
 
     room_id_set = set()
 
-    room_addr = 0
+    if mapping.memory_map.mode == 'hirom':
+        room_addr = 0
+    elif mapping.memory_map.mode == 'lorom':
+        room_addr = 0x8000
+    else:
+        raise RuntimeError(f"Unknown memory map mode")
 
     for basename in tmx_files:
         room_data = compile_room(os.path.join(rooms_directory, basename), entities, mapping)
