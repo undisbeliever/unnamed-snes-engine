@@ -45,7 +45,7 @@ in rodata0 {
 
     // resource entry = ResourceEntryTable[type][resourceId]
     const __ResourceEntryTable : [ *const u8 ] = [
-        @[ 0u8 ; sizeof(ResourceEntry) ] for let i in resources.n_resources_per_type
+        @[ 0u8 ; sizeof(ResourceEntry) * i ] for let i in resources.n_resources_per_type
     ];
     let ResourceEntryTable = far &__ResourceEntryTable as far * const *ResourceEntry;
 }
