@@ -59,8 +59,8 @@ PYTHON3  := python3 -bb
 all: $(BINARY)
 
 
-$(BINARY): $(INTERMEDIATE_BINARY) tools/insert-resources.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/insert-resources.py -o $(BINARY) resources/mappings.json $(INTERMEDIATE_BINARY:.sfc=.sym) $(INTERMEDIATE_BINARY)
+$(BINARY): $(INTERMEDIATE_BINARY) tools/insert_resources.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/insert_resources.py -o $(BINARY) resources/mappings.json $(INTERMEDIATE_BINARY:.sfc=.sym) $(INTERMEDIATE_BINARY)
 	cp $(INTERMEDIATE_BINARY:.sfc=.sym) $(BINARY:.sfc=.sym)
 
 
@@ -95,37 +95,37 @@ RESOURCES += $(4BPP_TILES) $(4BPP_PALETTES)
 RESOURCES += $(8BPP_TILES) $(8BPP_PALETTES)
 
 
-gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palette.png resources/metatiles/%.tsx resources/mappings.json tools/convert-tileset.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/convert-tileset.py -o '$@' 'resources/mappings.json' 'resources/metatiles/$*-tiles.png' 'resources/metatiles/$*-palette.png' 'resources/metatiles/$*.tsx'
+gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palette.png resources/metatiles/%.tsx resources/mappings.json tools/convert_tileset.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/convert_tileset.py -o '$@' 'resources/mappings.json' 'resources/metatiles/$*-tiles.png' 'resources/metatiles/$*-palette.png' 'resources/metatiles/$*.tsx'
 
-gen/interactive-tiles.wiz: resources/mappings.json tools/generate-interactive-tiles-wiz.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/generate-interactive-tiles-wiz.py -o '$@' 'resources/mappings.json'
-
-
-gen/rooms.bin: $(ROOMS_DIR) resources/mappings.json resources/entities.json tools/convert-rooms.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/convert-rooms.py -o '$@' 'resources/mappings.json' 'resources/entities.json' '$(ROOMS_DIR)'
+gen/interactive-tiles.wiz: resources/mappings.json tools/generate_interactive_tiles_wiz.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/generate_interactive_tiles_wiz.py -o '$@' 'resources/mappings.json'
 
 
-gen/resources.wiz: resources/mappings.json tools/generate-resources-wiz.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/generate-resources-wiz.py -o '$@' 'resources/mappings.json'
+gen/rooms.bin: $(ROOMS_DIR) resources/mappings.json resources/entities.json tools/convert_rooms.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/convert_rooms.py -o '$@' 'resources/mappings.json' 'resources/entities.json' '$(ROOMS_DIR)'
 
-gen/entity-data.wiz: resources/entities.json tools/generate-entity-data.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/generate-entity-data.py -o '$@' 'resources/entities.json'
 
-gen/ms-patterns-table.wiz: resources/ms-export-order.json tools/generate-ms-patterns-table-wiz.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/generate-ms-patterns-table-wiz.py -o '$@' 'resources/ms-export-order.json'
+gen/resources.wiz: resources/mappings.json tools/generate_resources_wiz.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/generate_resources_wiz.py -o '$@' 'resources/mappings.json'
 
-gen/entities.wiz: resources/entities.json resources/ms-export-order.json tools/generate-entities-wiz.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/generate-entities-wiz.py -o '$@' 'resources/entities.json' 'resources/ms-export-order.json'
+gen/entity-data.wiz: resources/entities.json tools/generate_entity_data.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/generate_entity_data.py -o '$@' 'resources/entities.json'
 
-gen/arctan-table.wiz: tools/generate-arctan-table.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/generate-arctan-table.py -o '$@'
+gen/ms-patterns-table.wiz: resources/ms-export-order.json tools/generate_ms_patterns_table_wiz.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/generate_ms_patterns_table_wiz.py -o '$@' 'resources/ms-export-order.json'
 
-gen/cosine-tables.wiz: tools/generate-cosine-tables.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/generate-cosine-tables.py -o '$@'
+gen/entities.wiz: resources/entities.json resources/ms-export-order.json tools/generate_entities_wiz.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/generate_entities_wiz.py -o '$@' 'resources/entities.json' 'resources/ms-export-order.json'
 
-gen/metasprites/%.wiz gen/metasprites/%.bin: resources/metasprites/%/_metasprites.json resources/ms-export-order.json tools/convert-metasprite.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/convert-metasprite.py --ppu-output 'gen/metasprites/$*.bin' --wiz-output 'gen/metasprites/$*.wiz' 'resources/metasprites/$*/_metasprites.json' 'resources/ms-export-order.json'
+gen/arctan-table.wiz: tools/generate_arctan_table.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/generate_arctan_table.py -o '$@'
+
+gen/cosine-tables.wiz: tools/generate_cosine_tables.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/generate_cosine_tables.py -o '$@'
+
+gen/metasprites/%.wiz gen/metasprites/%.bin: resources/metasprites/%/_metasprites.json resources/ms-export-order.json tools/convert_metasprite.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/convert_metasprite.py --ppu-output 'gen/metasprites/$*.bin' --wiz-output 'gen/metasprites/$*.wiz' 'resources/metasprites/$*/_metasprites.json' 'resources/ms-export-order.json'
 
 
 define __update_metasprite_dependencies

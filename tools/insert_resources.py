@@ -9,7 +9,7 @@ import argparse
 
 from _json_formats import load_mappings_json
 
-ROOM_DATA_BANK_OFFSET = __import__('generate-resources-wiz').ROOM_DATA_BANK_OFFSET
+from generate_resources_wiz import ROOM_DATA_BANK_OFFSET
 
 
 # order MUST match `ResourceType` enum in `src/metasprites.wiz`
