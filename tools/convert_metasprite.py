@@ -11,6 +11,8 @@ from collections import namedtuple
 from io import StringIO
 
 
+from _common import RomData
+
 from _snes import extract_small_tile, extract_large_tile, split_large_tile, \
             hflip_tile, vflip_tile, hflip_large_tile, vflip_large_tile, \
             create_palettes_map, get_palette_id, convert_palette_image, \
@@ -21,13 +23,20 @@ from _json_formats import load_ms_export_order_json, load_metasprites_json
 
 TILE_DATA_BPP = 4
 
-ROM_BANK = 'rodata0'
+# MUST match `ShadowSize` enum in `src/metasprites.wiz`
+SHADOW_SIZES = {
+    'NONE':   0,
+    'SMALL':  1,
+    'MEDIUM': 2,
+    'LARGE':  3,
+}
 
 
 
 PatternGrid = namedtuple('PatternGrid', ('tile_count', 'width', 'height', 'data', 'pattern'))
 
-FrameSet = namedtuple('FrameSet', ('name', 'shadow_size', 'tile_hitbox', 'pattern', 'ms_export_order', 'frames', 'animations'))
+# MsFramesetFormat and MsFsData intermediate
+MsFsEntry = namedtuple('MsFsEntry', ('fullname', 'ms_export_order', 'header', 'pattern', 'frames', 'animations'))
 
 
 
@@ -408,7 +417,7 @@ def build_animation_data(ani, get_frame_id):
 
 
 
-def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparent_color, pattern_grids):
+def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparent_color, pattern_grids, spritesheet_name):
     frames = dict()
     animations = dict()
 
@@ -564,22 +573,126 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparen
         print(f"WARNING: Unused MetaSprite animations in { fs.name }: { unused_animations }")
 
 
-    return FrameSet(fs.name, shadow_size, tile_hitbox, pattern_name, fs.ms_export_order, exported_frames, eo_animations)
+    return build_msfs_entry(spritesheet_name, fs.name, fs.ms_export_order, shadow_size, tile_hitbox, pattern_name, exported_frames, eo_animations)
 
 
 
-def build_spritesheet(ms_input, ms_export_orders, ms_dir, palettes_map, transparent_color, pattern_grids):
+#
+# MsFsData
+# ========
+#
 
-    tiles = Tileset(ms_input.first_tile, ms_input.end_tile)
 
-    spritesheet = list()
 
-    for fs in ms_input.framesets.values():
-        spritesheet.append(
-            build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparent_color, pattern_grids))
+def build_msfs_entry(spritesheet_name, fs_name, ms_export_order, shadow_size, tile_hitbox, pattern, frames, animations):
 
-    return spritesheet, tiles.get_tiles()
+    header = bytearray().zfill(3)
 
+    header[0] = SHADOW_SIZES[shadow_size]
+    header[1] = tile_hitbox[0]
+    header[2] = tile_hitbox[1]
+
+    return MsFsEntry(
+            fullname = f"{ spritesheet_name }.{ fs_name }",
+            ms_export_order = ms_export_order,
+            header = header,
+            pattern = pattern,
+            frames = frames,
+            animations = animations
+    )
+
+
+
+def msfs_entries_to_text(msfs_entries):
+    with StringIO() as out:
+        for entry in msfs_entries:
+            frames = ','.join([ f.hex() for f in entry.frames ])
+            animations = ','.join([ a.hex() for a in entry.animations ])
+
+            out.write(f"{entry.fullname} {entry.ms_export_order} {entry.header.hex()} {entry.pattern} {frames} {animations}\n")
+
+        return out.getvalue()
+
+
+
+def text_to_msfs_entries(line_iterator):
+    out = list()
+
+    for line in line_iterator:
+        sep = line.split(' ')
+
+        if len(sep) != 6:
+            raise ValueError("Invalid MsFsEntry text format")
+
+        out.append(MsFsEntry(
+                fullname = sep[0],
+                ms_export_order = sep[1],
+                header = bytes.fromhex(sep[2]),
+                pattern = sep[3],
+                frames = [ bytes.fromhex(i) for i in sep[4].split(',') ],
+                animations = [ bytes.fromhex(i) for i in sep[5].split(',') ]
+        ))
+
+    return out
+
+
+
+def build_ms_fs_data(spritesheets, symbols, bank_addr, bank_size):
+    # Return: tuple(rom_data, dict fs_fullname -> tuple(addr, export_order))
+
+    MS_FRAMESET_FORMAT_SIZE = 9
+
+    rom_data = RomData(bank_addr, bank_size)
+
+    fs_map = dict()
+
+    n_framesets = sum([ len(i) for i in spritesheets ])
+    assert(n_framesets > 0)
+
+    fs_table, fs_table_addr = rom_data.allocate(n_framesets * MS_FRAMESET_FORMAT_SIZE)
+    fs_pos = 0
+
+    for framesets in spritesheets:
+        for fs in framesets:
+            fs_addr = fs_table_addr + fs_pos
+
+            frame_table_addr = rom_data.insert_data_addr_table(fs.frames)
+            animation_table_addr = rom_data.insert_data_addr_table(fs.animations)
+
+            drawing_function = symbols[f"metasprites.drawing_functions.{ fs.pattern }"] & 0xffff
+
+
+            fs_table[fs_pos : fs_pos+3] = fs.header
+
+            fs_table[fs_pos + 3] = drawing_function & 0xff
+            fs_table[fs_pos + 4] = drawing_function >> 8
+
+            fs_table[fs_pos + 5] = frame_table_addr & 0xff
+            fs_table[fs_pos + 6] = frame_table_addr >> 8
+
+            fs_table[fs_pos + 7] = animation_table_addr & 0xff
+            fs_table[fs_pos + 8] = animation_table_addr >> 8
+
+            fs_pos += MS_FRAMESET_FORMAT_SIZE
+
+            fs_map[fs.fullname] = (fs_addr, fs.ms_export_order)
+
+    assert(fs_pos == n_framesets * MS_FRAMESET_FORMAT_SIZE)
+
+
+    # Ensure player data is the first item
+    if fs_map['common.Player'][0] != bank_addr:
+        raise RuntimeError("The first MetaSprite FrameSet MUST be the player")
+
+
+    return rom_data, fs_map
+
+
+
+#
+# Image loaders
+# =============
+#
 
 
 def load_palette(ms_dir, palette_filename):
@@ -601,77 +714,16 @@ def get_transparent_color(palette_data):
 
 
 
-def to_csv(l):
-    return ', '.join(map(str, l))
+def load_image(ms_dir, filename):
+    image_filename = os.path.join(ms_dir, filename)
 
+    with PIL.Image.open(image_filename) as image:
+        image.load()
 
-
-def generate_wiz_data(spritesheet, spritesheet_name, binary_data_path):
-    with StringIO() as out:
-        out.write("""
-import "../../src/memmap";
-import "../../src/metasprites";
-""")
-        out.write(f"in { ROM_BANK } {{")
-        out.write("""
-
-namespace ms_framesets {
-""")
-        out.write(f"namespace { spritesheet_name } {{\n")
-
-        for fs in spritesheet:
-            n_frames = len(fs.frames)
-
-            out.write('\n')
-            if fs.name != 'Player':
-                out.write(f"  const { fs.name } = metasprites.MsFramesetFormat{{\n")
-
-                out.write(f"    shadowSize = metasprites.ShadowSize.{ fs.shadow_size },\n")
-                out.write(f"    tileHitbox = [ { to_csv(fs.tile_hitbox) } ],\n")
-                out.write(f"    drawFunction = metasprites.drawing_functions.{ fs.pattern } as func,\n")
-
-                out.write(f"    frameTable = @[\n")
-                for frame_data in fs.frames:
-                    out.write(f"      @[ { frame_data[0] }u8, { to_csv(frame_data[1:]) } ],\n")
-                out.write( '    ],\n')
-
-                out.write(f"    animationTable = @[\n")
-                for animation_data in fs.animations:
-                    out.write(f"      @[ { animation_data[0] }u8, { to_csv(animation_data[1:]) } ],\n")
-                out.write( '    ]\n')
-
-                out.write( '  };\n')
-
-            else:
-                # Player frameset
-                out.write(f"  namespace { fs.name } {{\n")
-
-                out.write(f"    let shadowSize = metasprites.ShadowSize.{ fs.shadow_size };\n")
-                out.write(f"    let tileHitbox = [ { to_csv(fs.tile_hitbox) } ];\n")
-                out.write(f"    let drawFunction = metasprites.drawing_functions.{ fs.pattern };\n")
-
-                out.write(f"    const frameTable : [*const u8] = [\n")
-                for frame_data in fs.frames:
-                    out.write(f"      @[ { frame_data[0] }u8, { to_csv(frame_data[1:]) } ],\n")
-                out.write( '    ];\n')
-
-                out.write(f"    const animationTable : [*const u8] = [\n")
-                for animation_data in fs.animations:
-                    out.write(f"      @[ { animation_data[0] }u8, { to_csv(animation_data[1:]) } ],\n")
-                out.write( '    ];\n')
-
-                out.write( '  }\n')
-
-
-        out.write("""
-}
-}
-
-}
-
-""")
-
-        return out.getvalue()
+    if image.mode == 'RGB':
+        return image
+    else:
+        return image.convert('RGB')
 
 
 
@@ -705,25 +757,38 @@ def generate_ppu_data(ms_input, tileset, palette_data):
 
 
 
-def load_image(ms_dir, filename):
-    image_filename = os.path.join(ms_dir, filename)
+def convert_spritesheet(ms_input, ms_export_orders, pattern_grids, ms_dir):
+    # Returns tuple (binary_data, msfs_entries)
 
-    with PIL.Image.open(image_filename) as image:
-        image.load()
+    palettes_map, palette_data = load_palette(ms_dir, ms_input.palette)
+    transparent_color = get_transparent_color(palette_data)
 
-    if image.mode == 'RGB':
-        return image
-    else:
-        return image.convert('RGB')
+    tileset = Tileset(ms_input.first_tile, ms_input.end_tile)
 
+    msfs_entries = list()
+
+    for fs in ms_input.framesets.values():
+        msfs_entries.append(
+                build_frameset(fs, ms_export_orders, ms_dir, tileset, palettes_map, transparent_color, pattern_grids, ms_input.name)
+        )
+
+    bin_data = generate_ppu_data(ms_input, tileset.get_tiles(), palette_data)
+
+    return bin_data, msfs_entries
+
+
+
+#
+# =========================
+#
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ppu-output', required=True,
-                        help='ppu data output file')
-    parser.add_argument('--wiz-output', required=True,
-                        help='sprite output file')
+    parser.add_argument('--bin-output', required=True,
+                        help='binary (PPU) data output file')
+    parser.add_argument('--msfs-output', required=True,
+                        help='msfs text output file')
     parser.add_argument('json_filename', action='store',
                         help='Sprite map JSON file')
     parser.add_argument('ms_export_order_json_file', action='store',
@@ -743,26 +808,18 @@ def main():
     ms_input = load_metasprites_json(args.json_filename)
     ms_export_orders = load_ms_export_order_json(args.ms_export_order_json_file)
 
-
     pattern_grids = generate_pattern_grids(ms_export_orders)
 
-    palettes_map, palette_data = load_palette(ms_dir, ms_input.palette)
+    bin_data, msfs_entries = convert_spritesheet(ms_input, ms_export_orders, pattern_grids, ms_dir)
 
-    transparent_color = get_transparent_color(palette_data)
-
-    spritesheet, tileset = build_spritesheet(ms_input, ms_export_orders, ms_dir, palettes_map, transparent_color, pattern_grids)
+    msfs_text = msfs_entries_to_text(msfs_entries)
 
 
-    ppu_data = generate_ppu_data(ms_input, tileset, palette_data)
-    wiz_data = generate_wiz_data(spritesheet,
-                                 os.path.splitext(os.path.basename(args.wiz_output))[0],
-                                 os.path.relpath(args.ppu_output, os.path.dirname(args.wiz_output)))
+    with open(args.bin_output, 'wb') as fp:
+        fp.write(bin_data)
 
-    with open(args.ppu_output, 'wb') as fp:
-        fp.write(ppu_data)
-
-    with open(args.wiz_output, 'w') as fp:
-        fp.write(wiz_data)
+    with open(args.msfs_output, 'w') as fp:
+        fp.write(msfs_text)
 
 
 

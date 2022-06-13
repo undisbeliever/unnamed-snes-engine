@@ -37,7 +37,6 @@ RESOURCES  += $(patsubst %,gen/metatiles/%.bin, $(METATILE_TILESETS))
 GEN_SOURCES  := gen/resources.wiz
 GEN_SOURCES  += gen/interactive-tiles.wiz
 GEN_SOURCES  += gen/entities.wiz
-GEN_SOURCES  += gen/entity-data.wiz
 GEN_SOURCES  += gen/ms-patterns-table.wiz
 GEN_SOURCES  += gen/arctan-table.wiz
 GEN_SOURCES  += gen/cosine-tables.wiz
@@ -45,10 +44,10 @@ GEN_SOURCES  += gen/cosine-tables.wiz
 
 METASPRITE_SPRITESETS = common dungeon
 RESOURCES  += $(patsubst %,gen/metasprites/%.bin, $(METASPRITE_SPRITESETS))
-RESOURCES  += $(patsubst %,gen/metasprites/%.wiz, $(METASPRITE_SPRITESETS))
+RESOURCES  += $(patsubst %,gen/metasprites/%.txt, $(METASPRITE_SPRITESETS))
 
 
-COMMON_PYTHON_SCRIPTS = tools/_json_formats.py tools/_snes.py
+COMMON_PYTHON_SCRIPTS = tools/_json_formats.py tools/_snes.py tools/_common.py
 
 # Python interpreter
 # (-bb issues errors on bytes/string comparisons)
@@ -59,8 +58,8 @@ PYTHON3  := python3 -bb
 all: $(BINARY)
 
 
-$(BINARY): $(INTERMEDIATE_BINARY) tools/insert_resources.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/insert_resources.py -o $(BINARY) resources/mappings.json $(INTERMEDIATE_BINARY:.sfc=.sym) $(INTERMEDIATE_BINARY)
+$(BINARY): $(INTERMEDIATE_BINARY) tools/insert_resources.py tools/convert_metasprite.py tools/_entity_data.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/insert_resources.py -o $(BINARY) resources/mappings.json resources/entities.json $(INTERMEDIATE_BINARY:.sfc=.sym) $(INTERMEDIATE_BINARY)
 	cp $(INTERMEDIATE_BINARY:.sfc=.sym) $(BINARY:.sfc=.sym)
 
 
@@ -109,9 +108,6 @@ gen/rooms.bin: $(ROOMS_DIR) resources/mappings.json resources/entities.json tool
 gen/resources.wiz: resources/mappings.json tools/generate_resources_wiz.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate_resources_wiz.py -o '$@' 'resources/mappings.json'
 
-gen/entity-data.wiz: resources/entities.json tools/generate_entity_data.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/generate_entity_data.py -o '$@' 'resources/entities.json'
-
 gen/ms-patterns-table.wiz: resources/ms-export-order.json tools/generate_ms_patterns_table_wiz.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate_ms_patterns_table_wiz.py -o '$@' 'resources/ms-export-order.json'
 
@@ -124,8 +120,8 @@ gen/arctan-table.wiz: tools/generate_arctan_table.py $(COMMON_PYTHON_SCRIPTS)
 gen/cosine-tables.wiz: tools/generate_cosine_tables.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate_cosine_tables.py -o '$@'
 
-gen/metasprites/%.wiz gen/metasprites/%.bin: resources/metasprites/%/_metasprites.json resources/ms-export-order.json tools/convert_metasprite.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/convert_metasprite.py --ppu-output 'gen/metasprites/$*.bin' --wiz-output 'gen/metasprites/$*.wiz' 'resources/metasprites/$*/_metasprites.json' 'resources/ms-export-order.json'
+gen/metasprites/%.wiz gen/metasprites/%.txt: resources/metasprites/%/_metasprites.json resources/ms-export-order.json tools/convert_metasprite.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/convert_metasprite.py --bin-output 'gen/metasprites/$*.bin' --msfs-output 'gen/metasprites/$*.txt' 'resources/metasprites/$*/_metasprites.json' 'resources/ms-export-order.json'
 
 
 define __update_metasprite_dependencies

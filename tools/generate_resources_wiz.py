@@ -8,6 +8,7 @@ import argparse
 from io import StringIO
 
 from _json_formats import load_mappings_json
+from _common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET
 
 
 # order MUST match `ResourceType` enum in `src/metasprites.wiz`
@@ -17,10 +18,6 @@ RESOURCE_TYPES = (
     ('mt_tilesets',     'tilesets'),
     ('ms_spritesheets', 'metasprite_spritesheets')
 )
-
-
-# Offset between the first_resource_bank and the ROOM_DATA_BANK
-ROOM_DATA_BANK_OFFSET = 0
 
 
 
@@ -39,7 +36,9 @@ def generate_wiz_code(mappings):
     with StringIO() as out:
         out.write('namespace resources {\n\n')
 
-        out.write(f"let ROOM_DATA_BANK = { mappings.memory_map.first_resource_bank + ROOM_DATA_BANK_OFFSET };\n")
+        out.write(f"let MS_FS_DATA_BANK = { mappings.memory_map.first_resource_bank + MS_FS_DATA_BANK_OFFSET };\n")
+        out.write(f"let ROOM_DATA_BANK = { mappings.memory_map.first_resource_bank + ROOM_DATA_BANK_OFFSET };\n\n")
+
         out.write(f"let _STARTING_ROOM = { room_id_for_name(mappings.starting_room) };\n\n")
 
         out.write('let n_resources_per_type = [')

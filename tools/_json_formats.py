@@ -98,7 +98,7 @@ def check_hex_or_int(v):
 
 EntitiesJson = namedtuple('EntitiesJson', ('entity_functions', 'entities'))
 
-EntityFunction = namedtuple('EntityFunction', ('name', 'id', 'ms_export_order', 'parameter'))
+EntityFunction = namedtuple('EntityFunction', ('name', 'id', 'ms_export_order', 'parameter', 'uses_process_function_from'))
 EfParameter = namedtuple('EfParameter', ('type', 'values'))
 EntityVision = namedtuple('EntityVision', ('a', 'b'))
 
@@ -139,6 +139,7 @@ def load_entities_json(filename):
                 id = i,
                 ms_export_order = check_name(e['ms-export-order']),
                 parameter = parameter,
+                uses_process_function_from = check_optional_name(e.get('uses-process-function-from')),
         )
 
         if ef.name in entity_functions:

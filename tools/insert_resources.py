@@ -7,9 +7,13 @@ import re
 import os.path
 import argparse
 
-from _json_formats import load_mappings_json
+from _json_formats import load_mappings_json, load_entities_json
 
-from generate_resources_wiz import ROOM_DATA_BANK_OFFSET
+from _common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET
+
+from _entity_data import ENTITY_ROM_DATA_LABEL, validate_entity_rom_data_symbols, \
+                         expected_blank_entity_rom_data, create_entity_rom_data
+from convert_metasprite import text_to_msfs_entries, build_ms_fs_data
 
 
 # order MUST match `ResourceType` enum in `src/metasprites.wiz`
@@ -137,6 +141,11 @@ class ResourceInserter:
         raise RuntimeError(f"Cannot fit blob of size { blob_size } into binary")
 
 
+    def insert_blob_at_label(self, label, blob):
+        # NOTE: There is no boundary checking.  This could override data if I am not careful.
+        o = self.label_offset(label)
+        self.view[o : o + len(blob)] = blob
+
 
     def insert_blob_into_start_of_bank(self, bank_id, blob):
         blob_size = len(blob)
@@ -159,6 +168,11 @@ class ResourceInserter:
 
         return addr
 
+
+    def confirm_initial_data_is_correct(self, label, expected_data):
+        o = self.label_offset(label)
+        if self.view[o:o+len(expected_data)] != expected_data:
+            raise RuntimeError(f"ROM data does not match expected data: { label }")
 
 
     def resource_table_for_type(self, resource_type):
@@ -216,12 +230,47 @@ class ResourceInserter:
 
 
 
-def insert_resources(sfc_view, symbols, mappings):
+def insert_metasprite_data(ri, mappings):
+    spritesheets = list()
+
+    for ss_name in mappings.metasprite_spritesheets:
+        with open(f"gen/metasprites/{ ss_name }.txt", 'r') as fp:
+            spritesheets.append(text_to_msfs_entries(fp))
+
+    ms_fs_data, metasprite_map = build_ms_fs_data(spritesheets, ri.symbols, ri.bank_start, ri.bank_size)
+
+    ri.insert_blob_into_start_of_bank(MS_FS_DATA_BANK_OFFSET, ms_fs_data.data())
+
+    return metasprite_map
+
+
+
+def insert_entity_rom_data(ri, entities_input, symbols, metasprite_map):
+    n_entities = len(entities_input.entities)
+
+    validate_entity_rom_data_symbols(symbols, n_entities)
+    ri.confirm_initial_data_is_correct(ENTITY_ROM_DATA_LABEL,
+                                       expected_blank_entity_rom_data(symbols, n_entities))
+
+    entity_rom_data = create_entity_rom_data(entities_input.entities, entities_input.entity_functions, symbols, metasprite_map)
+
+    ri.insert_blob_at_label(ENTITY_ROM_DATA_LABEL, entity_rom_data)
+
+
+
+def insert_resources(sfc_view, symbols, mappings, entities):
     # sfc_view is a memoryview of a bytearray containing the SFC file
 
     # ::TODO confirm sfc_view is the correct file::
 
     ri = ResourceInserter(sfc_view, symbols, mappings.memory_map)
+
+
+    metasprite_map = insert_metasprite_data(ri, mappings)
+
+
+    insert_entity_rom_data(ri, entities, symbols, metasprite_map)
+
 
     ri.insert_room_data(ROOM_DATA_BANK_OFFSET,
                         read_binary_file('gen/rooms.bin', ri.bank_size))
@@ -242,6 +291,8 @@ def parse_arguments():
                         help='sfc output file')
     parser.add_argument('mappings_json_file',
                         help='mappings json file input')
+    parser.add_argument('entities_json_file',
+                        help='entities  JSON  file input')
     parser.add_argument('symbols_file',
                         help='symbols input file')
     parser.add_argument('sfc_input',
@@ -257,10 +308,11 @@ def main():
     args = parse_arguments()
 
     mappings = load_mappings_json(args.mappings_json_file)
+    entities = load_entities_json(args.entities_json_file)
     symbols = read_symbols_file(args.symbols_file)
     sfc_data = bytearray(read_binary_file(args.sfc_input, 4 * 1024 * 1024))
 
-    out = insert_resources(memoryview(sfc_data), symbols, mappings)
+    out = insert_resources(memoryview(sfc_data), symbols, mappings, entities)
 
     with open(args.output, 'wb') as fp:
         fp.write(sfc_data)

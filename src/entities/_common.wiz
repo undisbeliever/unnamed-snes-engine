@@ -3,7 +3,7 @@
 
 import "../memmap";
 
-import "../../gen/entity-data";
+import "../../gen/entities";
 
 import "_variables";
 
@@ -12,8 +12,6 @@ import "../metasprites";
 
 
 namespace entities {
-
-let N_ENTITY_TYPES = sizeof(typeof(entity_rom_data.init_functions)) / 2;
 
 
 in zeropage {
@@ -40,8 +38,8 @@ func init() {
         aa = player.ms_draw_function as u16;
         entities.SoA.ms_draw_function[0] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
 
-        entities.SoA.metaSpriteFrameTable[0] = aa = &player.ms_frame_table as u16;
-        entities.SoA.msAnimationTable[0] = aa = &player.ms_animation_table as u16;
+        entities.SoA.metaSpriteFrameTable[0] = aa = metasprites.MsFsData.frameTable[unaligned player.MS_FS_DATA_ADDR];
+        entities.SoA.msAnimationTable[0] = aa = metasprites.MsFsData.animationTable[unaligned player.MS_FS_DATA_ADDR];
 
         {
             // ::TODO cleanup player init, this code should not be here::
@@ -122,16 +120,16 @@ var _init_function_u16 : u16 in zpTmp_word_0;
 
             mem16();
             #[mem16] {
-                _init_function_u16 = aa = (far &entity_rom_data.init_functions as far *u16)[unaligned x];
+                _init_function_u16 = aa = (entity_rom_data.init_functions as far *u16)[unaligned x];
 
-                (&entities.SoA.process_function[0] as *u16)[unaligned y] = aa = (far &entity_rom_data.process_functions as far *u16)[unaligned x];
+                (&entities.SoA.process_function[0] as *u16)[unaligned y] = aa = (entity_rom_data.process_functions as far *u16)[unaligned x];
                 (&entities.SoA._visionAB[0] as *u16)[unaligned y] = aa = entity_rom_data.vision_ab[unaligned x];
 
                 (&entities.SoA._zPosAndBlank[0] as *u16)[unaligned y] = aa = entity_rom_data.initial_zpos_and_blank[unaligned x];
 
                 (&entities.SoA._healthAndAttackPower[0] as *u16)[unaligned y] = aa = entity_rom_data.health_and_attack_power[unaligned x];
 
-                aa = (far &entity_rom_data.metasprite_framesets as far *u16)[unaligned x];
+                aa = (entity_rom_data.metasprite_framesets as far *u16)[unaligned x];
             }
 
             mem16_idx16();
@@ -378,11 +376,19 @@ var _yPosToCompare : u8 in zpTmp_byte_1;
 }
 
 
+// A blank init process function that does nothing
+//
+// Used to determine if `entity_rom_data` is blank
+//
+// DB = 0x7e
+func _blank_init_function(entityId : u8 in y, parameter : u8 in x) {
+}
+
 
 // A blank entity process function that returns false (entity no-longer active)
 //
 // DB = 0x7e
-func _blank_entity_function() : bool in carry {
+func _blank_entity_function(entityId : u8 in y) : bool in carry {
     return false;
 }
 
@@ -397,6 +403,36 @@ func _blank_player_function() : bool in carry {
 }
 
 
+}
+
+}
+
+
+// Entity ROM Data is populated by the `tools/insert_resources.py` and `tools/_entity_data.py` scripts
+namespace entity_rom_data {
+
+let N_ENTRIES = entities.N_ENTITY_TYPES;
+
+// Filling the data with blank functions and `0xaa` bytes.
+// This is used by the *insert_resources* script, to ensure the entity_rom_data is inserted into the correct location.
+in rodata0 {
+    const __init_funtions : [ func(u8 in y, u8 in x) ; N_ENTRIES ] = [ entities._blank_init_function ; N_ENTRIES ];
+    let init_functions = far &__init_funtions;
+
+    const __process_funtions : [ func(u8 in y) : bool in carry ; N_ENTRIES ] = [ entities._blank_entity_function ; N_ENTRIES ];
+    let process_functions = far &__process_funtions;
+
+    const __metasprite_framesets : [ *const metasprites.MsFramesetFormat ; N_ENTRIES ] = [ 0xaaaa as *metasprites.MsFramesetFormat ; N_ENTRIES ];
+    let metasprite_framesets = far &__metasprite_framesets;
+
+    const __initial_zpos_and_blank : [u8 ; N_ENTRIES * 2] = [ 0xaa ; N_ENTRIES * 2];
+    let initial_zpos_and_blank = far &__initial_zpos_and_blank as far *u16;
+
+    const __vision_ab : [u8 ; N_ENTRIES * 2] = [ 0xaa ; N_ENTRIES * 2];
+    let vision_ab = far &__vision_ab as far *u16;
+
+    const __health_and_attack_power : [u8 ; N_ENTRIES * 2] = [ 0xaa ; N_ENTRIES * 2];
+    let health_and_attack_power = far &__health_and_attack_power as far *u16;
 }
 
 }

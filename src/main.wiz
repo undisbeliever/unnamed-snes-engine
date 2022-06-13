@@ -14,6 +14,17 @@ import "metasprites";
 import "resources";
 
 
+import "src/entities/sword-particles";
+import "src/entities/bouncing-off-walls";
+import "src/entities/crossbow-man";
+import "src/entities/skeleton";
+import "src/entities/slime";
+import "src/entities/swarming";
+import "src/entities/projectile";
+import "src/entities/projectile-angled";
+import "src/entities/test--calc-angle";
+
+
 in code {
 
 

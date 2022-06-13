@@ -54,6 +54,7 @@
     },
     {
       "name": "projectile_angled",
+      "uses-process-function-from": "projectile",
       "ms-export-order": "projectile",
       "parameter": {
         "type": "enum",

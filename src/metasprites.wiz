@@ -7,6 +7,8 @@ import "common/dma";
 import "common/math";
 import "../wiz/common/snes/snes";
 
+import "../gen/resources";
+
 
 let DISPLAY_WIDTH = 256;
 let DISPLAY_HEIGHT = 224;
@@ -17,6 +19,7 @@ namespace metasprites {
 let N_OBJECTS = 128;
 
 
+// MUST match `SHADOW_SIZES` in `tools/convert_metasprite.py`
 enum ShadowSize : u8 {
     // Deleted entities MUST NOT have a shadow
     NONE,
@@ -44,28 +47,33 @@ struct MsFramesetFormat {
 
 // ::HACK manually create accessors to MsFramesetFormat data ::
 namespace MsFsData {
-    let shadowSize      = 0xc10000 as far *ShadowSize;
-            let shadowSize__u16 = 0xc10000 as far *u16;
+    let _base = resources.MS_FS_DATA_BANK << 16;
 
-    let tileHitbox      = 0xc10001 as far *u16;
-    let drawFunction    = 0xc10003 as far *u16;
-    let frameTable      = 0xc10005 as far *u16;
-    let animationTable  = 0xc10007 as far *u16;
+    let shadowSize      = (_base + 0) as far *ShadowSize;
+            let shadowSize__u16 = (_base + 0) as far *u16;
+
+    let tileHitbox      = (_base + 1) as far *u16;
+    let drawFunction    = (_base + 3) as far *u16;
+    let frameTable      = (_base + 5) as far *u16;
+    let animationTable  = (_base + 7) as far *u16;
 };
 
 
 // MetaSprite Frame Table Data offset in ROM
 // (word addr table)
-let MetaSpriteFrameTableOffset = 0xc10000 as far *u16;
+let MetaSpriteFrameTableOffset = MsFsData._base as far *u16;
 
 
 // MetaSprite Animation Table Data offset in ROM
 // (word addr table)
-let MetaSpriteAnimationTableOffset = 0xc10000 as far *u16;
+let MetaSpriteAnimationTableOffset = MsFsData._base as far *u16;
 
 
 // MetaSprite Data in ROM
 namespace MsDataFormat {
+    let _base = resources.MS_FS_DATA_BANK << 16;
+
+
     // Byte value to use when there is no hitbox or hurtbox.
     let NO_AABB_VALUE = 0x80;
 
@@ -73,19 +81,19 @@ namespace MsDataFormat {
     // The MetaSprite frame's hitbox.
     //
     // If `hitbox_left` == `NO_AABB_VALUE` then the frame has no hitbox.
-    let hitbox_left     = 0xc10000 as far *i8;
-    let hitbox_right    = 0xc10001 as far *i8;
-    let hitbox_top      = 0xc10002 as far *i8;
-    let hitbox_bottom   = 0xc10003 as far *i8;
+    let hitbox_left     = (_base + 0) as far *i8;
+    let hitbox_right    = (_base + 1) as far *i8;
+    let hitbox_top      = (_base + 2) as far *i8;
+    let hitbox_bottom   = (_base + 3) as far *i8;
 
 
     // The MetaSprite frame's hurtbox.
     //
     // If `hurtbox_left` == `NO_AABB_VALUE` then the frame has no hurtbox.
-    let hurtbox_left     = 0xc10004 as far *i8;
-    let hurtbox_right    = 0xc10005 as far *i8;
-    let hurtbox_top      = 0xc10006 as far *i8;
-    let hurtbox_bottom   = 0xc10007 as far *i8;
+    let hurtbox_left     = (_base + 4) as far *i8;
+    let hurtbox_right    = (_base + 5) as far *i8;
+    let hurtbox_top      = (_base + 6) as far *i8;
+    let hurtbox_bottom   = (_base + 7) as far *i8;
 
 
     // MetaSprite Pattern Id
@@ -93,26 +101,24 @@ namespace MsDataFormat {
     // Only read if the entity uses multiple MetaSprite patterns.
     //
     // (byte index into `metasprites.ms_patterns_table`, masked by `MS_PATTERNS_TABLE_MASK`)
-    let pattern = 0xc10008 as far *u8;
+    let pattern = (_base +  8) as far *u8;
 
-    let xOffset = 0xc10009 as far *u8;
-    let yOffset = 0xc1000a as far *u8;
+    let xOffset = (_base +  9) as far *u8;
+    let yOffset = (_base + 10) as far *u8;
 
     // NOTE: Not all `charAttr*` fields will be filled.
     // Most MetaSprite patterns use less then 4 charAttr words.
-    let charAttr0 = 0xc1000b as far *u16;
-    let charAttr1 = 0xc1000d as far *u16;
-    let charAttr2 = 0xc1000f as far *u16;
-    let charAttr3 = 0xc10011 as far *u16;
+    let charAttr0 = (_base + 11) as far *u16;
+    let charAttr1 = (_base + 13) as far *u16;
+    let charAttr2 = (_base + 15) as far *u16;
+    let charAttr3 = (_base + 17) as far *u16;
 }
 
 
 
 // MetaSprite Animation Data in ROM
 namespace AnimationDataFormat {
-
-    // AnimationData is stored in bank c1
-    let _base = 0xc10000;
+    let _base = resources.MS_FS_DATA_BANK << 16;
 
 
     // Animation delay format.  First byte of an animation.

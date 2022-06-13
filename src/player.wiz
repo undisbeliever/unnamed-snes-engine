@@ -12,7 +12,6 @@ import "metatiles";
 import "metasprites";
 import "common/math";
 
-import "../gen/metasprites/common";
 import "../gen/entities";
 import "../gen/cosine-tables";
 
@@ -20,9 +19,10 @@ import "../gen/cosine-tables";
 namespace player {
 
 
-let ms_draw_function = ms_framesets.common.Player.drawFunction;
-let ms_frame_table = ms_framesets.common.Player.frameTable;
-let ms_animation_table = ms_framesets.common.Player.animationTable;
+// Address of the player's `metasprites.MsFramesetFormat` data
+let MS_FS_DATA_ADDR = 0x0000;
+
+let ms_draw_function = metasprites.drawing_functions.dynamic_pattern;
 
 
 
