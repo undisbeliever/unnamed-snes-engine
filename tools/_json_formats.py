@@ -5,6 +5,8 @@
 
 import re
 import json
+import os.path
+
 from collections import namedtuple, OrderedDict
 
 
@@ -249,7 +251,7 @@ def load_ms_export_order_json(filename):
 # =============
 
 
-Mappings = namedtuple('Mappings', ('starting_room', 'mt_tilesets', 'ms_spritesheets', 'interactive_tile_functions', 'memory_map'))
+Mappings = namedtuple('Mappings', ('starting_room', 'mt_tilesets', 'ms_spritesheets', 'tiles', 'interactive_tile_functions', 'memory_map'))
 MemoryMap = namedtuple('MemoryMap', ('mode', 'first_resource_bank', 'n_resource_banks'))
 
 
@@ -278,6 +280,7 @@ def load_mappings_json(filename):
             starting_room = check_room_name(json_input['starting_room']),
             mt_tilesets = check_name_list(json_input['mt_tilesets']),
             ms_spritesheets = check_name_list(json_input['ms_spritesheets']),
+            tiles = check_name_list(json_input['tiles']),
             interactive_tile_functions = check_name_list(json_input['interactive_tile_functions']),
             memory_map = __load_memory_map(json_input['memory_map'])
     )
@@ -493,5 +496,46 @@ def load_metasprites_json(filename):
 def load_metasprites_string(text):
     json_input = json.loads(text)
     return _load_metasprites(json_input)
+
+
+
+#
+# resources.json
+#
+
+
+ResourcesJson = namedtuple('ResourcesJson', ('tiles'))
+
+TilesInput = namedtuple('TilesInput', ('name', 'format', 'source'))
+
+
+def __load__resource_tiles(json_input, dirname):
+    out = dict()
+
+    for name, v in json_input.items():
+        if name in out:
+            raise ValueError(f"Duplicate tiles name: { t.name }")
+
+        out[name] = TilesInput(
+                name = name,
+                format = str(v['format']),
+                source = os.path.join(dirname, v['source']),
+        )
+
+    return out
+
+
+
+def load_resources_json(filename):
+
+    dirname = os.path.dirname(filename)
+
+    with open(filename, 'r') as fp:
+        json_input = json.load(fp)
+
+    return ResourcesJson(
+            tiles = __load__resource_tiles(json_input['tiles'], dirname),
+    )
+
 
 

@@ -99,13 +99,7 @@ inline func init() {
 inline func setup_ppu__forceblank() {
 
     // Transfer UI tiles VRAM
-    {
-        let tile_data = far &resources.ui.tiles as far *u8;
-        let tile_data_size = sizeof(typeof(resources.ui.tiles));
-
-        snes.ppu.vram_address_hl = xx = VRAM_BG3_TILES_WADDR;
-        dma.transfer_to_vram__forceblank(#:tile_data, tile_data as u16, tile_data_size);
-    }
+    resources.load_tiles_resource_into_vram(resources.tiles.ui, VRAM_BG3_TILES_WADDR);
 
     // Clear BG3 tilemap (with order bit set high)
     dma.set_tilemap__forceblank(VRAM_BG3_MAP_WADDR, 0x2000);

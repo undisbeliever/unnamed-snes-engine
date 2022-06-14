@@ -11,6 +11,15 @@ TileMapEntry = namedtuple('TileMapEntry', ('tile_id', 'palette_id', 'hflip', 'vf
 
 
 
+def convert_mode7_tileset(tiles):
+    out = bytes().join(tiles)
+
+    if len(out) > 256 * 64:
+        raise ValueError('Too many tiles in image')
+
+    return out
+
+
 def convert_snes_tileset(tiles, bpp):
     out = bytearray()
 
@@ -74,6 +83,25 @@ def extract_tileset_tiles(image):
                     tile_data.append(convert_rgb_color(image.getpixel((x, y))))
 
             yield tile_data
+
+
+
+def extract_tiles_from_paletted_image(image):
+    if image.width % 8 != 0 or image.height % 8 != 0:
+        raise ValueError('Image width MUST BE a multiple of 8')
+
+    if image.height % 8 != 0:
+        raise ValueError('Image height MUST BE a multiple of 8')
+
+    if not image.palette:
+        raise ValueError('Image does not have a palette')
+
+    img_data = image.getdata()
+
+    for ty in range(0, image.height, 8):
+        for tx in range(0, image.width, 8):
+            yield bytes(image.getpixel((x, y))
+                        for y in range(ty, ty + 8) for x in range(tx, tx + 8) )
 
 
 

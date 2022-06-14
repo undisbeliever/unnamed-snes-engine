@@ -11,20 +11,11 @@ MAKEFLAGS += --no-builtin-rules
 
 
 SOURCES	  := $(wildcard src/*.wiz src/*/*.wiz)
-RESOURCES :=
 
-8BPP_TILES_SRC	 := $(wildcard resources/*/*8bpp-tiles.png)
-4BPP_TILES_SRC	 := $(wildcard resources/*/*4bpp-tiles.png)
-2BPP_TILES_SRC	 := $(wildcard resources/*/*2bpp-tiles.png)
 
-RESOURCES  += $(patsubst resources/%.png,gen/%.tiles, $(8BPP_TILES_SRC))
-RESOURCES  += $(patsubst resources/%.png,gen/%.tiles, $(4BPP_TILES_SRC))
-RESOURCES  += $(patsubst resources/%.png,gen/%.tiles, $(2BPP_TILES_SRC))
+RESOURCES_DOT_BIN_SOURCES := $(wildcard resources/*/*8bpp-tiles.png)
 
-RESOURCES  += $(patsubst resources/%.png,gen/%.pal, $(8BPP_TILES_SRC))
-RESOURCES  += $(patsubst resources/%.png,gen/%.pal, $(4BPP_TILES_SRC))
-RESOURCES  += $(patsubst resources/%.png,gen/%.pal, $(2BPP_TILES_SRC))
-
+RESOURCES  := gen/resources.bin
 
 ROOMS_DIR  := resources/rooms
 ROOMS_SRC  := $(wildcard $(ROOMS_DIR)/*.tmx)
@@ -58,12 +49,12 @@ PYTHON3  := python3 -bb
 all: $(BINARY)
 
 
-$(BINARY): $(INTERMEDIATE_BINARY) tools/insert_resources.py tools/convert_metasprite.py tools/_entity_data.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/insert_resources.py -o $(BINARY) resources/mappings.json resources/entities.json $(INTERMEDIATE_BINARY:.sfc=.sym) $(INTERMEDIATE_BINARY)
+$(BINARY): $(INTERMEDIATE_BINARY) tools/insert_resources.py tools/convert_metasprite.py tools/convert_resources.py tools/_entity_data.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/insert_resources.py -o $(BINARY) resources/mappings.json resources/entities.json gen/resources.bin $(INTERMEDIATE_BINARY:.sfc=.sym) $(INTERMEDIATE_BINARY)
 	cp $(INTERMEDIATE_BINARY:.sfc=.sym) $(BINARY:.sfc=.sym)
 
 
-$(INTERMEDIATE_BINARY): wiz/bin/wiz $(SOURCES) $(GEN_SOURCES) $(RESOURCES)
+$(INTERMEDIATE_BINARY): wiz/bin/wiz $(SOURCES) $(GEN_SOURCES)
 	wiz/bin/wiz -s wla -I src src/main.wiz -o $(INTERMEDIATE_BINARY)
 
 
@@ -79,27 +70,15 @@ ifneq ($(.SHELLSTATUS), 0)
 endif
 
 
-
-gen/%-2bpp-tiles.tiles gen/%-2bpp-tiles.pal &: resources/%-2bpp-tiles.png tools/png2snes.py tools/_snes.py
-	$(PYTHON3) tools/png2snes.py -f 2bpp -t gen/$*-2bpp-tiles.tiles -p gen/$*-2bpp-tiles.pal $<
-
-gen/%-4bpp-tiles.tiles gen/%-4bpp-tiles.pal &: resources/%-4bpp-tiles.png tools/png2snes.py tools/_snes.py
-	$(PYTHON3) tools/png2snes.py -f 4bpp -t gen/$*-4bpp-tiles.tiles -p gen/$*-4bpp-tiles.pal $<
-
-gen/%-8bpp-tiles.tiles gen/%-8bpp-tiles.pal &: resources/%-8bpp-tiles.png tools/png2snes.py tools/_snes.py
-	$(PYTHON3) tools/png2snes.py -f 8bpp -t gen/$*-8bpp-tiles.tiles -p gen/$*-8bpp-tiles.pal $<
-
-RESOURCES += $(2BPP_TILES) $(2BPP_PALETTES)
-RESOURCES += $(4BPP_TILES) $(4BPP_PALETTES)
-RESOURCES += $(8BPP_TILES) $(8BPP_PALETTES)
-
-
 gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palette.png resources/metatiles/%.tsx resources/mappings.json tools/convert_tileset.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/convert_tileset.py -o '$@' 'resources/mappings.json' 'resources/metatiles/$*-tiles.png' 'resources/metatiles/$*-palette.png' 'resources/metatiles/$*.tsx'
 
 gen/interactive-tiles.wiz: resources/mappings.json tools/generate_interactive_tiles_wiz.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate_interactive_tiles_wiz.py -o '$@' 'resources/mappings.json'
 
+
+gen/resources.bin: resources/resources.json resources/mappings.json tools/convert_resources.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/convert_resources.py -o '$@' 'resources/mappings.json' 'resources/resources.json'
 
 gen/rooms.bin: $(ROOMS_DIR) resources/mappings.json resources/entities.json tools/convert_rooms.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/convert_rooms.py -o '$@' 'resources/mappings.json' 'resources/entities.json' '$(ROOMS_DIR)'

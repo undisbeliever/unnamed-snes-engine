@@ -1,0 +1,13 @@
+{
+  "tiles": {
+    "ui": {
+      "format": "2bpp",
+      "source": "tilesets/ui-2bpp-tiles.png"
+    },
+
+    "metasprite_shadows": {
+      "format": "4bpp",
+      "source": "metasprites/shadows-4bpp-tiles.png"
+    }
+  }
+}

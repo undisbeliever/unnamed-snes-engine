@@ -14,6 +14,7 @@ from _common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET
 from _entity_data import ENTITY_ROM_DATA_LABEL, validate_entity_rom_data_symbols, \
                          expected_blank_entity_rom_data, create_entity_rom_data
 from convert_metasprite import text_to_msfs_entries, build_ms_fs_data
+from convert_resources import load_resource_data_from_file
 
 
 # order MUST match `ResourceType` enum in `src/metasprites.wiz`
@@ -22,6 +23,7 @@ RESOURCE_TYPES = {
     # mappings name
     'mt_tileset'      : 0,
     'ms_spritesheets' : 1,
+    'tiles'           : 2,
 }
 
 
@@ -187,17 +189,16 @@ class ResourceInserter:
         return resource_table_addr, expected_n_resources
 
 
-
-    def insert_binary_resources(self, resource_type, resource_names, load_resource):
+    def _insert_binary_resources(self, resource_type, n_resources, func):
         table_addr, expected_n_resources = self.resource_table_for_type(resource_type)
 
-        if expected_n_resources != len(resource_names):
+        if n_resources != expected_n_resources:
             raise RuntimeError(f"NResourcesPerTypeTable mismatch in sfc_file: { resource_type }")
 
         table_pos = self.address_to_rom_offset(table_addr)
 
-        for name in resource_names:
-            data = load_resource(name)
+        for i in range(n_resources):
+            data = func(i)
 
             addr = self.insert_blob(data)
             size = len(data)
@@ -212,6 +213,32 @@ class ResourceInserter:
             self.view[table_pos + 4] = (size >> 8)
 
             table_pos += 5
+
+
+
+    def insert_binary_file_resources(self, resource_type, resource_names, fmt):
+        self._insert_binary_resources(
+                resource_type, len(resource_names),
+                lambda i : read_binary_file(fmt.format(resource_names[i]), self.bank_size)
+        )
+
+
+    def insert_resource_data(self, resource_data, mapping):
+        for resource_type in resource_data._fields:
+            mapping_names = getattr(mapping, resource_type)
+            resource_entries = getattr(resource_data, resource_type)
+
+            if len(mapping_names) != len(resource_entries):
+                raise RuntimeError(f"ResourceData file does not match mappings.json: { resource_type }")
+
+            for i in range(len(resource_entries)):
+                if mapping_names[i] != resource_entries[i].name:
+                    raise RuntimeError(f"ResourceData file does not match mappings.json: { resource_type }: { mappings[i] }, { resource_entries[i] }")
+
+            self._insert_binary_resources(
+                    resource_type, len(mapping_names),
+                    lambda i : resource_entries[i].data
+            )
 
 
     def insert_room_data(self, bank_offset, room_bin):
@@ -258,7 +285,7 @@ def insert_entity_rom_data(ri, entities_input, symbols, metasprite_map):
 
 
 
-def insert_resources(sfc_view, symbols, mappings, entities):
+def insert_resources(sfc_view, symbols, mappings, entities, resources_data):
     # sfc_view is a memoryview of a bytearray containing the SFC file
 
     # ::TODO confirm sfc_view is the correct file::
@@ -275,13 +302,11 @@ def insert_resources(sfc_view, symbols, mappings, entities):
     ri.insert_room_data(ROOM_DATA_BANK_OFFSET,
                         read_binary_file('gen/rooms.bin', ri.bank_size))
 
-    ri.insert_binary_resources('mt_tileset', mappings.mt_tilesets,
-                               lambda resource_name : read_binary_file(f"gen/metatiles/{ resource_name }.bin", ri.bank_size)
-    )
+    ri.insert_binary_file_resources('mt_tileset', mappings.mt_tilesets, "gen/metatiles/{}.bin")
 
-    ri.insert_binary_resources('ms_spritesheets', mappings.ms_spritesheets,
-                               lambda resource_name : read_binary_file(f"gen/metasprites/{ resource_name }.bin", ri.bank_size)
-    )
+    ri.insert_binary_file_resources('ms_spritesheets', mappings.ms_spritesheets, "gen/metasprites/{}.bin")
+
+    ri.insert_resource_data(resources_data, mappings)
 
 
 
@@ -293,6 +318,8 @@ def parse_arguments():
                         help='mappings json file input')
     parser.add_argument('entities_json_file',
                         help='entities  JSON  file input')
+    parser.add_argument('resources_bin_file',
+                        help='resources data binary file')
     parser.add_argument('symbols_file',
                         help='symbols input file')
     parser.add_argument('sfc_input',
@@ -310,9 +337,11 @@ def main():
     mappings = load_mappings_json(args.mappings_json_file)
     entities = load_entities_json(args.entities_json_file)
     symbols = read_symbols_file(args.symbols_file)
+    resources_data = load_resource_data_from_file(args.resources_bin_file)
+
     sfc_data = bytearray(read_binary_file(args.sfc_input, 4 * 1024 * 1024))
 
-    out = insert_resources(memoryview(sfc_data), symbols, mappings, entities)
+    out = insert_resources(memoryview(sfc_data), symbols, mappings, entities, resources_data)
 
     with open(args.output, 'wb') as fp:
         fp.write(sfc_data)

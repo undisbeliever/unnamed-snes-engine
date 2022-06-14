@@ -16,6 +16,7 @@ from _common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET
 RESOURCE_TYPES = (
     'mt_tilesets',
     'ms_spritesheets',
+    'tiles',
 )
 
 

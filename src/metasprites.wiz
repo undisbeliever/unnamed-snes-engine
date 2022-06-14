@@ -349,14 +349,7 @@ func __load_ppu_data_cgram__fblank() {
 func __load_fixed_ppu_tiles__fblank() {
 
     // Transfer shadow data to VRAM
-    {
-        let tile_data = far &resources.ms_ppu_data.shadow_tiles as far *u8;
-        let tile_data_size = sizeof(typeof(resources.ms_ppu_data.shadow_tiles));
-
-        snes.ppu.vram_address_hl = xx = VRAM_OBJ_WADDR;
-        dma.transfer_to_vram__forceblank(#:tile_data, tile_data as u16, tile_data_size);
-    }
-
+    resources.load_tiles_resource_into_vram(resources.tiles.metasprite_shadows, VRAM_OBJ_WADDR);
 
     // Set OBJ Registers
     snes.ppu.obj_control = a = (VRAM_OBJ_WADDR / 8192) | (snes.ppu.OBJ_CONTROL_8x8_16x16 << 4);

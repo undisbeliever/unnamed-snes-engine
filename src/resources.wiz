@@ -3,8 +3,11 @@
 
 import "memmap";
 import "room";
+import "common/dma";
 
 import "gen/resources";
+
+import "../wiz/common/snes/snes";
 
 
 namespace resources {
@@ -14,6 +17,7 @@ namespace resources {
 enum ResourceType : u8 {
   mt_tileset,
   ms_spritesheet,
+  tiles,
 };
 
 
@@ -155,26 +159,30 @@ func load_room(roomId : u8 in a) : bool in carry {
 }
 
 
+
+// Load a tiles resource into VRAM.
+//
+// REQUIRES: Force-Blank
+//
+// DB = 0x80
+#[mem8, idx16]
+func load_tiles_resource_into_vram(resourceId : resources.tiles in a, vramWordAddr : u16 in xx) {
+
+    snes.ppu.vram_address_hl = xx;
+
+    mem8_idx8();
+    #[mem8, idx8] {
+        res = load_resource(ResourceType.tiles, a);
+    }
+    idx16();
+
+    ^return dma.transfer_to_vram__forceblank(#:res.farPtr, *(&res.farPtr as *u16), res.size);
 }
 
 
+let load_tiles_resource_into_vram_a = load_tiles_resource_into_vram as func(u8 in a, u16 in xx);
 
 
-
-// Resource Data
-// =============
-
-namespace ms_ppu_data {
-in rodata0 {
-    const shadow_tiles = embed "gen/metasprites/shadows-4bpp-tiles.tiles";
-}
-}
-
-
-namespace ui {
-in rodata0 {
-    const tiles = embed "gen/tilesets/ui-2bpp-tiles.tiles";
-}
 }
 
 

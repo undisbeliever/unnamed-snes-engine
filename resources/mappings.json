@@ -12,6 +12,10 @@
    "common",
    "dungeon"
  ],
+ "tiles": [
+   "ui",
+   "metasprite_shadows"
+ ],
 
  "interactive_tile_functions": [
    "player_tile_collision_test",
