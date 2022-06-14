@@ -233,7 +233,7 @@ class ResourceInserter:
 def insert_metasprite_data(ri, mappings):
     spritesheets = list()
 
-    for ss_name in mappings.metasprite_spritesheets:
+    for ss_name in mappings.ms_spritesheets:
         with open(f"gen/metasprites/{ ss_name }.txt", 'r') as fp:
             spritesheets.append(text_to_msfs_entries(fp))
 
@@ -275,11 +275,11 @@ def insert_resources(sfc_view, symbols, mappings, entities):
     ri.insert_room_data(ROOM_DATA_BANK_OFFSET,
                         read_binary_file('gen/rooms.bin', ri.bank_size))
 
-    ri.insert_binary_resources('mt_tileset', mappings.tilesets,
+    ri.insert_binary_resources('mt_tileset', mappings.mt_tilesets,
                                lambda resource_name : read_binary_file(f"gen/metatiles/{ resource_name }.bin", ri.bank_size)
     )
 
-    ri.insert_binary_resources('ms_spritesheets', mappings.metasprite_spritesheets,
+    ri.insert_binary_resources('ms_spritesheets', mappings.ms_spritesheets,
                                lambda resource_name : read_binary_file(f"gen/metasprites/{ resource_name }.bin", ri.bank_size)
     )
 

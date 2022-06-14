@@ -204,7 +204,7 @@ def create_map_data(tmx_map, mapping, entities):
 
 
     # Tileset byte
-    data.append(mapping.tilesets.index(tmx_map.tileset.name))
+    data.append(mapping.mt_tilesets.index(tmx_map.tileset.name))
 
     data += create_room_entities_soa(tmx_map.entities, entities)
 

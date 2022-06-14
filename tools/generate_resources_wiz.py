@@ -14,9 +14,8 @@ from _common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET
 # order MUST match `ResourceType` enum in `src/metasprites.wiz`
 #        and match `RESOURCE_TYPES` in `tools/insert-resources.py`
 RESOURCE_TYPES = (
-    # enum name,        mappings name
-    ('mt_tilesets',     'tilesets'),
-    ('ms_spritesheets', 'metasprite_spritesheets')
+    'mt_tilesets',
+    'ms_spritesheets',
 )
 
 
@@ -42,16 +41,16 @@ def generate_wiz_code(mappings):
         out.write(f"let _STARTING_ROOM = { room_id_for_name(mappings.starting_room) };\n\n")
 
         out.write('let n_resources_per_type = [')
-        for enum_name, mapping_name in RESOURCE_TYPES:
-            l = len(getattr(mappings, mapping_name))
+        for enum_name in RESOURCE_TYPES:
+            l = len(getattr(mappings, enum_name))
             out.write(f"{ l }, ")
         out.write('];\n\n')
 
 
-        for enum_name, mapping_name in RESOURCE_TYPES:
+        for enum_name in RESOURCE_TYPES:
             out.write(f"enum { enum_name } : u8 {{\n")
 
-            for i in getattr(mappings, mapping_name):
+            for i in getattr(mappings, enum_name):
                 out.write(f"  { i },\n")
 
             out.write('};\n\n')

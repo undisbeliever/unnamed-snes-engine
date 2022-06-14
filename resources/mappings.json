@@ -5,13 +5,14 @@
    "n_resource_banks": 2
  },
 
- "tilesets": [
+ "mt_tilesets": [
    "dungeon"
  ],
- "metasprite_spritesheets": [
+ "ms_spritesheets": [
    "common",
    "dungeon"
  ],
+
  "interactive_tile_functions": [
    "player_tile_collision_test",
    "doorway",

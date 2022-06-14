@@ -249,7 +249,7 @@ def load_ms_export_order_json(filename):
 # =============
 
 
-Mappings = namedtuple('Mappings', ('starting_room', 'tilesets', 'metasprite_spritesheets', 'interactive_tile_functions', 'memory_map'))
+Mappings = namedtuple('Mappings', ('starting_room', 'mt_tilesets', 'ms_spritesheets', 'interactive_tile_functions', 'memory_map'))
 MemoryMap = namedtuple('MemoryMap', ('mode', 'first_resource_bank', 'n_resource_banks'))
 
 
@@ -276,8 +276,8 @@ def load_mappings_json(filename):
 
     return Mappings(
             starting_room = check_room_name(json_input['starting_room']),
-            tilesets = check_name_list(json_input['tilesets']),
-            metasprite_spritesheets = check_name_list(json_input['metasprite_spritesheets']),
+            mt_tilesets = check_name_list(json_input['mt_tilesets']),
+            ms_spritesheets = check_name_list(json_input['ms_spritesheets']),
             interactive_tile_functions = check_name_list(json_input['interactive_tile_functions']),
             memory_map = __load_memory_map(json_input['memory_map'])
     )
