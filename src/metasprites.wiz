@@ -285,11 +285,7 @@ var _res : resources.ResourceEntry in resources.res;
     snes.dma.hdma_enable = 0;
 
 
-    idx8();
-    #[idx8] {
-        _res = resources.load_resource(resources.ResourceType.ms_spritesheet, a);
-    }
-    idx16();
+    _res = resources.load_ms_spritesheet(a);
 
     snes.dma0.src_address_bank = a = #:_res.farPtr;
 

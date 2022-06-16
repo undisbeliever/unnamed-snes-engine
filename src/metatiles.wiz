@@ -145,11 +145,7 @@ var _res : resources.ResourceEntry in resources.res;
     snes.dma.hdma_enable = 0;
 
 
-    idx8();
-    #[idx8] {
-        _res = resources.load_resource(resources.ResourceType.mt_tileset, a);
-    }
-    idx16();
+    _res = resources.load_mt_tileset(a);
 
     xx = *(&_res.farPtr as *u16);
 

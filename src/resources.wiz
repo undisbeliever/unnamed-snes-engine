@@ -75,23 +75,58 @@ in zeropage {
 in code {
 
 
+// Load a MetaTile tileset resource.
+//
+// DB unknown
+#[mem8, idx16]
+func load_mt_tileset(resourceId : u8 in a) : ResourceEntry in res {
+    return __load_resource(ResourceType.mt_tileset as u16, a);
+}
+
+
+
+// Load a MetaSprite spritesheet resource.
+//
+// DB unknown
+#[mem8, idx16]
+func load_ms_spritesheet(resourceId : u8 in a) : ResourceEntry in res {
+    return __load_resource(ResourceType.ms_spritesheet as u16, a);
+}
+
+
+
+// Load a tiles resource.
+//
+// DB unknown
+#[mem8, idx16]
+func load_tiles_resource(resourceId : u8 in a) : ResourceEntry in res {
+    return __load_resource(ResourceType.tiles as u16, a);
+}
+
+
+
 // Load a resource
 //
 // ASSUMES: type is always valid
 //
 // DB unknown
-#[mem8, idx8]
-func load_resource(type : ResourceType in x, resourceId : u8 in a) : ResourceEntry in res {
+#[mem8, idx16]
+func __load_resource(type : u16 in xx, resourceId : u8 in a) : ResourceEntry in res {
 
     // This function MUST ONLY use zeropage variables
 
-    if a >= NResourcesPerTypeTable[x] {
+    if a >= NResourcesPerTypeTable[xx] {
         a = 0;
     }
-    y = a;
+
+    // Remove high bytes of index registers
+    idx8();
+    #[idx8] {
+        y = a;
+    }
 
     mem16_idx16();
-    #[mem16, idx16] {
+    #[mem16] {
         // No need to mask high byte of `xx`, it is always 0
         xx = aa = xx << 1;
 
@@ -112,7 +147,7 @@ func load_resource(type : ResourceType in x, resourceId : u8 in a) : ResourceEnt
 
         aa = (_RE.addrBank as far *u16)[unaligned xx];
     }
-    mem8_idx8();
+    mem8();
 
     #:res.farPtr = a;
 
@@ -170,11 +205,7 @@ func load_tiles_resource_into_vram(resourceId : resources.tiles in a, vramWordAd
 
     snes.ppu.vram_address_hl = xx;
 
-    mem8_idx8();
-    #[mem8, idx8] {
-        res = load_resource(ResourceType.tiles, a);
-    }
-    idx16();
+    res = __load_resource(ResourceType.tiles as u16, a);
 
     ^return dma.transfer_to_vram__forceblank(#:res.farPtr, *(&res.farPtr as *u16), res.size);
 }
