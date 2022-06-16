@@ -161,11 +161,10 @@ namespace AnimationDataFormat {
 // MetaSprie PPU data format in ROM.
 struct _PpuDataFormat {
     first_tile : u16,
-    tile_data_size : u16,
 
-    // tile_data
+    palette_data : [u16 ; 128],
 
-    // palette_data (256 bytes)
+    tile_data : u8,
 }
 
 
@@ -256,99 +255,64 @@ inline func setup__fblank() {
 
 
 
+// Load a MetaSprite Spritesheet into the PPU
+//
 // REQUIRES: Force-Blank
 // Uses DMA Channel 0
 // DB = 0x80
 #[mem8, idx16]
-inline func load_ppu_data__fblank(spritesheet_id : u8 in a) {
-    __load_ppu_data_vram__fblank(a);
-    __load_ppu_data_cgram__fblank();
+inline func load_ms_spritesheet_ppu_data__forceblank(spritesheet_id : u8 in a) {
+var _res : resources.ResourceEntry in resources.res;
 
-    // Load common spritesheet
-    __load_ppu_data_vram__fblank(0);
+    push8(a);
 
-    __load_fixed_ppu_tiles__fblank();
+    // Set OBJ Registers
+    snes.ppu.obj_control = a = (VRAM_OBJ_WADDR / 8192) | (snes.ppu.OBJ_CONTROL_8x8_16x16 << 4);
+
+
+    // Transfer shadow data to VRAM
+    resources.load_tiles_resource_into_vram(resources.tiles.metasprite_shadows, VRAM_OBJ_WADDR);
+
+    // Load common spritesheet tiles
+    // Assumes resources.ms_spritesheets.common is 0
+    _res = resources.load_ms_spritesheet(0);
+    __transfer_tile_data__forceblank(_res);
+
+
+    // Load requested spritesheet
+    // (Assumes resources.ms_spritesheets.common is 0)
+    a = pop8();
+    if !zero {
+        _res = resources.load_ms_spritesheet(a);
+        __transfer_tile_data__forceblank(_res);
+    }
+
+    resources.transfer_resource_palette__forceblank(_res, offsetof(_PpuDataFormat, palette_data), 256);
 }
 
 
 
-// REQUIRES: Force-Blank
-// Uses DMA Channel 0
+// Transfer spritesheet tile data into VRAM.
 //
-// OUTPUT: DMA Channel 0 src_address contains the address of the palette data
+// REQUIRES: force-blank
+// Uses DMA channel 0
 //
 // DB = 0x80
 #[mem8, idx16]
-func __load_ppu_data_vram__fblank(spritesheet_id : u8 in a) {
-var _res : resources.ResourceEntry in resources.res;
-
-    snes.dma.hdma_enable = 0;
-
-
-    _res = resources.load_ms_spritesheet(a);
-
-    snes.dma0.src_address_bank = a = #:_res.farPtr;
-
+func __transfer_tile_data__forceblank(_res : resources.ResourceEntry in resources.res) {
     mem16();
     #[mem16] {
-        snes.dma0.src_address_hl = aa = *(&_res.farPtr as *u16) + sizeof(_PpuDataFormat);
-
+        // Calculate VRAM address of tile data
 
         // _PpuDataFormat.first_tile;
         aa = **(&_res.farPtr as *far *u16);
 
         // +# safe, carry will never be set
         snes.ppu.vram_address_hl = aa = ((aa & 0x1ff) << 4) +# VRAM_OBJ_WADDR;
-
-
-        // _PpuDataFormat.tile_data_size;
-        snes.dma0.mdma_size_hl = aa = (*(&_res.farPtr as *far *u16))[unaligned yy = 2];
     }
     mem8();
 
-
-    snes.dma0.control = a = snes.dma.CONTROL_MODE_AB;
-    snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
-
-    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
-}
-
-
-
-// This function MUST BE called DIRECTLY AFTER `__load_ppu_data_vram__fblank`
-//
-// INPUT: Address of palette data in DMA Channel 0 src_address
-//
-// REQUIRES: Force-Blank
-// Uses DMA Channel 0
-// DB = 0x80
-#[mem8, idx16]
-func __load_ppu_data_cgram__fblank() {
-
-    // Transfer Palette data to CGRAM
-    snes.ppu.cgram_address = a = 128;
-
-    // snes.dma0.src_address already set
-    snes.dma0.control = a = snes.dma.CONTROL_MODE_A;
-    snes.dma0.mdma_dest = a = <:&snes.ppu.cgram_write_data;
-    snes.dma0.mdma_size_hl = yy = 128 * 2;
-
-    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
-}
-
-
-
-// DB = 0x80
-// REQUIRES: Force-Blank
-// Uses DMA Channel 0
-#[mem8, idx16]
-func __load_fixed_ppu_tiles__fblank() {
-
-    // Transfer shadow data to VRAM
-    resources.load_tiles_resource_into_vram(resources.tiles.metasprite_shadows, VRAM_OBJ_WADDR);
-
-    // Set OBJ Registers
-    snes.ppu.obj_control = a = (VRAM_OBJ_WADDR / 8192) | (snes.ppu.OBJ_CONTROL_8x8_16x16 << 4);
+    resources.transfer_resource_tail_to_vram__forceblank(_res, offsetof(_PpuDataFormat, tile_data));
 }
 
 

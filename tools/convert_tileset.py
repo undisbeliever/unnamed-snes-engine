@@ -157,11 +157,6 @@ def create_properties_array(tile_properties, interactive_tile_functions):
 def create_tileset_data(palette_data, tile_data, metatile_map, properties):
     data = bytearray()
 
-    # First Word: tile data size
-    tile_data_size = len(tile_data)
-    data.append(tile_data_size & 0xff)
-    data.append(tile_data_size >> 8)
-
     # 2048 bytes = metatile map
     assert(len(metatile_map) == 2048)
     data += metatile_map
@@ -174,7 +169,7 @@ def create_tileset_data(palette_data, tile_data, metatile_map, properties):
     data += palette_data
     data += bytes(0) * (256 - len(palette_data))
 
-    assert(len(data) == 2 + 2048 + 256 * 2)
+    assert(len(data) == 2048 + 256 * 2)
 
     # Next data: tile data
     data += tile_data

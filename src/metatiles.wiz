@@ -51,8 +51,6 @@ struct _Tileset {
 
 // Tileset data format in ROM.
 struct _DataFormat {
-    tile_data_size : u16,
-
     ram_data : _Tileset,
 
     palette_data : [u16 ; 128],
@@ -142,55 +140,18 @@ in code {
 func load_tileset__forceblank(tileset_id : u8 in a) {
 var _res : resources.ResourceEntry in resources.res;
 
-    snes.dma.hdma_enable = 0;
-
-
     _res = resources.load_mt_tileset(a);
 
-    xx = *(&_res.farPtr as *u16);
+    // Transfer header to WorkRAM
+    resources.transfer_resource_header_to_wram7e(_res, &tileset as u16, sizeof(_Tileset));
 
-    // Skip _DataFormat.tile_data_size in DMA's below
-    xx++;
-    xx++;
-
-    snes.dma0.src_address_hl = xx;
-    snes.dma0.src_address_bank = a = #:_res.farPtr;
-
-
-    // Copy first data block (tileset) into RAM
-    snes.wram.address_hl = xx = &tileset as u16;
-    snes.wram.address_bank = a = (#:far &__far_tileset) & 1;
-
-    snes.dma0.control = a = snes.dma.CONTROL_MODE_A;
-    snes.dma0.mdma_dest = a = <:&snes.wram.data;
-    snes.dma0.mdma_size_hl = xx = sizeof(_Tileset);
-
-    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
-
-
-    // Load palette to CGRAM
+    // Transfer palette to CGRAM
     snes.ppu.cgram_address = 0;
+    resources.transfer_resource_palette__forceblank(_res, offsetof(_DataFormat, palette_data), 256);
 
-    snes.dma0.mdma_dest = a = <:&snes.ppu.cgram_write_data;
-    snes.dma0.mdma_size_hl = yy = 128 * 2;
-
-    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
-
-
-    // Load tiles into VRAM
-    snes.ppu.vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
+    // Transfer tiles to VRAM
     snes.ppu.vram_address_hl = xx = VRAM_BG1_TILES_WADDR;
-
-    snes.dma0.control = a = snes.dma.CONTROL_MODE_AB;
-    snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
-
-    mem16();
-    #[mem16] {
-        snes.dma0.mdma_size_hl = aa = **(&_res.farPtr as *far *u16);
-    }
-    mem8();
-
-    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+    resources.transfer_resource_tail_to_vram__forceblank(_res, offsetof(_DataFormat, tile_data));
 }
 
 

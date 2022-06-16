@@ -198,6 +198,7 @@ func load_room(roomId : u8 in a) : bool in carry {
 // Load a tiles resource into VRAM.
 //
 // REQUIRES: Force-Blank
+// Uses DMA Channel 0
 //
 // DB = 0x80
 #[mem8, idx16]
@@ -212,6 +213,88 @@ func load_tiles_resource_into_vram(resourceId : resources.tiles in a, vramWordAd
 
 
 let load_tiles_resource_into_vram_a = load_tiles_resource_into_vram as func(u8 in a, u16 in xx);
+
+
+
+
+// Transfer the first `size` bytes of resource data into Work-RAM bank 0x7e.
+//
+// ASSUMES: resource size > size
+// Uses DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+func transfer_resource_header_to_wram7e(_resourceData : ResourceEntry in res, ptr : u16 in xx, size : u16 in yy)
+{
+    // Assumes res.farPtr is not Work-RAM.
+    // ::TODO slow path if `res.farPtr` bank is a Work-RAM address::
+
+    snes.wram.address_hl = xx;
+    snes.wram.address_bank = a = 0x7e;
+
+    snes.dma0.control = a = snes.dma.CONTROL_MODE_A;
+    snes.dma0.mdma_dest = a = <:&snes.wram.data;
+    snes.dma0.mdma_size_hl = yy;
+
+    snes.dma0.src_address_hl = xx = *(&res.farPtr as *u16);
+    snes.dma0.src_address_bank = a = #:res.farPtr;
+
+    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+}
+
+
+
+// Transfer palette data from resource data into CGRAM.
+//
+// NOTE: The size and location of the palette data is fixed.
+//
+// ASSUMES: _resourceData.size >= offset + size
+//
+// REQUIRES: Force-Blank
+// REQUIRES: `snes.ppu.cgram_address` set
+// Uses DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func transfer_resource_palette__forceblank(_resourceData : ResourceEntry in res,
+                                                  let offset : u16, let size : u16) {
+    mem16();
+    #[mem16] {
+        xx = aa = *(&res.farPtr as *u16) + offset;
+    }
+    mem8();
+
+    dma.transfer_to_cgram__forceblank(#:res.farPtr, xx, size);
+}
+
+
+
+// Transfer the tail-end of the resource data to VRAM, starting at `offset`.
+//
+// NOTE: The number of bytes to transfer is determined by the resource data size (`_resourceData.size - offset`
+//
+// ASSUMES: _resourceData.size > offset.
+//
+// REQUIRES: Force-Blank
+// REQUIRES: `snes.ppu.vram_address_hl` set
+// Uses DMA Channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func transfer_resource_tail_to_vram__forceblank(_resourceData : ResourceEntry in res, let offset : u16)
+{
+    mem16();
+    #[mem16] {
+        // addr
+        xx = aa = *(&res.farPtr as *u16) + offset;
+
+        // size
+        yy = aa = res.size - offset;
+    }
+    mem8();
+
+    dma.transfer_to_vram__forceblank(#:res.farPtr, xx, yy);
+}
 
 
 }

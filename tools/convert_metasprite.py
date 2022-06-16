@@ -743,15 +743,11 @@ def generate_ppu_data(ms_input, tileset, palette_data):
     data.append(ms_input.first_tile & 0xff)
     data.append(ms_input.first_tile >> 8)
 
-    # tile_data_size
-    data.append(len(tile_data) & 0xff)
-    data.append(len(tile_data) >> 8)
+    # palette_data
+    data += palette_data
 
     # tile_data
     data += tile_data
-
-    # palette_data
-    data += palette_data
 
     return data
 
