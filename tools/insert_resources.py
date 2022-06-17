@@ -9,22 +9,12 @@ import argparse
 
 from _json_formats import load_mappings_json, load_entities_json
 
-from _common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET
+from _common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET, ResourceType
 
 from _entity_data import ENTITY_ROM_DATA_LABEL, validate_entity_rom_data_symbols, \
                          expected_blank_entity_rom_data, create_entity_rom_data
 from convert_metasprite import text_to_msfs_entries, build_ms_fs_data
 from convert_resources import load_resource_data_from_file
-
-
-# order MUST match `ResourceType` enum in `src/metasprites.wiz`
-# and match `RESOURCE_TYPES` in `tools/generate-resources-wiz.py`
-RESOURCE_TYPES = {
-    # mappings name
-    'mt_tileset'      : 0,
-    'ms_spritesheets' : 1,
-    'tiles'           : 2,
-}
 
 
 def read_binary_file(path, max_size):
@@ -178,7 +168,7 @@ class ResourceInserter:
 
 
     def resource_table_for_type(self, resource_type):
-        resource_type_id = RESOURCE_TYPES[resource_type]
+        resource_type_id = resource_type.value
 
         nrptt_addr   = self.symbols['resources.__NResourcesPerTypeTable']
         retable_addr = self.symbols['resources.__ResourceEntryTable']
@@ -224,9 +214,10 @@ class ResourceInserter:
 
 
     def insert_resource_data(self, resource_data, mapping):
-        for resource_type in resource_data._fields:
-            mapping_names = getattr(mapping, resource_type)
-            resource_entries = getattr(resource_data, resource_type)
+        for resource_type_name in resource_data._fields:
+            mapping_names = getattr(mapping, resource_type_name)
+            resource_entries = getattr(resource_data, resource_type_name)
+            resource_type = ResourceType[resource_type_name]
 
             if len(mapping_names) != len(resource_entries):
                 raise RuntimeError(f"ResourceData file does not match mappings.json: { resource_type }")
@@ -302,9 +293,9 @@ def insert_resources(sfc_view, symbols, mappings, entities, resources_data):
     ri.insert_room_data(ROOM_DATA_BANK_OFFSET,
                         read_binary_file('gen/rooms.bin', ri.bank_size))
 
-    ri.insert_binary_file_resources('mt_tileset', mappings.mt_tilesets, "gen/metatiles/{}.bin")
+    ri.insert_binary_file_resources(ResourceType.mt_tilesets, mappings.mt_tilesets, "gen/metatiles/{}.bin")
 
-    ri.insert_binary_file_resources('ms_spritesheets', mappings.ms_spritesheets, "gen/metasprites/{}.bin")
+    ri.insert_binary_file_resources(ResourceType.ms_spritesheets, mappings.ms_spritesheets, "gen/metasprites/{}.bin")
 
     ri.insert_resource_data(resources_data, mappings)
 

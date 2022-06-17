@@ -12,8 +12,7 @@ import "../wiz/common/snes/snes";
 
 namespace resources {
 
-// order MUST match `RESOURCE_TYPES` in `tools/generate-resources-wiz.py`
-//        and match `RESOURCE_TYPES` in `tools/insert-resources.py`
+// order MUST match `ResourceType` in `tools/_common.py`
 enum ResourceType : u8 {
   mt_tileset,
   ms_spritesheet,

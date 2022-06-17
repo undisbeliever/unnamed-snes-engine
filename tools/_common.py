@@ -1,10 +1,23 @@
 # -*- coding: utf-8 -*-
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
+from enum import IntEnum, unique
+
 
 # Offset between the first_resource_bank and the named data banks
 MS_FS_DATA_BANK_OFFSET = 0
 ROOM_DATA_BANK_OFFSET = 1
+
+
+
+# order MUST match `ResourceType` enum in `src/metasprites.wiz`
+#
+# enum fields MUST be plural
+@unique
+class ResourceType(IntEnum):
+    mt_tilesets     = 0
+    ms_spritesheets = 1
+    tiles           = 2
 
 
 

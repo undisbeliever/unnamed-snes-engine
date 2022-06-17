@@ -8,17 +8,7 @@ import argparse
 from io import StringIO
 
 from _json_formats import load_mappings_json
-from _common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET
-
-
-# order MUST match `ResourceType` enum in `src/metasprites.wiz`
-#        and match `RESOURCE_TYPES` in `tools/insert-resources.py`
-RESOURCE_TYPES = (
-    'mt_tilesets',
-    'ms_spritesheets',
-    'tiles',
-)
-
+from _common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET, ResourceType
 
 
 def room_id_for_name(room_name):
@@ -42,16 +32,16 @@ def generate_wiz_code(mappings):
         out.write(f"let _STARTING_ROOM = { room_id_for_name(mappings.starting_room) };\n\n")
 
         out.write('let n_resources_per_type = [')
-        for enum_name in RESOURCE_TYPES:
-            l = len(getattr(mappings, enum_name))
+        for rt in ResourceType:
+            l = len(getattr(mappings, rt.name))
             out.write(f"{ l }, ")
         out.write('];\n\n')
 
 
-        for enum_name in RESOURCE_TYPES:
-            out.write(f"enum { enum_name } : u8 {{\n")
+        for rt in ResourceType:
+            out.write(f"enum { rt.name } : u8 {{\n")
 
-            for i in getattr(mappings, enum_name):
+            for i in getattr(mappings, rt.name):
                 out.write(f"  { i },\n")
 
             out.write('};\n\n')
