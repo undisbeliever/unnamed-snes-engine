@@ -196,6 +196,8 @@ class Editor:
             self.canvas['scrollregion'] = (0, 0, self.image.width() + FRAME_WIDTH, self.image.height() + FRAME_WIDTH)
 
 
+        assert self.image is not None
+
         c.delete('all')
         c.create_image(0, 0, image=self.image, anchor=tk.NW)
 
@@ -216,7 +218,7 @@ class Editor:
         # Frame grid
         image_width = self.image.width()
         image_height = self.image.height()
-        frames_per_row = image_width / (fs.frame_width * ZOOM)
+        frames_per_row = image_width // (fs.frame_width * ZOOM)
 
         frame_width = ZOOM * fs.frame_width
         frame_height = ZOOM * fs.frame_height
@@ -255,6 +257,8 @@ class Editor:
                     c.create_text(x + 5, y + 3, anchor=tk.NW, text=frame_name)
 
                 if block_pattern and show_objects:
+                    assert block.x is not None and block.y is not None
+
                     for o in block_pattern.objects:
                         ox = x + (block.x + o.xpos) * ZOOM
                         oy = y + (block.y + o.ypos) * ZOOM

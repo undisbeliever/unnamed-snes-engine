@@ -20,7 +20,7 @@ ENTITY_ROM_DATA_SOA_LABELS = (
 ENTITY_ROM_DATA_LABEL = ENTITY_ROM_DATA_SOA_LABELS[0]
 
 
-def validate_entity_rom_data_symbols(symbols : dict[str, int], n_entities : int) -> bool:
+def validate_entity_rom_data_symbols(symbols : dict[str, int], n_entities : int) -> None:
     array_size = n_entities * 2
 
     addr = symbols[ENTITY_ROM_DATA_LABEL]
@@ -28,10 +28,7 @@ def validate_entity_rom_data_symbols(symbols : dict[str, int], n_entities : int)
     for label in ENTITY_ROM_DATA_SOA_LABELS:
         if symbols[label] != addr:
             raise RuntimeError(f"Incorrect address for `{ label }`.  Maybe N_ENTITY_TYPES has changed?")
-            return False
         addr += array_size
-
-    return True
 
 
 

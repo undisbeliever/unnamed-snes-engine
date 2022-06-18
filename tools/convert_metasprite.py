@@ -331,7 +331,7 @@ def add_i8aabb(data : bytearray, box : Optional[Aabb], fs : MsFrameset) -> None:
         y2 = i8_cast(y2 - fs.y_origin)
 
         if x1 == NO_AABB_VALUE:
-            raiseValueError(f"Invalid AABB (x1 cannot be { NO_AABB_VALUE }): { box }")
+            raise ValueError(f"Invalid AABB (x1 cannot be { NO_AABB_VALUE }): { box }")
 
     else:
         x1 = x2 = y1 = y2 = NO_AABB_VALUE
@@ -354,15 +354,21 @@ def extract_frame(image : PIL.Image.Image, pattern : MsPattern, palettes_map : l
         if o.size == 8:
             tile = extract_small_tile(image, x + o.xpos, y + o.ypos)
             palette_id, pal_map = get_palette_id(tile, palettes_map)
+            if pal_map is None:
+                raise RuntimeError(f"Cannot find palette for small object tile at { x + o.xpos }, { y + o.ypos }")
             tile_data = bytes([pal_map[c] for c in tile])
             tile_id, hflip, vflip = tileset.add_or_get_small_tile(tile_data)
         else:
             tile = extract_large_tile(image, x + o.xpos, y + o.ypos)
             palette_id, pal_map = get_palette_id(tile, palettes_map)
+            if pal_map is None:
+                raise RuntimeError(f"Cannot find palette for large object tile at { x + o.xpos }, { y + o.ypos }")
             tile_data = bytes([pal_map[c] for c in tile])
             tile_id, hflip, vflip = tileset.add_or_get_large_tile(tile_data)
 
-        assert(tile_id < 512)
+        assert tile_id < 512
+        assert palette_id is not None
+
         data.append(tile_id & 0xff)
         data.append((tile_id >> 8)
                     | ((palette_id & 7) << 1)
@@ -415,6 +421,9 @@ def build_animation_data(ani : MsAnimation, get_frame_id : Callable[[Name], int]
     ani_data.append(ANIMATION_DELAY_IDS[ani.delay_type])
 
     if ani.fixed_delay is None:
+        assert ani.frame_delays is not None
+        assert len(ani.frame_delays) == len(ani.frames)
+
         for f, d in zip(ani.frames, ani.frame_delays):
             ani_data.append(get_frame_id(f))
             ani_data.append(ani_delay_converter(d))
@@ -528,6 +537,8 @@ def build_frameset(fs : MsFrameset, ms_export_orders : MsExportOrder, ms_dir : F
                     x_offset = fs.x_origin - pattern_x
                     y_offset = fs.y_origin - pattern_y
                 else:
+                    assert block.x is not None and block.y is not None
+
                     pattern = block_pattern
 
                     x += block.x
@@ -577,6 +588,7 @@ def build_frameset(fs : MsFrameset, ms_export_orders : MsExportOrder, ms_dir : F
 
 
     if all_blocks_use_the_same_pattern:
+        assert fs.pattern
         pattern_name = fs.pattern
     else:
         pattern_name = "dynamic_pattern"

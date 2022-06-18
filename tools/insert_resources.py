@@ -50,6 +50,8 @@ def read_symbols_file(symbol_filename : Filename) -> dict[str, int]:
                 continue
 
             m = regex.match(line)
+            if not m:
+                raise ValueError('Cannot read symbol file: invalid line')
             addr = (int(m.group(1), 16) << 16) | (int(m.group(2), 16))
             out[m.group(3)] = addr
 
@@ -88,7 +90,7 @@ class ResourceInserter:
             self.bank_start : int = 0
             self.bank_size  : int = 64 * 1024
         else:
-            raise ValueError(f"Invalid mapping mode: { mapping.mode }")
+            raise ValueError(f"Invalid mapping mode: { memory_map.mode }")
 
 
         self.bank_offset      : int = memory_map.first_resource_bank
@@ -234,7 +236,7 @@ class ResourceInserter:
 
             for i in range(len(resource_entries)):
                 if mapping_names[i] != resource_entries[i].name:
-                    raise RuntimeError(f"ResourceData file does not match mappings.json: { resource_type }: { mappings[i] }, { resource_entries[i] }")
+                    raise RuntimeError(f"ResourceData file does not match mappings.json: { resource_type }: { mapping_names[i] }, { resource_entries[i] }")
 
             self._insert_binary_resources(
                     resource_type, len(mapping_names),
@@ -342,7 +344,7 @@ def main() -> None:
 
     sfc_data = bytearray(read_binary_file(args.sfc_input, 4 * 1024 * 1024))
 
-    out = insert_resources(memoryview(sfc_data), symbols, mappings, entities, resources_data)
+    insert_resources(memoryview(sfc_data), symbols, mappings, entities, resources_data)
 
     with open(args.output, 'wb') as fp:
         fp.write(sfc_data)

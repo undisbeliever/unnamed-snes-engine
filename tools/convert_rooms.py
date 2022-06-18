@@ -75,6 +75,9 @@ def parse_layer_tag(tag : xml.etree.ElementTree.Element) -> list[int]:
 
     validate_tag_attr(data_tag, 'compression', 'gzip')
 
+    if not data_tag.text:
+        raise ValueError("Expected base64 encoded data")
+
     binary_data = gzip.decompress(base64.b64decode(data_tag.text))
 
     assert len(binary_data) == MAP_WIDTH * MAP_HEIGHT * 4
@@ -155,6 +158,12 @@ def parse_tmx_map(et : xml.etree.ElementTree.ElementTree) -> TmxMap:
     if entities is None:
         entities = list()
 
+    if tileset is None:
+        raise ValueError('Missing <tileset> tag')
+
+    if tiles is None:
+        raise ValueError('Missing <layer> tag')
+
     return TmxMap(tileset, tiles, entities)
 
 
@@ -164,6 +173,8 @@ def get_entity_parameter(e : TmxEntity, entities : OrderedDict[str, Entity]) -> 
 
     if p:
         if p.type == 'enum':
+            if not e.parameter:
+                raise ValueError(f"Missing parameter value for type: { p.type }")
             return p.values.index(e.parameter)
         else:
             raise ValueError(f"Unknown parameter type: { p.type }")

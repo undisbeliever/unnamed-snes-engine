@@ -264,10 +264,10 @@ def vflip_large_tile(tile : LargeTileData) -> LargeTileData:
 
 def split_large_tile(tile : LargeTileData) -> tuple[SmallTileData, SmallTileData, SmallTileData, SmallTileData]:
     return (
-        [ tile[y * 16 + x] for y in range(0, 8 ) for x in range(0, 8 ) ],
-        [ tile[y * 16 + x] for y in range(0, 8 ) for x in range(8, 16) ],
-        [ tile[y * 16 + x] for y in range(8, 16) for x in range(0, 8 ) ],
-        [ tile[y * 16 + x] for y in range(8, 16) for x in range(8, 16) ],
+        bytes(tile[y * 16 + x] for y in range(0, 8 ) for x in range(0, 8 ) ),
+        bytes(tile[y * 16 + x] for y in range(0, 8 ) for x in range(8, 16) ),
+        bytes(tile[y * 16 + x] for y in range(8, 16) for x in range(0, 8 ) ),
+        bytes(tile[y * 16 + x] for y in range(8, 16) for x in range(8, 16) ),
     )
 
 
@@ -286,6 +286,8 @@ def convert_tilemap_and_tileset(tiles : Generator[SmallColorTile, None, None], p
         palette_id, pal_map = get_palette_id(tile, palettes_map)
 
         if pal_map:
+            assert palette_id is not None
+
             # Must be bytes() here as a dict() key must be immutable
             tile_data = bytes([pal_map[c] for c in tile])
 

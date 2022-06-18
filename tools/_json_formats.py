@@ -446,16 +446,20 @@ def __read_animation_frames__no_fixed_delay(l : list[Any]) -> tuple[list[Name], 
 
 
 
-def __read_aabb(s : Optional[str]) -> Optional[Aabb]:
-    # Allow blank aabb in json source
-    if not s:
-        return None
+def __read_aabb(s : str) -> Aabb:
     if not isinstance(s, str):
         raise ValueError('Error: Expected a string containing four integers (aabb)')
     v = s.split()
     if len(v) != 4:
         raise ValueError('Error: Expected a string containing four integers (aabb)')
     return Aabb(int(v[0]), int(v[1]), int(v[2]), int(v[3]))
+
+
+
+def __read_optional_aabb(s : Optional[str]) -> Optional[Aabb]:
+    if not s:
+        return None
+    return __read_aabb(s)
 
 
 
@@ -468,7 +472,7 @@ def __read_flip(s : Optional[str]) -> Optional[str]:
     if s in _VALID_FLIPS:
         return s
 
-    raise ValueError(f"Error: Unknown flip value: {flip}")
+    raise ValueError(f"Error: Unknown flip value: { s }")
 
 
 
@@ -556,8 +560,8 @@ def __load_ms_framesets(json_input : list[dict[str, Any]]) -> OrderedDict[Name, 
 
     for f in json_input:
         fs_pattern = check_optional_name(f['pattern'])
-        fs_default_hitbox = __read_aabb(f['defaultHitbox']) if 'defaultHitbox' in f else None
-        fs_default_hurtbox = __read_aabb(f['defaultHurtbox']) if 'defaultHurtbox' in f else None
+        fs_default_hitbox = __read_optional_aabb(f.get('defaultHitbox'))
+        fs_default_hurtbox = __read_optional_aabb(f.get('defaultHurtbox'))
 
         fs = MsFrameset(
                 name = check_name(f['name']),
@@ -630,7 +634,7 @@ def __load__resource_tiles(json_input : dict[str, Any], dirname : Filename) -> d
 
     for name, v in json_input.items():
         if name in out:
-            raise ValueError(f"Duplicate tiles name: { t.name }")
+            raise ValueError(f"Duplicate tiles name: { name }")
 
         out[name] = TilesInput(
                 name = name,
