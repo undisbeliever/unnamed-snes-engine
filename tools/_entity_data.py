@@ -3,6 +3,9 @@
 
 
 import itertools
+from collections import OrderedDict
+
+from _json_formats import Name, ScopedName, Entity, EntityFunction
 
 
 ENTITY_ROM_DATA_SOA_LABELS = (
@@ -17,7 +20,7 @@ ENTITY_ROM_DATA_SOA_LABELS = (
 ENTITY_ROM_DATA_LABEL = ENTITY_ROM_DATA_SOA_LABELS[0]
 
 
-def validate_entity_rom_data_symbols(symbols, n_entities):
+def validate_entity_rom_data_symbols(symbols : dict[str, int], n_entities : int) -> bool:
     array_size = n_entities * 2
 
     addr = symbols[ENTITY_ROM_DATA_LABEL]
@@ -32,7 +35,7 @@ def validate_entity_rom_data_symbols(symbols, n_entities):
 
 
 
-def expected_blank_entity_rom_data(symbols, n_entities):
+def expected_blank_entity_rom_data(symbols : dict[str, int], n_entities : int) -> bytes:
     blank_init_function_addr = symbols['entities._blank_init_function'] & 0xffff
     blank_entity_function_addr = symbols['entities._blank_entity_function'] & 0xffff
 
@@ -44,11 +47,12 @@ def expected_blank_entity_rom_data(symbols, n_entities):
 
 
 
-def create_entity_rom_data(entities, entity_functions, symbols, metasprite_map):
-    out = bytearray(2 * len(entities) * len(ENTITY_ROM_DATA_SOA_LABELS))
+def create_entity_rom_data(entities_input : OrderedDict[Name, Entity], entity_functions : OrderedDict[Name, EntityFunction], symbols : dict[str, int], metasprite_map : dict[ScopedName, tuple[int, Name]]) -> bytes:
+
+    out = bytearray(2 * len(entities_input) * len(ENTITY_ROM_DATA_SOA_LABELS))
     i = 0
 
-    def write_function_addr(fname):
+    def write_function_addr(fname : str) -> None:
         nonlocal out, i
 
         addr = symbols[fname]
@@ -60,7 +64,7 @@ def create_entity_rom_data(entities, entity_functions, symbols, metasprite_map):
         i += 2
 
 
-    entities = entities.values()
+    entities = entities_input.values()
 
     # init_functions
     for e in entities:

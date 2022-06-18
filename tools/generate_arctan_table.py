@@ -15,7 +15,7 @@ MAX_ANGLE = (N_ARCTAN_ANGLES // 4) - 1
 FIXED_POINT_BITS = 5
 
 
-def build_arctan_32x2_table():
+def build_arctan_32x2_table() -> list[int]:
     FIXED_POINT_SCALE = 1 << FIXED_POINT_BITS
 
     out = list()
@@ -32,7 +32,7 @@ def build_arctan_32x2_table():
 
 
 
-def generate_wiz_code(arctan_32x2_table):
+def generate_wiz_code(arctan_32x2_table : list[int]) -> str:
 
     assert len(arctan_32x2_table) < 0xff
 
@@ -67,7 +67,7 @@ in rodata0 {
 
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output', required=True,
                         help='wiz output file')
@@ -78,7 +78,7 @@ def parse_arguments():
 
 
 
-def main():
+def main() -> None:
     args = parse_arguments()
 
     arctan_32x2_table = build_arctan_32x2_table()

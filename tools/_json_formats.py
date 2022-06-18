@@ -7,39 +7,49 @@ import re
 import json
 import os.path
 
-from collections import namedtuple, OrderedDict
+from collections import OrderedDict
+
+from typing import Any, NamedTuple, Optional, Union
 
 
 
-def check_name(s):
+Name       = str
+ScopedName = str
+RoomName   = str
+
+Filename   = str
+
+
+
+def check_name(s : str) -> Name:
     if re.match(r'[a-zA-Z0-9_]+$', s):
         return s
     else:
         raise ValueError(f"Invalid name: {s}")
 
 
-def check_name_with_dot(s):
+def check_name_with_dot(s : str) -> ScopedName:
     if re.match(r'[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$', s):
         return s
     else:
         raise ValueError(f"Invalid name: {s}")
 
 
-def check_optional_name(s):
+def check_optional_name(s : Optional[str]) -> Optional[Name]:
     if s:
         return check_name(s)
     else:
         return None
 
 
-def check_room_name(s):
+def check_room_name(s : str) -> RoomName:
     if re.match(r'[a-zA-Z0-9_-]+$', s):
         return s
     else:
         raise ValueError(f"Invalid name: {s}")
 
 
-def check_name_list(l):
+def check_name_list(l : list[str]) -> list[Name]:
     if not isinstance(l, list):
         raise ValueError('Error: Not a list')
 
@@ -49,21 +59,21 @@ def check_name_list(l):
     return l
 
 
-def check_obj_size(v):
+def check_obj_size(v : Union[int, str]) -> int:
     i = int(v)
     if i not in (8, 16):
         raise ValueError(f"Invalid Object Size: { i }")
     return i
 
 
-def optional_int(v):
+def optional_int(v : Optional[Union[int, str]]) -> Optional[int]:
     if v is not None:
         return int(v)
     else:
         return None
 
 
-def check_bool(v):
+def check_bool(v : Union[bool, str, None]) -> bool:
     if v is None:
         return False
 
@@ -79,13 +89,13 @@ def check_bool(v):
     return bool(v)
 
 
-def check_float(v):
+def check_float(v : Union[float, int]) -> Union[float, int]:
     if not isinstance(v, float) and not isinstance(v, int):
         raise ValueError(f"Invalid float value: { v }")
     return v
 
 
-def check_hex_or_int(v):
+def check_hex_or_int(v : Union[int, str]) -> int:
     if isinstance(v, int):
         return v
     if isinstance(v, str):
@@ -98,17 +108,43 @@ def check_hex_or_int(v):
 # entities.json
 # =============
 
-EntitiesJson = namedtuple('EntitiesJson', ('entity_functions', 'entities'))
 
-EntityFunction = namedtuple('EntityFunction', ('name', 'id', 'ms_export_order', 'parameter', 'uses_process_function_from'))
-EfParameter = namedtuple('EfParameter', ('type', 'values'))
-EntityVision = namedtuple('EntityVision', ('a', 'b'))
-
-Entity = namedtuple('Entity', ('name', 'id', 'code', 'metasprites', 'zpos', 'vision', 'health', 'attack'))
+class EfParameter(NamedTuple):
+    type    : str
+    values  : list[Name]
 
 
+class EntityFunction(NamedTuple):
+    name                        : Name
+    id                          : int
+    ms_export_order             : Name
+    parameter                   : Optional[EfParameter]
+    uses_process_function_from  : Optional[Name]
 
-def _read_entity_vision_parameter(s):
+
+class EntityVision(NamedTuple):
+    a   : int
+    b   : int
+
+
+class Entity(NamedTuple):
+    name        : Name
+    id          : int
+    code        : EntityFunction
+    metasprites : ScopedName
+    zpos        : int
+    vision      : Optional[EntityVision]
+    health      : int
+    attack      : int
+
+
+class EntitiesJson(NamedTuple):
+    entity_functions : OrderedDict[Name, EntityFunction]
+    entities         : OrderedDict[Name, Entity]
+
+
+
+def _read_entity_vision_parameter(s : Optional[str]) -> Optional[EntityVision]:
     if s is None:
         return None
     if not isinstance(s, str):
@@ -120,7 +156,7 @@ def _read_entity_vision_parameter(s):
 
 
 
-def load_entities_json(filename):
+def load_entities_json(filename : Filename) -> EntitiesJson:
     with open(filename, 'r') as fp:
         entities_json = json.load(fp)
 
@@ -180,13 +216,32 @@ def load_entities_json(filename):
 # ms-export-order.json
 # ====================
 
-MsPatternObject         = namedtuple('MsPatternObject', ('xpos', 'ypos', 'size'))
-MsPattern               = namedtuple('MsPattern', ('name', 'id', 'objects'))
-MsAnimationExportOrder  = namedtuple('MsAnimationExportOrder', ('name', 'animations'))
-MsExportOrder           = namedtuple('MsExportOrder', ('patterns', 'shadow_sizes', 'animation_lists'))
+
+class MsPatternObject(NamedTuple):
+    xpos : int
+    ypos : int
+    size : int
 
 
-def _load_pattern_objects(json_list):
+class MsPattern(NamedTuple):
+    name    : Name
+    id      : int
+    objects : list[MsPatternObject]
+
+
+class MsAnimationExportOrder(NamedTuple):
+    name        : Name
+    animations  : list[Name]
+
+
+class MsExportOrder(NamedTuple):
+    patterns        : OrderedDict[Name, MsPattern]
+    shadow_sizes    : OrderedDict[Name, int]
+    animation_lists : OrderedDict[Name, MsAnimationExportOrder]
+
+
+
+def _load_pattern_objects(json_list : list[dict[str, Any]]) -> list[MsPatternObject]:
     objs = list()
 
     for o in json_list:
@@ -202,7 +257,7 @@ def _load_pattern_objects(json_list):
 
 
 
-def load_ms_export_order_json(filename):
+def load_ms_export_order_json(filename : Filename) -> MsExportOrder:
     with open(filename, 'r') as fp:
         mseo_input = json.load(fp)
 
@@ -251,15 +306,26 @@ def load_ms_export_order_json(filename):
 # =============
 
 
-Mappings = namedtuple('Mappings', ('starting_room', 'mt_tilesets', 'ms_spritesheets', 'tiles', 'interactive_tile_functions', 'memory_map'))
-MemoryMap = namedtuple('MemoryMap', ('mode', 'first_resource_bank', 'n_resource_banks'))
+class MemoryMap(NamedTuple):
+    mode                : str
+    first_resource_bank : int
+    n_resource_banks    : int
+
+
+class Mappings(NamedTuple):
+    starting_room               : RoomName
+    mt_tilesets                 : list[Name]
+    ms_spritesheets             : list[Name]
+    tiles                       : list[Name]
+    interactive_tile_functions  : list[Name]
+    memory_map                  : MemoryMap
 
 
 VALID_MEMORY_MAP_MODES = ('hirom', 'lorom')
 
 
 
-def __load_memory_map(json_map):
+def __load_memory_map(json_map : dict[str, Any]) -> MemoryMap:
     mode = json_map['mode']
     if mode not in VALID_MEMORY_MAP_MODES:
         raise ValueError(f"Unknown memory mapping mode: { mode }")
@@ -272,7 +338,7 @@ def __load_memory_map(json_map):
 
 
 
-def load_mappings_json(filename):
+def load_mappings_json(filename : Filename) -> Mappings:
     with open(filename, 'r') as fp:
         json_input = json.load(fp)
 
@@ -291,23 +357,68 @@ def load_mappings_json(filename):
 # ================
 
 
-MsSpritesheet = namedtuple('MsSpritesheet', ('name', 'palette', 'first_tile', 'end_tile', 'framesets'))
-MsFrameset = namedtuple('MsFrameset', ('name', 'source', 'frame_width', 'frame_height', 'x_origin', 'y_origin',
-                                       'shadow_size', 'tilehitbox', 'default_hitbox', 'default_hurtbox',
-                                       'pattern', 'ms_export_order', 'order', 'blocks',
-                                       'hitbox_overrides', 'hurtbox_overrides', 'animations'))
-MsBlock = namedtuple('MsBlock', ('pattern', 'start', 'x', 'y', 'flip', 'frames', 'default_hitbox', 'default_hurtbox'))
-
-# fixed_delay is optional
-# if fixed_delay is None, frames contains an interleaved list of `frame_name` and `frame_delay`
-MsAnimation = namedtuple('MsAnimation', ('name', 'loop', 'delay_type', 'fixed_delay', 'frames', 'frame_delays'))
+class Aabb(NamedTuple):
+    x       : int
+    y       : int
+    width   : int
+    height  : int
 
 
-TileHitbox = namedtuple('TileHitbox', ('half_width', 'half_height'))
-Aabb = namedtuple('Aabb', ('x', 'y', 'width', 'height'))
+class MsBlock(NamedTuple):
+    pattern         : Optional[Name]
+    start           : int
+    x               : Optional[int]
+    y               : Optional[int]
+    flip            : Optional[str]
+    frames          : list[Name]
+    default_hitbox  : Optional[Aabb]
+    default_hurtbox : Optional[Aabb]
 
 
-def __read_tilehitbox(s):
+class TileHitbox(NamedTuple):
+    half_width  : int
+    half_height : int
+
+
+class MsAnimation(NamedTuple):
+    name            : Name
+    loop            : bool
+    delay_type      : str
+    fixed_delay     : Optional[Union[float, int]]
+    frames          : list[Name]
+    frame_delays    : Optional[list[Union[float, int]]]
+
+
+class MsFrameset(NamedTuple):
+    name                : Name
+    source              : Filename
+    frame_width         : int
+    frame_height        : int
+    x_origin            : int
+    y_origin            : int
+    shadow_size         : str
+    tilehitbox          : TileHitbox
+    default_hitbox      : Optional[Aabb]
+    default_hurtbox     : Optional[Aabb]
+    pattern             : Optional[Name]
+    ms_export_order     : Name
+    order               : int
+    blocks              : list[MsBlock]
+    hitbox_overrides    : dict[Name, Aabb]
+    hurtbox_overrides   : dict[Name, Aabb]
+    animations          : OrderedDict[Name, MsAnimation]
+
+
+class MsSpritesheet(NamedTuple):
+    name        : Name
+    palette     : Filename
+    first_tile  : int
+    end_tile    : int
+    framesets   : OrderedDict[Name, MsFrameset]
+
+
+
+def __read_tilehitbox(s : str) -> TileHitbox:
     if not isinstance(s, str):
         raise ValueError('Error: Expected a string containing two integers (tilehitbox)')
     v = s.split()
@@ -317,7 +428,7 @@ def __read_tilehitbox(s):
 
 
 
-def __read_animation_frames__no_fixed_delay(l):
+def __read_animation_frames__no_fixed_delay(l : list[Any]) -> tuple[list[Name], list[Union[int, float]]]:
     if not isinstance(l, list):
         raise ValueError('ERROR: Expected a list (animation frame list)')
     if len(l) % 2 != 0:
@@ -335,7 +446,7 @@ def __read_animation_frames__no_fixed_delay(l):
 
 
 
-def __read_aabb(s):
+def __read_aabb(s : Optional[str]) -> Optional[Aabb]:
     # Allow blank aabb in json source
     if not s:
         return None
@@ -350,7 +461,7 @@ def __read_aabb(s):
 
 _VALID_FLIPS = frozenset(('hflip', 'vflip', 'hvflip'))
 
-def __read_flip(s):
+def __read_flip(s : Optional[str]) -> Optional[str]:
     if not s:
         return None
 
@@ -361,8 +472,8 @@ def __read_flip(s):
 
 
 
-def __load_aabb_overrides(json_map):
-    out = dict()
+def __load_aabb_overrides(json_map : Optional[dict[str, Any]]) -> dict[str, Aabb]:
+    out : dict[str, Aabb] = dict()
 
     if json_map is None:
         return out
@@ -377,7 +488,7 @@ def __load_aabb_overrides(json_map):
 
 
 
-def __load_ms_blocks(json_input, fs_pattern, fs_default_hitbox, fs_default_hurtbox):
+def __load_ms_blocks(json_input : list[dict[str, Any]], fs_pattern : Optional[Name], fs_default_hitbox : Optional[Aabb], fs_default_hurtbox : Optional[Aabb]) -> list[MsBlock]:
     blocks = list()
 
     for j in json_input:
@@ -409,7 +520,7 @@ def __load_ms_blocks(json_input, fs_pattern, fs_default_hitbox, fs_default_hurtb
 
 
 
-def __load_ms_animations(json_input):
+def __load_ms_animations(json_input : dict[str, Any]) -> OrderedDict[Name, MsAnimation]:
     animations = OrderedDict()
 
     for name, a in json_input.items():
@@ -440,7 +551,7 @@ def __load_ms_animations(json_input):
 
 
 
-def __load_ms_framesets(json_input):
+def __load_ms_framesets(json_input : list[dict[str, Any]]) -> OrderedDict[Name, MsFrameset]:
     framesets = OrderedDict()
 
     for f in json_input:
@@ -475,7 +586,7 @@ def __load_ms_framesets(json_input):
     return framesets
 
 
-def _load_metasprites(json_input):
+def _load_metasprites(json_input : dict[str, Any]) -> MsSpritesheet:
     return MsSpritesheet(
             name = check_name(json_input['name']),
             palette = str(json_input['palette']),
@@ -486,14 +597,14 @@ def _load_metasprites(json_input):
 
 
 
-def load_metasprites_json(filename):
+def load_metasprites_json(filename : Filename) -> MsSpritesheet:
     with open(filename, 'r') as fp:
         json_input = json.load(fp)
     return _load_metasprites(json_input)
 
 
 
-def load_metasprites_string(text):
+def load_metasprites_string(text : str) -> MsSpritesheet:
     json_input = json.loads(text)
     return _load_metasprites(json_input)
 
@@ -503,13 +614,18 @@ def load_metasprites_string(text):
 # resources.json
 #
 
+class TilesInput(NamedTuple):
+    name    : Name
+    format  : str
+    source  : Filename
 
-ResourcesJson = namedtuple('ResourcesJson', ('tiles'))
 
-TilesInput = namedtuple('TilesInput', ('name', 'format', 'source'))
+class ResourcesJson(NamedTuple):
+    tiles   : dict[Name, TilesInput]
 
 
-def __load__resource_tiles(json_input, dirname):
+
+def __load__resource_tiles(json_input : dict[str, Any], dirname : Filename) -> dict[Name, TilesInput]:
     out = dict()
 
     for name, v in json_input.items():
@@ -526,7 +642,7 @@ def __load__resource_tiles(json_input, dirname):
 
 
 
-def load_resources_json(filename):
+def load_resources_json(filename : Filename) -> ResourcesJson:
 
     dirname = os.path.dirname(filename)
 

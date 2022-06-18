@@ -12,10 +12,12 @@ import struct
 import argparse
 import xml.etree.ElementTree
 import posixpath
+from collections import OrderedDict
 
-from collections import namedtuple
+from _json_formats import load_entities_json, load_mappings_json, \
+                          Mappings, EntitiesJson, Entity
 
-from _json_formats import load_entities_json, load_mappings_json
+from typing import NamedTuple, Optional
 
 
 MAP_WIDTH = 16
@@ -27,30 +29,42 @@ TILE_SIZE = 16
 
 
 
-# A limited subset of the TMX data format (only supporting one map layer and tileset)::
-TmxMap = namedtuple('MapData', ('tileset', 'map', 'entities'))
-Entity = namedtuple('Entity', ('x', 'y', 'type', 'parameter'))
-TilesetData = namedtuple('TilesetData', ('name', 'firstgid'))
+# `TmxMap` is a limited subset of the TMX data format (only supporting one map layer and tileset)
+
+class TmxTileset(NamedTuple):
+    name        : str
+    firstgid    : int
+
+class TmxEntity(NamedTuple):
+    x           : int
+    y           : int
+    type        : str
+    parameter   : Optional[str]
+
+class TmxMap(NamedTuple):
+    tileset     : TmxTileset
+    map         : list[int]
+    entities    : list[TmxEntity]
 
 
 
-def validate_tag_attr(tag, name, value):
+def validate_tag_attr(tag : xml.etree.ElementTree.Element, name : str, value : str) -> None:
     if tag.attrib[name] != value:
         raise ValueError(f"Invalid attribute: Expected {name}=\"{value}\"")
 
 
 
-def parse_tileset_tag(tag):
-    # Return basename without extension
+def parse_tileset_tag(tag : xml.etree.ElementTree.Element) -> TmxTileset:
+    # basename without extension
     tileset_name = posixpath.splitext(posixpath.basename(tag.attrib['source']))[0]
 
     firstgid = int(tag.attrib['firstgid'])
 
-    return TilesetData(tileset_name, firstgid)
+    return TmxTileset(tileset_name, firstgid)
 
 
 
-def parse_layer_tag(tag):
+def parse_layer_tag(tag : xml.etree.ElementTree.Element) -> list[int]:
     validate_tag_attr(tag, 'width', str(MAP_WIDTH))
     validate_tag_attr(tag, 'height', str(MAP_HEIGHT))
 
@@ -71,7 +85,7 @@ def parse_layer_tag(tag):
 
 
 
-def parse_objectgroup_tag(tag):
+def parse_objectgroup_tag(tag : xml.etree.ElementTree.Element) -> list[TmxEntity]:
     objects = list()
 
     if 'offsetx' in tag.attrib or 'offsety' in tag.attrib:
@@ -97,14 +111,14 @@ def parse_objectgroup_tag(tag):
                             else:
                                 raise ValueError('Only one parameter is allowed per entity')
 
-            objects.append(Entity(int(child.attrib['x']), int(child.attrib['y']), child.attrib['type'], parameter))
+            objects.append(TmxEntity(int(child.attrib['x']), int(child.attrib['y']), child.attrib['type'], parameter))
 
 
     return objects
 
 
 
-def parse_tmx_map(et):
+def parse_tmx_map(et : xml.etree.ElementTree.ElementTree) -> TmxMap:
     root = et.getroot()
 
     if root.tag != 'map':
@@ -145,7 +159,7 @@ def parse_tmx_map(et):
 
 
 
-def get_entity_parameter(e, entities):
+def get_entity_parameter(e : TmxEntity, entities : OrderedDict[str, Entity]) -> int:
     p = entities[e.type].code.parameter
 
     if p:
@@ -162,7 +176,7 @@ def get_entity_parameter(e, entities):
 
 
 
-def create_room_entities_soa(room_entities, entities):
+def create_room_entities_soa(room_entities : list[TmxEntity], entities : OrderedDict[str, Entity]) -> bytes:
     if len(room_entities) > ENTITIES_IN_MAP:
         raise ValueError(f"Too many entities in room ({ len(room_entities) }, max: { ENTITIES_IN_MAP }");
 
@@ -194,7 +208,7 @@ def create_room_entities_soa(room_entities, entities):
 
 
 
-def create_map_data(tmx_map, mapping, entities):
+def create_map_data(tmx_map : TmxMap, mapping : Mappings, entities : OrderedDict[str, Entity]) -> bytes:
     data = bytearray()
 
     try:
@@ -213,7 +227,7 @@ def create_map_data(tmx_map, mapping, entities):
 
 
 
-def compile_room(filename, entities, mapping):
+def compile_room(filename : str, entities : EntitiesJson, mapping : Mappings) -> bytes:
     with open(filename, 'r') as fp:
         tmx_et = xml.etree.ElementTree.parse(fp)
 
@@ -225,7 +239,7 @@ def compile_room(filename, entities, mapping):
 
 
 
-def get_list_of_tmx_files(directory):
+def get_list_of_tmx_files(directory : str) -> list[str]:
     tmx_files = list()
 
     for e in os.scandir(directory):
@@ -242,7 +256,7 @@ def get_list_of_tmx_files(directory):
 
 ROOM_LOCATION_REGEX = re.compile(r'(\d+)-(\d+)-.+.tmx$')
 
-def extract_room_id(basename):
+def extract_room_id(basename : str) -> int:
     m = ROOM_LOCATION_REGEX.match(basename)
     if not m:
         raise ValueError("Invalid room filename")
@@ -251,7 +265,7 @@ def extract_room_id(basename):
 
 
 
-def compile_rooms(rooms_directory, entities, mapping):
+def compile_rooms(rooms_directory : str, entities : EntitiesJson, mapping : Mappings) -> bytes:
 
     tmx_files = get_list_of_tmx_files(rooms_directory)
 
@@ -290,7 +304,7 @@ def compile_rooms(rooms_directory, entities, mapping):
 
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output', required=True,
                         help='output file')
@@ -307,7 +321,7 @@ def parse_arguments():
 
 
 
-def main():
+def main() -> None:
     args = parse_arguments()
 
     entities = load_entities_json(args.entities_json_file)

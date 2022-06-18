@@ -7,17 +7,26 @@ import re
 import os.path
 import argparse
 
-from _json_formats import load_mappings_json, load_entities_json
+from typing import Callable
+
+from _json_formats import load_mappings_json, load_entities_json, \
+                          Name, Filename, MemoryMap, Mappings, EntitiesJson
 
 from _common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET, ResourceType
 
 from _entity_data import ENTITY_ROM_DATA_LABEL, validate_entity_rom_data_symbols, \
                          expected_blank_entity_rom_data, create_entity_rom_data
 from convert_metasprite import text_to_msfs_entries, build_ms_fs_data
-from convert_resources import load_resource_data_from_file
+from convert_resources import load_resource_data_from_file, ResourceEntry, ResourceData
 
 
-def read_binary_file(path, max_size):
+
+Address = int
+RomOffset = int
+
+
+
+def read_binary_file(path : Filename, max_size : int) -> bytes:
     with open(path, 'rb') as fp:
         out = fp.read(max_size)
 
@@ -28,7 +37,7 @@ def read_binary_file(path, max_size):
 
 
 
-def read_symbols_file(symbol_filename):
+def read_symbols_file(symbol_filename : Filename) -> dict[str, int]:
     regex = re.compile(r'([0-9A-F]{2}):([0-9A-F]{4}) (.+)')
 
     out = dict()
@@ -47,13 +56,13 @@ def read_symbols_file(symbol_filename):
     return out
 
 
-def get_largest_rom_address(symbols):
+def get_largest_rom_address(symbols : dict[str, int]) -> int:
     # assumes max is never a zeropage or low-Ram address
     return max([a for a in symbols.values() if a & 0xfe0000 != 0x7e ])
 
 
 
-def hirom_address_to_rom_offset(addr):
+def hirom_address_to_rom_offset(addr : Address) -> RomOffset:
     if addr & 0x3f0000 < 0x40 and addr & 0xffff < 0x8000:
         raise ValueError(f"addr is not a ROM address: 0x{addr:06x}")
 
@@ -69,22 +78,23 @@ class ResourceInserter:
     BLANK_RESOURCE_ENTRY = bytes(5)
 
 
-    def __init__(self, sfc_view, symbols, memory_map):
-        self.view = sfc_view
-        self.symbols = symbols
+    def __init__(self, sfc_view : memoryview, symbols : dict[str, int], memory_map : MemoryMap):
+        self.view    : memoryview = sfc_view
+        self.symbols : dict[str, int] = symbols
 
         # Assume HiRom mapping
         if memory_map.mode == 'hirom':
-            self.address_to_rom_offset = hirom_address_to_rom_offset
-            self.bank_start = 0
-            self.bank_size = 64 * 1024
+            self.address_to_rom_offset : Callable[[int], int] = hirom_address_to_rom_offset
+            self.bank_start : int = 0
+            self.bank_size  : int = 64 * 1024
         else:
             raise ValueError(f"Invalid mapping mode: { mapping.mode }")
 
 
-        self.bank_offset = memory_map.first_resource_bank
-        self.n_resource_banks = memory_map.n_resource_banks
-        self.bank_positions = [ self.bank_start ] * memory_map.n_resource_banks
+        self.bank_offset      : int = memory_map.first_resource_bank
+        self.n_resource_banks : int = memory_map.n_resource_banks
+
+        self.bank_positions   : list[int] = [ self.bank_start ] * memory_map.n_resource_banks
 
 
         last_symbol_bank = get_largest_rom_address(symbols) >> 16
@@ -97,22 +107,22 @@ class ResourceInserter:
             raise RuntimeError(f"ERROR:  Expected a sfc file that is { expected_size // 1024 } bytes in size")
 
 
-    def label_offset(self, label):
+    def label_offset(self, label : str) -> RomOffset:
         return self.address_to_rom_offset(self.symbols[label])
 
 
-    def read_u8(self, addr):
+    def read_u8(self, addr : Address) -> int:
         return self.view[self.address_to_rom_offset(addr)]
 
 
 
-    def read_u16(self, addr):
+    def read_u16(self, addr : Address) -> int:
         ra = self.address_to_rom_offset(addr)
         return self.view[ra] | (self.view[ra + 1] << 8)
 
 
 
-    def insert_blob(self, blob):
+    def insert_blob(self, blob : bytes) -> Address:
         assert isinstance(blob, bytes) or isinstance(blob, bytearray)
 
         blob_size = len(blob)
@@ -133,13 +143,13 @@ class ResourceInserter:
         raise RuntimeError(f"Cannot fit blob of size { blob_size } into binary")
 
 
-    def insert_blob_at_label(self, label, blob):
+    def insert_blob_at_label(self, label : str, blob : bytes) -> None:
         # NOTE: There is no boundary checking.  This could override data if I am not careful.
         o = self.label_offset(label)
         self.view[o : o + len(blob)] = blob
 
 
-    def insert_blob_into_start_of_bank(self, bank_id, blob):
+    def insert_blob_into_start_of_bank(self, bank_id : int, blob : bytes) -> Address:
         blob_size = len(blob)
         assert blob_size > 0
 
@@ -151,7 +161,7 @@ class ResourceInserter:
         if blob_size > self.BANK_END:
             raise RuntimeError("Cannot fit blob of size { blob_size } into binary")
 
-        addr = ((self.bank_offset + bank_id) << 16) + u16_addr
+        addr : Address = ((self.bank_offset + bank_id) << 16) + u16_addr
         rom_offset = self.address_to_rom_offset(addr)
 
         self.view[rom_offset : rom_offset+blob_size] = blob
@@ -161,13 +171,13 @@ class ResourceInserter:
         return addr
 
 
-    def confirm_initial_data_is_correct(self, label, expected_data):
+    def confirm_initial_data_is_correct(self, label : str, expected_data : bytes) -> None:
         o = self.label_offset(label)
         if self.view[o:o+len(expected_data)] != expected_data:
             raise RuntimeError(f"ROM data does not match expected data: { label }")
 
 
-    def resource_table_for_type(self, resource_type):
+    def resource_table_for_type(self, resource_type : ResourceType) -> tuple[Address, int]:
         resource_type_id = resource_type.value
 
         nrptt_addr   = self.symbols['resources.__NResourcesPerTypeTable']
@@ -179,7 +189,7 @@ class ResourceInserter:
         return resource_table_addr, expected_n_resources
 
 
-    def _insert_binary_resources(self, resource_type, n_resources, func):
+    def _insert_binary_resources(self, resource_type : ResourceType, n_resources : int, func : Callable[[int], bytes]) -> None:
         table_addr, expected_n_resources = self.resource_table_for_type(resource_type)
 
         if n_resources != expected_n_resources:
@@ -206,17 +216,17 @@ class ResourceInserter:
 
 
 
-    def insert_binary_file_resources(self, resource_type, resource_names, fmt):
+    def insert_binary_file_resources(self, resource_type : ResourceType, resource_names : list[Name], fmt : str) -> None:
         self._insert_binary_resources(
                 resource_type, len(resource_names),
                 lambda i : read_binary_file(fmt.format(resource_names[i]), self.bank_size)
         )
 
 
-    def insert_resource_data(self, resource_data, mapping):
+    def insert_resource_data(self, resource_data : ResourceData, mapping : Mappings) -> None:
         for resource_type_name in resource_data._fields:
-            mapping_names = getattr(mapping, resource_type_name)
-            resource_entries = getattr(resource_data, resource_type_name)
+            mapping_names    : list[Name]          = getattr(mapping, resource_type_name)
+            resource_entries : list[ResourceEntry] = getattr(resource_data, resource_type_name)
             resource_type = ResourceType[resource_type_name]
 
             if len(mapping_names) != len(resource_entries):
@@ -232,7 +242,7 @@ class ResourceInserter:
             )
 
 
-    def insert_room_data(self, bank_offset, room_bin):
+    def insert_room_data(self, bank_offset : int, room_bin : bytes) -> None:
         ROOM_TABLE_SIZE = 0x100 * 2
 
         room_view = memoryview(room_bin)
@@ -248,7 +258,7 @@ class ResourceInserter:
 
 
 
-def insert_metasprite_data(ri, mappings):
+def insert_metasprite_data(ri : ResourceInserter, mappings : Mappings) -> dict[str, tuple[int, Name]]:
     spritesheets = list()
 
     for ss_name in mappings.ms_spritesheets:
@@ -263,7 +273,7 @@ def insert_metasprite_data(ri, mappings):
 
 
 
-def insert_entity_rom_data(ri, entities_input, symbols, metasprite_map):
+def insert_entity_rom_data(ri : ResourceInserter, entities_input : EntitiesJson, symbols : dict[str, int], metasprite_map : dict[str, tuple[int, Name]]) -> None:
     n_entities = len(entities_input.entities)
 
     validate_entity_rom_data_symbols(symbols, n_entities)
@@ -276,7 +286,7 @@ def insert_entity_rom_data(ri, entities_input, symbols, metasprite_map):
 
 
 
-def insert_resources(sfc_view, symbols, mappings, entities, resources_data):
+def insert_resources(sfc_view : memoryview, symbols : dict[str, Address], mappings : Mappings, entities : EntitiesJson, resources_data : ResourceData) -> None:
     # sfc_view is a memoryview of a bytearray containing the SFC file
 
     # ::TODO confirm sfc_view is the correct file::
@@ -301,7 +311,7 @@ def insert_resources(sfc_view, symbols, mappings, entities, resources_data):
 
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output', required=True,
                         help='sfc output file')
@@ -322,7 +332,7 @@ def parse_arguments():
 
 
 
-def main():
+def main() -> None:
     args = parse_arguments()
 
     mappings = load_mappings_json(args.mappings_json_file)

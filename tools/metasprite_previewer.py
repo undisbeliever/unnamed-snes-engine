@@ -12,7 +12,10 @@ import tkinter as tk
 import tkinter.ttk as ttk
 from tkinter.scrolledtext import ScrolledText
 
-from _json_formats import load_ms_export_order_json, load_metasprites_string
+from typing import Any, Optional
+
+from _json_formats import load_ms_export_order_json, load_metasprites_string, \
+                          Name, Filename, MsExportOrder, MsSpritesheet
 
 
 
@@ -34,14 +37,14 @@ HURTBOX_COLOR = '#0000aa'
 
 
 class Editor:
-    def __init__(self, json_filename, ms_export_orders):
-        self.json_filename = json_filename
-        self.ms_dir = os.path.dirname(json_filename)
-        self.ms_export_orders = ms_export_orders
+    def __init__(self, json_filename : Filename, ms_export_orders : MsExportOrder):
+        self.json_filename    : Filename = json_filename
+        self.ms_dir           : Filename = os.path.dirname(json_filename)
+        self.ms_export_orders : MsExportOrder = ms_export_orders
 
-        self.ms_data = None
-        self.image = None
-        self.image_source = None
+        self.ms_data          : Optional[MsSpritesheet] = None
+        self.image            : Optional[tk.PhotoImage] = None
+        self.image_source     : Optional[Filename] = None
 
 
         self.window = tk.Tk()
@@ -71,7 +74,7 @@ class Editor:
         self.fs_combo.bind('<<ComboboxSelected>>', self.on_fs_combo_selected)
 
 
-        def add_show_cb(text):
+        def add_show_cb(text : str) -> tk.IntVar:
             v = tk.IntVar()
             v.set(1)
             cb = tk.Checkbutton(top_row, text=text, variable=v, command=self._update_canvas)
@@ -106,12 +109,12 @@ class Editor:
 
 
 
-    def mainloop(self):
+    def mainloop(self) -> None:
         self.window.mainloop()
 
 
 
-    def print_exception_traceback(self):
+    def print_exception_traceback(self) -> None:
         self.canvas.delete('all')
         self.canvas.create_text(10, 10, text=traceback.format_exc(16), anchor=tk.NW)
         self.canvas.xview(tk.MOVETO, 0)
@@ -119,19 +122,19 @@ class Editor:
 
 
 
-    def on_fs_combo_selected(self, event):
+    def on_fs_combo_selected(self, event : Any) -> None:
         self._update_canvas()
 
 
 
-    def on_refresh_clicked(self):
+    def on_refresh_clicked(self) -> None:
         self._load_and_parse_json_file()
         self._update_combobox()
         self._update_canvas()
 
 
 
-    def _load_and_parse_json_file(self):
+    def _load_and_parse_json_file(self) -> None:
         try:
             with open(self.json_filename, 'r') as fp:
                 json_text = fp.read()
@@ -150,7 +153,7 @@ class Editor:
 
 
 
-    def _update_combobox(self):
+    def _update_combobox(self) -> None:
         if self.ms_data is None:
             self.fs_combo['values'] = []
             return
@@ -164,7 +167,7 @@ class Editor:
 
 
 
-    def _update_canvas(self):
+    def _update_canvas(self) -> None:
         if self.ms_data is None:
             return
 
@@ -277,7 +280,7 @@ class Editor:
 
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('json_filename', action='store',
                         help='Sprite map JSON file')
@@ -290,7 +293,7 @@ def parse_arguments():
 
 
 
-def main():
+def main() -> None:
     args = parse_arguments()
 
     ms_export_orders = load_ms_export_order_json(args.ms_export_order_json_file)

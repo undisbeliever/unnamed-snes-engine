@@ -25,7 +25,7 @@ COSINE_TABLES = (
 )
 
 
-def build_cosine_table(amplitude):
+def build_cosine_table(amplitude : int) -> list[int]:
     out = list()
 
     for i in range(N_ANGLES):
@@ -35,7 +35,7 @@ def build_cosine_table(amplitude):
 
 
 
-def generate_wiz_code():
+def generate_wiz_code() -> str:
 
     with StringIO() as out:
 
@@ -66,7 +66,7 @@ in rodata0 {
 
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output', required=True,
                         help='wiz output file')
@@ -77,7 +77,7 @@ def parse_arguments():
 
 
 
-def main():
+def main() -> None:
     args = parse_arguments()
 
     out = generate_wiz_code()

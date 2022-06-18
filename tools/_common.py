@@ -22,20 +22,20 @@ class ResourceType(IntEnum):
 
 
 class RomData:
-    def __init__(self, addr, max_size):
-        self._out = bytearray(max_size)
+    def __init__(self, addr : int, max_size : int) -> None:
+        self._out   : bytearray = bytearray(max_size)
 
-        self._view = memoryview(self._out)
+        self._view  : memoryview = memoryview(self._out)
 
-        self._pos = 0
-        self._addr = addr
+        self._pos   : int = 0
+        self._addr  : int = addr
 
 
-    def data(self):
+    def data(self) -> memoryview:
         return self._view[0:self._pos]
 
 
-    def allocate(self, size):
+    def allocate(self, size : int) -> tuple[memoryview, int]:
         a = self._addr
         v = self._view[self._pos : self._pos + size]
 
@@ -45,7 +45,7 @@ class RomData:
         return v, a
 
 
-    def insert_data(self, data):
+    def insert_data(self, data : bytes) -> int:
         # ::TODO deduplicate data::
         size = len(data)
 
@@ -58,7 +58,7 @@ class RomData:
         return a
 
 
-    def insert_data_addr_table(self, data_list):
+    def insert_data_addr_table(self, data_list : list[bytes]) -> int:
         table_size = len(data_list) * 2
         table, table_addr = self.allocate(table_size)
 

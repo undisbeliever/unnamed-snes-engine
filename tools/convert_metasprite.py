@@ -5,26 +5,29 @@
 
 import json
 import os.path
-import PIL.Image
+import PIL.Image # type: ignore
 import argparse
-from collections import namedtuple
 from io import StringIO
 
+from typing import Callable, Iterable, NamedTuple, Optional, Union
 
 from _common import RomData
 
 from _snes import extract_small_tile, extract_large_tile, split_large_tile, \
             hflip_tile, vflip_tile, hflip_large_tile, vflip_large_tile, \
             create_palettes_map, get_palette_id, convert_palette_image, \
-            convert_snes_tileset, is_small_tile_not_transparent
+            convert_snes_tileset, is_small_tile_not_transparent, \
+            SnesColor, SmallTileData, LargeTileData, PaletteMap
 
-from _json_formats import load_ms_export_order_json, load_metasprites_json
+from _json_formats import load_ms_export_order_json, load_metasprites_json, \
+                          Name, ScopedName, Filename, MsExportOrder, MsPattern, \
+                          Aabb, TileHitbox, MsAnimation, MsFrameset, MsSpritesheet
 
 
 TILE_DATA_BPP = 4
 
 # MUST match `ShadowSize` enum in `src/metasprites.wiz`
-SHADOW_SIZES = {
+SHADOW_SIZES : dict[str, int] = {
     'NONE':   0,
     'SMALL':  1,
     'MEDIUM': 2,
@@ -33,15 +36,27 @@ SHADOW_SIZES = {
 
 
 
-PatternGrid = namedtuple('PatternGrid', ('tile_count', 'width', 'height', 'data', 'pattern'))
+class PatternGrid(NamedTuple):
+    tile_count      : int
+    width           : int
+    height          : int
+    data            : list[bool]
+    pattern         : Optional[MsPattern]
+
 
 # MsFramesetFormat and MsFsData intermediate
-MsFsEntry = namedtuple('MsFsEntry', ('fullname', 'ms_export_order', 'header', 'pattern', 'frames', 'animations'))
+class MsFsEntry(NamedTuple):
+    fullname            : ScopedName
+    ms_export_order     : Name
+    header              : bytes
+    pattern             : Name
+    frames              : list[bytes]
+    animations          : list[bytes]
 
 
 
 class Tileset:
-    def __init__(self, starting_tile, end_tile):
+    def __init__(self, starting_tile : int, end_tile : int):
         assert(starting_tile < 512)
         assert(end_tile <= 512)
         assert(starting_tile < end_tile)
@@ -49,19 +64,20 @@ class Tileset:
         # starting_tile must start on a VRAM row
         assert(starting_tile % 0x10 == 0)
 
-        self.starting_tile = starting_tile
-        self.max_tiles = end_tile - starting_tile
+        self.starting_tile      : int = starting_tile
+        self.max_tiles          : int = end_tile - starting_tile
 
-        self.tiles = [ None ] * 0x20
-        self.large_tile_pos = 0
-        self.small_tile_pos = 4
-        self.small_tile_offset = 0
+        self.tiles              : list[Optional[LargeTileData]] = [ None ] * 0x20
 
-        self.small_tiles_map = dict()
-        self.large_tiles_map = dict()
+        self.large_tile_pos     : int = 0
+        self.small_tile_pos     : int = 4
+        self.small_tile_offset  : int = 0
+
+        self.small_tiles_map    : dict[SmallTileData, tuple[int, bool, bool]] = dict()
+        self.large_tiles_map    : dict[LargeTileData, tuple[int, bool, bool]] = dict()
 
 
-    def get_tiles(self):
+    def get_tiles(self) -> list[LargeTileData]:
         # Replace unused tiles with blank data
         blank_tile = bytearray(64)
         tiles = [ blank_tile if t is None else t for t in self.tiles ]
@@ -79,7 +95,7 @@ class Tileset:
         return tiles[:n_tiles]
 
 
-    def _allocate_large_tile(self):
+    def _allocate_large_tile(self) -> int:
         tile_pos = self.large_tile_pos
 
         self.large_tile_pos += 2
@@ -91,7 +107,7 @@ class Tileset:
         return tile_pos
 
 
-    def _allocate_small_tile(self):
+    def _allocate_small_tile(self) -> int:
         if self.small_tile_pos >= 4:
             self.small_tile_pos = 0
             self.small_tile_offset = self._allocate_large_tile()
@@ -104,7 +120,7 @@ class Tileset:
     _SMALL_TILE_OFFSETS = [ 0x00, 0x01, 0x10, 0x11 ]
 
 
-    def add_small_tile(self, tile_data):
+    def add_small_tile(self, tile_data : SmallTileData) -> int:
         assert(len(tile_data) == 64)
 
         tile_pos = self._allocate_small_tile()
@@ -114,7 +130,7 @@ class Tileset:
         return tile_pos + self.starting_tile
 
 
-    def add_large_tile(self, tile_data):
+    def add_large_tile(self, tile_data : LargeTileData) -> int:
         assert(len(tile_data) == 256)
 
         tile1, tile2, tile3, tile4 = split_large_tile(tile_data)
@@ -129,7 +145,7 @@ class Tileset:
         return tile_pos + self.starting_tile
 
 
-    def add_or_get_small_tile(self, tile_data):
+    def add_or_get_small_tile(self, tile_data : SmallTileData) -> tuple[int, bool, bool]:
         assert(len(tile_data) == 64)
 
         match = self.small_tiles_map.get(tile_data)
@@ -150,7 +166,7 @@ class Tileset:
         return match
 
 
-    def add_or_get_large_tile(self, tile_data):
+    def add_or_get_large_tile(self, tile_data : LargeTileData) -> tuple[int, bool, bool]:
         match = self.large_tiles_map.get(tile_data)
         if match is None:
             tile_id = self.add_large_tile(tile_data)
@@ -170,7 +186,7 @@ class Tileset:
 
 
 
-def generate_pattern_grids(ms_export_orders):
+def generate_pattern_grids(ms_export_orders : MsExportOrder) -> list[PatternGrid]:
     """
     Convert `ms_export_orders.patterns' to a list of `PatternGrid`.
     """
@@ -215,7 +231,7 @@ def generate_pattern_grids(ms_export_orders):
 
 
 
-def test_pattern_grid(p_grid, i_grid, x_offset, y_offset):
+def test_pattern_grid(p_grid : PatternGrid, i_grid : PatternGrid, x_offset : int, y_offset : int) -> tuple[bool, int]:
     """
     Test if a PatternGrid can be used on an Image Grid at a given location.
 
@@ -243,7 +259,7 @@ def test_pattern_grid(p_grid, i_grid, x_offset, y_offset):
 
 
 
-def find_best_pattern(image, transparent_color, pattern_grids, x_offset, y_offset, frame_width, frame_height):
+def find_best_pattern(image : None, transparent_color : SnesColor, pattern_grids : list[PatternGrid], x_offset : int, y_offset : int, frame_width : int, frame_height : int) -> tuple[MsPattern, int, int]:
     """
     Search through the `pattern_grids` and find the best pattern for a given frame image.
 
@@ -291,7 +307,7 @@ def find_best_pattern(image, transparent_color, pattern_grids, x_offset, y_offse
 
 
 
-def i8_cast(i):
+def i8_cast(i : int) -> int:
     if i < 0:
         return 0x100 + i
     return i;
@@ -299,7 +315,7 @@ def i8_cast(i):
 
 NO_AABB_VALUE = 0x80
 
-def add_i8aabb(data, box, fs):
+def add_i8aabb(data : bytearray, box : Optional[Aabb], fs : MsFrameset) -> None:
     if box is not None:
         if box.x < 0 or box.y < 0 or box.width <= 0 or box.height <= 0:
             raise ValueError(f"AABB box is invalid: { box }")
@@ -324,7 +340,7 @@ def add_i8aabb(data, box, fs):
 
 
 
-def extract_frame(image, pattern, palettes_map, tileset, fs, x, y, x_offset, y_offset, hitbox, hurtbox):
+def extract_frame(image : PIL.Image.Image, pattern : MsPattern, palettes_map : list[PaletteMap], tileset : Tileset, fs : MsFrameset, x : int, y : int, x_offset : int, y_offset : int, hitbox : Optional[Aabb], hurtbox : Optional[Aabb]) -> bytes:
     data = bytearray()
 
     add_i8aabb(data, hitbox, fs)
@@ -359,13 +375,13 @@ def extract_frame(image, pattern, palettes_map, tileset, fs, x, y, x_offset, y_o
 
 
 
-def animation_delay__distance(d):
+def animation_delay__distance(d : Union[float, int]) -> int:
     if d < 0.0 or d >= 16.0:
         raise ValueError(f"Invalid animation frame delay (must be between 0 and 16): { d }")
     return round(d * 16)
 
 
-ANIMATION_DELAY_FUNCTIONS = {
+ANIMATION_DELAY_FUNCTIONS : dict[str, Callable[[Union[float, int]], int]] = {
     'none':         lambda d : 0,
     'frame':        lambda d : int(d),
     'distance_x':   animation_delay__distance,
@@ -374,7 +390,7 @@ ANIMATION_DELAY_FUNCTIONS = {
 }
 
 # NOTE: If you modify this map, also modify the `AnimationProcessFunctions` in `metasprites.wiz`
-ANIMATION_DELAY_IDS = {
+ANIMATION_DELAY_IDS : dict[str, int] = {
     'none':        0,
     'frame':       2,
     'distance_x':  4,
@@ -389,7 +405,7 @@ END_OF_ANIMATION_BYTE = 0xfe
 MAX_FRAME_ID = 0xfc
 
 
-def build_animation_data(ani, get_frame_id):
+def build_animation_data(ani : MsAnimation, get_frame_id : Callable[[Name], int]) -> bytes:
     if ani.delay_type == 'none' and len(ani.frames) != 1:
         raise ValueError("A 'none' delay type can only contain a single animation frame")
 
@@ -417,12 +433,12 @@ def build_animation_data(ani, get_frame_id):
 
 
 
-def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparent_color, pattern_grids, spritesheet_name):
-    frames = dict()
-    animations = dict()
+def build_frameset(fs : MsFrameset, ms_export_orders : MsExportOrder, ms_dir : Filename, tiles : Tileset, palettes_map : list[PaletteMap], transparent_color : SnesColor, pattern_grids : list[PatternGrid], spritesheet_name : Name) -> MsFsEntry:
+    frames      : dict[Name, bytes] = dict()
+    animations  : dict[Name, bytes] = dict()
 
-    exported_frames = list()
-    exported_frame_ids = dict()
+    exported_frames    : list[bytes]     = list()
+    exported_frame_ids : dict[Name, int] = dict()
 
     if fs.pattern:
         base_pattern = ms_export_orders.patterns[fs.pattern]
@@ -438,9 +454,11 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparen
 
     image = load_image(ms_dir, fs.source)
 
-    image_hflip = None
-    image_vflip = None
-    image_hvflip = None
+    image_hflip : Optional[PIL.Image.Image] = None
+    image_vflip : Optional[PIL.Image.Image] = None
+    image_hvflip : Optional[PIL.Image.Image] = None
+
+    block_pattern : Optional[MsPattern] = None
 
 
     if image.width % fs.frame_width != 0 or image.height % fs.frame_height != 0:
@@ -526,7 +544,7 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparen
                 raise Exception(f"Error with { fs.name }, frame { frame_name }: { e }")
 
 
-    def get_frame_id(frame_name):
+    def get_frame_id(frame_name : Name) -> int:
         if frame_name in exported_frame_ids:
             return exported_frame_ids[frame_name]
         else:
@@ -584,7 +602,7 @@ def build_frameset(fs, ms_export_orders, ms_dir, tiles, palettes_map, transparen
 
 
 
-def build_msfs_entry(spritesheet_name, fs_name, ms_export_order, shadow_size, tile_hitbox, pattern, frames, animations):
+def build_msfs_entry(spritesheet_name : Name, fs_name : Name, ms_export_order : Name, shadow_size : Name, tile_hitbox : TileHitbox, pattern : Name, frames : list[bytes], animations : list[bytes]) -> MsFsEntry:
 
     header = bytearray().zfill(3)
 
@@ -603,7 +621,7 @@ def build_msfs_entry(spritesheet_name, fs_name, ms_export_order, shadow_size, ti
 
 
 
-def msfs_entries_to_text(msfs_entries):
+def msfs_entries_to_text(msfs_entries : list[MsFsEntry]) -> str:
     with StringIO() as out:
         for entry in msfs_entries:
             frames = ','.join([ f.hex() for f in entry.frames ])
@@ -615,7 +633,7 @@ def msfs_entries_to_text(msfs_entries):
 
 
 
-def text_to_msfs_entries(line_iterator):
+def text_to_msfs_entries(line_iterator : Iterable[str]) -> list[MsFsEntry]:
     out = list()
 
     for line in line_iterator:
@@ -637,7 +655,7 @@ def text_to_msfs_entries(line_iterator):
 
 
 
-def build_ms_fs_data(spritesheets, symbols, bank_addr, bank_size):
+def build_ms_fs_data(spritesheets : list[list[MsFsEntry]], symbols : dict[str, int], bank_addr : int, bank_size : int) -> tuple[RomData, dict[ScopedName, tuple[int, Name]]]:
     # Return: tuple(rom_data, dict fs_fullname -> tuple(addr, export_order))
 
     MS_FRAMESET_FORMAT_SIZE = 9
@@ -695,7 +713,7 @@ def build_ms_fs_data(spritesheets, symbols, bank_addr, bank_size):
 #
 
 
-def load_palette(ms_dir, palette_filename):
+def load_palette(ms_dir : Filename, palette_filename : Filename) -> tuple[list[PaletteMap], bytes]:
     image = load_image(ms_dir, palette_filename)
 
     if image.width != 16 or image.height != 8:
@@ -708,13 +726,13 @@ def load_palette(ms_dir, palette_filename):
 
 
 
-def get_transparent_color(palette_data):
+def get_transparent_color(palette_data : bytes) -> SnesColor:
     # Hack to reconstruct the first color from palette_data bytes
     return palette_data[0] | (palette_data[1] << 8)
 
 
 
-def load_image(ms_dir, filename):
+def load_image(ms_dir : Filename, filename : Filename) -> PIL.Image.Image:
     image_filename = os.path.join(ms_dir, filename)
 
     with PIL.Image.open(image_filename) as image:
@@ -733,7 +751,7 @@ def load_image(ms_dir, filename):
 
 
 
-def generate_ppu_data(ms_input, tileset, palette_data):
+def generate_ppu_data(ms_input : MsSpritesheet, tileset : list[SmallTileData], palette_data : bytes) -> bytes:
     tile_data = convert_snes_tileset(tileset, TILE_DATA_BPP)
 
 
@@ -753,7 +771,7 @@ def generate_ppu_data(ms_input, tileset, palette_data):
 
 
 
-def convert_spritesheet(ms_input, ms_export_orders, pattern_grids, ms_dir):
+def convert_spritesheet(ms_input : MsSpritesheet, ms_export_orders : MsExportOrder, pattern_grids : list[PatternGrid], ms_dir : Filename) -> tuple[bytes, list[MsFsEntry]]:
     # Returns tuple (binary_data, msfs_entries)
 
     palettes_map, palette_data = load_palette(ms_dir, ms_input.palette)
@@ -779,7 +797,7 @@ def convert_spritesheet(ms_input, ms_export_orders, pattern_grids, ms_dir):
 #
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('--bin-output', required=True,
                         help='binary (PPU) data output file')
@@ -796,7 +814,7 @@ def parse_arguments():
 
 
 
-def main():
+def main() -> None:
     args = parse_arguments()
 
     ms_dir = os.path.dirname(args.json_filename)

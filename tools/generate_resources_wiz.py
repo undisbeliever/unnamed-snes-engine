@@ -7,11 +7,11 @@ import re
 import argparse
 from io import StringIO
 
-from _json_formats import load_mappings_json
+from _json_formats import RoomName, load_mappings_json, Mappings
 from _common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET, ResourceType
 
 
-def room_id_for_name(room_name):
+def room_id_for_name(room_name : RoomName) -> int:
     m = re.match(r'(\d+)-(\d+)-.+$', room_name)
 
     if not m:
@@ -21,7 +21,7 @@ def room_id_for_name(room_name):
 
 
 
-def generate_wiz_code(mappings):
+def generate_wiz_code(mappings : Mappings) -> str:
 
     with StringIO() as out:
         out.write('namespace resources {\n\n')
@@ -52,7 +52,7 @@ def generate_wiz_code(mappings):
 
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output', required=True,
                         help='wiz output file')
@@ -65,7 +65,7 @@ def parse_arguments():
 
 
 
-def main():
+def main() -> None:
     args = parse_arguments()
 
     mappings = load_mappings_json(args.mappings_json_file)

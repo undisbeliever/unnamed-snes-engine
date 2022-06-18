@@ -4,14 +4,37 @@
 
 
 import itertools
-from collections import namedtuple
+
+import PIL.Image # type: ignore
+
+from typing import Generator, Iterable, NamedTuple, Optional, Union
 
 
-TileMapEntry = namedtuple('TileMapEntry', ('tile_id', 'palette_id', 'hflip', 'vflip'))
+
+SnesColor       = int
+
+# Tiles made up of `SnesColor`s
+SmallColorTile  = list[SnesColor] # 64 (8x8) `SnesColor`s
+LargeColorTile  = list[SnesColor] # 256 (16x16) `SnesColor`s
+
+# Tiles made up of palette indexes
+SmallTileData   = bytes # 64 (8x8) bytes
+LargeTileData   = bytes # 256 (16x16) bytes
+
+# Mapping of `SnesColor` to palette index
+PaletteMap      = dict[SnesColor, int]
 
 
 
-def convert_mode7_tileset(tiles):
+class TileMapEntry(NamedTuple):
+    tile_id     : int
+    palette_id  : int
+    hflip       : bool
+    vflip       : bool
+
+
+
+def convert_mode7_tileset(tiles : Iterable[SmallTileData]) -> bytes:
     out = bytes().join(tiles)
 
     if len(out) > 256 * 64:
@@ -20,7 +43,7 @@ def convert_mode7_tileset(tiles):
     return out
 
 
-def convert_snes_tileset(tiles, bpp):
+def convert_snes_tileset(tiles : Iterable[SmallTileData], bpp : int) -> bytes:
     out = bytearray()
 
     for tile in tiles:
@@ -38,7 +61,7 @@ def convert_snes_tileset(tiles, bpp):
 
 
 
-def convert_rgb_color(c):
+def convert_rgb_color(c : tuple[int, int, int]) -> SnesColor:
     r, g, b = c
 
     b = (b >> 3) & 31;
@@ -49,7 +72,7 @@ def convert_rgb_color(c):
 
 
 
-def is_small_tile_not_transparent(image, transparent_color, xpos, ypos):
+def is_small_tile_not_transparent(image : PIL.Image.Image, transparent_color : SnesColor, xpos : int, ypos : int) -> bool:
     """ Returns True if the tile contains a non-transparent pixel """
 
     if xpos + 8 > image.width or ypos + 8 > image.height:
@@ -60,7 +83,7 @@ def is_small_tile_not_transparent(image, transparent_color, xpos, ypos):
 
 
 
-def extract_tileset_tiles(image):
+def extract_tileset_tiles(image : PIL.Image.Image) -> Generator[SmallColorTile, None, None]:
     """ Extracts 8x8px tiles from the image. """
 
     if image.mode != 'RGB':
@@ -86,7 +109,7 @@ def extract_tileset_tiles(image):
 
 
 
-def extract_tiles_from_paletted_image(image):
+def extract_tiles_from_paletted_image(image : PIL.Image.Image) -> Generator[SmallTileData, None, None]:
     if image.width % 8 != 0 or image.height % 8 != 0:
         raise ValueError('Image width MUST BE a multiple of 8')
 
@@ -105,7 +128,7 @@ def extract_tiles_from_paletted_image(image):
 
 
 
-def extract_small_tile(image, xpos, ypos):
+def extract_small_tile(image : PIL.Image.Image, xpos : int, ypos : int) -> SmallColorTile:
     if xpos + 8 > image.width or ypos + 8 > image.height:
         raise ValueError(f"position out of bounds: { xpos }, { ypos }")
 
@@ -114,7 +137,7 @@ def extract_small_tile(image, xpos, ypos):
 
 
 
-def extract_large_tile(image, xpos, ypos):
+def extract_large_tile(image : PIL.Image.Image, xpos : int, ypos : int) -> LargeColorTile:
     if xpos + 16 > image.width or ypos + 16 > image.height:
         raise ValueError(f"position out of bounds: { xpos }, { ypos }")
 
@@ -123,7 +146,7 @@ def extract_large_tile(image, xpos, ypos):
 
 
 
-def extract_tilemap_tiles(image):
+def extract_tilemap_tiles(image : PIL.Image.Image) -> Generator[SmallColorTile, None, None]:
     """ Extracts 8x8px tiles from the image, in the same order as a SNES tilemap. """
 
     if image.mode != 'RGB':
@@ -161,7 +184,7 @@ def extract_tilemap_tiles(image):
 
 
 
-def create_palettes_map(image, bpp, pad_palette_data=None):
+def create_palettes_map(image : PIL.Image.Image, bpp : int) -> list[PaletteMap]:
     # Returns palettes_map
 
     if image.mode != 'RGB':
@@ -196,7 +219,7 @@ def create_palettes_map(image, bpp, pad_palette_data=None):
 
 
 
-def convert_palette_image(image):
+def convert_palette_image(image : PIL.Image.Image) -> bytes:
     palette_data = bytearray()
 
     for c in image.getdata():
@@ -209,9 +232,9 @@ def convert_palette_image(image):
 
 
 
-def get_palette_id(tile, palette_map):
+def get_palette_id(tile : Union[SmallColorTile, LargeColorTile], palettes_map : list[PaletteMap]) -> tuple[Optional[int], Optional[PaletteMap]]:
     # Returns a tuple of (palette_id, palette_map)
-    for palette_id, pal_map in enumerate(palette_map):
+    for palette_id, pal_map in enumerate(palettes_map):
         if all([c in pal_map for c in tile]):
             return palette_id, pal_map
 
@@ -222,24 +245,24 @@ def get_palette_id(tile, palette_map):
 _H_FLIP_ORDER_SMALL = [ (y * 8 + x) for y, x in itertools.product(range(8), reversed(range(8))) ]
 _V_FLIP_ORDER_SMALL = [ (y * 8 + x) for y, x in itertools.product(reversed(range(8)), range(8)) ]
 
-def hflip_tile(tile):
+def hflip_tile(tile : SmallTileData) -> SmallTileData:
     return bytes([ tile[i] for i in _H_FLIP_ORDER_SMALL ])
 
-def vflip_tile(tile):
+def vflip_tile(tile : SmallTileData) -> SmallTileData:
     return bytes([ tile[i] for i in _V_FLIP_ORDER_SMALL ])
 
 
 _H_FLIP_ORDER_LARGE = [ (y * 16 + x) for y, x in itertools.product(range(16), reversed(range(16))) ]
 _V_FLIP_ORDER_LARGE = [ (y * 16 + x) for y, x in itertools.product(reversed(range(16)), range(16)) ]
 
-def hflip_large_tile(tile):
+def hflip_large_tile(tile : LargeTileData) -> LargeTileData:
     return bytes([ tile[i] for i in _H_FLIP_ORDER_LARGE ])
 
-def vflip_large_tile(tile):
+def vflip_large_tile(tile : LargeTileData) -> LargeTileData:
     return bytes([ tile[i] for i in _V_FLIP_ORDER_LARGE ])
 
 
-def split_large_tile(tile):
+def split_large_tile(tile : LargeTileData) -> tuple[SmallTileData, SmallTileData, SmallTileData, SmallTileData]:
     return (
         [ tile[y * 16 + x] for y in range(0, 8 ) for x in range(0, 8 ) ],
         [ tile[y * 16 + x] for y in range(0, 8 ) for x in range(8, 16) ],
@@ -249,15 +272,15 @@ def split_large_tile(tile):
 
 
 
-def convert_tilemap_and_tileset(tiles, palettes_map):
+def convert_tilemap_and_tileset(tiles : Generator[SmallColorTile, None, None], palettes_map : list[PaletteMap]) -> tuple[list[TileMapEntry], list[SmallTileData]]:
     # Returns a tuple(tilemap, tileset)
 
     invalid_tiles = list()
 
-    tilemap = list()
-    tileset = list()
+    tilemap : list[TileMapEntry] = list()
+    tileset : list[SmallTileData] = list()
 
-    tileset_map = dict()
+    tileset_map : dict[SmallTileData, tuple[int, bool, bool]] = dict()
 
     for tile_index, tile in enumerate(tiles):
         palette_id, pal_map = get_palette_id(tile, palettes_map)
@@ -293,7 +316,7 @@ def convert_tilemap_and_tileset(tiles, palettes_map):
 
 
 
-def create_tilemap_data(tilemap, default_order):
+def create_tilemap_data(tilemap : list[TileMapEntry], default_order : bool) -> bytes:
     data = bytearray()
 
     assert(len(tilemap) % 32 * 32 == 0)
@@ -307,7 +330,7 @@ def create_tilemap_data(tilemap, default_order):
 
 
 
-def create_tilemap_data_low(tilemap):
+def create_tilemap_data_low(tilemap : list[TileMapEntry]) -> bytes:
     data = bytearray()
 
     assert(len(tilemap) % 32 * 32 == 0)
@@ -319,7 +342,7 @@ def create_tilemap_data_low(tilemap):
 
 
 
-def create_tilemap_data_high(tilemap, default_order):
+def create_tilemap_data_high(tilemap : list[TileMapEntry], default_order : bool) -> bytes:
     data = bytearray()
 
     assert(len(tilemap) % 32 * 32 == 0)
@@ -332,7 +355,7 @@ def create_tilemap_data_high(tilemap, default_order):
 
 
 
-def image_to_snes(image, palette_image, bpp):
+def image_to_snes(image : PIL.Image.Image, palette_image : PIL.Image.Image, bpp : int) -> tuple[list[TileMapEntry], bytes, bytes]:
     # Return (tilemap, tile_data, palette_data)
 
     tilemap, tileset = convert_tilemap_and_tileset(

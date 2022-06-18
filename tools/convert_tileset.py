@@ -3,17 +3,13 @@
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
 
-import PIL.Image
+import PIL.Image # type: ignore
 import argparse
 import xml.etree.ElementTree
-from collections import namedtuple
-
+from typing import NamedTuple, Optional
 
 from _json_formats import load_mappings_json
-from _snes import image_to_snes
-
-
-TileProperty = namedtuple('TileProperty', ('solid', 'type', 'priority'))
+from _snes import image_to_snes, TileMapEntry
 
 
 N_TILES = 256
@@ -26,8 +22,14 @@ DEFAULT_PRIORITY = 0
 TILE_PROPERTY_SOLID_BIT = 7
 
 
+class TileProperty(NamedTuple):
+    solid       : bool
+    type        : Optional[str]
+    priority    : int           # integer bitfield (4 bits wide), one priority bit for each 8px tile
 
-def create_metatile_map(tilemap, tile_properties):
+
+
+def create_metatile_map(tilemap : list[TileMapEntry], tile_properties : list[TileProperty]) -> bytes:
     data = bytearray()
 
     priotity_bit = 1 << 4
@@ -57,7 +59,7 @@ def create_metatile_map(tilemap, tile_properties):
 
 
 
-def check_objectgroup_tag(tag):
+def check_objectgroup_tag(tag : xml.etree.ElementTree.Element) -> bool:
     if len(tag) != 1:
         return False
 
@@ -74,7 +76,7 @@ def check_objectgroup_tag(tag):
 
 
 
-def read_tile_priority_value(value, tile_id):
+def read_tile_priority_value(value : str, tile_id : int) -> int:
     if not isinstance(value, str):
         raise ValueError('Unknown type, expected string')
 
@@ -90,7 +92,7 @@ def read_tile_priority_value(value, tile_id):
 
 
 
-def read_tile_tag(tile_tag):
+def read_tile_tag(tile_tag : xml.etree.ElementTree.Element) -> tuple[int, TileProperty]:
     """ Returns (tile_id, TileProperty) """
 
     tile_id = int(tile_tag.attrib['id'])
@@ -121,7 +123,7 @@ def read_tile_tag(tile_tag):
 
 
 
-def read_tile_properties(tsx_et):
+def read_tile_properties(tsx_et : xml.etree.ElementTree.ElementTree) -> list[TileProperty]:
 
     out = [ TileProperty(solid=False, type=None, priority=DEFAULT_PRIORITY) ] * N_TILES
 
@@ -135,7 +137,7 @@ def read_tile_properties(tsx_et):
 
 
 
-def create_properties_array(tile_properties, interactive_tile_functions):
+def create_properties_array(tile_properties : list[TileProperty], interactive_tile_functions : list[str]) -> bytes:
     data = bytearray(256)
 
     for i, tile in enumerate(tile_properties):
@@ -154,7 +156,7 @@ def create_properties_array(tile_properties, interactive_tile_functions):
 
 
 
-def create_tileset_data(palette_data, tile_data, metatile_map, properties):
+def create_tileset_data(palette_data : bytes, tile_data : bytes, metatile_map : bytes, properties : bytes) -> bytes:
     data = bytearray()
 
     # 2048 bytes = metatile map
@@ -178,7 +180,7 @@ def create_tileset_data(palette_data, tile_data, metatile_map, properties):
 
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output', required=True,
                         help='tileset output file')
@@ -197,7 +199,7 @@ def parse_arguments():
 
 
 
-def main():
+def main() -> None:
     args = parse_arguments()
 
     with PIL.Image.open(args.palette_filename) as palette_image:

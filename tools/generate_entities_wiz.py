@@ -6,10 +6,11 @@
 import argparse
 from io import StringIO
 
-from _json_formats import load_entities_json, load_ms_export_order_json
+from _json_formats import load_entities_json, load_ms_export_order_json, \
+                          EntitiesJson, MsExportOrder
 
 
-def generate_wiz_code(entities_input, ms_export_orders):
+def generate_wiz_code(entities_input : EntitiesJson, ms_export_orders : MsExportOrder) -> str:
 
     entity_functions = entities_input.entity_functions.values()
     entities = entities_input.entities.values()
@@ -58,7 +59,7 @@ def generate_wiz_code(entities_input, ms_export_orders):
 
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output', required=True,
                         help='wiz output file')
@@ -73,7 +74,7 @@ def parse_arguments():
 
 
 
-def main():
+def main() -> None:
     args = parse_arguments()
 
     entities = load_entities_json(args.entities_json_file)

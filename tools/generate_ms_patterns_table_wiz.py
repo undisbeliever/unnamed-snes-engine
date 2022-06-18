@@ -5,11 +5,12 @@
 
 import argparse
 from io import StringIO
+from collections import OrderedDict
 
-from _json_formats import load_ms_export_order_json
+from _json_formats import load_ms_export_order_json, MsPattern
 
 
-def generate_wiz_code(ms_patterns):
+def generate_wiz_code(ms_patterns : OrderedDict[str, MsPattern]) -> str:
 
     table_size = 1
     while table_size < len(ms_patterns):
@@ -50,7 +51,7 @@ in code {
 
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output', required=True,
                         help='wiz output file')
@@ -63,7 +64,7 @@ def parse_arguments():
 
 
 
-def main():
+def main() -> None:
     args = parse_arguments()
 
     ms_export_orders = load_ms_export_order_json(args.ms_export_order_json_file)

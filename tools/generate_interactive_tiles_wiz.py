@@ -6,11 +6,11 @@
 import argparse
 from io import StringIO
 
-from _json_formats import load_mappings_json
+from _json_formats import load_mappings_json, Mappings
 
 
 
-def generate_wiz_code(interactive_tile_functions):
+def generate_wiz_code(interactive_tile_functions : list[str]) -> str:
 
     # function 0 is null
     n_functions = len(interactive_tile_functions) + 1
@@ -47,7 +47,7 @@ in code {
         out.write(f"let FUNCTION_TABLE_MASK = 0x{ (table_size - 1) * 2 :02x};\n\n")
 
 
-        def generate_table(table_name, fn_type, fn_name):
+        def generate_table(table_name : str, fn_type : str, fn_name : str) -> None:
             null_line = f"  metatiles.interactive_tiles.null_function as {fn_type},\n"
 
             out.write(f"const { table_name } : [ { fn_type } ; { table_size } ] = [\n")
@@ -76,7 +76,7 @@ in code {
 
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output', required=True,
                         help='wiz output file')
@@ -89,7 +89,7 @@ def parse_arguments():
 
 
 
-def main():
+def main() -> None:
     args = parse_arguments()
 
     mappings = load_mappings_json(args.mappings_json_file)
