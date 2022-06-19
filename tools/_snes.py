@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
