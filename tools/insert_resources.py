@@ -79,8 +79,14 @@ class ResourceInserter:
     BANK_END = 0x10000
     BLANK_RESOURCE_ENTRY = bytes(5)
 
+    ROM_HEADER_TITLE_ADDR = 0xFFC0
+    ROM_HEADER_TITLE_SIZE = 21
+    ROM_HEADER_TITLE_ENCODING = 'Shift-JIS' # This is supposed to be `JIS X 0201`, but python does not support it.
 
-    def __init__(self, sfc_view : memoryview, symbols : dict[str, int], memory_map : MemoryMap):
+
+    def __init__(self, sfc_view : memoryview, symbols : dict[str, int], mappings : Mappings):
+        memory_map = mappings.memory_map
+
         self.view    : memoryview = sfc_view
         self.symbols : dict[str, int] = symbols
 
@@ -109,6 +115,13 @@ class ResourceInserter:
             raise RuntimeError(f"ERROR:  Expected a sfc file that is { expected_size // 1024 } bytes in size")
 
 
+        expected_title = mappings.game_title.encode(self.ROM_HEADER_TITLE_ENCODING).ljust(self.ROM_HEADER_TITLE_SIZE, b'\x20')
+        title_in_sfc_view = self.subview_addr(self.ROM_HEADER_TITLE_ADDR, self.ROM_HEADER_TITLE_SIZE)
+        if title_in_sfc_view != expected_title:
+            decoded_title_in_sfc_view = bytes(title_in_sfc_view).decode(self.ROM_HEADER_TITLE_ENCODING).strip()
+            raise RuntimeError(f"ERROR: sfc file header ({ decoded_title_in_sfc_view }) does not match mappings game_title ({ mappings.game_title })")
+
+
     def label_offset(self, label : str) -> RomOffset:
         return self.address_to_rom_offset(self.symbols[label])
 
@@ -117,11 +130,14 @@ class ResourceInserter:
         return self.view[self.address_to_rom_offset(addr)]
 
 
-
     def read_u16(self, addr : Address) -> int:
         ra = self.address_to_rom_offset(addr)
         return self.view[ra] | (self.view[ra + 1] << 8)
 
+
+    def subview_addr(self, addr : Address, size : int) -> memoryview:
+        o = self.address_to_rom_offset(addr)
+        return self.view[o:o+size]
 
 
     def insert_blob(self, blob : bytes) -> Address:
@@ -293,7 +309,7 @@ def insert_resources(sfc_view : memoryview, symbols : dict[str, Address], mappin
 
     # ::TODO confirm sfc_view is the correct file::
 
-    ri = ResourceInserter(sfc_view, symbols, mappings.memory_map)
+    ri = ResourceInserter(sfc_view, symbols, mappings)
 
 
     metasprite_map = insert_metasprite_data(ri, mappings)

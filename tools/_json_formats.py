@@ -312,6 +312,7 @@ class MemoryMap(NamedTuple):
 
 
 class Mappings(NamedTuple):
+    game_title                  : str
     starting_room               : RoomName
     mt_tilesets                 : list[Name]
     ms_spritesheets             : list[Name]
@@ -342,6 +343,7 @@ def load_mappings_json(filename : Filename) -> Mappings:
         json_input = json.load(fp)
 
     return Mappings(
+            game_title = str(json_input['game_title']),
             starting_room = check_room_name(json_input['starting_room']),
             mt_tilesets = check_name_list(json_input['mt_tilesets']),
             ms_spritesheets = check_name_list(json_input['ms_spritesheets']),

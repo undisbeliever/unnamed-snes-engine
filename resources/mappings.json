@@ -1,4 +1,5 @@
 {
+ "game_title": "UNNAMED SNES GAME",
  "memory_map": {
    "mode": "hirom",
    "first_resource_bank": "c2",
