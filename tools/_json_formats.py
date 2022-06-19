@@ -8,6 +8,8 @@ import os.path
 
 from collections import OrderedDict
 
+from _common import MemoryMapMode
+
 from typing import Any, NamedTuple, Optional, Union
 
 
@@ -306,7 +308,7 @@ def load_ms_export_order_json(filename : Filename) -> MsExportOrder:
 
 
 class MemoryMap(NamedTuple):
-    mode                : str
+    mode                : MemoryMapMode
     first_resource_bank : int
     n_resource_banks    : int
 
@@ -321,14 +323,12 @@ class Mappings(NamedTuple):
     memory_map                  : MemoryMap
 
 
-VALID_MEMORY_MAP_MODES = ('hirom', 'lorom')
-
-
 
 def __load_memory_map(json_map : dict[str, Any]) -> MemoryMap:
-    mode = json_map['mode']
-    if mode not in VALID_MEMORY_MAP_MODES:
-        raise ValueError(f"Unknown memory mapping mode: { mode }")
+    try:
+        mode = MemoryMapMode[json_map['mode'].upper()]
+    except KeyError:
+        raise ValueError(f"Unknown memory mapping mode: { json_map['mode'] }")
 
     return MemoryMap(
             mode = mode,

@@ -11,7 +11,7 @@ from io import StringIO
 
 from typing import Callable, Iterable, NamedTuple, Optional, Union
 
-from _common import RomData
+from _common import RomData, MemoryMapMode
 
 from _snes import extract_small_tile, extract_large_tile, split_large_tile, \
             hflip_tile, vflip_tile, hflip_large_tile, vflip_large_tile, \
@@ -667,12 +667,12 @@ def text_to_msfs_entries(line_iterator : Iterable[str]) -> list[MsFsEntry]:
 
 
 
-def build_ms_fs_data(spritesheets : list[list[MsFsEntry]], symbols : dict[str, int], bank_addr : int, bank_size : int) -> tuple[RomData, dict[ScopedName, tuple[int, Name]]]:
+def build_ms_fs_data(spritesheets : list[list[MsFsEntry]], symbols : dict[str, int], mapmode : MemoryMapMode) -> tuple[RomData, dict[ScopedName, tuple[int, Name]]]:
     # Return: tuple(rom_data, dict fs_fullname -> tuple(addr, export_order))
 
     MS_FRAMESET_FORMAT_SIZE = 9
 
-    rom_data = RomData(bank_addr, bank_size)
+    rom_data = RomData(mapmode.bank_start, mapmode.bank_size)
 
     fs_map = dict()
 
@@ -711,7 +711,7 @@ def build_ms_fs_data(spritesheets : list[list[MsFsEntry]], symbols : dict[str, i
 
 
     # Ensure player data is the first item
-    if fs_map['common.Player'][0] != bank_addr:
+    if fs_map['common.Player'][0] != mapmode.bank_start:
         raise RuntimeError("The first MetaSprite FrameSet MUST be the player")
 
 

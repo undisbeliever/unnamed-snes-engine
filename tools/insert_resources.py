@@ -64,17 +64,6 @@ def get_largest_rom_address(symbols : dict[str, int]) -> int:
 
 
 
-def hirom_address_to_rom_offset(addr : Address) -> RomOffset:
-    if addr & 0x3f0000 < 0x40 and addr & 0xffff < 0x8000:
-        raise ValueError(f"addr is not a ROM address: 0x{addr:06x}")
-
-    if addr >> 16 == 0x7e or addr >> 16 == 0x7f:
-        raise ValueError(f"addr is not a ROM address: 0x{addr:06x}")
-
-    return addr & 0x3fffff
-
-
-
 class ResourceInserter:
     BANK_END = 0x10000
     BLANK_RESOURCE_ENTRY = bytes(5)
@@ -91,13 +80,9 @@ class ResourceInserter:
         self.symbols : dict[str, int] = symbols
 
         # Assume HiRom mapping
-        if memory_map.mode == 'hirom':
-            self.address_to_rom_offset : Callable[[int], int] = hirom_address_to_rom_offset
-            self.bank_start : int = 0
-            self.bank_size  : int = 64 * 1024
-        else:
-            raise ValueError(f"Invalid mapping mode: { memory_map.mode }")
-
+        self.address_to_rom_offset : Callable[[Address], RomOffset] = memory_map.mode.address_to_rom_offset
+        self.bank_start : int = memory_map.mode.bank_start
+        self.bank_size  : int = memory_map.mode.bank_size
 
         self.bank_offset      : int = memory_map.first_resource_bank
         self.n_resource_banks : int = memory_map.n_resource_banks
@@ -283,7 +268,7 @@ def insert_metasprite_data(ri : ResourceInserter, mappings : Mappings) -> dict[s
         with open(f"gen/metasprites/{ ss_name }.txt", 'r') as fp:
             spritesheets.append(text_to_msfs_entries(fp))
 
-    ms_fs_data, metasprite_map = build_ms_fs_data(spritesheets, ri.symbols, ri.bank_start, ri.bank_size)
+    ms_fs_data, metasprite_map = build_ms_fs_data(spritesheets, ri.symbols, mappings.memory_map.mode)
 
     ri.insert_blob_into_start_of_bank(MS_FS_DATA_BANK_OFFSET, ms_fs_data.data())
 

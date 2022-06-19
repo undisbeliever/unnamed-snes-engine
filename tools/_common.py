@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
-from enum import IntEnum, unique
+from enum import IntEnum, Enum, unique
+
+from typing import Callable
 
 
 # Offset between the first_resource_bank and the named data banks
@@ -18,6 +20,39 @@ class ResourceType(IntEnum):
     mt_tilesets     = 0
     ms_spritesheets = 1
     tiles           = 2
+
+
+
+def lorom_address_to_rom_offset(addr : int) -> int:
+    if addr & 0x3f0000 < 0x40 and addr & 0xffff < 0x8000:
+        raise ValueError(f"addr is not a ROM address: 0x{addr:06x}")
+
+    if addr >> 16 == 0x7e or addr >> 16 == 0x7f:
+        raise ValueError(f"addr is not a ROM address: 0x{addr:06x}")
+
+    return ((addr & 0x3f0000) >> 1) | (addr & 0x7fff)
+
+
+
+def hirom_address_to_rom_offset(addr : int) -> int:
+    if addr & 0x3f0000 < 0x40 and addr & 0xffff < 0x8000:
+        raise ValueError(f"addr is not a ROM address: 0x{addr:06x}")
+
+    if addr >> 16 == 0x7e or addr >> 16 == 0x7f:
+        raise ValueError(f"addr is not a ROM address: 0x{addr:06x}")
+
+    return addr & 0x3fffff
+
+
+
+class MemoryMapMode(Enum):
+    LOROM = 0x8000,  0x8000, lorom_address_to_rom_offset
+    HIROM = 0x0000, 0x10000, hirom_address_to_rom_offset
+
+    def __init__(self, bank_start : int, bank_size : int, addr_to_offset : Callable[[int], int]):
+        self.bank_start : int = bank_start
+        self.bank_size  : int = bank_size
+        self.address_to_rom_offset : Callable[[int], int] = addr_to_offset
 
 
 
