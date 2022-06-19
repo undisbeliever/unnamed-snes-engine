@@ -57,12 +57,12 @@ class MsFsEntry(NamedTuple):
 
 class Tileset:
     def __init__(self, starting_tile : int, end_tile : int):
-        assert(starting_tile < 512)
-        assert(end_tile <= 512)
-        assert(starting_tile < end_tile)
+        assert starting_tile < 512
+        assert end_tile <= 512
+        assert starting_tile < end_tile
 
         # starting_tile must start on a VRAM row
-        assert(starting_tile % 0x10 == 0)
+        assert starting_tile % 0x10 == 0
 
         self.starting_tile      : int = starting_tile
         self.max_tiles          : int = end_tile - starting_tile
@@ -121,7 +121,7 @@ class Tileset:
 
 
     def add_small_tile(self, tile_data : SmallTileData) -> int:
-        assert(len(tile_data) == 64)
+        assert len(tile_data) == 64
 
         tile_pos = self._allocate_small_tile()
 
@@ -131,7 +131,7 @@ class Tileset:
 
 
     def add_large_tile(self, tile_data : LargeTileData) -> int:
-        assert(len(tile_data) == 256)
+        assert len(tile_data) == 256
 
         tile1, tile2, tile3, tile4 = split_large_tile(tile_data)
 
@@ -146,7 +146,7 @@ class Tileset:
 
 
     def add_or_get_small_tile(self, tile_data : SmallTileData) -> tuple[int, bool, bool]:
-        assert(len(tile_data) == 64)
+        assert len(tile_data) == 64
 
         match = self.small_tiles_map.get(tile_data)
         if match is None:
@@ -677,7 +677,7 @@ def build_ms_fs_data(spritesheets : list[list[MsFsEntry]], symbols : dict[str, i
     fs_map = dict()
 
     n_framesets = sum([ len(i) for i in spritesheets ])
-    assert(n_framesets > 0)
+    assert n_framesets > 0
 
     fs_table, fs_table_addr = rom_data.allocate(n_framesets * MS_FRAMESET_FORMAT_SIZE)
     fs_pos = 0
@@ -707,7 +707,7 @@ def build_ms_fs_data(spritesheets : list[list[MsFsEntry]], symbols : dict[str, i
 
             fs_map[fs.fullname] = (fs_addr, fs.ms_export_order)
 
-    assert(fs_pos == n_framesets * MS_FRAMESET_FORMAT_SIZE)
+    assert fs_pos == n_framesets * MS_FRAMESET_FORMAT_SIZE
 
 
     # Ensure player data is the first item

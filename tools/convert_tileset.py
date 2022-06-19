@@ -34,7 +34,7 @@ def create_metatile_map(tilemap : list[TileMapEntry], tile_properties : list[Til
 
     priotity_bit = 1 << 4
 
-    assert(len(tilemap) == 32 * 32)
+    assert len(tilemap) == 32 * 32
     for xoffset, yoffset in ((0, 0), (1, 0), (0, 1), (1, 1)):
         priotity_bit >>= 1
 
@@ -50,8 +50,8 @@ def create_metatile_map(tilemap : list[TileMapEntry], tile_properties : list[Til
 
                 tm = tilemap[x + y * 32]
                 # This should never happen
-                assert(tm.tile_id <= 0x3ff)
-                assert(tm.palette_id <= 7)
+                assert tm.tile_id <= 0x3ff
+                assert tm.palette_id <= 7
                 data.append((tm.tile_id >> 8) | (tm.palette_id << 2) | (bool(priority) << 5)
                             | (bool(tm.hflip) << 6) | (bool(tm.vflip) << 7))
 
@@ -160,18 +160,18 @@ def create_tileset_data(palette_data : bytes, tile_data : bytes, metatile_map : 
     data = bytearray()
 
     # 2048 bytes = metatile map
-    assert(len(metatile_map) == 2048)
+    assert len(metatile_map) == 2048
     data += metatile_map
 
     # 256 bytes = properties map
-    assert(len(properties) == 256)
+    assert len(properties) == 256
     data += properties
 
     # Next 256 bytes = palette data
     data += palette_data
     data += bytes(0) * (256 - len(palette_data))
 
-    assert(len(data) == 2048 + 256 * 2)
+    assert len(data) == 2048 + 256 * 2
 
     # Next data: tile data
     data += tile_data

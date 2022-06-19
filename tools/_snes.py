@@ -320,7 +320,7 @@ def convert_tilemap_and_tileset(tiles : Generator[SmallColorTile, None, None], p
 def create_tilemap_data(tilemap : list[TileMapEntry], default_order : bool) -> bytes:
     data = bytearray()
 
-    assert(len(tilemap) % 32 * 32 == 0)
+    assert len(tilemap) % (32 * 32) == 0
 
     for t in tilemap:
         data.append(t.tile_id & 0xff)
@@ -334,7 +334,7 @@ def create_tilemap_data(tilemap : list[TileMapEntry], default_order : bool) -> b
 def create_tilemap_data_low(tilemap : list[TileMapEntry]) -> bytes:
     data = bytearray()
 
-    assert(len(tilemap) % 32 * 32 == 0)
+    assert len(tilemap) % (32 * 32) == 0
 
     for t in tilemap:
         data.append(t.tile_id & 0xff)
@@ -346,7 +346,7 @@ def create_tilemap_data_low(tilemap : list[TileMapEntry]) -> bytes:
 def create_tilemap_data_high(tilemap : list[TileMapEntry], default_order : bool) -> bytes:
     data = bytearray()
 
-    assert(len(tilemap) % 32 * 32 == 0)
+    assert len(tilemap) % (32 * 32) == 0
 
     for t in tilemap:
         data.append(((t.tile_id & 0x3ff) >> 8) | ((t.palette_id & 7) << 2)
