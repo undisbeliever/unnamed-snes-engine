@@ -62,6 +62,10 @@ in rodata0 {
     // (256 word address, pointing to RoomData)
     const __RoomsTable : [ *const RoomData ; 0x100 ] = [ INVALID_ROOM_ADDR as *const RoomData ; 0x100 ];
     let RoomsTable = far &__RoomsTable as far * const * RoomData;
+
+
+    // This value is set to 0 by `insert_resources.py`
+    const UseResourcesOverUsb2Snes : u8 = 0xff;
 }
 
 
@@ -118,11 +122,17 @@ func __load_resource(type : u16 in xx, resourceId : u8 in a) : ResourceEntry in 
         a = 0;
     }
 
-    // Remove high bytes of index registers
-    idx8();
+    // Save resourceId in `yy`, UseResourcesOverUsb2Snes test clobbers `a` (no `bit long` instructions).
     #[idx8] {
         y = a;
     }
+    a = *far &UseResourcesOverUsb2Snes;
+    if !zero {
+        ^return resources_over_usb2snes.load_resource(xx, yy);
+    }
+
+    // Clear high bytes of the index registers
+    idx8();
 
     mem16_idx16();
     #[mem16] {
@@ -161,11 +171,18 @@ func __load_resource(type : u16 in xx, resourceId : u8 in a) : ResourceEntry in 
 #[mem8, idx8]
 func load_room(roomId : u8 in a) : bool in carry {
 
-    debug_break();
+    // Save roomId in `y`, UseResourcesOverUsb2Snes test clobbers `a` (no `bit long` instructions).
+    y = a;
+
+    a = *far &UseResourcesOverUsb2Snes;
+    if !zero {
+        ^return resources_over_usb2snes.load_room(y);
+    }
 
     mem16_idx16();
     #[mem16, idx16] {
-        xx = aa = (aa & 0xff) << 1;
+        // No need to mask high byte of `yy`, it is always 0
+        xx = aa = yy << 1;
 
         aa = RoomsTable[unaligned xx] as u16;
         if aa == INVALID_ROOM_ADDR {
@@ -308,4 +325,8 @@ namespace rooms {
 }
 
 }
+
+
+
+import "resources-over-usb2snes";
 

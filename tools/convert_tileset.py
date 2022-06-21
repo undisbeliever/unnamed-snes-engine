@@ -8,7 +8,7 @@ import argparse
 import xml.etree.ElementTree
 from typing import NamedTuple, Optional
 
-from _json_formats import load_mappings_json
+from _json_formats import load_mappings_json, Mappings
 from _snes import image_to_snes, TileMapEntry
 
 
@@ -180,6 +180,27 @@ def create_tileset_data(palette_data : bytes, tile_data : bytes, metatile_map : 
 
 
 
+def convert_mt_tileset(tsx_filename : str, image_filename : str, palette_filename : str, mappings : Mappings) -> bytes:
+
+    with PIL.Image.open(palette_filename) as palette_image:
+        with PIL.Image.open(image_filename) as image:
+            if image.width != 256 or image.height != 256:
+                raise ValueError('Tileset Image MUST BE 256x256 px in size')
+
+            tilemap, tile_data, palette_data = image_to_snes(image, palette_image, TILE_DATA_BPP)
+
+    with open(tsx_filename, 'r') as tsx_fp:
+        tsx_et = xml.etree.ElementTree.parse(tsx_fp)
+
+    tile_properties = read_tile_properties(tsx_et)
+
+    metatile_map = create_metatile_map(tilemap, tile_properties)
+    properties = create_properties_array(tile_properties, mappings.interactive_tile_functions)
+
+    return create_tileset_data(palette_data, tile_data, metatile_map, properties)
+
+
+
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output', required=True,
@@ -202,24 +223,9 @@ def parse_arguments() -> argparse.Namespace:
 def main() -> None:
     args = parse_arguments()
 
-    with PIL.Image.open(args.palette_filename) as palette_image:
-        with PIL.Image.open(args.image_filename) as image:
-            if image.width != 256 or image.height != 256:
-                raise ValueError('Tileset Image MUST BE 256x256 px in size')
-
-            tilemap, tile_data, palette_data = image_to_snes(image, palette_image, TILE_DATA_BPP)
-
-    with open(args.tsx_filename, 'r') as tsx_fp:
-        tsx_et = xml.etree.ElementTree.parse(tsx_fp)
-
-    tile_properties = read_tile_properties(tsx_et)
-
     mappings = load_mappings_json(args.mappings_json_file)
 
-    metatile_map = create_metatile_map(tilemap, tile_properties)
-    properties = create_properties_array(tile_properties, mappings.interactive_tile_functions)
-
-    tileset_data = create_tileset_data(palette_data, tile_data, metatile_map, properties)
+    tileset_data = convert_mt_tileset(args.tsx_filename, args.image_filename, args.palette_filename, mappings)
 
     with open(args.output, 'wb') as fp:
         fp.write(tileset_data)

@@ -10,6 +10,11 @@ from typing import Callable
 MS_FS_DATA_BANK_OFFSET = 0
 ROOM_DATA_BANK_OFFSET = 1
 
+# Reuse Room Data Bank for resources_over_usb2snes response data
+USB2SNES_DATA_BANK_OFFSET = ROOM_DATA_BANK_OFFSET
+
+
+USE_RESOURCES_OVER_USB2SNES_LABEL = 'resources.UseResourcesOverUsb2Snes'
 
 
 # order MUST match `ResourceType` enum in `src/metasprites.wiz`

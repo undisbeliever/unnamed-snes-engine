@@ -142,21 +142,17 @@ TILE_FORMATS : dict[str, Callable[[Iterable[SmallTileData]], bytes]] = {
 }
 
 
-def convert_tiles(t : _json_formats.TilesInput) -> ResourceEntry:
+def convert_tiles(t : _json_formats.TilesInput) -> bytes:
     tile_converter = TILE_FORMATS[t.format]
 
     with PIL.Image.open(t.source) as image:
         image.load()
 
-    tile_data = tile_converter(extract_tiles_from_paletted_image(image))
-
-    l = list(extract_tiles_from_paletted_image(image))
-
-    return ResourceEntry(t.name, tile_data)
+    return tile_converter(extract_tiles_from_paletted_image(image))
 
 
 
-def compile_list(typename : Name, mapping : list[Name], inputs : dict[str, Any], func : Callable[[Any], ResourceEntry]) -> list[ResourceEntry]:
+def compile_list(typename : Name, mapping : list[Name], inputs : dict[str, Any], func : Callable[[Any], bytes]) -> list[ResourceEntry]:
     out = list()
 
     for resource_name in mapping:
@@ -164,7 +160,7 @@ def compile_list(typename : Name, mapping : list[Name], inputs : dict[str, Any],
         if not i:
             raise RuntimeError(f"Cannot find { typename } resource: {resource_name}")
 
-        out.append(func(i))
+        out.append(ResourceEntry(resource_name, func(i)))
 
     return out
 

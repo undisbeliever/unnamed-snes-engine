@@ -12,7 +12,8 @@ from typing import Callable
 from _json_formats import load_mappings_json, load_entities_json, \
                           Name, Filename, MemoryMap, Mappings, EntitiesJson
 
-from _common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET, ResourceType
+from _common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET, ResourceType, \
+                    USE_RESOURCES_OVER_USB2SNES_LABEL
 
 from _entity_data import ENTITY_ROM_DATA_LABEL, validate_entity_rom_data_symbols, \
                          expected_blank_entity_rom_data, create_entity_rom_data
@@ -311,6 +312,10 @@ def insert_resources(sfc_view : memoryview, symbols : dict[str, Address], mappin
     ri.insert_binary_file_resources(ResourceType.ms_spritesheets, mappings.ms_spritesheets, "gen/metasprites/{}.bin")
 
     ri.insert_resource_data(resources_data, mappings)
+
+
+    if USE_RESOURCES_OVER_USB2SNES_LABEL in symbols:
+        ri.insert_blob_at_label(USE_RESOURCES_OVER_USB2SNES_LABEL, bytes(1))
 
 
 

@@ -12,6 +12,7 @@ import "gamemodes";
 import "metatiles";
 import "metasprites";
 import "resources";
+import "resources-over-usb2snes";
 
 
 import "src/entities/sword-particles";
@@ -33,6 +34,7 @@ in code {
 func main() {
     snes.ppu.brightness = a = snes.ppu.BRIGHTNESS_FORCE_BLANK;
 
+    resources_over_usb2snes.init();
 
     metasprites.setup__fblank();
 
