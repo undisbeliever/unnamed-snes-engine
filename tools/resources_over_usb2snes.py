@@ -30,6 +30,7 @@
 import sys
 import os.path
 import argparse
+import threading
 import multiprocessing
 from enum import IntEnum, unique
 
@@ -74,6 +75,26 @@ N_RESOURCE_TYPES : Final[int] = len(ResourceType)
 class SpecialRequestType(IntEnum):
     rooms           = 0xff
     init            = 0xaa
+
+
+
+# =======
+# Logging
+# =======
+
+if __name__ != '__main__':
+    raise ImportError("Cannot import this file as a python module")
+
+# Disable the `print` function
+print : Final = None
+
+# Thread safe printing
+def log(s : str) -> None:
+    with __log_lock:
+        sys.stdout.write(s)
+        sys.stdout.write('\n')
+
+__log_lock : Final = threading.Lock()
 
 
 
@@ -284,14 +305,14 @@ def compile_all_resources(data_store : DataStore, compiler : Compiler, n_process
 
                 if co.error:
                     # ::TODO find a better way to handle the errors::
-                    print("ERROR: ", co.error)
+                    log(f"ERROR: { co.error }")
 
 
     msfs_and_entity_data = compiler.compile_msfs_and_entity_data(data_store.get_msfs_lists())
     data_store.insert_msfs_and_entity_data(msfs_and_entity_data)
     if msfs_and_entity_data.error:
         # ::TODO find a better way to handle the errors::
-        print("ERROR: ", msfs_and_entity_data.error)
+        log(f"ERROR: { msfs_and_entity_data.error }")
 
 
 
@@ -530,7 +551,7 @@ class ResourcesOverUsb2Snes:
         if request.request_id == 0:
             return
 
-        print(f"Request 0x{request.request_id:02x}: { request.request_type.name }[{ request.resource_id }]")
+        log(f"Request 0x{request.request_id:02x}: { request.request_type.name }[{ request.resource_id }]")
 
         try:
             if request.request_type in self.REQUEST_TYPE_USES_MSFS_OR_ENTITY_DATA:
@@ -547,7 +568,7 @@ class ResourcesOverUsb2Snes:
                     raise RuntimeError("No data")
 
             if co.data is None:
-                print(f"    Cannot access resource: { request.request_type }[{ request.resource_id }]: { co.error }")
+                log(f"    Cannot access resource: { request.request_type }[{ request.resource_id }]: { co.error }")
                 raise RuntimeError("No data")
 
             assert co.data
@@ -566,18 +587,18 @@ class ResourcesOverUsb2Snes:
 
         if not me.msfs_data or not me.entity_rom_data:
             if not me.msfs_data:
-                print(f"    Cannot access MsFsData: { me.error }")
+                log(f"    Cannot access MsFsData: { me.error }")
 
             if not me.entity_rom_data:
-                print(f"    Cannot access MsFsData: { me.error }")
+                log(f"    Cannot access MsFsData: { me.error }")
 
             raise RuntimeError("Cannot access MsFs or Entity ROM Data")
 
 
-        print(f"    MsFsData { len(me.msfs_data) } bytes")
+        log(f"    MsFsData { len(me.msfs_data) } bytes")
         await self.usb2snes.write_to_offset(self.msfs_data_offset,       me.msfs_data)
 
-        print(f"    entity_rom_data { len(me.entity_rom_data) } bytes")
+        log(f"    entity_rom_data { len(me.entity_rom_data) } bytes")
         await self.usb2snes.write_to_offset(self.entity_rom_data_offset, me.entity_rom_data)
 
         self.data_store.mark_msfs_and_entity_data_valid()
@@ -588,7 +609,7 @@ class ResourcesOverUsb2Snes:
         if data_size > self.max_data_size:
             raise ValueError(f"data is too large: { data_size }")
 
-        print(f"    { status.name } { data_size } bytes")
+        log(f"    { status.name } { data_size } bytes")
 
         if data is not None:
             await self.usb2snes.write_to_offset(self.response_data_offset, data)
@@ -605,10 +626,10 @@ class ResourcesOverUsb2Snes:
     async def process_init_request(self) -> None:
         try:
             while await self.read_request() != INIT_REQUEST:
-                print("Waiting for correctly formatted init request")
+                log("Waiting for correctly formatted init request")
                 await asyncio.sleep(NORMAL_REQUEST_SLEEP_DELAY)
 
-            print("Init")
+            log("Init")
 
             await self.transmit_msfs_and_entity_data()
 
@@ -627,7 +648,7 @@ class ResourcesOverUsb2Snes:
         await asyncio.sleep(0.5)
 
         await self.validate_correct_rom()
-        print("Confirmed running game is correct.")
+        log("Confirmed running game is correct.")
 
         burst_read_counter : int = 0
         current_request_id : int = 0
@@ -661,10 +682,10 @@ async def create_and_process_websocket(address : str, data_store : DataStore, me
 
         connected : bool = await usb2snes.find_and_attach_device()
         if not connected:
-            print(f"Could not connect to usb2snes device.")
+            log(f"Could not connect to usb2snes device.")
             return
 
-        print(f"Connected to { usb2snes.device_name() }")
+        log(f"Connected to { usb2snes.device_name() }")
 
         rou2s = ResourcesOverUsb2Snes(usb2snes, data_store, memory_map, symbols)
         await rou2s.run_forever()
