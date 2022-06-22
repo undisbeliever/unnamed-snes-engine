@@ -27,16 +27,21 @@
 # SOFTWARE.
 
 
+import re
 import sys
 import os.path
 import argparse
 import threading
+import subprocess
 import multiprocessing
 from enum import IntEnum, unique
 
 import json
 import asyncio
 import websockets.client
+
+import watchdog.events # type: ignore
+import watchdog.observers # type: ignore
 
 from typing import cast, Any, Callable, Final, NamedTuple, Optional, Union
 
@@ -54,6 +59,9 @@ from _common import ResourceType, MS_FS_DATA_BANK_OFFSET, USB2SNES_DATA_BANK_OFF
 from _entity_data import create_entity_rom_data, ENTITY_ROM_DATA_LABEL
 
 
+# Sleep delay when waiting on a resource
+# (seconds)
+WAITING_FOR_RESOURCE_DELAY : Final[float] = 0.5
 
 # Sleep delay when there is no request to process
 # (seconds)
@@ -134,49 +142,61 @@ class DataStoreKey(NamedTuple):
 
 
 
+# Thread Safety: This class MUST ONLY be accessed via method calls.
+# Thread Safety: All methods in this class must acquire the `_lock` before accessing fields.
 class DataStore:
     def __init__(self, mappings : Mappings):
-        self._resources             : dict[DataStoreKey, CompilerOutput] = dict()
+        self._lock : Final[threading.Lock] = threading.Lock()
 
-        self._msfs_lists            : list[Optional[list[MsFsEntry]]] = [ None ] * len(mappings.ms_spritesheets)
+        with self._lock:
+            self._resources             : dict[DataStoreKey, CompilerOutput] = dict()
 
-        self._msfs_and_entity_data       : Optional[MsFsAndEntityOutput] = None
-        self._msfs_and_entity_data_valid : bool = False
+            self._msfs_lists            : list[Optional[list[MsFsEntry]]] = [ None ] * len(mappings.ms_spritesheets)
+
+            self._msfs_and_entity_data       : Optional[MsFsAndEntityOutput] = None
+            self._msfs_and_entity_data_valid : bool = False
 
 
     def insert_data(self, c : CompilerOutput) -> None:
-        key = DataStoreKey(c.data_type, c.resource_id)
-        self._resources[key] = c
+        with self._lock:
+            key = DataStoreKey(c.data_type, c.resource_id)
+            self._resources[key] = c
 
-        if c.data_type == DataType.MS_SPRITESHEET:
-            self._msfs_lists[c.resource_id] = c.msfs_entries
-            self._msfa_and_entity_rom_data = None
-            self._msfs_and_entity_data_valid = False
+            if c.data_type == DataType.MS_SPRITESHEET:
+                self._msfs_lists[c.resource_id] = c.msfs_entries
+                self._msfa_and_entity_rom_data = None
+                self._msfs_and_entity_data_valid = False
 
 
     def insert_msfs_and_entity_data(self, me : MsFsAndEntityOutput) -> None:
-        self._msfs_and_entity_data = me
+        with self._lock:
+            self._msfs_and_entity_data = me
 
 
     def get_msfs_lists(self) -> list[Optional[list[MsFsEntry]]]:
-        return self._msfs_lists
+        with self._lock:
+            return self._msfs_lists
 
 
     def is_msfs_and_entity_data_valid(self) -> bool:
-        return self._msfs_and_entity_data_valid
+        with self._lock:
+            return self._msfs_and_entity_data_valid
 
 
     def mark_msfs_and_entity_data_valid(self) -> None:
-        self._msfs_and_entity_data_valid = True
+        with self._lock:
+            self._msfs_and_entity_data_valid = True
 
 
     def get_msfs_and_entity_data(self) -> Optional[MsFsAndEntityOutput]:
-        return self._msfs_and_entity_data
+        with self._lock:
+            return self._msfs_and_entity_data
 
 
     def get_resource_data(self, r_type : Union[ResourceType, SpecialRequestType], r_id : int) -> Optional[CompilerOutput]:
-        key = DataStoreKey(DataType(r_type.value), r_id)
-        return self._resources.get(key)
+        with self._lock:
+            key = DataStoreKey(DataType(r_type.value), r_id)
+            return self._resources.get(key)
 
 
 
@@ -186,6 +206,7 @@ class DataStore:
 
 
 
+# ASSUMES: current working directory is the resources directory
 class Compiler:
     # ::TODO do something about these hard coded filenames::
 
@@ -284,6 +305,145 @@ class Compiler:
 
 
 
+# ASSUMES: current working directory is the resources directory
+class FsEventHandler(watchdog.events.FileSystemEventHandler):
+    FILES_THAT_CANNOT_CHANGE : Final[tuple[str, ...]] = (
+        'mappings.json',
+        'entities.json',
+        'resources.json',
+        'ms-export-order.json',
+    )
+
+    MT_TILESET_REGEX     : Final = re.compile(r'^metatiles/(\w+)(\.tsx|-tiles\.png|palette\.png)$')
+    MS_SPRITESHEET_REGEX : Final = re.compile(r'^metasprites/(\w+)/')
+
+
+    def __init__(self, data_store : DataStore, compiler : Compiler):
+        super().__init__()
+
+        self.data_store : Final = data_store
+        self.compiler   : Final = compiler
+
+        # Set by `FsEventHandler` if a FILES_THAT_CANNOT_CHANGE is modified
+        self.stop_token : Final = threading.Event()
+
+
+    def on_closed(self, event : watchdog.events.FileSystemEvent) -> None:
+        if event.is_directory is False:
+            self.process_file(event.src_path)
+
+
+    def on_deleted(self, event : watchdog.events.FileSystemEvent) -> None:
+        if event.is_directory is False:
+            self.process_file(event.src_path)
+
+
+    def on_moved(self, event : watchdog.events.FileSystemMovedEvent) -> None:
+        if event.is_directory is False:
+            self.process_file(event.dest_path)
+
+
+    def process_file(self, src_path : str) -> None:
+        # ::TODO do something about these hard coded filenames::
+
+        filename : Final = src_path.removeprefix('./')
+        ext = os.path.splitext(filename)[1]
+
+        log(f"File Changed: { filename }")
+
+        if filename in self.FILES_THAT_CANNOT_CHANGE:
+            log(f"STOP: { filename } changed, restart required")
+            self.stop_token.set()
+            return
+
+
+        compiler : Final = self.compiler
+        mappings : Final = compiler.mappings
+
+
+        if ext == '.aseprite':
+            self.process_aseprite_file_changed(filename)
+            return
+
+        elif ext == '.tmx':
+            self.process_room(filename)
+            return
+
+        elif m := self.MT_TILESET_REGEX.match(filename):
+            self.process_resource('mt_tileset', compiler.compile_mt_tileset, mappings.mt_tilesets, m.group(1))
+            return
+
+        elif m := self.MS_SPRITESHEET_REGEX.match(filename):
+            self.process_resource('ms_spritesheet', compiler.compile_ms_spritesheet, mappings.ms_spritesheets, m.group(1))
+            self.process_msfs_and_entity_data()
+            return
+
+        elif (tile_name := self._search_through_tiles(filename)) is not None:
+            self.process_resource('tile', compiler.compile_tiles, mappings.tiles, tile_name)
+            return
+
+
+    def _search_through_tiles(self, filename : Filename) -> Optional[str]:
+        for name, t in self.compiler.resources.tiles.items():
+            if filename == t.source:
+                return name
+        return None
+
+
+    def process_aseprite_file_changed(self, filename : str) -> None:
+        # ASSUMES: current directory is the resources directory
+        png_filename = os.path.splitext(filename)[0] + '.png'
+        log(f"    make { png_filename }")
+        subprocess.call(('make', png_filename ))
+
+
+    def process_resource(self, rtype : str, func : Callable[[int], CompilerOutput], name_list : list[Name], name : str) -> None:
+        try:
+            i = name_list.index(name)
+        except ValueError:
+            log("    Cannot find resource id for {rtype}: { name }")
+            return
+
+        log(f"    Compiling { rtype }: { name }")
+        co = func(i)
+        if co.error:
+            log(f"    ERROR: { rtype } { name }: { co.error }")
+        self.data_store.insert_data(co)
+
+
+    def process_room(self, filename : str) -> None:
+        basename = os.path.basename(filename)
+
+        log(f"    Compiling room: { basename }")
+        co = self.compiler.compile_room(basename)
+        if co.error:
+            log(f"    ERROR: room { basename }: { co.error }")
+        self.data_store.insert_data(co)
+
+
+    def process_msfs_and_entity_data(self) -> None:
+        log(f"    Compiling MsFs and Entity Data")
+        me_data = self.compiler.compile_msfs_and_entity_data(self.data_store.get_msfs_lists())
+        if me_data.error:
+            log(f"    ERROR: MsFs and entity_rom_data: { me_data.error }")
+        self.data_store.insert_msfs_and_entity_data(me_data)
+
+
+
+# ASSUMES: current working directory is the resources directory
+def start_filesystem_watcher(data_store : DataStore, compiler : Compiler) -> tuple[watchdog.observers.Observer, threading.Event]:
+
+    handler = FsEventHandler(data_store, compiler)
+
+    observer = watchdog.observers.Observer()
+    observer.schedule(handler, path='.', recursive=True)
+    observer.start()
+
+    return observer, handler.stop_token
+
+
+
+# ASSUMES: current working directory is the resources directory
 def compile_all_resources(data_store : DataStore, compiler : Compiler, n_processes : Optional[int]) -> None:
     # Uses multiprocessing to speed up the compiling
 
@@ -503,10 +663,11 @@ class ResourcesOverUsb2Snes:
     )
 
 
-    def __init__(self, usb2snes : Usb2Snes, data_store : DataStore, memory_map : MemoryMap, symbols : dict[str, int]) -> None:
+    def __init__(self, usb2snes : Usb2Snes, stop_token : threading.Event, data_store : DataStore, memory_map : MemoryMap, symbols : dict[str, int]) -> None:
         address_to_rom_offset  : Final = memory_map.mode.address_to_rom_offset
 
         self.usb2snes   : Final[Usb2Snes] = usb2snes
+        self.stop_token : Final[threading.Event] = stop_token
         self.data_store : Final[DataStore] = data_store
 
         self.address_to_rom_offset  : Final[Callable[[int], int]] = address_to_rom_offset
@@ -545,6 +706,7 @@ class ResourcesOverUsb2Snes:
         return Request(rb[0], rt, rb[2])
 
 
+    # NOTE: This method will sleep until the resource data is valid
     async def process_request(self, request : Request) -> None:
         assert request.request_type != SpecialRequestType.init
 
@@ -560,39 +722,54 @@ class ResourcesOverUsb2Snes:
 
             co = self.data_store.get_resource_data(request.request_type, request.resource_id)
 
+            if co is None or (not co.data):
+                if co:
+                    log(f"    ERROR: { request.request_type.name }[{ request.resource_id }]: { co.error }")
+
+                # Do not wait if request_type is room and resource does not exist.
+                if co is not None or request.request_type != SpecialRequestType.rooms:
+                    log(f"    Waiting until resource data is ready...")
+                    while co is None or (not co.data):
+                        # Exit early if stop_token set
+                        if self.stop_token.is_set():
+                            log("    Stop waiting")
+                            break
+                        co = self.data_store.get_resource_data(request.request_type, request.resource_id)
+                        await asyncio.sleep(WAITING_FOR_RESOURCE_DELAY)
+
             if co is None:
-                if request.request_type == SpecialRequestType.rooms:
-                    await self.write_response(request.request_id, ResponseStatus.NOT_FOUND, None)
-                    return
-                else:
-                    raise RuntimeError("No data")
-
-            if co.data is None:
-                log(f"    Cannot access resource: { request.request_type }[{ request.resource_id }]: { co.error }")
-                raise RuntimeError("No data")
-
-            assert co.data
-            await self.write_response(request.request_id, ResponseStatus.OK, co.data)
+                await self.write_response(request.request_id, ResponseStatus.NOT_FOUND, None)
+            elif co.data:
+                await self.write_response(request.request_id, ResponseStatus.OK, co.data)
+            else:
+                await self.write_response(request.request_id, ResponseStatus.ERROR, None)
 
         except Exception as e:
             await self.write_response(request.request_id, ResponseStatus.ERROR, None)
             raise
 
 
+    # NOTE: This method will sleep until the resource data is valid
     async def transmit_msfs_and_entity_data(self) -> None:
         me = self.data_store.get_msfs_and_entity_data()
 
-        if me is None:
-            raise RuntimeError("Cannot access MsFs or Entity ROM Data")
-
-        if not me.msfs_data or not me.entity_rom_data:
-            if not me.msfs_data:
+        if me is None or (not me.msfs_data) or (not me.entity_rom_data):
+            if me is None:
+                log(f"    Cannot access MsFsData or Entity ROM Data")
+            elif not me.msfs_data:
                 log(f"    Cannot access MsFsData: { me.error }")
+            elif not me.entity_rom_data:
+                log(f"    Cannot access entity_rom_data: { me.error }")
 
-            if not me.entity_rom_data:
-                log(f"    Cannot access MsFsData: { me.error }")
+            log(f"    Waiting until data is ready...")
 
-            raise RuntimeError("Cannot access MsFs or Entity ROM Data")
+            while me is None or (not me.msfs_data) or (not me.entity_rom_data):
+                # Exit early if stop_token set
+                if self.stop_token.is_set():
+                    log("    Stop waiting")
+                    return
+                me = self.data_store.get_msfs_and_entity_data()
+                await asyncio.sleep(WAITING_FOR_RESOURCE_DELAY)
 
 
         log(f"    MsFsData { len(me.msfs_data) } bytes")
@@ -640,7 +817,7 @@ class ResourcesOverUsb2Snes:
             raise
 
 
-    async def run_forever(self) -> None:
+    async def run_until_stop_token_set(self) -> None:
         # This sleep statement is required.
         # On my system there needs to be a 1/2 second delay between a usb2snes "Boot" command and a "GetAddress" command.
         #
@@ -653,7 +830,7 @@ class ResourcesOverUsb2Snes:
         burst_read_counter : int = 0
         current_request_id : int = 0
 
-        while True:
+        while not self.stop_token.is_set():
             request = await self.read_request()
 
             if request.request_type == SpecialRequestType.init:
@@ -675,7 +852,7 @@ class ResourcesOverUsb2Snes:
 
 
 
-async def create_and_process_websocket(address : str, data_store : DataStore, memory_map : MemoryMap, symbols : dict[str, int]) -> None:
+async def create_and_process_websocket(address : str, stop_token : threading.Event, data_store : DataStore, memory_map : MemoryMap, symbols : dict[str, int]) -> None:
 
     async with websockets.client.connect(address) as socket:
         usb2snes = Usb2Snes(socket)
@@ -687,8 +864,8 @@ async def create_and_process_websocket(address : str, data_store : DataStore, me
 
         log(f"Connected to { usb2snes.device_name() }")
 
-        rou2s = ResourcesOverUsb2Snes(usb2snes, data_store, memory_map, symbols)
-        await rou2s.run_forever()
+        rou2s = ResourcesOverUsb2Snes(usb2snes, stop_token, data_store, memory_map, symbols)
+        await rou2s.run_until_stop_token_set()
 
 
 
@@ -700,7 +877,12 @@ def resources_over_usb2snes(sym_file_relpath : Filename, websocket_address : str
     # ::TODO compile resources while creating usb2snes connection::
     compile_all_resources(data_store, compiler, n_processes)
 
-    asyncio.run(create_and_process_websocket(websocket_address, data_store, compiler.mappings.memory_map, compiler.symbols))
+    fs_watcher, stop_token = start_filesystem_watcher(data_store, compiler)
+
+    asyncio.run(create_and_process_websocket(websocket_address, stop_token, data_store, compiler.mappings.memory_map, compiler.symbols))
+
+    fs_watcher.stop()
+    fs_watcher.join()
 
 
 
