@@ -42,6 +42,19 @@ in wram7e_roomstate {
 
     // The location of the current room
     var currentRoom : u8;
+
+
+    // If non-zero, the next room transition will be a fadeout room transition.
+    //
+    // A Fadeout room transition will always reload MetaTile and MetaSprite resources.
+    //
+    // This value is reset after a fadein room transition.
+    //
+    // NOTE: This variable is declared in `room.wiz` to prevent an
+    //       "encountered a reference to `var metasprites.xPos` before its type was known" error
+    //
+    // (byte flag)
+    var forceFadeoutRoomTransition : u8;
 }
 
 }

@@ -203,9 +203,17 @@ var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u1
     }
 
 
-    // Get the tileset id from the backup
+    // Get the tileset id from the backup and test if the tileset has changed.
+    // (the "empty dummy" room has a tileset id of 0xff)
     a = room.tileset;
     if a != 0xff && a != _roomStateBackup__room_tileset {
+        return false;
+    }
+
+
+    // Check if a fadeout transition was requested
+    a = roomstate.forceFadeoutRoomTransition;
+    if !zero {
         return false;
     }
 
@@ -430,6 +438,9 @@ func _fadein__room_in_memory() {
 
     __setup_ppu_and_reset_graphics_subsystems();
     gameloop.draw_entities();
+
+    // Ensure next room transition is a normal transition.
+    roomstate.forceFadeoutRoomTransition = 0;
 
 
     // Fade in

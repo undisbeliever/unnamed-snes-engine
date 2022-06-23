@@ -59,11 +59,12 @@ let INIT_REQUEST = Request{
 
 // Must match `ResponseStatus` in `tools/resources_over_usb2snes.py`
 enum ResponseStatus : u8 {
-    NOT_CONNECTED = 0,
-    OK            = 0x20,
-    INIT_OK       = 0xbb,
-    NOT_FOUND     = 0x40,
-    ERROR         = 0x0ff,
+    NOT_CONNECTED        = 0,
+    OK                   = 0x20,
+    OK_RESOURCES_CHANGED = 0x21, // Only `room` requests return this response.
+    INIT_OK              = 0xbb, // Only `init` requests return this response.
+    NOT_FOUND            = 0x40,
+    ERROR                = 0xff,
 };
 
 
@@ -268,6 +269,14 @@ func load_room(roomId : u8 in y) : bool in carry {
         if a == ResponseStatus.NOT_FOUND as u8 {
             // Room does not exist
             return false;
+        }
+
+        if a == ResponseStatus.OK_RESOURCES_CHANGED as u8 {
+            // Room exists the resources have changed.
+            // Force a fade-out room transition to ensure new resources will be loaded.
+            // a is non-zero
+            roomstate.forceFadeoutRoomTransition = a;
+            break;
         }
     }
     while a != ResponseStatus.OK as u8;

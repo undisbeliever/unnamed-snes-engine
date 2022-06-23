@@ -156,11 +156,17 @@ class DataStore:
             self._msfs_and_entity_data       : Optional[MsFsAndEntityOutput] = None
             self._msfs_and_entity_data_valid : bool = False
 
+            # Not incremented when room data changes
+            self._not_room_counter : int = 0
+
 
     def insert_data(self, c : CompilerOutput) -> None:
         with self._lock:
             key = DataStoreKey(c.data_type, c.resource_id)
             self._resources[key] = c
+
+            if c.data_type != DataType.ROOM:
+                self._not_room_counter += 1
 
             if c.data_type == DataType.MS_SPRITESHEET:
                 self._msfs_lists[c.resource_id] = c.msfs_entries
@@ -171,6 +177,12 @@ class DataStore:
     def insert_msfs_and_entity_data(self, me : MsFsAndEntityOutput) -> None:
         with self._lock:
             self._msfs_and_entity_data = me
+            self._not_room_counter += 1
+
+
+    def get_not_room_counter(self) -> int:
+        with self._lock:
+            return self._not_room_counter
 
 
     def get_msfs_lists(self) -> list[Optional[list[MsFsEntry]]]:
@@ -641,12 +653,14 @@ INIT_REQUEST : Final = Request(0, SpecialRequestType.init, SpecialRequestType.in
 
 
 # Must match `ResponseStatus` enum in `src/resources-over-usb2snes.wiz`
+@unique
 class ResponseStatus(IntEnum):
-    NOT_CONNECTED = 0
-    OK            = 0x20
-    INIT_OK       = 0xbb
-    NOT_FOUND     = 0x40
-    ERROR         = 0xff
+    NOT_CONNECTED        = 0
+    OK                   = 0x20
+    OK_RESOURCES_CHANGED = 0x21 # Only `room` requests can return this response.
+    INIT_OK              = 0xbb # Only `init` requests can return this response.
+    NOT_FOUND            = 0x40
+    ERROR                = 0xff
 
 
 
@@ -680,6 +694,8 @@ class ResourcesOverUsb2Snes:
         self.msfs_data_offset       : Final[int] = address_to_rom_offset(address_at_bank_offset(memory_map, MS_FS_DATA_BANK_OFFSET))
 
         self.max_data_size          : Final[int] = min(memory_map.mode.bank_size, 0xffff)
+
+        self.not_room_counter   : int = data_store.get_not_room_counter()
 
 
     async def validate_correct_rom(self) -> None:
@@ -737,12 +753,21 @@ class ResourcesOverUsb2Snes:
                         co = self.data_store.get_resource_data(request.request_type, request.resource_id)
                         await asyncio.sleep(WAITING_FOR_RESOURCE_DELAY)
 
+            status = ResponseStatus.ERROR
+
             if co is None:
-                await self.write_response(request.request_id, ResponseStatus.NOT_FOUND, None)
-            elif co.data:
-                await self.write_response(request.request_id, ResponseStatus.OK, co.data)
+                status = ResponseStatus.NOT_FOUND
             else:
-                await self.write_response(request.request_id, ResponseStatus.ERROR, None)
+                status = ResponseStatus.OK
+
+                if co.data_type == DataType.ROOM:
+                    nrc = self.data_store.get_not_room_counter()
+                    if nrc != self.not_room_counter:
+                        self.not_room_counter = nrc
+                        status = ResponseStatus.OK_RESOURCES_CHANGED
+
+            await self.write_response(request.request_id, status,
+                                      co.data if co else None)
 
         except Exception as e:
             await self.write_response(request.request_id, ResponseStatus.ERROR, None)
