@@ -49,7 +49,7 @@ from convert_tileset import convert_mt_tileset
 from convert_metasprite import convert_spritesheet, generate_pattern_grids, PatternGrid, MsFsEntry, build_ms_fs_data
 from convert_rooms import get_list_of_tmx_files, extract_room_id, compile_room
 from convert_resources import convert_tiles
-from insert_resources import read_symbols_file
+from insert_resources import read_binary_file, read_symbols_file, validate_sfc_file
 
 from _json_formats import load_mappings_json, load_entities_json, load_ms_export_order_json, load_resources_json, load_metasprites_json, \
                           Name, Filename, MemoryMap, Mappings, EntitiesJson, MsExportOrder, ResourcesJson
@@ -588,18 +588,27 @@ class Usb2Snes:
 
 
     async def read_offset(self, offset : int, size : int) -> bytes:
-        if size > self.BLOCK_SIZE:
-            raise ValueError(f"size to too large: { size }")
-
         if size < 0:
             raise ValueError('Invalid size')
 
         await self._request('GetAddress', hex(offset), hex(size))
 
-        out = await self._socket.recv()
+        if size <= self.BLOCK_SIZE:
+            out = await self._socket.recv()
 
-        if not isinstance(out, bytes):
-            raise RuntimeError(f"Unknown response from QUsb2Snes, expected bytes got { type(out) }")
+            if not isinstance(out, bytes):
+                raise RuntimeError(f"Unknown response from QUsb2Snes, expected bytes got { type(out) }")
+        else:
+            out = bytes()
+
+            while len(out) < size:
+                o = await self._socket.recv()
+                if not isinstance(o, bytes):
+                    raise RuntimeError(f"Unknown response from QUsb2Snes, expected bytes got { type(out) }")
+                out += o
+
+        if len(out) != size:
+            raise RuntimeError(f"Size mismatch: got { len(out) } bytes, expected { size }")
 
         return out
 
@@ -662,6 +671,7 @@ class ResponseStatus(IntEnum):
     NOT_FOUND            = 0x40
     ERROR                = 0xff
 
+RESPONSE_SIZE : Final = 4
 
 
 def address_at_bank_offset(memory_map : MemoryMap, bank_offset : int) -> int:
@@ -703,9 +713,22 @@ class ResourcesOverUsb2Snes:
         if urou2s_data != b'\xff':
             raise ValueError(f"{ self.usb2snes.device_name() } is not running the build without resources")
 
-        # ::TODO add more tests::
         # ::TODO validate game title::
-        # ::TODO validate `NResourcesPerTypeTable`::
+
+
+    async def validate_game_matches_sfc_file(self, sfc_file_data : bytes, memory_map : MemoryMap) -> None:
+        # Assumes `sfc_file_data` passes `insert_resources.validate_sfc_file()` tests
+
+        n_bytes_to_test : Final = (memory_map.first_resource_bank & 0x3f) * memory_map.mode.bank_size
+        usb2snes_data : Final = await self.usb2snes.read_offset(0, n_bytes_to_test)
+
+        # Test `usb2snes_data matches` `sfc_file_data`, except for the `resources_over_usb2snes.resources` data
+        p1 : Final = self.response_offset
+        p2 : Final = self.response_offset + RESPONSE_SIZE
+        assert n_bytes_to_test >= p2
+
+        if usb2snes_data[:p1] != sfc_file_data[:p1] and usb2snes_data[p2:n_bytes_to_test] != sfc_file_data[p2:n_bytes_to_test]:
+            raise RuntimeError(f"{ self.usb2snes.device_name() } does not match sfc file")
 
 
     async def read_request(self) -> Request:
@@ -816,7 +839,7 @@ class ResourcesOverUsb2Snes:
         if data is not None:
             await self.usb2snes.write_to_offset(self.response_data_offset, data)
 
-        r = bytearray(4)
+        r = bytearray(RESPONSE_SIZE)
         r[0] = response_id
         r[1] = status.value
         r[2] = data_size & 0xff
@@ -843,15 +866,6 @@ class ResourcesOverUsb2Snes:
 
 
     async def run_until_stop_token_set(self) -> None:
-        # This sleep statement is required.
-        # On my system there needs to be a 1/2 second delay between a usb2snes "Boot" command and a "GetAddress" command.
-        #
-        # ::TODO find a way to eliminate this::
-        await asyncio.sleep(0.5)
-
-        await self.validate_correct_rom()
-        log("Confirmed running game is correct.")
-
         burst_read_counter : int = 0
         current_request_id : int = 0
 
@@ -877,7 +891,7 @@ class ResourcesOverUsb2Snes:
 
 
 
-async def create_and_process_websocket(address : str, stop_token : threading.Event, data_store : DataStore, memory_map : MemoryMap, symbols : dict[str, int]) -> None:
+async def create_and_process_websocket(address : str, stop_token : threading.Event, sfc_file_data : bytes, data_store : DataStore, memory_map : MemoryMap, symbols : dict[str, int]) -> None:
 
     async with websockets.client.connect(address) as socket:
         usb2snes = Usb2Snes(socket)
@@ -890,12 +904,30 @@ async def create_and_process_websocket(address : str, stop_token : threading.Eve
         log(f"Connected to { usb2snes.device_name() }")
 
         rou2s = ResourcesOverUsb2Snes(usb2snes, stop_token, data_store, memory_map, symbols)
+
+        # This sleep statement is required.
+        # On my system there needs to be a 1/2 second delay between a usb2snes "Boot" command and a "GetAddress" command.
+        #
+        # ::TODO find a way to eliminate this::
+        await asyncio.sleep(0.5)
+
+        await rou2s.validate_correct_rom()
+        await rou2s.validate_game_matches_sfc_file(sfc_file_data, memory_map)
+        log("Confirmed running game matches sfc file.")
+
         await rou2s.run_until_stop_token_set()
 
 
 
-def resources_over_usb2snes(sym_file_relpath : Filename, websocket_address : str, n_processes : Optional[int]) -> None:
+def resources_over_usb2snes(sfc_file_relpath : Filename, websocket_address : str, n_processes : Optional[int]) -> None:
+
+    sym_file_relpath = os.path.splitext(sfc_file_relpath)[0] + '.sym'
+
     compiler = Compiler(sym_file_relpath)
+
+    sfc_file_data = read_binary_file(sfc_file_relpath, 512 * 1024)
+    validate_sfc_file(sfc_file_data, compiler.symbols, compiler.mappings)
+
 
     data_store = DataStore(compiler.mappings)
 
@@ -904,7 +936,7 @@ def resources_over_usb2snes(sym_file_relpath : Filename, websocket_address : str
 
     fs_watcher, stop_token = start_filesystem_watcher(data_store, compiler)
 
-    asyncio.run(create_and_process_websocket(websocket_address, stop_token, data_store, compiler.mappings.memory_map, compiler.symbols))
+    asyncio.run(create_and_process_websocket(websocket_address, stop_token, sfc_file_data, data_store, compiler.mappings.memory_map, compiler.symbols))
 
     fs_watcher.stop()
     fs_watcher.join()
@@ -927,8 +959,8 @@ def parse_arguments() -> argparse.Namespace:
                         help='Number of processors to use (default = all)')
     parser.add_argument('resources_directory', action='store',
                         help='resources directory')
-    parser.add_argument('sym_file', action='store',
-                        help='symbols file')
+    parser.add_argument('sfc_file', action='store',
+                        help='sfc file (without resources)')
 
     args = parser.parse_args()
 
@@ -939,11 +971,11 @@ def parse_arguments() -> argparse.Namespace:
 def main() -> None:
     args = parse_arguments()
 
-    sym_file_relpath = os.path.relpath(args.sym_file, args.resources_directory)
+    sfc_file_relpath = os.path.relpath(args.sfc_file, args.resources_directory)
 
     os.chdir(args.resources_directory)
 
-    resources_over_usb2snes(sym_file_relpath, args.address, args.processes)
+    resources_over_usb2snes(sfc_file_relpath, args.address, args.processes)
 
 
 if __name__ == '__main__':

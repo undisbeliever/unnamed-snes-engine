@@ -65,14 +65,56 @@ def get_largest_rom_address(symbols : dict[str, int]) -> int:
 
 
 
+ROM_HEADER_TITLE_ADDR = 0xFFC0
+ROM_HEADER_TITLE_SIZE = 21
+ROM_HEADER_TITLE_ENCODING = 'Shift-JIS' # This is supposed to be `JIS X 0201`, but python does not support it.
+
+
+def convert_title(s : str) -> bytes:
+    title = s.encode(ROM_HEADER_TITLE_ENCODING).ljust(ROM_HEADER_TITLE_SIZE, b'\x20')
+    if len(title) != ROM_HEADER_TITLE_SIZE:
+        raise ValueError(f"Title is too large ({ len(title) }, max: { ROM_HEADER_TITLE_SIZE })")
+    return title
+
+
+
+def validate_sfc_file(sfc_data : bytes, symbols : dict[str, int], mappings : Mappings) -> None:
+    """
+    Validates `sfc_data` matches symbols and mappings.
+    """
+
+    memory_map = mappings.memory_map
+    address_to_rom_offset : Callable[[Address], RomOffset] = memory_map.mode.address_to_rom_offset
+
+    last_symbol_bank = get_largest_rom_address(symbols) >> 16
+    if last_symbol_bank >= memory_map.first_resource_bank:
+        raise RuntimeError(f"ERROR: first_resource_bank is not empty.  Found a symbol in bank 0x{last_symbol_bank:02x}")
+
+
+    expected_size = ((memory_map.first_resource_bank + memory_map.n_resource_banks) & 0x3f) * memory_map.mode.bank_size
+    if len(sfc_data) != expected_size:
+        raise RuntimeError(f"ERROR:  Expected a sfc file that is { expected_size // 1024 } bytes in size")
+
+
+    title_offset = address_to_rom_offset(ROM_HEADER_TITLE_ADDR)
+
+    expected_title = convert_title(mappings.game_title)
+    title_in_sfc_data = sfc_data[title_offset : title_offset + ROM_HEADER_TITLE_SIZE]
+    if title_in_sfc_data != expected_title:
+        decoded_title_in_sfc_data = bytes(title_in_sfc_data).decode(ROM_HEADER_TITLE_ENCODING).strip()
+        raise RuntimeError(f"ERROR: sfc file header ({ decoded_title_in_sfc_data }) does not match mappings game_title ({ mappings.game_title })")
+
+
+    if USE_RESOURCES_OVER_USB2SNES_LABEL in symbols:
+        o = address_to_rom_offset(symbols[USE_RESOURCES_OVER_USB2SNES_LABEL])
+        if sfc_data[o] != 0xff:
+            raise ValueError(f"sfc file contains resource data")
+
+
+
 class ResourceInserter:
     BANK_END = 0x10000
     BLANK_RESOURCE_ENTRY = bytes(5)
-
-    ROM_HEADER_TITLE_ADDR = 0xFFC0
-    ROM_HEADER_TITLE_SIZE = 21
-    ROM_HEADER_TITLE_ENCODING = 'Shift-JIS' # This is supposed to be `JIS X 0201`, but python does not support it.
-
 
     def __init__(self, sfc_view : memoryview, symbols : dict[str, int], mappings : Mappings):
         memory_map = mappings.memory_map
@@ -90,22 +132,7 @@ class ResourceInserter:
 
         self.bank_positions   : list[int] = [ self.bank_start ] * memory_map.n_resource_banks
 
-
-        last_symbol_bank = get_largest_rom_address(symbols) >> 16
-        if last_symbol_bank >= memory_map.first_resource_bank:
-            raise RuntimeError(f"ERROR: first_resource_bank is not empty.  Found a symbol in bank 0x{last_symbol_bank:02x}")
-
-
-        expected_size = ((memory_map.first_resource_bank + memory_map.n_resource_banks) & 0x3f) * self.bank_size
-        if len(sfc_view) != expected_size:
-            raise RuntimeError(f"ERROR:  Expected a sfc file that is { expected_size // 1024 } bytes in size")
-
-
-        expected_title = mappings.game_title.encode(self.ROM_HEADER_TITLE_ENCODING).ljust(self.ROM_HEADER_TITLE_SIZE, b'\x20')
-        title_in_sfc_view = self.subview_addr(self.ROM_HEADER_TITLE_ADDR, self.ROM_HEADER_TITLE_SIZE)
-        if title_in_sfc_view != expected_title:
-            decoded_title_in_sfc_view = bytes(title_in_sfc_view).decode(self.ROM_HEADER_TITLE_ENCODING).strip()
-            raise RuntimeError(f"ERROR: sfc file header ({ decoded_title_in_sfc_view }) does not match mappings game_title ({ mappings.game_title })")
+        validate_sfc_file(sfc_view, symbols, mappings)
 
 
     def label_offset(self, label : str) -> RomOffset:
