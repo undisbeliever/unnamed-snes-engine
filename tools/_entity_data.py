@@ -19,6 +19,8 @@ ENTITY_ROM_DATA_SOA_LABELS = (
 
 ENTITY_ROM_DATA_LABEL = ENTITY_ROM_DATA_SOA_LABELS[0]
 
+ENTITY_ROM_DATA_BYTES_PER_ENTITY = len(ENTITY_ROM_DATA_SOA_LABELS) * 2
+
 
 def validate_entity_rom_data_symbols(symbols : dict[str, int], n_entities : int) -> None:
     array_size = n_entities * 2

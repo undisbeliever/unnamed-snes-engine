@@ -56,7 +56,7 @@ from _json_formats import load_mappings_json, load_entities_json, load_ms_export
 
 from _common import ResourceType, MS_FS_DATA_BANK_OFFSET, USB2SNES_DATA_BANK_OFFSET, USE_RESOURCES_OVER_USB2SNES_LABEL
 
-from _entity_data import create_entity_rom_data, ENTITY_ROM_DATA_LABEL
+from _entity_data import create_entity_rom_data, ENTITY_ROM_DATA_LABEL, ENTITY_ROM_DATA_BYTES_PER_ENTITY
 
 
 # Sleep delay when waiting on a resource
@@ -687,7 +687,7 @@ class ResourcesOverUsb2Snes:
     )
 
 
-    def __init__(self, usb2snes : Usb2Snes, stop_token : threading.Event, data_store : DataStore, memory_map : MemoryMap, symbols : dict[str, int]) -> None:
+    def __init__(self, usb2snes : Usb2Snes, stop_token : threading.Event, data_store : DataStore, memory_map : MemoryMap, n_entities : int, symbols : dict[str, int]) -> None:
         address_to_rom_offset  : Final = memory_map.mode.address_to_rom_offset
 
         self.usb2snes   : Final[Usb2Snes] = usb2snes
@@ -703,6 +703,8 @@ class ResourcesOverUsb2Snes:
         self.response_data_offset   : Final[int] = address_to_rom_offset(address_at_bank_offset(memory_map, USB2SNES_DATA_BANK_OFFSET))
         self.msfs_data_offset       : Final[int] = address_to_rom_offset(address_at_bank_offset(memory_map, MS_FS_DATA_BANK_OFFSET))
 
+        self.expected_entity_rom_data_size : Final[int] = n_entities * ENTITY_ROM_DATA_BYTES_PER_ENTITY
+
         self.max_data_size          : Final[int] = min(memory_map.mode.bank_size, 0xffff)
 
         self.not_room_counter   : int = data_store.get_not_room_counter()
@@ -717,17 +719,26 @@ class ResourcesOverUsb2Snes:
 
 
     async def validate_game_matches_sfc_file(self, sfc_file_data : bytes, memory_map : MemoryMap) -> None:
-        # Assumes `sfc_file_data` passes `insert_resources.validate_sfc_file()` tests
+        # Assumes `sfc_file_data` passes `validate_sfc_file()` tests
 
         n_bytes_to_test : Final = (memory_map.first_resource_bank & 0x3f) * memory_map.mode.bank_size
-        usb2snes_data : Final = await self.usb2snes.read_offset(0, n_bytes_to_test)
+        assert len(sfc_file_data) >= n_bytes_to_test
 
-        # Test `usb2snes_data matches` `sfc_file_data`, except for the `resources_over_usb2snes.resources` data
-        p1 : Final = self.response_offset
-        p2 : Final = self.response_offset + RESPONSE_SIZE
-        assert n_bytes_to_test >= p2
+        usb2snes_data = bytearray(await self.usb2snes.read_offset(0, n_bytes_to_test))
 
-        if usb2snes_data[:p1] != sfc_file_data[:p1] and usb2snes_data[p2:n_bytes_to_test] != sfc_file_data[p2:n_bytes_to_test]:
+        # Ignore any changes to the `Response` byte
+        p1 = self.response_offset
+        p2 = self.response_offset + RESPONSE_SIZE
+        assert p2 < n_bytes_to_test
+        usb2snes_data[p1:p2] = sfc_file_data[p1:p2]
+
+        # Ignore any changes to `entity_rom_data`
+        p1 = self.entity_rom_data_offset
+        p2 = self.entity_rom_data_offset + self.expected_entity_rom_data_size
+        assert p2 < n_bytes_to_test
+        usb2snes_data[p1:p2] = sfc_file_data[p1:p2]
+
+        if usb2snes_data != sfc_file_data[:n_bytes_to_test]:
             raise RuntimeError(f"{ self.usb2snes.device_name() } does not match sfc file")
 
 
@@ -819,6 +830,8 @@ class ResourcesOverUsb2Snes:
                 me = self.data_store.get_msfs_and_entity_data()
                 await asyncio.sleep(WAITING_FOR_RESOURCE_DELAY)
 
+        assert len(me.entity_rom_data) == self.expected_entity_rom_data_size
+
 
         log(f"    MsFsData { len(me.msfs_data) } bytes")
         await self.usb2snes.write_to_offset(self.msfs_data_offset,       me.msfs_data)
@@ -891,7 +904,7 @@ class ResourcesOverUsb2Snes:
 
 
 
-async def create_and_process_websocket(address : str, stop_token : threading.Event, sfc_file_data : bytes, data_store : DataStore, memory_map : MemoryMap, symbols : dict[str, int]) -> None:
+async def create_and_process_websocket(address : str, stop_token : threading.Event, sfc_file_data : bytes, data_store : DataStore, memory_map : MemoryMap, n_entities : int, symbols : dict[str, int]) -> None:
 
     async with websockets.client.connect(address) as socket:
         usb2snes = Usb2Snes(socket)
@@ -903,7 +916,7 @@ async def create_and_process_websocket(address : str, stop_token : threading.Eve
 
         log(f"Connected to { usb2snes.device_name() }")
 
-        rou2s = ResourcesOverUsb2Snes(usb2snes, stop_token, data_store, memory_map, symbols)
+        rou2s = ResourcesOverUsb2Snes(usb2snes, stop_token, data_store, memory_map, n_entities, symbols)
 
         # This sleep statement is required.
         # On my system there needs to be a 1/2 second delay between a usb2snes "Boot" command and a "GetAddress" command.
@@ -936,7 +949,7 @@ def resources_over_usb2snes(sfc_file_relpath : Filename, websocket_address : str
 
     fs_watcher, stop_token = start_filesystem_watcher(data_store, compiler)
 
-    asyncio.run(create_and_process_websocket(websocket_address, stop_token, sfc_file_data, data_store, compiler.mappings.memory_map, compiler.symbols))
+    asyncio.run(create_and_process_websocket(websocket_address, stop_token, sfc_file_data, data_store, compiler.mappings.memory_map, len(compiler.entities.entities), compiler.symbols))
 
     fs_watcher.stop()
     fs_watcher.join()
