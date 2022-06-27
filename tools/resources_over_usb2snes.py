@@ -38,6 +38,7 @@ from enum import IntEnum, unique
 
 import json
 import asyncio
+import posixpath
 import websockets.client
 
 import watchdog.events # type: ignore
@@ -587,6 +588,15 @@ class Usb2Snes:
         return True
 
 
+    async def get_playing_filename(self) -> str:
+        r = await self._request_response('Info')
+        return r[2]
+
+
+    async def get_playing_basename(self) -> str:
+        return posixpath.basename(await self.get_playing_filename())
+
+
     async def read_offset(self, offset : int, size : int) -> bytes:
         if size < 0:
             raise ValueError('Invalid size')
@@ -710,7 +720,11 @@ class ResourcesOverUsb2Snes:
         self.not_room_counter   : int = data_store.get_not_room_counter()
 
 
-    async def validate_correct_rom(self) -> None:
+    async def validate_correct_rom(self, sfc_file_basename : Filename) -> None:
+        playing_basename : Final[str] = await self.usb2snes.get_playing_basename()
+        if playing_basename != sfc_file_basename:
+            raise RuntimeError(f"{ self.usb2snes.device_name() } is not running { sfc_file_basename } (currently playing { playing_basename })")
+
         urou2s_data = await self.usb2snes.read_offset(self.urou2s_offset, 1)
         if urou2s_data != b'\xff':
             raise ValueError(f"{ self.usb2snes.device_name() } is not running the build without resources")
@@ -904,7 +918,8 @@ class ResourcesOverUsb2Snes:
 
 
 
-async def create_and_process_websocket(address : str, stop_token : threading.Event, sfc_file_data : bytes, data_store : DataStore, memory_map : MemoryMap, n_entities : int, symbols : dict[str, int]) -> None:
+async def create_and_process_websocket(address : str, stop_token : threading.Event, sfc_file_basename : Filename, sfc_file_data : bytes,
+                                       data_store : DataStore, memory_map : MemoryMap, n_entities : int, symbols : dict[str, int]) -> None:
 
     async with websockets.client.connect(address) as socket:
         usb2snes = Usb2Snes(socket)
@@ -924,9 +939,9 @@ async def create_and_process_websocket(address : str, stop_token : threading.Eve
         # ::TODO find a way to eliminate this::
         await asyncio.sleep(0.5)
 
-        await rou2s.validate_correct_rom()
+        await rou2s.validate_correct_rom(sfc_file_basename)
         await rou2s.validate_game_matches_sfc_file(sfc_file_data, memory_map)
-        log("Confirmed running game matches sfc file.")
+        log(f"Confirmed device is running { sfc_file_basename }")
 
         await rou2s.run_until_stop_token_set()
 
@@ -935,6 +950,7 @@ async def create_and_process_websocket(address : str, stop_token : threading.Eve
 def resources_over_usb2snes(sfc_file_relpath : Filename, websocket_address : str, n_processes : Optional[int]) -> None:
 
     sym_file_relpath = os.path.splitext(sfc_file_relpath)[0] + '.sym'
+    sfc_file_basename = os.path.basename(sfc_file_relpath)
 
     compiler = Compiler(sym_file_relpath)
 
@@ -949,7 +965,7 @@ def resources_over_usb2snes(sfc_file_relpath : Filename, websocket_address : str
 
     fs_watcher, stop_token = start_filesystem_watcher(data_store, compiler)
 
-    asyncio.run(create_and_process_websocket(websocket_address, stop_token, sfc_file_data, data_store, compiler.mappings.memory_map, len(compiler.entities.entities), compiler.symbols))
+    asyncio.run(create_and_process_websocket(websocket_address, stop_token, sfc_file_basename, sfc_file_data, data_store, compiler.mappings.memory_map, len(compiler.entities.entities), compiler.symbols))
 
     fs_watcher.stop()
     fs_watcher.join()
