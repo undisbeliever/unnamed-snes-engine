@@ -603,19 +603,15 @@ class Usb2Snes:
 
         await self._request('GetAddress', hex(offset), hex(size))
 
-        if size <= self.BLOCK_SIZE:
-            out = await self._socket.recv()
+        out = bytes()
 
-            if not isinstance(out, bytes):
+        # This loop is required.
+        # On my system, Work-RAM addresses are sent in 128 byte blocks.
+        while len(out) < size:
+            o = await self._socket.recv()
+            if not isinstance(o, bytes):
                 raise RuntimeError(f"Unknown response from QUsb2Snes, expected bytes got { type(out) }")
-        else:
-            out = bytes()
-
-            while len(out) < size:
-                o = await self._socket.recv()
-                if not isinstance(o, bytes):
-                    raise RuntimeError(f"Unknown response from QUsb2Snes, expected bytes got { type(out) }")
-                out += o
+            out += o
 
         if len(out) != size:
             raise RuntimeError(f"Size mismatch: got { len(out) } bytes, expected { size }")
