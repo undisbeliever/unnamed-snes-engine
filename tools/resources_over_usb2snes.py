@@ -33,6 +33,7 @@ import os.path
 import argparse
 import threading
 import subprocess
+import secrets
 import multiprocessing
 from enum import IntEnum, unique
 
@@ -50,7 +51,7 @@ from convert_tileset import convert_mt_tileset
 from convert_metasprite import convert_spritesheet, generate_pattern_grids, PatternGrid, MsFsEntry, build_ms_fs_data
 from convert_rooms import get_list_of_tmx_files, extract_room_id, compile_room
 from convert_resources import convert_tiles
-from insert_resources import read_binary_file, read_symbols_file, validate_sfc_file
+from insert_resources import read_binary_file, read_symbols_file, validate_sfc_file, ROM_HEADER_V3_ADDR
 
 from _json_formats import load_mappings_json, load_entities_json, load_ms_export_order_json, load_resources_json, load_metasprites_json, \
                           Name, Filename, MemoryMap, Mappings, EntitiesJson, MsExportOrder, ResourcesJson
@@ -73,11 +74,20 @@ NORMAL_REQUEST_SLEEP_DELAY : Final[float] = 1 / 10
 # (seconds)
 BURST_SLEEP_DELAY : Final[float] = 1 / 100
 
+# Sleep delay when waiting for `update_requested_spinloop` signal
+UPDATE_ROM_SPINLOOP_SLEEP_DELAY : Final[float] = 1 / 60
+
+
 # Number of times to sleep for `BURST_SLEEP_DELAY`, before returning to `NORMAL_REQUEST_SLEEP_DELAY`
 BURST_COUNT : Final[int] = 5
 
 
 N_RESOURCE_TYPES : Final[int] = len(ResourceType)
+
+
+# MUST match `RomUpdateRequired` address in `src/resources-over-usb2snes.wiz`
+# (+6 is maker code & game code)
+ROM_UPDATE_REQUIRED_ADDR = ROM_HEADER_V3_ADDR + 6 + 3
 
 
 # Must match `SpecialRequestType` in `src/resources-over-usb2snes.wiz`
@@ -597,6 +607,11 @@ class Usb2Snes:
         return posixpath.basename(await self.get_playing_filename())
 
 
+    async def send_reset_command(self) -> None:
+        # Reset command does not return a response
+        await self._request('Reset')
+
+
     async def read_offset(self, offset : int, size : int) -> bytes:
         if size < 0:
             raise ValueError('Invalid size')
@@ -709,6 +724,8 @@ class ResourcesOverUsb2Snes:
         self.response_data_offset   : Final[int] = address_to_rom_offset(address_at_bank_offset(memory_map, USB2SNES_DATA_BANK_OFFSET))
         self.msfs_data_offset       : Final[int] = address_to_rom_offset(address_at_bank_offset(memory_map, MS_FS_DATA_BANK_OFFSET))
 
+        self.rom_update_required_offset : Final[int] = address_to_rom_offset(ROM_UPDATE_REQUIRED_ADDR)
+
         self.expected_entity_rom_data_size : Final[int] = n_entities * ENTITY_ROM_DATA_BYTES_PER_ENTITY
 
         self.max_data_size          : Final[int] = min(memory_map.mode.bank_size, 0xffff)
@@ -728,7 +745,7 @@ class ResourcesOverUsb2Snes:
         # ::TODO validate game title::
 
 
-    async def validate_game_matches_sfc_file(self, sfc_file_data : bytes, memory_map : MemoryMap) -> None:
+    async def test_game_matches_sfc_file(self, sfc_file_data : bytes, memory_map : MemoryMap) -> bool:
         # Assumes `sfc_file_data` passes `validate_sfc_file()` tests
 
         n_bytes_to_test : Final = (memory_map.first_resource_bank & 0x3f) * memory_map.mode.bank_size
@@ -748,8 +765,57 @@ class ResourcesOverUsb2Snes:
         assert p2 < n_bytes_to_test
         usb2snes_data[p1:p2] = sfc_file_data[p1:p2]
 
-        if usb2snes_data != sfc_file_data[:n_bytes_to_test]:
-            raise RuntimeError(f"{ self.usb2snes.device_name() } does not match sfc file")
+        return usb2snes_data == sfc_file_data[:n_bytes_to_test]
+
+
+    async def reset_and_update_rom(self, rom_data : bytes) -> None:
+        # NOTE: This does not modify the file on the SD-card.
+
+        # ASSUMES: rom_data passes `validate_sfc_file()` tests
+
+        if len(rom_data) > 512 * 1024:
+            raise ValueError("rom_data is too large")
+
+        # Set rom update requested byte
+        await self.usb2snes.write_to_offset(self.rom_update_required_offset, bytes([0xff]))
+
+        log('Reset')
+        await self.usb2snes.send_reset_command();
+
+        # Wait until the game is executing the rom-update-required spinloop (which resides in Work-RAM)
+        log('Waiting for RomUpdateRequiredSpinloop...')
+        await self.__update_rom_spinloop_test_and_wait(0x42)
+        await self.__update_rom_spinloop_test_and_wait(0x42 ^ 0xff)
+        await self.__update_rom_spinloop_test_and_wait(secrets.randbelow(256))
+        await self.__update_rom_spinloop_test_and_wait(secrets.randbelow(256))
+        await self.__update_rom_spinloop_test_and_wait(secrets.randbelow(256))
+        await self.__update_rom_spinloop_test_and_wait(secrets.randbelow(256))
+
+        # Confirmed game is executing Work-RAM code and the ROM can be safely modified.
+
+        log(f"Updating game...")
+        await self.usb2snes.write_to_offset(0, rom_data)
+
+        log('Reset')
+        await self.usb2snes.send_reset_command();
+
+
+    async def __update_rom_spinloop_test_and_wait(self, b : int) -> None:
+        """
+        Set ROM_UPDATE_REQUIRED_ADDR to `b` and wait until the all bytes in zeropage is `b`.
+
+        Used to confirm the SNES is executing the `RomUpdateRequiredSpinloop`.
+        """
+
+        await self.usb2snes.write_to_offset(self.rom_update_required_offset, bytes([b]))
+
+        expected_zeropage : Final = bytes([b]) * 256
+
+        zeropage : Optional[bytes] = None
+
+        while zeropage != expected_zeropage:
+            await asyncio.sleep(UPDATE_ROM_SPINLOOP_SLEEP_DELAY)
+            zeropage = await self.usb2snes.read_wram_addr(0x7e0000, 256)
 
 
     async def read_request(self) -> Request:
@@ -936,8 +1002,12 @@ async def create_and_process_websocket(address : str, stop_token : threading.Eve
         await asyncio.sleep(0.5)
 
         await rou2s.validate_correct_rom(sfc_file_basename)
-        await rou2s.validate_game_matches_sfc_file(sfc_file_data, memory_map)
-        log(f"Confirmed device is running { sfc_file_basename }")
+
+        if await rou2s.test_game_matches_sfc_file(sfc_file_data, memory_map) == False:
+            log(f"Running game does not match { sfc_file_basename }")
+            await rou2s.reset_and_update_rom(sfc_file_data)
+        else:
+            log(f"Running game matches { sfc_file_basename }")
 
         await rou2s.run_until_stop_token_set()
 

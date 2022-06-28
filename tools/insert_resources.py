@@ -65,6 +65,7 @@ def get_largest_rom_address(symbols : dict[str, int]) -> int:
 
 
 
+ROM_HEADER_V3_ADDR = 0xffb0
 ROM_HEADER_TITLE_ADDR = 0xFFC0
 ROM_HEADER_TITLE_SIZE = 21
 ROM_HEADER_TITLE_ENCODING = 'Shift-JIS' # This is supposed to be `JIS X 0201`, but python does not support it.
@@ -94,6 +95,15 @@ def validate_sfc_file(sfc_data : bytes, symbols : dict[str, int], mappings : Map
     expected_size = ((memory_map.first_resource_bank + memory_map.n_resource_banks) & 0x3f) * memory_map.mode.bank_size
     if len(sfc_data) != expected_size:
         raise RuntimeError(f"ERROR:  Expected a sfc file that is { expected_size // 1024 } bytes in size")
+
+
+    # 6 spaces (unlicensed game) + 6 zeros
+    # The 6 zeros is the important bit, used by the 'RomUpdateRequired' subsystem of resources-over-usb2snes.
+    expected_header_start = (b' ' * 6) + bytes(6)
+    header_offset = address_to_rom_offset(ROM_HEADER_V3_ADDR)
+    header_start_in_sfc_data = sfc_data[header_offset : header_offset + len(expected_header_start)]
+    if expected_header_start != header_start_in_sfc_data:
+        raise RuntimeError('ERROR: Start of header does not match expected value')
 
 
     title_offset = address_to_rom_offset(ROM_HEADER_TITLE_ADDR)
