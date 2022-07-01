@@ -10,7 +10,7 @@ from collections import OrderedDict
 
 from _common import MemoryMapMode
 
-from typing import Any, NamedTuple, Optional, Union
+from typing import Any, Callable, Final, Generator, NamedTuple, NoReturn, Optional, Type, TypeVar, Union
 
 
 
@@ -22,87 +22,378 @@ Filename   = str
 
 
 
-def check_name(s : str) -> Name:
-    if re.match(r'[a-zA-Z0-9_]+$', s):
-        return s
-    else:
-        raise ValueError(f"Invalid name: {s}")
+class JsonError(Exception):
+    def __init__(self, message : str, path : tuple[str, ...]):
+        self.message : Final = message
+        self.path    : Final = path
+
+    def __str__(self) -> str:
+        return f"{ self.location_string() }: { self.message }"
+
+    def location_string(self) -> str:
+        return ' '.join(self.path)
 
 
-def check_name_with_dot(s : str) -> ScopedName:
-    if re.match(r'[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$', s):
-        return s
-    else:
-        raise ValueError(f"Invalid name: {s}")
+
+class _Helper:
+    """
+    A helper class to help parse the output of `json.load()` into structured data.
+
+    This class will also recursively track the position within the `json.load()` output to improve error messages.
+    """
+
+    # _Helper class or subclass of _Helper
+    _Self = TypeVar('_Self', bound='_Helper')
+
+    _T = TypeVar('_T')
+    _U = TypeVar('_U')
 
 
-def check_optional_name(s : Optional[str]) -> Optional[Name]:
-    if s:
-        return check_name(s)
-    else:
-        return None
+    NAME_REGEX          : Final = re.compile(r'[a-zA-Z0-9_]+$')
+    NAME_WITH_DOT_REGEX : Final = re.compile(r'[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$')
+    ROOM_NAME_REGEX     : Final = re.compile(r'[a-zA-Z0-9_-]+$')
 
 
-def check_room_name(s : str) -> RoomName:
-    if re.match(r'[a-zA-Z0-9_-]+$', s):
-        return s
-    else:
-        raise ValueError(f"Invalid name: {s}")
+    def __init__(self, d : dict[str, Any], *path : str):
+        if not isinstance(d, dict):
+            raise JsonError('Expected a dict', path)
+
+        self.__dict : Final = d
+        self.__path : Final = path
 
 
-def check_name_list(l : list[str]) -> list[Name]:
-    if not isinstance(l, list):
-        raise ValueError('Error: Not a list')
-
-    for n in l:
-        check_name(n)
-
-    return l
+    def _raise_error(self, e : Union[str, Exception], *location : str) -> NoReturn:
+        if isinstance(e, Exception):
+            e = f"{ type(e).__name__ }: { e }"
+        raise JsonError(e, self.__path + location) from None
 
 
-def check_obj_size(v : Union[int, str]) -> int:
-    i = int(v)
-    if i not in (8, 16):
-        raise ValueError(f"Invalid Object Size: { i }")
-    return i
+    def _raise_missing_field_error(self, key : str, *location : str) -> NoReturn:
+        raise JsonError(f"Missing JSON field: { key }", self.__path + location)
 
 
-def optional_int(v : Optional[Union[int, str]]) -> Optional[int]:
-    if v is not None:
-        return int(v)
-    else:
-        return None
+    def contains(self, key : str) -> bool:
+        return key in self.__dict
 
 
-def check_bool(v : Union[bool, str, None]) -> bool:
-    if v is None:
-        return False
+    def _get(self, key : str, _type : Type[_T]) -> _T:
+        assert _type != dict and _type != OrderedDict
 
-    if isinstance(v,str):
-        if v == '0':
-            return False
-
-        if v == '1':
-            return True
-
-        raise ValueError(f"Invalid bool value: Expected \"1\" or \"0\": { v }")
-
-    return bool(v)
-
-
-def check_float(v : Union[float, int]) -> Union[float, int]:
-    if not isinstance(v, float) and not isinstance(v, int):
-        raise ValueError(f"Invalid float value: { v }")
-    return v
-
-
-def check_hex_or_int(v : Union[int, str]) -> int:
-    if isinstance(v, int):
+        v = self.__dict.get(key)
+        if v is None:
+            self._raise_missing_field_error(key)
+        if not isinstance(v, _type):
+            self._raise_error(f"Expected a { _type.__name__ }", key)
         return v
-    if isinstance(v, str):
-        return int(v, 16)
 
-    raise ValueError(f"Invalid type: expected int or hex string")
+
+    def _get2(self, key : str, type_a : Type[_T], type_b : Type[_U]) -> Union[_T, _U]:
+        assert type_a != dict and type_a != OrderedDict
+        assert type_b != dict and type_b != OrderedDict
+
+        v = self.__dict.get(key)
+        if v is None:
+            self._raise_missing_field_error(key)
+        if not isinstance(v, type_a) and not isinstance(v, type_b):
+            self._raise_error(f"Expected a { type_a.__name__ } or { type_b.__name__ }", key)
+        return v
+
+
+    def _optional_get(self, key : str, _type : Type[_T]) -> Optional[_T]:
+        assert _type != dict and _type != OrderedDict
+
+        v = self.__dict.get(key)
+        if v is None:
+            return None
+        if not isinstance(v, _type):
+            self._raise_error(f"Expected a { _type.__name__ }", key)
+        return v
+
+
+    def _optional_get2(self, key : str, type_a : Type[_T], type_b : Type[_U]) -> Optional[Union[_T, _U]]:
+        assert type_a != dict and type_a != OrderedDict
+        assert type_b != dict and type_b != OrderedDict
+
+        v = self.__dict.get(key)
+        if v is None:
+            return None
+        if not isinstance(v, type_a) and not isinstance(v, type_b):
+            self._raise_error(f"Expected a { type_a.__name__ } or { type_b.__name__ }", key)
+        return v
+
+
+    def get_optional_dict(self : _Self, key : str) -> Optional[_Self]:
+        cls = type(self)
+
+        d = self.__dict.get(key)
+        if d is None:
+            return None
+        if not isinstance(d, dict):
+            self._raise_error(f"Expected a JSON dict type", key)
+
+        return cls(d, *self.__path, key)
+
+
+    def get_dict(self : _Self, key : str) -> _Self:
+        cls = type(self)
+
+        d = self.__dict.get(key)
+        if not isinstance(d, dict):
+            self._raise_error(f"Expected a JSON dict type", key)
+
+        return cls(d, *self.__path, key)
+
+
+    def iterate_list_of_dicts(self : _Self, key : str) -> Generator[_Self, None, None]:
+        cls = type(self)
+
+        for i, item in enumerate(self._get(key, list)):
+            if not isinstance(item, dict):
+                self._raise_error(f"Expected a dict", key)
+
+            yield cls(item, *self.__path, key, str(i))
+
+
+    def iterate_dict_of_dicts(self : _Self, key : str) -> Generator[tuple[Name, _Self], None, None]:
+        cls = type(self)
+
+        d = self.__dict.get(key)
+        if not isinstance(d, dict):
+            self._raise_error(f"Expected a JSON dict type", key)
+
+        for name, item in d.items():
+            name = self._test_name(name, key)
+
+            if not isinstance(item, dict):
+                self._raise_error('Expected a dict', key, name)
+
+            yield name, cls(item, *self.__path, key)
+
+
+    def iterate_dict(self, key : str, _type : Type[_T]) -> Generator[tuple[Name, _T], None, None]:
+        assert _type != dict or _type != OrderedDict
+
+        d = self.__dict.get(key)
+        if not isinstance(d, dict):
+            self._raise_error(f"Expected a JSON dict type", key)
+
+        for name, item in d.items():
+            name = self._test_name(name, key)
+
+            if not isinstance(item, _type):
+                self._raise_error(f"Expected a { _type.__name__ }", key, name)
+
+            yield name, item
+
+
+    # `self.__dict` MUST NOT be accessed below this line
+    # --------------------------------------------------
+
+
+    def get_string(self, key : str) -> str:
+        return self._get(key, str)
+
+
+    def get_optional_string(self, key : str) -> Optional[str]:
+        return self._optional_get(key, str)
+
+
+    def get_filename(self, key : str) -> Filename:
+        return self._get(key, str)
+
+
+    def get_int(self, key : str) -> int:
+        v = self._get2(key, str, int)
+        if isinstance(v, int):
+            return v
+        else:
+            try:
+                return int(v)
+            except ValueError:
+                self._raise_error('Expected an integer', key)
+
+
+    def get_float(self, key : str) -> float:
+        return self._get2(key, int, float)
+
+
+    def get_hex_or_int(self, key : str) -> int:
+        v = self._get2(key, int, str)
+        if isinstance(v, int):
+            return v
+        else:
+            try:
+                return int(v, 16)
+            except ValueError:
+                self._raise_error(f"Expected hex string: { v }", key)
+
+
+    def get_bool(self, key : str) -> bool:
+        v = self._optional_get(key, bool)
+
+        if v is None:
+            return False
+        return v
+
+
+    def get_object_size(self, key : str) -> int:
+        i = self.get_int(key)
+        if i not in (8, 16):
+            self._raise_error(f"Invalid Object Size: { i }", key)
+        return i
+
+
+    def get_name(self, key : str) -> Name:
+        s = self.get_string(key)
+        if self.NAME_REGEX.match(s):
+            return s
+        else:
+            self._raise_error(f"Invalid name: {s}", key)
+
+
+    def get_name_with_dot(self, key : str) -> ScopedName:
+        s = self.get_string(key)
+        if self.NAME_WITH_DOT_REGEX.match(s):
+            return s
+        else:
+            self._raise_error(f"Invalid name with dot: {s}", key)
+
+
+    def get_optional_name(self, key : str) -> Optional[Name]:
+        s = self.get_optional_string(key)
+        if not s:
+            return None
+        if self.NAME_REGEX.match(s):
+            return s
+        else:
+            self._raise_error(f"Invalid name with dot: {s}", key)
+
+
+    def get_room_name(self, key : str) -> RoomName:
+        s = self.get_string(key)
+        if self.ROOM_NAME_REGEX.match(s):
+            return s
+        else:
+            self._raise_error(f"Invalid room name: {s}", key)
+
+
+    def get_name_list(self, key : str) -> list[Name]:
+        l = self._get(key, list)
+
+        for i, s in enumerate(l):
+            if not isinstance(s, str):
+                self._raise_error('Expected a string', key, str(i))
+            if not self.NAME_REGEX.match(s):
+                self._raise_error(f"Invalid name: {s}", key, str(i))
+        return l
+
+
+    def get_name_list_mapping(self, key : str, max_items : Optional[int] = None) -> OrderedDict[Name, int]:
+        l = self.get_name_list(key)
+
+        out : OrderedDict[Name, int] = OrderedDict()
+
+        for i, s in enumerate(l):
+            if s in out:
+                self._raise_error(f"Duplicate name: { s }", key, str(i))
+            out[s] = i
+
+        return out
+
+
+    def _test_name(self, s : Any, *path : str) -> Name:
+        if not isinstance(s, str):
+            self._raise_error('Expected a string', *path)
+        if not self.NAME_REGEX.match(s):
+            self._raise_error(f"Invalid name: {s}", *path)
+        return s
+
+
+    def _test_name_list(self, l : Any, *path : str) -> list[Name]:
+        if not isinstance(l, list):
+            self._raise_error('Expected a list of names', *path)
+
+        for i, s in enumerate(l):
+            if not isinstance(s, str):
+                self._raise_error('Expected a string', *path, str(i))
+            if not self.NAME_REGEX.match(s):
+                self._raise_error(f"Invalid name: {s}", *path, str(i))
+        return l
+
+
+    def build_dict_from_dict(self : _Self, key : str, _type : Type[_T], max_elements : int,
+                             func : Callable[[_Self, Name], _T]) -> dict[Name, _T]:
+        out : dict[Name, _Helper._T] = dict()
+
+        for item_name, d in self.iterate_dict_of_dicts(key):
+            # item_name has been checked by `iterate_dict_of_dicts`
+
+            if item_name in out:
+                self._raise_error(f"Duplicate { _type.__name__ } name: { item_name }", key)
+
+            try:
+                item = func(d, item_name)
+            except JsonError:
+                raise
+            except Exception as ex:
+                self._raise_error(ex, key, item_name)
+
+            assert item_name not in out
+            out[item_name] = item
+
+        if len(out) > max_elements:
+            self._raise_error(f"Too many items ({ len(out) }, max: { max_elements })", key)
+
+        return out
+
+
+    def build_ordered_dict_from_list(self : _Self, key : str, _type : Type[_T], max_elements : int,
+                                     func : Callable[[_Self, Name, int], _T]) -> OrderedDict[Name, _T]:
+        cls = type(self)
+
+        out : OrderedDict[Name, _Helper._T] = OrderedDict()
+
+        for i, d in enumerate(self._get(key, list)):
+            if not isinstance(d, dict):
+                self._raise_error('Expected a JSON dict', key, str(i))
+
+            # Testing 'name' here improves the error messages in the child `cls` instance.
+            item_name : Optional[Name] = d.get('name')
+            if item_name is None:
+                self._raise_missing_field_error('name', key)
+            if not isinstance(item_name, str):
+                self._raise_error(f"Expected a string", key, str(i), 'name')
+            if not self.NAME_REGEX.match(item_name):
+                self._raise_error(f"Invalid name: { item_name }", key, str(i), 'name')
+
+            if item_name in out:
+                self._raise_error(f"Duplicate { _type.__name__ } name: { item_name }", key, str(i))
+
+            item_index_str = f"{i} ({item_name})"
+            try:
+                item = func(cls(d, *self.__path, key, item_index_str), item_name, i)
+            except JsonError:
+                raise
+            except Exception as ex:
+                self._raise_error(ex, key, item_index_str)
+
+            assert item_name not in out
+            out[item_name] = item
+
+        if len(out) > max_elements:
+            self._raise_error(f"Too many items ({ len(out) }, max: { max_elements })", key)
+
+        return out
+
+
+
+def _load_json_file(filename : Filename, cls : Type[_Helper._Self]) -> _Helper._Self:
+    basename = os.path.basename(filename)
+
+    with open(filename, 'r') as fp:
+        j = json.load(fp)
+
+    return cls(j, os.path.basename(filename))
 
 
 
@@ -145,69 +436,58 @@ class EntitiesJson(NamedTuple):
 
 
 
-def _read_entity_vision_parameter(s : Optional[str]) -> Optional[EntityVision]:
-    if s is None:
-        return None
-    if not isinstance(s, str):
-        raise ValueError('Error: Expected a string containing two integers (vision)')
-    v = s.split()
-    if len(v) != 2:
-        raise ValueError('Error: Expected a string containing two integers (vision)')
-    return EntityVision(int(v[0]), int(v[1]))
+class _Entities_Helper(_Helper):
+    def get_entity_vision(self, key : str) -> Optional[EntityVision]:
+        s = self.get_optional_string(key)
+        if not s:
+            return None
+        v = s.split()
+        if len(v) != 2:
+            self._raise_error('Expected a string containing two integers', key)
+
+        try:
+            return EntityVision(int(v[0]), int(v[1]))
+        except ValueError:
+            self._raise_error('Expected a string containing two integers', key)
+
+
+    def get_ef_parameter(self, key : str) -> Optional[EfParameter]:
+        p = self.get_optional_dict(key)
+        if p is None:
+            return None
+
+        t = p.get_string('type')
+
+        if t == 'enum':
+            return EfParameter('enum', p.get_name_list('values'))
+        else:
+            self._raise_error(f"Unknown function parameter type: { t }", key)
 
 
 
 def load_entities_json(filename : Filename) -> EntitiesJson:
-    with open(filename, 'r') as fp:
-        entities_json = json.load(fp)
+    jh = _load_json_file(filename, _Entities_Helper)
 
-
-    entity_functions = OrderedDict()
-
-    for i, e in enumerate(entities_json['entity_functions']):
-        parameter = None
-        if 'parameter' in e:
-            t = e['parameter']['type']
-            if t == 'enum':
-                parameter = EfParameter('enum', check_name_list(e['parameter']['values']))
-            else:
-                raise ValueError(f"Unknown parameter type: { t }")
-
-        ef = EntityFunction(
-                name = check_name(e['name']),
+    entity_functions = jh.build_ordered_dict_from_list('entity_functions', EntityFunction, 256,
+            lambda ef, name, i : EntityFunction(
+                name = name,
                 id = i,
-                ms_export_order = check_name(e['ms-export-order']),
-                parameter = parameter,
-                uses_process_function_from = check_optional_name(e.get('uses-process-function-from')),
-        )
+                ms_export_order = ef.get_name('ms-export-order'),
+                parameter = ef.get_ef_parameter('parameter'),
+                uses_process_function_from = ef.get_optional_name('uses-process-function-from'),
+        ))
 
-        if ef.name in entity_functions:
-            raise ValueError(f"Duplicate entity function name: { ef.name }")
-        entity_functions[ef.name] = ef
-
-
-    entities = OrderedDict()
-
-    for i, e in enumerate(entities_json['entities']):
-        entity = Entity(
-                    name = check_name(e['name']),
-                    id = i,
-                    code = entity_functions[e['code']],
-                    metasprites = check_name_with_dot(e['metasprites']),
-                    zpos = int(e['zpos']),
-                    vision = _read_entity_vision_parameter(e.get('vision')),
-                    health = int(e['health']),
-                    attack = int(e['attack']),
-        )
-
-        if entity.name in entities:
-            raise ValueError(f"Duplicate entity name: { entity.name }")
-        entities[entity.name] = entity
-
-
-    if len(entities) > 254:
-        raise ValueError("Too many entities")
-
+    entities = jh.build_ordered_dict_from_list('entities', Entity, 254,
+            lambda e, name, i : Entity(
+                name = name,
+                id = i,
+                code = entity_functions[e.get_name('code')],
+                metasprites = e.get_name_with_dot('metasprites'),
+                zpos = e.get_int('zpos'),
+                vision = e.get_entity_vision('vision'),
+                health = e.get_int('health'),
+                attack = e.get_int('attack'),
+        ))
 
     return EntitiesJson(entity_functions=entity_functions, entities=entities)
 
@@ -242,64 +522,56 @@ class MsExportOrder(NamedTuple):
 
 
 
-def _load_pattern_objects(json_list : list[dict[str, Any]]) -> list[MsPatternObject]:
-    objs = list()
+class _MSEO_Helper(_Helper):
+    def get_pattern_objects(self, key : str) -> list[MsPatternObject]:
+        objs = list()
 
-    for o in json_list:
-        objs.append(
-            MsPatternObject(
-                xpos = int(o['x']),
-                ypos = int(o['y']),
-                size = check_obj_size(o['size'])
+        for o in self.iterate_list_of_dicts(key):
+            objs.append(
+                MsPatternObject(
+                    xpos = o.get_int('x'),
+                    ypos = o.get_int('y'),
+                    size = o.get_object_size('size')
+                )
             )
-        )
 
-    return objs
+        return objs
+
+
+    def get_animation_eo_lists(self, key : str) -> OrderedDict[Name, MsAnimationExportOrder]:
+        out = OrderedDict()
+
+        for name, al in self.iterate_dict(key, list):
+            eo = MsAnimationExportOrder(
+                    name = name,
+                    animations = self._test_name_list(al, key, name),
+            )
+
+            if eo.name in out:
+                self._raise_error(f"Duplicate name: { eo.name }", key)
+            out[eo.name] = eo
+
+        return out
 
 
 
 def load_ms_export_order_json(filename : Filename) -> MsExportOrder:
-    with open(filename, 'r') as fp:
-        mseo_input = json.load(fp)
+    jh = _load_json_file(filename, _MSEO_Helper)
 
-
-    patterns = OrderedDict()
-    for i, p in enumerate(list(mseo_input['patterns'])):
-        pat = MsPattern(
-                name = check_name(p['name']),
+    patterns = jh.build_ordered_dict_from_list('patterns', MsPattern, 256,
+            lambda p, name, i: MsPattern(
+                name = name,
                 id = i * 2,
-                objects = _load_pattern_objects(p['objects'])
-        )
+                objects = p.get_pattern_objects('objects')
+        ))
 
-        if pat.name in patterns:
-            raise ValueError(f"Duplicate Pattern name: { pat.name }")
-        patterns[pat.name] = pat
+    shadow_sizes = jh.get_name_list_mapping('shadow_sizes')
 
-
-    shadow_sizes = OrderedDict()
-    for i, s in enumerate(mseo_input['shadow_sizes']):
-        if s in shadow_sizes:
-            raise ValueError(f"Duplicate shadow size: { s }")
-        shadow_sizes[check_name(s)] = i
-
-
-    if len(patterns) > 256:
-        raise ValueError('Too many MetaSprite patterns')
-
-
-    animation_lists = OrderedDict()
-    for name, al in mseo_input['animation_lists'].items():
-        eo = MsAnimationExportOrder(
-                name = check_name(name),
-                animations = check_name_list(al),
-        )
-
-        if eo.name in animation_lists:
-            raise ValueError(f"Duplicate MetaSprite Export Order Name: { eo.name }")
-        animation_lists[eo.name] = eo
-
-
-    return MsExportOrder(patterns=patterns, shadow_sizes=shadow_sizes, animation_lists=animation_lists)
+    return MsExportOrder(
+            patterns = patterns,
+            shadow_sizes = jh.get_name_list_mapping('shadow_sizes'),
+            animation_lists = jh.get_animation_eo_lists('animation_lists'),
+    )
 
 
 
@@ -323,33 +595,34 @@ class Mappings(NamedTuple):
     memory_map                  : MemoryMap
 
 
+class _Mappings_Helper(_Helper):
+    def get_memory_map(self, key : str) -> MemoryMap:
+        mm = self.get_dict(key)
 
-def __load_memory_map(json_map : dict[str, Any]) -> MemoryMap:
-    try:
-        mode = MemoryMapMode[json_map['mode'].upper()]
-    except KeyError:
-        raise ValueError(f"Unknown memory mapping mode: { json_map['mode'] }")
+        mode_str = mm.get_string('mode')
+        try:
+            mode = MemoryMapMode[mode_str.upper()]
+        except ValueError:
+            self._raise_error(f"Unknown memory mapping mode: { mode_str }", key)
 
-    return MemoryMap(
+        return MemoryMap(
             mode = mode,
-            first_resource_bank = check_hex_or_int(json_map['first_resource_bank']),
-            n_resource_banks = int(json_map['n_resource_banks'])
-    )
-
+            first_resource_bank = mm.get_hex_or_int('first_resource_bank'),
+            n_resource_banks = mm.get_int('n_resource_banks'),
+        )
 
 
 def load_mappings_json(filename : Filename) -> Mappings:
-    with open(filename, 'r') as fp:
-        json_input = json.load(fp)
+    jh = _load_json_file(filename, _Mappings_Helper)
 
     return Mappings(
-            game_title = str(json_input['game_title']),
-            starting_room = check_room_name(json_input['starting_room']),
-            mt_tilesets = check_name_list(json_input['mt_tilesets']),
-            ms_spritesheets = check_name_list(json_input['ms_spritesheets']),
-            tiles = check_name_list(json_input['tiles']),
-            interactive_tile_functions = check_name_list(json_input['interactive_tile_functions']),
-            memory_map = __load_memory_map(json_input['memory_map'])
+            game_title = jh.get_string('game_title'),
+            starting_room = jh.get_room_name('starting_room'),
+            mt_tilesets = jh.get_name_list('mt_tilesets'),
+            ms_spritesheets = jh.get_name_list('ms_spritesheets'),
+            tiles = jh.get_name_list('tiles'),
+            interactive_tile_functions = jh.get_name_list('interactive_tile_functions'),
+            memory_map = jh.get_memory_map('memory_map'),
     )
 
 
@@ -407,7 +680,7 @@ class MsFrameset(NamedTuple):
     blocks              : list[MsBlock]
     hitbox_overrides    : dict[Name, Aabb]
     hurtbox_overrides   : dict[Name, Aabb]
-    animations          : OrderedDict[Name, MsAnimation]
+    animations          : dict[Name, MsAnimation]
 
 
 class MsSpritesheet(NamedTuple):
@@ -419,199 +692,184 @@ class MsSpritesheet(NamedTuple):
 
 
 
-def __read_tilehitbox(s : str) -> TileHitbox:
-    if not isinstance(s, str):
-        raise ValueError('Error: Expected a string containing two integers (tilehitbox)')
-    v = s.split()
-    if len(v) != 2:
-        raise ValueError('Error: Expected a string containing two integers (tilehitbox)')
-    return TileHitbox(int(v[0]), int(v[1]))
+class _Ms_Helper(_Helper):
+    def get_tilehitbox(self, key : str) -> TileHitbox:
+        s = self.get_string(key)
+
+        v = s.split()
+        if len(v) != 2:
+            self._raise_error('Expected a string containing two integers (TileHitbox)', key)
+
+        try:
+            return TileHitbox(int(v[0]), int(v[1]))
+        except ValueError:
+            self._raise_error('Expected a string containing two integers (TileHitbox)', key)
 
 
+    def get_animation_frames__no_fixed_delay(self, key : str) -> tuple[list[Name], list[Union[int, float]]]:
+        l = self._get(key, list)
 
-def __read_animation_frames__no_fixed_delay(l : list[Any]) -> tuple[list[Name], list[Union[int, float]]]:
-    if not isinstance(l, list):
-        raise ValueError('ERROR: Expected a list (animation frame list)')
-    if len(l) % 2 != 0:
-        raise ValueError('ERROR: Expected a list of `frame, delay` (animation frame list)')
+        if len(l) % 2 != 0:
+            self._raise_error('Expected a list of `frame, delay, frame, delay, frame, delay, ...`', key)
 
-    # off indexes
-    frames = check_name_list(l[0::2])
-    frame_delays = l[1::2]
+        # off indexes
+        frames = l[0::2]
+        frame_delays = l[1::2]
 
-    for i in frame_delays:
-        if not isinstance(i, float) and not isinstance(i, int):
-            raise ValueError('Error: Expected a float containing the delay time (animation frames list, even indexes)')
+        for index, s in enumerate(frames):
+            if not isinstance(s, str):
+                self._raise_error('Expected a str', str(index * 2))
 
-    return frames, frame_delays
+        for index, delay in enumerate(frame_delays):
+            if not isinstance(delay, float) and not isinstance(delay, int):
+                self._raise_error('Expected a float containing the delay time', str(index * 2 + 1))
 
-
-
-def __read_aabb(s : str) -> Aabb:
-    if not isinstance(s, str):
-        raise ValueError('Error: Expected a string containing four integers (aabb)')
-    v = s.split()
-    if len(v) != 4:
-        raise ValueError('Error: Expected a string containing four integers (aabb)')
-    return Aabb(int(v[0]), int(v[1]), int(v[2]), int(v[3]))
+        return frames, frame_delays
 
 
-
-def __read_optional_aabb(s : Optional[str]) -> Optional[Aabb]:
-    if not s:
-        return None
-    return __read_aabb(s)
-
-
-
-_VALID_FLIPS = frozenset(('hflip', 'vflip', 'hvflip'))
-
-def __read_flip(s : Optional[str]) -> Optional[str]:
-    if not s:
-        return None
-
-    if s in _VALID_FLIPS:
-        return s
-
-    raise ValueError(f"Error: Unknown flip value: { s }")
+    def __convert_aabb(self, s : str, *path : str) -> Aabb:
+        v = s.split()
+        if len(v) != 4:
+            self._raise_error('Expected a string containing four integers (Aabb)', *path)
+        try:
+            return Aabb(int(v[0]), int(v[1]), int(v[2]), int(v[3]))
+        except ValueError:
+            self._raise_error('Expected a string containing four integers (Aabb)', *path)
 
 
+    def get_aabb(self, key : str) -> Aabb:
+        s = self._get(key, str)
+        return self.__convert_aabb(s, key)
 
-def __load_aabb_overrides(json_map : Optional[dict[str, Any]]) -> dict[str, Aabb]:
-    out : dict[str, Aabb] = dict()
 
-    if json_map is None:
+    def get_optional_aabb(self, key : str) -> Optional[Aabb]:
+        s = self._optional_get(key, str)
+        if s is None:
+            return None
+        return self.__convert_aabb(s, key)
+
+
+    def get_aabb_overrides(self, key : str) -> dict[Name, Aabb]:
+        out : dict[Name, Aabb] = dict()
+
+        if self.contains(key):
+            for name, i in self.iterate_dict(key, str):
+                if name in out:
+                    self._raise_error(f"Duplicate name: { name }", key)
+                out[name] = self.__convert_aabb(i, key, name)
+
         return out
 
-    if not isinstance(json_map, dict):
-        raise ValueError('Error: Expected a map for AABB overrides')
 
-    for k, v in json_map.items():
-        out[k] = __read_aabb(v)
+    VALID_FLIPS : Final = ('hflip', 'vflip', 'hvflip')
 
-    return out
+    def get_flip(self, key : str) -> Optional[str]:
+        s = self._optional_get(key, str)
+        if not s:
+            return None
+
+        if s not in self.VALID_FLIPS:
+            self._raise_error(f"Unknown flip: { s }", key)
+        return s
 
 
 
-def __load_ms_blocks(json_input : list[dict[str, Any]], fs_pattern : Optional[Name], fs_default_hitbox : Optional[Aabb], fs_default_hurtbox : Optional[Aabb]) -> list[MsBlock]:
+def __read_ms_animation(a : _Ms_Helper, name : Name) -> MsAnimation:
+    if a.contains('fixed-delay'):
+        fixed_delay = a.get_float('fixed-delay')
+        frames = a.get_name_list('frames')
+        frame_delays = None
+    else:
+        fixed_delay = None
+        frames, frame_delays = a.get_animation_frames__no_fixed_delay('frames')
+
+    return MsAnimation(
+            name = name,
+            loop = a.get_bool('loop'),
+            delay_type = a.get_name('delay-type'),
+            fixed_delay = fixed_delay,
+            frames = frames,
+            frame_delays = frame_delays,
+    )
+
+
+
+
+def __read_ms_frameset(jh : _Ms_Helper, name : Name, i : int) -> MsFrameset:
+    fs_pattern         : Final = jh.get_optional_name('pattern')
+    fs_default_hitbox  : Final = jh.get_optional_aabb('defaultHitbox')
+    fs_default_hurtbox : Final = jh.get_optional_aabb('defaultHurtbox')
+
+
     blocks = list()
-
-    for j in json_input:
-        pattern = check_optional_name(j.get('pattern'))
+    for b in jh.iterate_list_of_dicts('blocks'):
+        pattern = b.get_optional_name('pattern')
         if pattern or fs_pattern:
-            x = int(j['x'])
-            y = int(j['y'])
+            x = b.get_int('x')
+            y = b.get_int('y')
         else:
-            if 'x' in j or 'y' in j:
-                raise ValueError("MS Blocks with no pattern must not have a 'x' or 'y' field")
+            if b.contains('x') or b.contains('y'):
+                b._raise_error('MS Blocks with no pattern must not have a `x` or `y` field')
             x = None
             y = None
 
+        hitbox = b.get_optional_aabb('defaultHitbox')
+        hurtbox = b.get_optional_aabb('defaultHurtbox')
 
         blocks.append(
             MsBlock(
                 pattern = pattern,
-                start = int(j['start']),
+                start = b.get_int('start'),
                 x = x,
                 y = y,
-                flip = __read_flip(j.get('flip', None)),
-                frames = check_name_list(j['frames']),
-                default_hitbox = __read_aabb(j['defaultHitbox']) if 'defaultHitbox' in j else fs_default_hitbox,
-                default_hurtbox = __read_aabb(j['defaultHurtbox']) if 'defaultHurtbox' in j else fs_default_hurtbox,
+                flip = b.get_flip('flip'),
+                frames = b.get_name_list('frames'),
+                default_hitbox = hitbox if hitbox else fs_default_hitbox,
+                default_hurtbox = hurtbox if hurtbox else fs_default_hurtbox,
             )
         )
 
-    return blocks
+
+    return MsFrameset(
+            name = name,
+            source              = jh.get_filename('source'),
+            frame_width         = jh.get_int('frameWidth'),
+            frame_height        = jh.get_int('frameHeight'),
+            x_origin            = jh.get_int('xorigin'),
+            y_origin            = jh.get_int('yorigin'),
+            shadow_size         = jh.get_name('shadowSize'),
+            tilehitbox          = jh.get_tilehitbox('tilehitbox'),
+            default_hitbox      = fs_default_hitbox,
+            default_hurtbox     = fs_default_hurtbox,
+            pattern             = fs_pattern,
+            ms_export_order     = jh.get_name('ms-export-order'),
+            order               = jh.get_int('order'),
+            blocks              = blocks,
+            hitbox_overrides    = jh.get_aabb_overrides('hitboxes'),
+            hurtbox_overrides   = jh.get_aabb_overrides('hurtboxes'),
+            animations          = jh.build_dict_from_dict('animations', MsAnimation, 254, __read_ms_animation),
+    )
 
 
-
-def __load_ms_animations(json_input : dict[str, Any]) -> OrderedDict[Name, MsAnimation]:
-    animations = OrderedDict()
-
-    for name, a in json_input.items():
-        name = check_name(name)
-
-        if name in animations:
-            raise ValueError(f"Duplicate MS animation name: { name }")
-
-        if 'fixed-delay' in a:
-            fixed_delay = check_float(a['fixed-delay'])
-            frames = check_name_list(a['frames'])
-            frame_delays = None
-        else:
-            fixed_delay = None
-            frames, frame_delays = __read_animation_frames__no_fixed_delay(a['frames'])
-
-
-        animations[name] = MsAnimation(
-                name = name,
-                loop = check_bool(a.get('loop', True)),
-                delay_type = check_name(a['delay-type']),
-                fixed_delay = fixed_delay,
-                frames = frames,
-                frame_delays = frame_delays,
-        )
-
-    return animations
-
-
-
-def __load_ms_framesets(json_input : list[dict[str, Any]]) -> OrderedDict[Name, MsFrameset]:
-    framesets = OrderedDict()
-
-    for f in json_input:
-        fs_pattern = check_optional_name(f['pattern'])
-        fs_default_hitbox = __read_optional_aabb(f.get('defaultHitbox'))
-        fs_default_hurtbox = __read_optional_aabb(f.get('defaultHurtbox'))
-
-        fs = MsFrameset(
-                name = check_name(f['name']),
-                source = str(f['source']),
-                frame_width = int(f['frameWidth']),
-                frame_height = int(f['frameHeight']),
-                x_origin = int(f['xorigin']),
-                y_origin = int(f['yorigin']),
-                shadow_size = check_name(f['shadowSize']),
-                tilehitbox = __read_tilehitbox(f['tilehitbox']),
-                default_hitbox = fs_default_hitbox,
-                default_hurtbox = fs_default_hurtbox,
-                pattern = fs_pattern,
-                ms_export_order = check_name(f['ms-export-order']),
-                order = int(f['order']),
-                blocks = __load_ms_blocks(f['blocks'], fs_pattern, fs_default_hitbox, fs_default_hurtbox),
-                hitbox_overrides = __load_aabb_overrides(f.get('hitboxes')),
-                hurtbox_overrides = __load_aabb_overrides(f.get('hurtboxes')),
-                animations = __load_ms_animations(f['animations']),
-        )
-
-        if fs.name in framesets:
-            raise ValueError(f"Duplicate MetaSprite Frameset: { fs.name }")
-        framesets[fs.name] = fs
-
-    return framesets
-
-
-def _load_metasprites(json_input : dict[str, Any]) -> MsSpritesheet:
+def _load_metasprites(jh : _Ms_Helper) -> MsSpritesheet:
     return MsSpritesheet(
-            name = check_name(json_input['name']),
-            palette = str(json_input['palette']),
-            first_tile = int(json_input['firstTile']),
-            end_tile = int(json_input['endTile']),
-            framesets = __load_ms_framesets(json_input['framesets'])
+            name = jh.get_name('name'),
+            palette = jh.get_filename('palette'),
+            first_tile = jh.get_int('firstTile'),
+            end_tile = jh.get_int('endTile'),
+            framesets = jh.build_ordered_dict_from_list('framesets', MsFrameset, 256, __read_ms_frameset)
     )
 
 
 
 def load_metasprites_json(filename : Filename) -> MsSpritesheet:
-    with open(filename, 'r') as fp:
-        json_input = json.load(fp)
-    return _load_metasprites(json_input)
+    jh = _load_json_file(filename, _Ms_Helper)
+    return _load_metasprites(jh)
 
 
 
 def load_metasprites_string(text : str) -> MsSpritesheet:
-    json_input = json.loads(text)
-    return _load_metasprites(json_input)
+    return _load_metasprites(_Ms_Helper(json.loads(text)))
 
 
 
@@ -630,33 +888,20 @@ class ResourcesJson(NamedTuple):
 
 
 
-def __load__resource_tiles(json_input : dict[str, Any], dirname : Filename) -> dict[Name, TilesInput]:
-    out = dict()
-
-    for name, v in json_input.items():
-        if name in out:
-            raise ValueError(f"Duplicate tiles name: { name }")
-
-        out[name] = TilesInput(
-                name = name,
-                format = str(v['format']),
-                source = os.path.join(dirname, v['source']),
-        )
-
-    return out
-
-
-
 def load_resources_json(filename : Filename) -> ResourcesJson:
+    jh = _load_json_file(filename, _Helper)
 
     dirname = os.path.dirname(filename)
 
-    with open(filename, 'r') as fp:
-        json_input = json.load(fp)
+    tiles = jh.build_dict_from_dict('tiles', TilesInput, 256,
+            lambda t, name: TilesInput(
+                name = name,
+                format = t.get_string('format'),
+                source = os.path.join(dirname, t.get_filename('source')),
+    ))
 
     return ResourcesJson(
-            tiles = __load__resource_tiles(json_input['tiles'], dirname),
+            tiles = tiles,
     )
-
 
 
