@@ -3,7 +3,8 @@
 
 from enum import IntEnum, Enum, unique
 
-from typing import Callable
+from typing import Callable, TextIO
+from abc import abstractmethod
 
 
 # Offset between the first_resource_bank and the named data banks
@@ -115,5 +116,10 @@ class RomData:
 
         return table_addr
 
+
+
+class MultilineError(Exception):
+    @abstractmethod
+    def print_indented(self, fp : TextIO) -> None: pass
 
 

@@ -57,7 +57,7 @@ from insert_resources import read_binary_file, read_symbols_file, validate_sfc_f
 from _json_formats import load_mappings_json, load_entities_json, load_ms_export_order_json, load_resources_json, load_metasprites_json, \
                           Name, Filename, JsonError, MemoryMap, Mappings, EntitiesJson, MsExportOrder, ResourcesJson
 
-from _common import ResourceType, MS_FS_DATA_BANK_OFFSET, USB2SNES_DATA_BANK_OFFSET, USE_RESOURCES_OVER_USB2SNES_LABEL
+from _common import MultilineError, ResourceType, MS_FS_DATA_BANK_OFFSET, USB2SNES_DATA_BANK_OFFSET, USE_RESOURCES_OVER_USB2SNES_LABEL
 
 from _entity_data import create_entity_rom_data, ENTITY_ROM_DATA_LABEL, ENTITY_ROM_DATA_BYTES_PER_ENTITY
 
@@ -138,6 +138,8 @@ def log_error(s : str, e : Optional[Exception] = None) -> None:
                     sys.stdout.write(': ')
                 sys.stdout.write(colorama.Fore.LIGHTRED_EX)
                 sys.stdout.write(e.message)
+            elif isinstance(e, MultilineError):
+                e.print_indented(sys.stdout)
             else:
                 sys.stdout.write(f"{ type(e).__name__ }({ e })")
         sys.stdout.write(colorama.Style.RESET_ALL + '\n')

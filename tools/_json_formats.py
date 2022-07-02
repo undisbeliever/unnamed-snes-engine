@@ -10,7 +10,7 @@ from collections import OrderedDict
 
 from _common import MemoryMapMode
 
-from typing import Any, Callable, Final, Generator, NamedTuple, NoReturn, Optional, Type, TypeVar, Union
+from typing import Any, Callable, Final, Generator, Literal, NamedTuple, NoReturn, Optional, Type, TypeVar, Union
 
 
 
@@ -236,11 +236,14 @@ class _Helper:
         return v
 
 
-    def get_object_size(self, key : str) -> int:
+    def get_object_size(self, key : str) -> Literal[8, 16]:
         i = self.get_int(key)
-        if i not in (8, 16):
+        if i == 8:
+            return 8
+        elif i == 16:
+            return 16
+        else:
             self._raise_error(f"Invalid Object Size: { i }", key)
-        return i
 
 
     def get_name(self, key : str) -> Name:
@@ -501,7 +504,7 @@ def load_entities_json(filename : Filename) -> EntitiesJson:
 class MsPatternObject(NamedTuple):
     xpos : int
     ypos : int
-    size : int
+    size : Literal[8, 16]
 
 
 class MsPattern(NamedTuple):
