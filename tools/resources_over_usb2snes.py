@@ -42,6 +42,7 @@ import asyncio
 import posixpath
 import websockets.client
 
+import colorama # type: ignore
 import watchdog.events # type: ignore
 import watchdog.observers # type: ignore
 
@@ -54,7 +55,7 @@ from convert_resources import convert_tiles
 from insert_resources import read_binary_file, read_symbols_file, validate_sfc_file, ROM_HEADER_V3_ADDR
 
 from _json_formats import load_mappings_json, load_entities_json, load_ms_export_order_json, load_resources_json, load_metasprites_json, \
-                          Name, Filename, MemoryMap, Mappings, EntitiesJson, MsExportOrder, ResourcesJson
+                          Name, Filename, JsonError, MemoryMap, Mappings, EntitiesJson, MsExportOrder, ResourcesJson
 
 from _common import ResourceType, MS_FS_DATA_BANK_OFFSET, USB2SNES_DATA_BANK_OFFSET, USE_RESOURCES_OVER_USB2SNES_LABEL
 
@@ -107,13 +108,55 @@ if __name__ != '__main__':
 # Disable the `print` function
 print : Final = None
 
-# Thread safe printing
-def log(s : str) -> None:
-    with __log_lock:
-        sys.stdout.write(s)
-        sys.stdout.write('\n')
 
 __log_lock : Final = threading.Lock()
+
+# Thread safe printing
+def __log(s : str, c : colorama.Fore) -> None:
+    with __log_lock:
+        sys.stdout.write(c)
+        sys.stdout.write(s)
+        sys.stdout.write(colorama.Style.RESET_ALL + '\n')
+
+
+# Thread safe printing
+def log_error(s : str, e : Optional[Exception] = None) -> None:
+    with __log_lock:
+        sys.stdout.write(colorama.Fore.LIGHTRED_EX + colorama.Style.BRIGHT)
+        sys.stdout.write(s)
+        if e:
+            sys.stdout.write(colorama.Style.NORMAL)
+            if isinstance(e, ValueError) or isinstance(e, RuntimeError):
+                sys.stdout.write(str(e))
+            elif isinstance(e, JsonError):
+                sys.stdout.write(colorama.Fore.LIGHTWHITE_EX + colorama.Style.BRIGHT)
+                sys.stdout.write(e.path[0])
+                sys.stdout.write(colorama.Style.NORMAL)
+                if len(e.path) > 1:
+                    sys.stdout.write(f" { ': '.join(e.path[1:]) }: ")
+                else:
+                    sys.stdout.write(': ')
+                sys.stdout.write(colorama.Fore.LIGHTRED_EX)
+                sys.stdout.write(e.message)
+            else:
+                sys.stdout.write(f"{ type(e).__name__ }({ e })")
+        sys.stdout.write(colorama.Style.RESET_ALL + '\n')
+
+
+def log_fs_watcher(s : str) -> None:
+    __log(s, colorama.Fore.LIGHTBLUE_EX)
+
+def log_request(s : str) -> None:
+    __log(s, colorama.Fore.LIGHTMAGENTA_EX)
+
+def log_response(s : str) -> None:
+    __log(s, colorama.Fore.LIGHTYELLOW_EX)
+
+def log_notice(s : str) -> None:
+    __log(s, colorama.Fore.LIGHTCYAN_EX)
+
+def log_success(s : str) -> None:
+    __log(s, colorama.Fore.GREEN)
 
 
 
@@ -133,17 +176,18 @@ class DataType(IntEnum):
 class CompilerOutput(NamedTuple):
     data_type        : DataType
     resource_id      : int
+    name             : Name
 
     data             : Optional[bytes]           = None
     msfs_entries     : Optional[list[MsFsEntry]] = None
-    error            : Optional[str]             = None
+    error            : Optional[Exception]       = None
 
 
 
 class MsFsAndEntityOutput(NamedTuple):
-    msfs_data       : Optional[bytes] = None
-    entity_rom_data : Optional[bytes] = None
-    error           : Optional[str]   = None
+    msfs_data       : Optional[bytes]       = None
+    entity_rom_data : Optional[bytes]       = None
+    error           : Optional[Exception]   = None
 
 
 
@@ -253,10 +297,10 @@ class Compiler:
 
             data = convert_mt_tileset(tsx_filename, image_filename, palette_filename, self.mappings)
 
-            return CompilerOutput(DataType.MT_TILESET, rid, data=data)
+            return CompilerOutput(DataType.MT_TILESET, rid, name, data=data)
 
         except Exception as e:
-            return CompilerOutput(DataType.MT_TILESET, rid, error=f"Cannot compile tiles `{ name }`: { e }")
+            return CompilerOutput(DataType.MT_TILESET, rid, name, error=e)
 
 
     def compile_ms_spritesheet(self, rid : int) -> CompilerOutput:
@@ -270,10 +314,10 @@ class Compiler:
 
             data, msfs_entries = convert_spritesheet(ms_input, self.ms_export_orders, self.ms_pattern_grids, ms_dir)
 
-            return CompilerOutput(DataType.MS_SPRITESHEET, rid, data=data, msfs_entries=msfs_entries)
+            return CompilerOutput(DataType.MS_SPRITESHEET, rid, name, data=data, msfs_entries=msfs_entries)
 
         except Exception as e:
-            return CompilerOutput(DataType.MS_SPRITESHEET, rid, error=f"Cannot compile tiles `{ name }`: { e }")
+            return CompilerOutput(DataType.MS_SPRITESHEET, rid, name, error=e)
 
 
     def compile_tiles(self, rid : int) -> CompilerOutput:
@@ -284,14 +328,15 @@ class Compiler:
 
             data = convert_tiles(t)
 
-            return CompilerOutput(DataType.TILE, rid, data=data)
+            return CompilerOutput(DataType.TILE, rid, name, data=data)
 
         except Exception as e:
-            return CompilerOutput(DataType.TILE, rid, error=f"Cannot compile tiles `{ name }`: { e }")
+            return CompilerOutput(DataType.TILE, rid, name, error=e)
 
 
     def compile_room(self, basename : Filename) -> CompilerOutput:
         room_id = -1
+        name = os.path.splitext(basename)[0]
 
         try:
             room_id = extract_room_id(basename)
@@ -300,16 +345,16 @@ class Compiler:
 
             data = compile_room(filename, self.entities, self.mappings)
 
-            return CompilerOutput(DataType.ROOM, room_id, data=data)
+            return CompilerOutput(DataType.ROOM, room_id, name, data=data)
 
         except Exception as e:
-            return CompilerOutput(DataType.ROOM, room_id, error=f"Cannot compile room: { filename }: { e }")
+            return CompilerOutput(DataType.ROOM, room_id, name, error=e)
 
 
     def compile_msfs_and_entity_data(self, optional_msfs_lists : list[Optional[list[MsFsEntry]]]) -> MsFsAndEntityOutput:
 
         if any(l is None for l in optional_msfs_lists):
-            return MsFsAndEntityOutput(error=f"Cannot compile MsFs data.  There is an error in a MS Spritesheet.")
+            return MsFsAndEntityOutput(error=ValueError('Cannot compile MsFs data.  There is an error in a MS Spritesheet.'))
 
         msfs_lists = cast(list[list[MsFsEntry]], optional_msfs_lists)
 
@@ -317,12 +362,12 @@ class Compiler:
             rom_data, ms_map = build_ms_fs_data(msfs_lists, self.symbols, self.mappings.memory_map.mode)
             ms_fs_data = bytes(rom_data.data())
         except Exception as e:
-            return MsFsAndEntityOutput(error=f"Cannot compile MsFs data: { e }")
+            return MsFsAndEntityOutput(error=e)
 
         try:
             entity_rom_data = create_entity_rom_data(self.entities.entities, self.entities.entity_functions, self.symbols, ms_map)
         except Exception as e:
-            return MsFsAndEntityOutput(error=f"Cannot compile Entity ROM data: { e }")
+            return MsFsAndEntityOutput(error=e)
 
         return MsFsAndEntityOutput(ms_fs_data, entity_rom_data)
 
@@ -372,10 +417,10 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
         filename : Final = src_path.removeprefix('./')
         ext = os.path.splitext(filename)[1]
 
-        log(f"File Changed: { filename }")
+        log_fs_watcher(f"File Changed: { filename }")
 
         if filename in self.FILES_THAT_CANNOT_CHANGE:
-            log(f"STOP: { filename } changed, restart required")
+            log_error(f"STOP: { filename } changed, restart required")
             self.stop_token.set()
             return
 
@@ -416,7 +461,7 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
     def process_aseprite_file_changed(self, filename : str) -> None:
         # ASSUMES: current directory is the resources directory
         png_filename = os.path.splitext(filename)[0] + '.png'
-        log(f"    make { png_filename }")
+        log_fs_watcher(f"    make { png_filename }")
         subprocess.call(('make', png_filename ))
 
 
@@ -424,31 +469,31 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
         try:
             i = name_list.index(name)
         except ValueError:
-            log("    Cannot find resource id for {rtype}: { name }")
+            log_error(f"    Cannot find resource id for {rtype}: { name }")
             return
 
-        log(f"    Compiling { rtype }: { name }")
+        log_fs_watcher(f"    Compiling { rtype }: { name }")
         co = func(i)
         if co.error:
-            log(f"    ERROR: { rtype } { name }: { co.error }")
+            log_error(f"    ERROR: { rtype } { name }: ", co.error)
         self.data_store.insert_data(co)
 
 
     def process_room(self, filename : str) -> None:
         basename = os.path.basename(filename)
 
-        log(f"    Compiling room: { basename }")
+        log_fs_watcher(f"    Compiling room: { basename }")
         co = self.compiler.compile_room(basename)
         if co.error:
-            log(f"    ERROR: room { basename }: { co.error }")
+            log_error(f"    ERROR: room { basename }: ", co.error)
         self.data_store.insert_data(co)
 
 
     def process_msfs_and_entity_data(self) -> None:
-        log(f"    Compiling MsFs and Entity Data")
+        log_fs_watcher(f"    Compiling MsFs and Entity Data")
         me_data = self.compiler.compile_msfs_and_entity_data(self.data_store.get_msfs_lists())
         if me_data.error:
-            log(f"    ERROR: MsFs and entity_rom_data: { me_data.error }")
+            log_error(f"    ERROR: MsFs and entity_rom_data: ", me_data.error)
         self.data_store.insert_msfs_and_entity_data(me_data)
 
 
@@ -487,15 +532,13 @@ def compile_all_resources(data_store : DataStore, compiler : Compiler, n_process
                 data_store.insert_data(co)
 
                 if co.error:
-                    # ::TODO find a better way to handle the errors::
-                    log(f"ERROR: { co.error }")
+                    log_error(f"ERROR: { co.data_type.name.lower() } { co.name }: ", co.error)
 
 
     msfs_and_entity_data = compiler.compile_msfs_and_entity_data(data_store.get_msfs_lists())
     data_store.insert_msfs_and_entity_data(msfs_and_entity_data)
     if msfs_and_entity_data.error:
-        # ::TODO find a better way to handle the errors::
-        log(f"ERROR: { msfs_and_entity_data.error }")
+        log_error('ERROR: MsFs and entity_rom_data: ', msfs_and_entity_data.error)
 
 
 
@@ -779,11 +822,11 @@ class ResourcesOverUsb2Snes:
         # Set rom update requested byte
         await self.usb2snes.write_to_offset(self.rom_update_required_offset, bytes([0xff]))
 
-        log('Reset')
+        log_notice('Reset')
         await self.usb2snes.send_reset_command();
 
         # Wait until the game is executing the rom-update-required spinloop (which resides in Work-RAM)
-        log('Waiting for RomUpdateRequiredSpinloop...')
+        log_notice('Waiting for RomUpdateRequiredSpinloop...')
         await self.__update_rom_spinloop_test_and_wait(0x42)
         await self.__update_rom_spinloop_test_and_wait(0x42 ^ 0xff)
         await self.__update_rom_spinloop_test_and_wait(secrets.randbelow(256))
@@ -793,10 +836,10 @@ class ResourcesOverUsb2Snes:
 
         # Confirmed game is executing Work-RAM code and the ROM can be safely modified.
 
-        log(f"Updating game...")
+        log_notice(f"Updating game...")
         await self.usb2snes.write_to_offset(0, rom_data)
 
-        log('Reset')
+        log_notice('Reset')
         await self.usb2snes.send_reset_command();
 
 
@@ -839,7 +882,7 @@ class ResourcesOverUsb2Snes:
         if request.request_id == 0:
             return
 
-        log(f"Request 0x{request.request_id:02x}: { request.request_type.name }[{ request.resource_id }]")
+        log_request(f"Request 0x{request.request_id:02x}: { request.request_type.name }[{ request.resource_id }]")
 
         try:
             if request.request_type in self.REQUEST_TYPE_USES_MSFS_OR_ENTITY_DATA:
@@ -850,15 +893,15 @@ class ResourcesOverUsb2Snes:
 
             if co is None or (not co.data):
                 if co:
-                    log(f"    ERROR: { request.request_type.name }[{ request.resource_id }]: { co.error }")
+                    log_error(f"    ERROR: { request.request_type.name }[{ request.resource_id }]: ", co.error)
 
                 # Do not wait if request_type is room and resource does not exist.
                 if co is not None or request.request_type != SpecialRequestType.rooms:
-                    log(f"    Waiting until resource data is ready...")
+                    log_notice(f"    Waiting until resource data is ready...")
                     while co is None or (not co.data):
                         # Exit early if stop_token set
                         if self.stop_token.is_set():
-                            log("    Stop waiting")
+                            log_notice("    Stop waiting")
                             break
                         co = self.data_store.get_resource_data(request.request_type, request.resource_id)
                         await asyncio.sleep(WAITING_FOR_RESOURCE_DELAY)
@@ -890,18 +933,18 @@ class ResourcesOverUsb2Snes:
 
         if me is None or (not me.msfs_data) or (not me.entity_rom_data):
             if me is None:
-                log(f"    Cannot access MsFsData or Entity ROM Data")
+                log_error(f"    Cannot access MsFsData or Entity ROM Data")
             elif not me.msfs_data:
-                log(f"    Cannot access MsFsData: { me.error }")
+                log_error(f"    Cannot access MsFsData: ", me.error)
             elif not me.entity_rom_data:
-                log(f"    Cannot access entity_rom_data: { me.error }")
+                log_error(f"    Cannot access entity_rom_data: ", me.error)
 
-            log(f"    Waiting until data is ready...")
+            log_notice(f"    Waiting until data is ready...")
 
             while me is None or (not me.msfs_data) or (not me.entity_rom_data):
                 # Exit early if stop_token set
                 if self.stop_token.is_set():
-                    log("    Stop waiting")
+                    log_notice("    Stop waiting")
                     return
                 me = self.data_store.get_msfs_and_entity_data()
                 await asyncio.sleep(WAITING_FOR_RESOURCE_DELAY)
@@ -909,10 +952,10 @@ class ResourcesOverUsb2Snes:
         assert len(me.entity_rom_data) == self.expected_entity_rom_data_size
 
 
-        log(f"    MsFsData { len(me.msfs_data) } bytes")
+        log_response(f"    MsFsData { len(me.msfs_data) } bytes")
         await self.usb2snes.write_to_offset(self.msfs_data_offset,       me.msfs_data)
 
-        log(f"    entity_rom_data { len(me.entity_rom_data) } bytes")
+        log_response(f"    entity_rom_data { len(me.entity_rom_data) } bytes")
         await self.usb2snes.write_to_offset(self.entity_rom_data_offset, me.entity_rom_data)
 
         self.data_store.mark_msfs_and_entity_data_valid()
@@ -923,7 +966,7 @@ class ResourcesOverUsb2Snes:
         if data_size > self.max_data_size:
             raise ValueError(f"data is too large: { data_size }")
 
-        log(f"    { status.name } { data_size } bytes")
+        log_response(f"    { status.name } { data_size } bytes")
 
         if data is not None:
             await self.usb2snes.write_to_offset(self.response_data_offset, data)
@@ -940,10 +983,10 @@ class ResourcesOverUsb2Snes:
     async def process_init_request(self) -> None:
         try:
             while await self.read_request() != INIT_REQUEST:
-                log("Waiting for correctly formatted init request")
+                log_notice("Waiting for correctly formatted init request")
                 await asyncio.sleep(NORMAL_REQUEST_SLEEP_DELAY)
 
-            log("Init")
+            log_request("Init")
 
             await self.transmit_msfs_and_entity_data()
 
@@ -988,10 +1031,9 @@ async def create_and_process_websocket(address : str, stop_token : threading.Eve
 
         connected : bool = await usb2snes.find_and_attach_device()
         if not connected:
-            log(f"Could not connect to usb2snes device.")
-            return
+            raise RuntimeError('Could not connect to usb2snes device.')
 
-        log(f"Connected to { usb2snes.device_name() }")
+        log_success(f"Connected to { usb2snes.device_name() }")
 
         rou2s = ResourcesOverUsb2Snes(usb2snes, stop_token, data_store, memory_map, n_entities, symbols)
 
@@ -1004,10 +1046,10 @@ async def create_and_process_websocket(address : str, stop_token : threading.Eve
         await rou2s.validate_correct_rom(sfc_file_basename)
 
         if await rou2s.test_game_matches_sfc_file(sfc_file_data, memory_map) == False:
-            log(f"Running game does not match { sfc_file_basename }")
+            log_notice(f"Running game does not match { sfc_file_basename }")
             await rou2s.reset_and_update_rom(sfc_file_data)
         else:
-            log(f"Running game matches { sfc_file_basename }")
+            log_success(f"Running game matches { sfc_file_basename }")
 
         await rou2s.run_until_stop_token_set()
 
@@ -1018,23 +1060,27 @@ def resources_over_usb2snes(sfc_file_relpath : Filename, websocket_address : str
     sym_file_relpath = os.path.splitext(sfc_file_relpath)[0] + '.sym'
     sfc_file_basename = os.path.basename(sfc_file_relpath)
 
-    compiler = Compiler(sym_file_relpath)
+    try:
+        compiler = Compiler(sym_file_relpath)
 
-    sfc_file_data = read_binary_file(sfc_file_relpath, 512 * 1024)
-    validate_sfc_file(sfc_file_data, compiler.symbols, compiler.mappings)
+        sfc_file_data = read_binary_file(sfc_file_relpath, 512 * 1024)
+        validate_sfc_file(sfc_file_data, compiler.symbols, compiler.mappings)
 
 
-    data_store = DataStore(compiler.mappings)
+        data_store = DataStore(compiler.mappings)
 
-    # ::TODO compile resources while creating usb2snes connection::
-    compile_all_resources(data_store, compiler, n_processes)
+        # ::TODO compile resources while creating usb2snes connection::
+        compile_all_resources(data_store, compiler, n_processes)
 
-    fs_watcher, stop_token = start_filesystem_watcher(data_store, compiler)
+        fs_watcher, stop_token = start_filesystem_watcher(data_store, compiler)
 
-    asyncio.run(create_and_process_websocket(websocket_address, stop_token, sfc_file_basename, sfc_file_data, data_store, compiler.mappings.memory_map, len(compiler.entities.entities), compiler.symbols))
+        asyncio.run(create_and_process_websocket(websocket_address, stop_token, sfc_file_basename, sfc_file_data, data_store, compiler.mappings.memory_map, len(compiler.entities.entities), compiler.symbols))
 
-    fs_watcher.stop()
-    fs_watcher.join()
+        fs_watcher.stop()
+        fs_watcher.join()
+
+    except Exception as e:
+        log_error("ERROR: ", e)
 
 
 
@@ -1064,6 +1110,8 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def main() -> None:
+    colorama.init()
+
     args = parse_arguments()
 
     sfc_file_relpath = os.path.relpath(args.sfc_file, args.resources_directory)
