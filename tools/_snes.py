@@ -6,8 +6,10 @@ import itertools
 
 import PIL.Image # type: ignore
 
-from typing import Generator, Iterable, NamedTuple, Optional, Sequence, Union
+from typing import Generator, Final, Iterable, Literal, NamedTuple, Optional, Sequence, TextIO, Union
 
+from _json_formats import Filename
+from _common import MultilineError
 
 
 SnesColor       = int
@@ -40,6 +42,42 @@ class TileMap(NamedTuple):
     # NOTE: No bounds checking
     def get_tile(self, x : int, y : int) -> TileMapEntry:
         return self.grid[x + y * self.width]
+
+
+
+class ImageError(Exception):
+    def __init__(self, filename : Filename, message : str):
+        self.filename : Final = filename
+        self.message : Final = message
+
+
+    def __str__(self) -> str:
+        return f"{self.filename}: {self.message}"
+
+
+
+class InvalidTilesError(MultilineError):
+    def __init__(self, message : str, invalid_tiles : list[int], tilemap_width : int, tile_size : Literal[8, 16]):
+        self.message       : Final = message
+        self.invalid_tiles : Final = invalid_tiles
+        self.tilemap_width : Final = tilemap_width
+        self.tile_size     : Final = tile_size
+
+
+    def print_indented(self, fp : TextIO) -> None:
+        to_print : Final = min(48, len(self.invalid_tiles))
+        per_line : Final = 16
+
+        fp.write(f"{ self.message } for { len(self.invalid_tiles) } { self.tile_size }px tiles:")
+        for i in range(0, to_print, per_line):
+            fp.write(f'\n   ')
+            fp.write(','.join(f"{t:5}" for t in self.invalid_tiles[i:i+per_line]))
+        if len(self.invalid_tiles) > to_print:
+            fp.write(' ...')
+
+
+    def __str__(self) -> str:
+        return f"{ self.message } for { len(self.invalid_tiles) } { self.tile_size }px tiles"
 
 
 
@@ -95,14 +133,14 @@ def is_small_tile_not_transparent(image : PIL.Image.Image, transparent_color : S
 def extract_small_tile_grid(image : PIL.Image.Image) -> Generator[SmallColorTile, None, None]:
     """ Generator that extracts 8px tiles from the image in consecutive order. """
 
+    # Required as `image.convert()` has no `filename` attribute
+    image_filename = image.filename
+
     if image.mode != 'RGB':
         image = image.convert('RGB')
 
-    if image.width % 8 != 0:
-        raise ValueError('Image height MUST BE multiple of 8')
-
-    if image.height % 8 != 0:
-        raise ValueError('Image height MUST BE multiple of 8')
+    if image.width % 8 != 0 or image.height % 8 != 0:
+        raise ImageError(image_filename, 'Image width and height MUST be a multiple of 8')
 
     for ty in range(0, image.height, 8):
         for tx in range(0, image.width, 8):
@@ -113,13 +151,10 @@ def extract_small_tile_grid(image : PIL.Image.Image) -> Generator[SmallColorTile
 
 def extract_tiles_from_paletted_image(image : PIL.Image.Image) -> Generator[SmallTileData, None, None]:
     if image.width % 8 != 0 or image.height % 8 != 0:
-        raise ValueError('Image width MUST BE a multiple of 8')
-
-    if image.height % 8 != 0:
-        raise ValueError('Image height MUST BE a multiple of 8')
+        raise ImageError(image.filename, 'Image width and height MUST be a multiple of 8')
 
     if not image.palette:
-        raise ValueError('Image does not have a palette')
+        raise ImageError(image.filename, 'Image does not have a palette')
 
     img_data = image.getdata()
 
@@ -131,6 +166,8 @@ def extract_tiles_from_paletted_image(image : PIL.Image.Image) -> Generator[Smal
 
 
 def extract_small_tile(image : PIL.Image.Image, xpos : int, ypos : int) -> SmallColorTile:
+    # Assumes image.mode == 'RGB'
+
     if xpos + 8 > image.width or ypos + 8 > image.height:
         raise ValueError(f"position out of bounds: { xpos }, { ypos }")
 
@@ -140,6 +177,8 @@ def extract_small_tile(image : PIL.Image.Image, xpos : int, ypos : int) -> Small
 
 
 def extract_large_tile(image : PIL.Image.Image, xpos : int, ypos : int) -> LargeColorTile:
+    # Assumes image.mode == 'RGB'
+
     if xpos + 16 > image.width or ypos + 16 > image.height:
         raise ValueError(f"position out of bounds: { xpos }, { ypos }")
 
@@ -159,10 +198,10 @@ def create_palettes_map(image : PIL.Image.Image, bpp : int) -> list[PaletteMap]:
     max_colors = min(colors_per_palette * 8, 256)
 
     if image.width != 16:
-        raise ValueError('Palette Image MUST BE 16 px in width')
+        raise ImageError(image.filename, 'Palette Image must be 16 pixels in width')
 
     if image.width * image.height > max_colors:
-        raise ValueError(f"Palette Image has too many colours (max { max_colors })")
+        raise ImageError(image.filename, f"Palette Image has too many colours (max { max_colors })")
 
     image_data = image.getdata()
 
@@ -276,7 +315,7 @@ def convert_tilemap_and_tileset(tiles : Generator[SmallColorTile, None, None], p
             invalid_tiles.append(tile_index)
 
     if invalid_tiles:
-        raise ValueError(f"Cannot find palette for tiles {invalid_tiles}")
+        raise InvalidTilesError('Cannot find palette', invalid_tiles, map_width, 8)
 
     assert len(tilemap) == map_width * map_height
 

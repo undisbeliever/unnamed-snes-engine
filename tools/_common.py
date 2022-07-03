@@ -3,7 +3,7 @@
 
 from enum import IntEnum, Enum, unique
 
-from typing import Callable, TextIO
+from typing import Callable, Final, TextIO
 from abc import abstractmethod
 
 
@@ -121,5 +121,21 @@ class RomData:
 class MultilineError(Exception):
     @abstractmethod
     def print_indented(self, fp : TextIO) -> None: pass
+
+
+
+class SimpleMultilineError(MultilineError):
+    def __init__(self, short_message : str, errors : list[str]):
+        self.short_message : Final = short_message
+        self.errors : Final = errors
+
+
+    def print_indented(self, fp : TextIO) -> None:
+        if len(self.errors) == 1:
+            fp.write(f"{ self.short_message }: { self.errors[0] }")
+        else:
+            fp.write(f"{ self.short_message }:")
+            for e in self.errors:
+                fp.write(f"\n    { e }")
 
 
