@@ -9,7 +9,7 @@ import xml.etree.ElementTree
 from typing import NamedTuple, Optional
 
 from _json_formats import load_mappings_json, Mappings
-from _snes import image_to_snes, TileMapEntry
+from _snes import image_to_snes, TileMap
 
 
 N_TILES = 256
@@ -29,18 +29,21 @@ class TileProperty(NamedTuple):
 
 
 
-def create_metatile_map(tilemap : list[TileMapEntry], tile_properties : list[TileProperty]) -> bytes:
+def create_metatile_map(tilemap : TileMap, tile_properties : list[TileProperty]) -> bytes:
     data = bytearray()
+
+    if tilemap.width != 32 and tilemap.height != 32:
+        raise ValueError(f"Invalid tilemap size: { tilemap.width }x{ tilemap.height }")
 
     priotity_bit = 1 << 4
 
-    assert len(tilemap) == 32 * 32
+    assert len(tilemap.grid) == 32 * 32
     for xoffset, yoffset in ((0, 0), (1, 0), (0, 1), (1, 1)):
         priotity_bit >>= 1
 
         for y in range(yoffset, 32, 2):
             for x in range(xoffset, 32, 2):
-                tm = tilemap[x + y * 32]
+                tm = tilemap.get_tile(x, y)
                 data.append(tm.tile_id & 0xff)
 
         for y in range(yoffset, 32, 2):
@@ -48,7 +51,7 @@ def create_metatile_map(tilemap : list[TileMapEntry], tile_properties : list[Til
                 tile_id = (y // 2) * 16 + (x // 2)
                 priority = tile_properties[tile_id].priority & priotity_bit;
 
-                tm = tilemap[x + y * 32]
+                tm = tilemap.get_tile(x, y)
                 # This should never happen
                 assert tm.tile_id <= 0x3ff
                 assert tm.palette_id <= 7
