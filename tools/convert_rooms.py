@@ -16,6 +16,7 @@ from collections import OrderedDict
 
 from _json_formats import load_entities_json, load_mappings_json, \
                           Filename, Mappings, EntitiesJson, Entity
+from _common import MultilineError, SimpleMultilineError
 
 from typing import Final, NamedTuple, Optional, Union
 
@@ -31,11 +32,8 @@ ENTITIES_IN_MAP = 8
 TILE_SIZE = 16
 
 
-class RoomError(Exception):
-    def __init__(self, errors : Union[str, list[str]]):
-        if not isinstance(errors, list):
-            errors = [ errors ]
-        self.errors : Final = errors
+class RoomError(SimpleMultilineError):
+    pass
 
 
 # `TmxMap` is a limited subset of the TMX data format (only supporting one map layer and tileset)
@@ -59,13 +57,27 @@ class TmxMap(NamedTuple):
 
 
 
-def validate_tag_attr(tag : xml.etree.ElementTree.Element, name : str, value : str) -> None:
-    if tag.attrib[name] != value:
-        raise RoomError(f"Invalid attribute: Expected {name}=\"{value}\"")
+def validate_tag_attr(tag : xml.etree.ElementTree.Element, name : str, value : str, error_list : list[str]) -> None:
+    if tag.attrib.get(name) != value:
+        error_list.append(f"Invalid attribute: Expected {name}=\"{value}\"")
 
 
 
-def parse_tileset_tag(tag : xml.etree.ElementTree.Element) -> TmxTileset:
+def read_tag_attr_int(tag : xml.etree.ElementTree.Element, name : str, error_list : list[str]) -> int:
+    a = tag.attrib.get(name)
+    if not a:
+        error_list.append(f"<{ tag.tag } id={ tag.attrib.get('id', '') }>: Missing attribute `{name}`")
+        return 0
+
+    try:
+        return int(a)
+    except:
+        error_list.append(f"<{ tag.tag } id={ tag.attrib.get('id', '') } { name }>: Cannot convert attribute to int: { a }")
+        return 0
+
+
+
+def parse_tileset_tag(tag : xml.etree.ElementTree.Element) -> Optional[TmxTileset]:
     # basename without extension
     tileset_name = posixpath.splitext(posixpath.basename(tag.attrib['source']))[0]
 
@@ -76,22 +88,29 @@ def parse_tileset_tag(tag : xml.etree.ElementTree.Element) -> TmxTileset:
 
 
 def parse_layer_tag(tag : xml.etree.ElementTree.Element) -> list[int]:
-    validate_tag_attr(tag, 'width', str(MAP_WIDTH))
-    validate_tag_attr(tag, 'height', str(MAP_HEIGHT))
+    layer_width = tag.attrib.get('width')
+    layer_height = tag.attrib.get('height')
+
+    if layer_width != str(MAP_WIDTH) or layer_height != str(MAP_HEIGHT):
+        raise ValueError(f"Tile Layer must be { MAP_WIDTH } x { MAP_HEIGHT }")
 
     if len(tag) != 1 or tag[0].tag != 'data':
-        raise RoomError("Unexpected data")
+        raise ValueError("Unexpected data")
 
     data_tag = tag[0]
 
-    validate_tag_attr(data_tag, 'compression', 'gzip')
+    compression = data_tag.attrib.get('compression')
+    if compression != 'gzip':
+        raise ValueError('Expected a gzip compressed tile layer')
 
     if not data_tag.text:
-        raise RoomError("Expected base64 encoded data")
+        raise ValueError('No tile layer data')
 
     binary_data = gzip.decompress(base64.b64decode(data_tag.text))
 
-    assert len(binary_data) == MAP_WIDTH * MAP_HEIGHT * 4
+    expected_binary_data_size = MAP_WIDTH * MAP_HEIGHT * 4
+    if len(binary_data) != expected_binary_data_size:
+        raise ValueError(f"Tile layer data size mismatch (got { len(binary_data) }, expected { expected_binary_data_size })")
 
     tiles = [ i[0] for i in struct.iter_unpack('<I', binary_data) ]
 
@@ -99,34 +118,50 @@ def parse_layer_tag(tag : xml.etree.ElementTree.Element) -> list[int]:
 
 
 
-def parse_objectgroup_tag(tag : xml.etree.ElementTree.Element) -> list[TmxEntity]:
+def parse_objectgroup_tag(tag : xml.etree.ElementTree.Element, error_list : list[str]) -> list[TmxEntity]:
     objects = list()
 
     if 'offsetx' in tag.attrib or 'offsety' in tag.attrib:
-        raise RoomError('<objectgroup> tag must not have an offset')
-
+        error_list.append('<objectgroup> tag must not have an offset')
 
     for child in tag:
         if child.tag == 'object':
+            o_id_str   = child.attrib.get('id', '')
+
+            def add_error(msg : str) -> None:
+                error_list.append(f"<object id=\"{ o_id_str }\">: { msg }")
+
+            o_id   = read_tag_attr_int(child, 'id', error_list)
+            o_name = child.attrib.get('name')
+            o_x    = read_tag_attr_int(child, 'x', error_list)
+            o_y    = read_tag_attr_int(child, 'y', error_list)
+            o_type = child.attrib.get('type')
+
+            if not o_type:
+                add_error('Missing type')
+                o_type = '__ERROR__'
+
             parameter = None
 
             if not any([c.tag == 'point' for c in child]):
-                raise RoomError('Object must be a point')
+                add_error('Object must be a point')
 
             for c in child:
                 if c.tag == 'properties':
                     for p in c:
                         if p.tag == 'property':
                             if parameter is None:
-                                if p.attrib['name'] == 'parameter':
-                                    parameter = p.attrib['value']
+                                p_name = p.attrib.get('name', '')
+                                if p_name == 'parameter':
+                                    parameter = p.attrib.get('value')
+                                    if not parameter:
+                                        add_error(f'Missing parameter value')
                                 else:
-                                    raise RoomError(f"Unknown property: { p.attrib['name'] }")
+                                    add_error(f'Unknown property: { p_name }')
                             else:
-                                raise RoomError('Only one parameter is allowed per entity')
+                                add_error('Only one parameter is allowed per entity')
 
-            a = child.attrib
-            objects.append(TmxEntity(int(a['id']), a.get('name'), int(a['x']), int(a['y']), a['type'], parameter))
+            objects.append(TmxEntity(o_id, o_name, o_x, o_y, o_type, parameter))
 
 
     return objects
@@ -134,18 +169,20 @@ def parse_objectgroup_tag(tag : xml.etree.ElementTree.Element) -> list[TmxEntity
 
 
 def parse_tmx_map(et : xml.etree.ElementTree.ElementTree) -> TmxMap:
+    error_list : list[str] = list()
+
     root = et.getroot()
 
     if root.tag != 'map':
-        raise RoomError("Invalid XML file: Expected a <map> tag")
+        raise RoomError('Error reading TMX file', ['Expected a <map> tag'])
 
-    validate_tag_attr(root, 'orientation', 'orthogonal')
-    validate_tag_attr(root, 'renderorder', 'right-down')
-    validate_tag_attr(root, 'width', str(MAP_WIDTH))
-    validate_tag_attr(root, 'height', str(MAP_HEIGHT))
-    validate_tag_attr(root, 'tilewidth', str(TILE_SIZE))
-    validate_tag_attr(root, 'tileheight', str(TILE_SIZE))
-    validate_tag_attr(root, 'infinite', '0')
+    validate_tag_attr(root, 'orientation', 'orthogonal', error_list)
+    validate_tag_attr(root, 'renderorder', 'right-down', error_list)
+    validate_tag_attr(root, 'width', str(MAP_WIDTH), error_list)
+    validate_tag_attr(root, 'height', str(MAP_HEIGHT), error_list)
+    validate_tag_attr(root, 'tilewidth', str(TILE_SIZE), error_list)
+    validate_tag_attr(root, 'tileheight', str(TILE_SIZE), error_list)
+    validate_tag_attr(root, 'infinite', '0', error_list)
 
     tileset = None
     tiles = None
@@ -154,27 +191,40 @@ def parse_tmx_map(et : xml.etree.ElementTree.ElementTree) -> TmxMap:
     for child in root:
         if child.tag == 'tileset':
             if tileset is not None:
-                raise RoomError('Expected only one <tileset> tag')
-            tileset = parse_tileset_tag(child)
+                error_list.append('Expected only one <tileset> tag')
+            try:
+                tileset = parse_tileset_tag(child)
+            except Exception as e:
+                error_list.append(f"<tileset>: { e }")
 
         elif child.tag == 'layer':
             if tiles is not None:
-                raise RoomError('Expected only one <layer> tag')
-            tiles = parse_layer_tag(child)
+                error_list.append('Expected only one <layer> tag')
+            try:
+                tiles = parse_layer_tag(child)
+            except Exception as e:
+                error_list.append(f"<layer>: { e }")
 
         elif child.tag == 'objectgroup':
             if entities is not None:
-                raise RoomError('Expected only one <objectgroup> tag')
-            entities = parse_objectgroup_tag(child)
+                error_list.append('Expected only one <objectgroup> tag')
+            entities = parse_objectgroup_tag(child, error_list)
 
     if entities is None:
         entities = list()
 
     if tileset is None:
-        raise RoomError('Missing <tileset> tag')
+        error_list.append('Missing <tileset> tag')
 
     if tiles is None:
-        raise RoomError('Missing <layer> tag')
+        error_list.append('Missing <layer> tag')
+
+    if error_list:
+        raise RoomError('Error reading TMX file', error_list)
+
+    assert tileset
+    assert tiles
+    assert entities is not None
 
     return TmxMap(tileset, tiles, entities)
 
@@ -187,25 +237,29 @@ class RoomEntity(NamedTuple):
     parameter   : int
 
 
-def process_room_entities(room_entities : list[TmxEntity], all_entities : OrderedDict[str, Entity]) -> list[RoomEntity]:
-    if len(room_entities) > ENTITIES_IN_MAP:
-        raise RoomError(f"Too many entities in room ({ len(room_entities) }, max: { ENTITIES_IN_MAP }");
+class RoomIntermediate(NamedTuple):
+    map_data    : bytes
+    tileset_id  : int
+    entities    : list[RoomEntity]
 
-    errors : list[str] = list()
+
+
+def process_room_entities(room_entities : list[TmxEntity], all_entities : OrderedDict[str, Entity], error_list : list[str]) -> list[RoomEntity]:
+    if len(room_entities) > ENTITIES_IN_MAP:
+        error_list.append(f"Too many entities in room ({ len(room_entities) }, max: { ENTITIES_IN_MAP }");
 
     out = list()
 
     for tmx_entity in room_entities:
         def add_error(msg : str) -> None:
             if tmx_entity.name:
-                errors.append(f"Entity { tmx_entity.id } { tmx_entity.name } ({ tmx_entity.type }): { msg }")
+                error_list.append(f"Entity { tmx_entity.id } { tmx_entity.name } ({ tmx_entity.type }): { msg }")
             else:
-                errors.append(f"Entity { tmx_entity.id } ({ tmx_entity.type }): { msg }")
+                error_list.append(f"Entity { tmx_entity.id } ({ tmx_entity.type }): { msg }")
 
         entity_type = all_entities.get(tmx_entity.type)
         if entity_type is None:
-            errors.append(f"Entity { tmx_entity.id }: Unknown entity type: { tmx_entity.type }")
-            continue
+            add_error(f"Unknown entity type: { tmx_entity.type }")
 
         if tmx_entity.x < 0 or tmx_entity.x >= MAP_WIDTH_PX:
             add_error(f"Invalid x position: { tmx_entity.x }")
@@ -213,37 +267,60 @@ def process_room_entities(room_entities : list[TmxEntity], all_entities : Ordere
         if tmx_entity.y < 0 or tmx_entity.y >= MAP_HEIGHT_PX:
             add_error(f"Invalid x position: { tmx_entity.y }")
 
-
+        entity_type_id = 0
         parameter = 0
-        if entity_type.code.parameter:
-            p = entity_type.code.parameter
 
-            if not tmx_entity.parameter:
-                add_error(f"Missing parameter value for { p.type }")
-            elif p.type == 'enum':
-                try:
-                    parameter = p.values.index(tmx_entity.parameter)
-                except ValueError:
-                    add_error(f"Invalid parameter for { tmx_entity.type } enum: { tmx_entity.parameter }")
+        if entity_type:
+            entity_type_id = entity_type.id
+
+            if entity_type.code.parameter:
+                p = entity_type.code.parameter
+
+                if not tmx_entity.parameter:
+                    add_error(f"Missing parameter value for { p.type }")
+                elif p.type == 'enum':
+                    try:
+                        parameter = p.values.index(tmx_entity.parameter)
+                    except ValueError:
+                        add_error(f"Invalid parameter for { tmx_entity.type } enum: { tmx_entity.parameter }")
+                else:
+                    add_error(f"Unknown parameter type: { p.type }")
             else:
-                add_error(f"Unknown parameter type: { p.type }")
-        else:
-            # no parameter
-            if tmx_entity.parameter is not None:
-                add_error(f"Entity does not have a parameter")
+                # no parameter
+                if tmx_entity.parameter is not None:
+                    add_error(f"Entity does not have a parameter")
 
 
         out.append(RoomEntity(
             xpos      = tmx_entity.x,
             ypos      = tmx_entity.y,
-            type_id   = entity_type.id,
+            type_id   = entity_type_id,
             parameter = parameter
         ))
 
-    if errors:
-        raise RoomError(errors)
-
     return out
+
+
+def process_room(tmx_map : TmxMap, mapping : Mappings, all_entities : OrderedDict[str, Entity]) -> RoomIntermediate:
+    error_list : list[str] = list()
+
+    try:
+        tileset_id = mapping.mt_tilesets.index(tmx_map.tileset.name)
+    except ValueError:
+        error_list.append('Unknown MetaTile tileset name: { tmx_map.tileset.name }')
+
+    try:
+        map_data = bytes([ i - tmx_map.tileset.firstgid for i in tmx_map.map ])
+    except ValueError:
+        error_list.append("Unknown tile in map.  There must be a maximum of 256 tiles in the tileset and no transparent or flipped tiles in the map.")
+
+    room_entities = process_room_entities(tmx_map.entities, all_entities, error_list)
+
+
+    if error_list:
+        raise RoomError('Error compiling room', error_list)
+
+    return RoomIntermediate(map_data, tileset_id, room_entities)
 
 
 
@@ -278,25 +355,14 @@ def create_room_entities_soa(entities : list[RoomEntity]) -> bytes:
 
 
 
-def create_map_data(tmx_map : TmxMap, mapping : Mappings, room_entities : list[RoomEntity]) -> bytes:
+def create_map_data(room : RoomIntermediate) -> bytes:
 
-    try:
-        tileset_id = mapping.mt_tilesets.index(tmx_map.tileset.name)
-    except ValueError:
-        raise RoomError('Unknown MetaTile tileset name: { tmx_map.tileset.name }') from None
-
-    try:
-        map_data = bytes([ i - tmx_map.tileset.firstgid for i in tmx_map.map ])
-    except ValueError:
-        raise RoomError("Unknown tile in map.  There must be a maximum of 256 tiles in the tileset and no transparent or flipped tiles in the map.")
-
-
-    data = bytearray(map_data)
+    data = bytearray(room.map_data)
 
     # Tileset byte
-    data.append(tileset_id)
+    data.append(room.tileset_id)
 
-    data += create_room_entities_soa(room_entities)
+    data += create_room_entities_soa(room.entities)
 
     return data
 
@@ -308,11 +374,11 @@ def compile_room(filename : str, entities : EntitiesJson, mapping : Mappings) ->
 
     tmx_map = parse_tmx_map(tmx_et)
 
-    room_entities = process_room_entities(tmx_map.entities, entities.entities)
+    room = process_room(tmx_map, mapping, entities.entities)
 
     # ::TODO compress room data with lz4::
 
-    return create_map_data(tmx_map, mapping, room_entities)
+    return create_map_data(room)
 
 
 
@@ -336,7 +402,7 @@ ROOM_LOCATION_REGEX = re.compile(r'(\d+)-(\d+)-.+.tmx$')
 def extract_room_id(basename : str) -> int:
     m = ROOM_LOCATION_REGEX.match(basename)
     if not m:
-        raise RoomError("Invalid room filename")
+        raise RuntimeError("Invalid room filename")
 
     return int(m.group(1), 10) + 16 * int(m.group(2), 10)
 
@@ -362,7 +428,7 @@ def compile_rooms(rooms_directory : str, entities : EntitiesJson, mapping : Mapp
             room_id = extract_room_id(basename)
 
             if room_id in room_id_set:
-                raise RoomError(f"Two rooms have the same location: { room_id }")
+                raise RuntimeError(f"Two rooms have the same location: { room_id }")
             room_id_set.add(room_id)
 
             out[room_id * 2 + 0] = room_addr & 0xff
@@ -383,13 +449,12 @@ def compile_rooms(rooms_directory : str, entities : EntitiesJson, mapping : Mapp
         # Print errors
         sys.stderr.write('ROOM ERRORS:\n')
         for basename, e in errors:
-            sys.stderr.write(f"{ basename }\n")
-            if isinstance(e, RoomError):
-                for m in e.errors:
-                    sys.stderr.write(f"    { m }\n")
-                sys.stderr.write('\n')
+            sys.stderr.write(f"{ basename }: ")
+            if isinstance(e, MultilineError):
+                e.print_indented(sys.stderr)
             else:
-                sys.stderr.write(f"    { type(e).__name__ }: { e }")
+                sys.stderr.write(f"{ type(e).__name__ }: { e }")
+            sys.stderr.write('\n')
 
         sys.exit(f"{ len(errors) } rooms contain errors")
 
