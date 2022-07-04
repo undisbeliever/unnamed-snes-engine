@@ -4,12 +4,14 @@
 
 
 import PIL.Image # type: ignore
+import sys
 import argparse
 
 from collections import OrderedDict
-from typing import Any, Callable, Iterable, NamedTuple
+from typing import Any, Callable, Iterable, NamedTuple, Optional
 
 import _json_formats
+from _common import print_error
 
 from _snes import extract_tiles_from_paletted_image, convert_mode7_tileset, convert_snes_tileset, \
                   SmallTileData
@@ -152,7 +154,9 @@ def convert_tiles(t : _json_formats.TilesInput) -> bytes:
 
 
 
-def compile_list(typename : Name, mapping : list[Name], inputs : dict[str, Any], func : Callable[[Any], bytes]) -> list[ResourceEntry]:
+def compile_list(typename : Name, mapping : list[Name], inputs : dict[str, Any], func : Callable[[Any], bytes]) -> Optional[list[ResourceEntry]]:
+    valid = True
+
     out = list()
 
     for resource_name in mapping:
@@ -160,7 +164,15 @@ def compile_list(typename : Name, mapping : list[Name], inputs : dict[str, Any],
         if not i:
             raise RuntimeError(f"Cannot find { typename } resource: {resource_name}")
 
-        out.append(ResourceEntry(resource_name, func(i)))
+        try:
+            out.append(ResourceEntry(resource_name, func(i)))
+        except Exception as e:
+            print_error("ERROR compiling { typename } { resource_name }", e)
+            valid = False
+
+
+    if not valid:
+        return None
 
     return out
 
@@ -173,9 +185,14 @@ def compile_list(typename : Name, mapping : list[Name], inputs : dict[str, Any],
 
 
 
-def build_resources(mapping : _json_formats.Mappings, resources : _json_formats.ResourcesJson) -> ResourceData:
+def build_resources(mapping : _json_formats.Mappings, resources : _json_formats.ResourcesJson) -> Optional[ResourceData]:
+    tiles = compile_list('tiles', mapping.tiles, resources.tiles, convert_tiles)
+
+    if tiles is None:
+        return None
+
     return ResourceData(
-            tiles = compile_list('tiles', mapping.tiles, resources.tiles, convert_tiles)
+            tiles = tiles
     )
 
 
@@ -202,6 +219,9 @@ def main() -> None:
     resources = load_resources_json(args.resources_json_file)
 
     resource_data = build_resources(mapping, resources)
+
+    if not resource_data:
+        sys.exit('Error compiling resources')
 
     save_resource_data_to_file(args.output, resource_data)
 

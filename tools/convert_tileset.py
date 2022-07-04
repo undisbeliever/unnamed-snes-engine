@@ -3,6 +3,7 @@
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
 
+import sys
 import PIL.Image # type: ignore
 import argparse
 import xml.etree.ElementTree
@@ -10,7 +11,7 @@ from typing import Final, NamedTuple, Optional, TextIO
 
 from _json_formats import load_mappings_json, Filename, Mappings
 from _snes import image_to_snes, TileMap, ImageError, InvalidTilesError
-from _common import SimpleMultilineError
+from _common import SimpleMultilineError, print_error
 
 
 N_TILES = 256
@@ -256,14 +257,19 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def main() -> None:
-    args = parse_arguments()
+    try:
+        args = parse_arguments()
 
-    mappings = load_mappings_json(args.mappings_json_file)
+        mappings = load_mappings_json(args.mappings_json_file)
 
-    tileset_data = convert_mt_tileset(args.tsx_filename, args.image_filename, args.palette_filename, mappings)
+        tileset_data = convert_mt_tileset(args.tsx_filename, args.image_filename, args.palette_filename, mappings)
 
-    with open(args.output, 'wb') as fp:
-        fp.write(tileset_data)
+        with open(args.output, 'wb') as fp:
+            fp.write(tileset_data)
+
+    except Exception as e:
+        print_error('ERROR', e)
+        sys.exit("Error compiling MetaTile tileset")
 
 
 if __name__ == '__main__':

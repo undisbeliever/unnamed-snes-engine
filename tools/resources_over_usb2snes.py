@@ -62,6 +62,8 @@ from _common import MultilineError, ResourceType, MS_FS_DATA_BANK_OFFSET, USB2SN
 
 from _entity_data import create_entity_rom_data, ENTITY_ROM_DATA_LABEL, ENTITY_ROM_DATA_BYTES_PER_ENTITY
 
+from _common import print_error as __print_error
+
 
 # Sleep delay when waiting on a resource
 # (seconds)
@@ -106,8 +108,11 @@ class SpecialRequestType(IntEnum):
 if __name__ != '__main__':
     raise ImportError("Cannot import this file as a python module")
 
+
 # Disable the `print` function
 print : Final = None
+
+print_error : Final = None
 
 
 __log_lock : Final = threading.Lock()
@@ -123,27 +128,7 @@ def __log(s : str, c : str) -> None:
 # Thread safe printing
 def log_error(s : str, e : Optional[Exception] = None) -> None:
     with __log_lock:
-        sys.stdout.write(AnsiColors.BOLD + AnsiColors.BRIGHT_RED)
-        sys.stdout.write(s)
-        if e:
-            sys.stdout.write(AnsiColors.NORMAL)
-            if isinstance(e, ValueError) or isinstance(e, RuntimeError):
-                sys.stdout.write(str(e))
-            elif isinstance(e, JsonError):
-                sys.stdout.write(AnsiColors.BOLD + AnsiColors.BRIGHT_WHITE)
-                sys.stdout.write(e.path[0])
-                sys.stdout.write(AnsiColors.NORMAL)
-                if len(e.path) > 1:
-                    sys.stdout.write(f" { ': '.join(e.path[1:]) }: ")
-                else:
-                    sys.stdout.write(': ')
-                sys.stdout.write(AnsiColors.BRIGHT_RED)
-                sys.stdout.write(e.message)
-            elif isinstance(e, MultilineError):
-                e.print_indented(sys.stdout)
-            else:
-                sys.stdout.write(f"{ type(e).__name__ }({ e })")
-        sys.stdout.write(AnsiColors.RESET + '\n')
+        __print_error(s, e, sys.stdout)
 
 
 def log_fs_watcher(s : str) -> None:
@@ -478,7 +463,7 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
         log_fs_watcher(f"    Compiling { rtype }: { name }")
         co = func(i)
         if co.error:
-            log_error(f"    ERROR: { rtype } { name }: ", co.error)
+            log_error(f"    ERROR: { rtype } { name }", co.error)
         self.data_store.insert_data(co)
 
 
@@ -488,7 +473,7 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
         log_fs_watcher(f"    Compiling room: { basename }")
         co = self.compiler.compile_room(basename)
         if co.error:
-            log_error(f"    ERROR: room { basename }: ", co.error)
+            log_error(f"    ERROR: room { basename }", co.error)
         self.data_store.insert_data(co)
 
 
@@ -496,7 +481,7 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
         log_fs_watcher(f"    Compiling MsFs and Entity Data")
         me_data = self.compiler.compile_msfs_and_entity_data(self.data_store.get_msfs_lists())
         if me_data.error:
-            log_error(f"    ERROR: MsFs and entity_rom_data: ", me_data.error)
+            log_error(f"    ERROR: MsFs and entity_rom_data", me_data.error)
         self.data_store.insert_msfs_and_entity_data(me_data)
 
 
@@ -535,13 +520,13 @@ def compile_all_resources(data_store : DataStore, compiler : Compiler, n_process
                 data_store.insert_data(co)
 
                 if co.error:
-                    log_error(f"ERROR: { co.data_type.name.lower() } { co.name }: ", co.error)
+                    log_error(f"ERROR: { co.data_type.name.lower() } { co.name }", co.error)
 
 
     msfs_and_entity_data = compiler.compile_msfs_and_entity_data(data_store.get_msfs_lists())
     data_store.insert_msfs_and_entity_data(msfs_and_entity_data)
     if msfs_and_entity_data.error:
-        log_error('ERROR: MsFs and entity_rom_data: ', msfs_and_entity_data.error)
+        log_error('ERROR: MsFs and entity_rom_data', msfs_and_entity_data.error)
 
 
 
@@ -896,7 +881,7 @@ class ResourcesOverUsb2Snes:
 
             if co is None or (not co.data):
                 if co:
-                    log_error(f"    ERROR: { request.request_type.name }[{ request.resource_id }]: ", co.error)
+                    log_error(f"    ERROR: { request.request_type.name }[{ request.resource_id }]", co.error)
 
                 # Do not wait if request_type is room and resource does not exist.
                 if co is not None or request.request_type != SpecialRequestType.rooms:
@@ -938,9 +923,9 @@ class ResourcesOverUsb2Snes:
             if me is None:
                 log_error(f"    Cannot access MsFsData or Entity ROM Data")
             elif not me.msfs_data:
-                log_error(f"    Cannot access MsFsData: ", me.error)
+                log_error(f"    Cannot access MsFsData", me.error)
             elif not me.entity_rom_data:
-                log_error(f"    Cannot access entity_rom_data: ", me.error)
+                log_error(f"    Cannot access entity_rom_data", me.error)
 
             log_notice(f"    Waiting until data is ready...")
 
@@ -1083,7 +1068,7 @@ def resources_over_usb2snes(sfc_file_relpath : Filename, websocket_address : str
         fs_watcher.join()
 
     except Exception as e:
-        log_error("ERROR: ", e)
+        log_error('ERROR', e)
 
 
 

@@ -9,7 +9,7 @@ import PIL.Image # type: ignore
 from typing import Generator, Final, Iterable, Literal, NamedTuple, Optional, Sequence, TextIO, Union
 
 from _json_formats import Filename
-from _common import MultilineError
+from _common import MultilineError, FileError
 
 
 SnesColor       = int
@@ -45,14 +45,9 @@ class TileMap(NamedTuple):
 
 
 
-class ImageError(Exception):
+class ImageError(FileError):
     def __init__(self, filename : Filename, message : str):
-        self.filename : Final = filename
-        self.message : Final = message
-
-
-    def __str__(self) -> str:
-        return f"{self.filename}: {self.message}"
+        super().__init__(message, (filename, ))
 
 
 

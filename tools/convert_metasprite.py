@@ -12,7 +12,7 @@ from io import StringIO
 
 from typing import Callable, Final, Iterable, Literal, NamedTuple, Optional, TextIO, Union
 
-from _common import RomData, MemoryMapMode, MultilineError
+from _common import RomData, MemoryMapMode, MultilineError, print_error
 
 from _snes import extract_small_tile, extract_large_tile, split_large_tile, \
             hflip_tile, vflip_tile, hflip_large_tile, vflip_large_tile, \
@@ -1004,9 +1004,9 @@ def main() -> None:
         with open(args.msfs_output, 'w') as fp:
             fp.write(msfs_text)
 
-    except SpritesheetError as e:
-        e.print_indented(sys.stderr)
-        sys.exit("Error compiling metasprites")
+    except Exception as e:
+        print_error('ERROR', e)
+        sys.exit("Error compiling MetaSprite spritesheet")
 
 
 if __name__ == '__main__':

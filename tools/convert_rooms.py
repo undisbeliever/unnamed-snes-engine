@@ -16,7 +16,7 @@ from collections import OrderedDict
 
 from _json_formats import load_entities_json, load_mappings_json, \
                           Filename, Mappings, EntitiesJson, Entity
-from _common import MultilineError, SimpleMultilineError
+from _common import MultilineError, SimpleMultilineError, print_error
 
 from typing import Final, NamedTuple, Optional, Union
 
@@ -408,8 +408,8 @@ def extract_room_id(basename : str) -> int:
 
 
 
-def compile_rooms(rooms_directory : str, entities : EntitiesJson, mapping : Mappings) -> bytes:
-    errors : list[tuple[Filename, Exception]] = list()
+def compile_rooms(rooms_directory : str, entities : EntitiesJson, mapping : Mappings) -> Optional[bytes]:
+    valid = True
 
     tmx_files = get_list_of_tmx_files(rooms_directory)
 
@@ -438,25 +438,16 @@ def compile_rooms(rooms_directory : str, entities : EntitiesJson, mapping : Mapp
             room_addr += len(room_data)
 
         except Exception as ex:
-            errors.append( (basename, ex) )
+            print_error(f"ERROR compiling { basename }", ex)
+            valid = False
 
 
     if room_addr > 0x10000:
         raise RuntimeError("Output too large.  Maximum rooms binary is 64KiB.")
 
 
-    if errors:
-        # Print errors
-        sys.stderr.write('ROOM ERRORS:\n')
-        for basename, e in errors:
-            sys.stderr.write(f"{ basename }: ")
-            if isinstance(e, MultilineError):
-                e.print_indented(sys.stderr)
-            else:
-                sys.stderr.write(f"{ type(e).__name__ }: { e }")
-            sys.stderr.write('\n')
-
-        sys.exit(f"{ len(errors) } rooms contain errors")
+    if not valid:
+        return None
 
     return out
 
@@ -486,6 +477,9 @@ def main() -> None:
     mapping = load_mappings_json(args.mapping_filename)
 
     rooms_bin = compile_rooms(args.rooms_directory, entities, mapping)
+
+    if not rooms_bin:
+        sys.exit('Error compiling rooms')
 
     with open(args.output, 'wb') as fp:
         fp.write(rooms_bin)

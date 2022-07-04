@@ -8,7 +8,7 @@ import os.path
 
 from collections import OrderedDict
 
-from _common import MemoryMapMode
+from _common import MemoryMapMode, FileError
 
 from typing import Any, Callable, Final, Generator, Literal, NamedTuple, NoReturn, Optional, Type, TypeVar, Union
 
@@ -22,16 +22,8 @@ Filename   = str
 
 
 
-class JsonError(Exception):
-    def __init__(self, message : str, path : tuple[str, ...]):
-        self.message : Final = message
-        self.path    : Final = path
-
-    def __str__(self) -> str:
-        return f"{ self.location_string() }: { self.message }"
-
-    def location_string(self) -> str:
-        return ' '.join(self.path)
+class JsonError(FileError):
+    pass
 
 
 
