@@ -42,11 +42,12 @@ import asyncio
 import posixpath
 import websockets.client
 
-import colorama # type: ignore
 import watchdog.events # type: ignore
 import watchdog.observers # type: ignore
 
 from typing import cast, Any, Callable, Final, NamedTuple, Optional, Union
+
+from _ansi_color import AnsiColors
 
 from convert_tileset import convert_mt_tileset
 from convert_metasprite import convert_spritesheet, generate_pattern_grids, PatternGrid, MsFsEntry, build_ms_fs_data
@@ -112,53 +113,53 @@ print : Final = None
 __log_lock : Final = threading.Lock()
 
 # Thread safe printing
-def __log(s : str, c : colorama.Fore) -> None:
+def __log(s : str, c : str) -> None:
     with __log_lock:
         sys.stdout.write(c)
         sys.stdout.write(s)
-        sys.stdout.write(colorama.Style.RESET_ALL + '\n')
+        sys.stdout.write(AnsiColors.RESET + '\n')
 
 
 # Thread safe printing
 def log_error(s : str, e : Optional[Exception] = None) -> None:
     with __log_lock:
-        sys.stdout.write(colorama.Fore.LIGHTRED_EX + colorama.Style.BRIGHT)
+        sys.stdout.write(AnsiColors.BOLD + AnsiColors.BRIGHT_RED)
         sys.stdout.write(s)
         if e:
-            sys.stdout.write(colorama.Style.NORMAL)
+            sys.stdout.write(AnsiColors.NORMAL)
             if isinstance(e, ValueError) or isinstance(e, RuntimeError):
                 sys.stdout.write(str(e))
             elif isinstance(e, JsonError):
-                sys.stdout.write(colorama.Fore.LIGHTWHITE_EX + colorama.Style.BRIGHT)
+                sys.stdout.write(AnsiColors.BOLD + AnsiColors.BRIGHT_WHITE)
                 sys.stdout.write(e.path[0])
-                sys.stdout.write(colorama.Style.NORMAL)
+                sys.stdout.write(AnsiColors.NORMAL)
                 if len(e.path) > 1:
                     sys.stdout.write(f" { ': '.join(e.path[1:]) }: ")
                 else:
                     sys.stdout.write(': ')
-                sys.stdout.write(colorama.Fore.LIGHTRED_EX)
+                sys.stdout.write(AnsiColors.BRIGHT_RED)
                 sys.stdout.write(e.message)
             elif isinstance(e, MultilineError):
                 e.print_indented(sys.stdout)
             else:
                 sys.stdout.write(f"{ type(e).__name__ }({ e })")
-        sys.stdout.write(colorama.Style.RESET_ALL + '\n')
+        sys.stdout.write(AnsiColors.RESET + '\n')
 
 
 def log_fs_watcher(s : str) -> None:
-    __log(s, colorama.Fore.LIGHTBLUE_EX)
+    __log(s, AnsiColors.BRIGHT_BLUE)
 
 def log_request(s : str) -> None:
-    __log(s, colorama.Fore.LIGHTMAGENTA_EX)
+    __log(s, AnsiColors.BRIGHT_MAGENTA)
 
 def log_response(s : str) -> None:
-    __log(s, colorama.Fore.LIGHTYELLOW_EX)
+    __log(s, AnsiColors.BRIGHT_YELLOW)
 
 def log_notice(s : str) -> None:
-    __log(s, colorama.Fore.LIGHTCYAN_EX)
+    __log(s, AnsiColors.BRIGHT_CYAN)
 
 def log_success(s : str) -> None:
-    __log(s, colorama.Fore.GREEN)
+    __log(s, AnsiColors.GREEN)
 
 
 
@@ -1112,8 +1113,6 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def main() -> None:
-    colorama.init()
-
     args = parse_arguments()
 
     sfc_file_relpath = os.path.relpath(args.sfc_file, args.resources_directory)

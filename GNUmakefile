@@ -38,7 +38,7 @@ RESOURCES  += $(patsubst %,gen/metasprites/%.bin, $(METASPRITE_SPRITESETS))
 RESOURCES  += $(patsubst %,gen/metasprites/%.txt, $(METASPRITE_SPRITESETS))
 
 
-COMMON_PYTHON_SCRIPTS = tools/_json_formats.py tools/_snes.py tools/_common.py
+COMMON_PYTHON_SCRIPTS = tools/_json_formats.py tools/_snes.py tools/_ansi_color.py tools/_common.py
 
 # Python interpreter
 # (-bb issues errors on bytes/string comparisons)
