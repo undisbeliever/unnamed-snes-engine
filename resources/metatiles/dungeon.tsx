@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<tileset version="1.8" tiledversion="1.8.4" name="dungeon" tilewidth="16" tileheight="16" tilecount="256" columns="16">
+<tileset version="1.9" tiledversion="1.9.0" name="dungeon" tilewidth="16" tileheight="16" tilecount="256" columns="16">
  <image source="dungeon-tiles.png" width="256" height="256"/>
  <tile id="0">
   <properties>
@@ -174,12 +174,12 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="88" type="player_tile_collision_test">
+ <tile id="88" class="player_tile_collision_test">
   <objectgroup draworder="index" id="2">
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="89" type="heal"/>
+ <tile id="89" class="heal"/>
  <tile id="92">
   <objectgroup draworder="index" id="2">
    <object id="1" x="0" y="0" width="16" height="16"/>
@@ -256,7 +256,7 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="130" type="doorway">
+ <tile id="130" class="doorway">
   <properties>
    <property name="priority" value="1100"/>
   </properties>
@@ -264,7 +264,7 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="131" type="doorway">
+ <tile id="131" class="doorway">
   <properties>
    <property name="priority" value="1100"/>
   </properties>
@@ -308,7 +308,7 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="146" type="doorway">
+ <tile id="146" class="doorway">
   <properties>
    <property name="priority" value="0"/>
   </properties>
@@ -316,7 +316,7 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="147" type="doorway">
+ <tile id="147" class="doorway">
   <properties>
    <property name="priority" value="0"/>
   </properties>
@@ -340,7 +340,7 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="162" type="doorway">
+ <tile id="162" class="doorway">
   <properties>
    <property name="priority" value="0"/>
   </properties>
@@ -348,7 +348,7 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="163" type="doorway">
+ <tile id="163" class="doorway">
   <properties>
    <property name="priority" value="0"/>
   </properties>
@@ -372,7 +372,7 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="178" type="doorway">
+ <tile id="178" class="doorway">
   <properties>
    <property name="priority" value="0011"/>
   </properties>
@@ -380,7 +380,7 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="179" type="doorway">
+ <tile id="179" class="doorway">
   <properties>
    <property name="priority" value="0011"/>
   </properties>
@@ -404,7 +404,7 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="194" type="doorway">
+ <tile id="194" class="doorway">
   <properties>
    <property name="priority" value="1010"/>
   </properties>
@@ -412,7 +412,7 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="195" type="doorway">
+ <tile id="195" class="doorway">
   <properties>
    <property name="priority" value="0"/>
   </properties>
@@ -436,7 +436,7 @@
    <object id="2" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="210" type="doorway">
+ <tile id="210" class="doorway">
   <properties>
    <property name="priority" value="1010"/>
   </properties>
@@ -444,7 +444,7 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="211" type="doorway">
+ <tile id="211" class="doorway">
   <properties>
    <property name="priority" value="0"/>
   </properties>
@@ -468,7 +468,7 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="226" type="doorway">
+ <tile id="226" class="doorway">
   <properties>
    <property name="priority" value="0"/>
   </properties>
@@ -476,7 +476,7 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="227" type="doorway">
+ <tile id="227" class="doorway">
   <properties>
    <property name="priority" value="0101"/>
   </properties>
@@ -500,7 +500,7 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="242" type="doorway">
+ <tile id="242" class="doorway">
   <properties>
    <property name="priority" value="0"/>
   </properties>
@@ -508,7 +508,7 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="243" type="doorway">
+ <tile id="243" class="doorway">
   <properties>
    <property name="priority" value="0101"/>
   </properties>

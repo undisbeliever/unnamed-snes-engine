@@ -121,7 +121,7 @@ def read_tile_tag(tile_tag : xml.etree.ElementTree.Element, error_list : list[st
     tile_solid = False
     tile_priority = 0
 
-    tile_type = tile_tag.attrib.get('type')
+    tile_type = tile_tag.attrib.get('class', tile_tag.attrib.get('type')) # Tiled 1.9 renamed 'type' attribute to 'class'
 
     for tag in tile_tag:
         if tag.tag == 'objectgroup':

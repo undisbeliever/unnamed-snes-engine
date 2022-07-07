@@ -135,7 +135,7 @@ def parse_objectgroup_tag(tag : xml.etree.ElementTree.Element, error_list : list
             o_name = child.attrib.get('name')
             o_x    = read_tag_attr_int(child, 'x', error_list)
             o_y    = read_tag_attr_int(child, 'y', error_list)
-            o_type = child.attrib.get('type')
+            o_type = child.attrib.get('class', child.attrib.get('type')) # Tiled 1.9 renamed 'type' attribute to 'class'
 
             if not o_type:
                 add_error('Missing type')
