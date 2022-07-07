@@ -4,6 +4,7 @@
 
 
 import sys
+import os.path
 import PIL.Image # type: ignore
 import argparse
 import xml.etree.ElementTree
@@ -30,10 +31,16 @@ class TileProperty(NamedTuple):
     priority    : int           # integer bitfield (4 bits wide), one priority bit for each 8px tile
 
 
+class TsxFile(NamedTuple):
+    name                : str
+    image_filename      : Filename
+    palette_filename    : Filename
+    tile_properties     : list[TileProperty]
+
+
 
 class TsxFileError(SimpleMultilineError):
-    def __init__(self, errors : list[str]):
-        super().__init__('Error reading TSX file', errors)
+    pass
 
 
 
@@ -143,22 +150,92 @@ def read_tile_tag(tile_tag : xml.etree.ElementTree.Element, error_list : list[st
 
 
 
-def read_tile_properties(tsx_et : xml.etree.ElementTree.ElementTree, error_list : list[str]) -> list[TileProperty]:
-    out = [ TileProperty(solid=False, type=None, priority=DEFAULT_PRIORITY) ] * N_TILES
+def read_tsx_file(tsx_filename : Filename) -> TsxFile:
+    with open(tsx_filename, 'r') as tsx_fp:
+        tsx_et = xml.etree.ElementTree.parse(tsx_fp)
+
+    error_list : list[str] = list()
+
+    image_filename : Optional[Filename] = None
+    palette_filename : Optional[Filename] = None
 
     read_tiles : set[int] = set()
+    tile_properties = [ TileProperty(solid=False, type=None, priority=DEFAULT_PRIORITY) ] * N_TILES
 
-    for tag in tsx_et.getroot():
+
+    root_tag = tsx_et.getroot()
+    if root_tag.tag != 'tileset':
+        raise TsxFileError(f"Error reading { tsx_filename }", ['Expected a <tileset> tag'])
+
+
+    name = root_tag.get('name')
+    if not name:
+        error_list.append('Missing tileset name')
+
+    if name:
+        if name + '.tsx' != os.path.basename(tsx_filename):
+            error_list.append('')
+
+
+    for tag in root_tag:
+        if tag.tag == 'image':
+            if image_filename:
+                error_list.append('Only one <image> tag is allowed')
+            image_filename = tag.attrib.get('source')
+            if not image_filename:
+                error_list.append('<image> tag is missing attribute: source')
+
+        if tag.tag == 'properties':
+            for ptag in tag:
+                if ptag.tag == 'property':
+                    pname = ptag.attrib.get('name')
+                    if pname == 'palette':
+                        palette_filename = ptag.attrib.get('value')
+                        if not palette_filename:
+                            error_list.append('palette property is missing a value')
+                    else:
+                        error_list.append(f"Unknown property: { pname }")
+
         if tag.tag == 'tile':
             tile_id, t = read_tile_tag(tag, error_list)
 
             if tile_id not in read_tiles:
-                out[tile_id] = t;
                 read_tiles.add(tile_id)
+                tile_properties[tile_id] = t;
             else:
                 error_list.append(f"Duplicate <tile> id: { tile_id }")
 
-    return out
+
+    if not image_filename:
+        error_list.append('Missing image filename')
+
+    if not palette_filename:
+        error_list.append('Missing palette filename')
+
+    if name:
+        if image_filename:
+            if not image_filename.startswith(name + '-'):
+                error_list.append(f"Invalid image filename (expected `{ name }-*`): { image_filename }")
+
+        if palette_filename:
+            if not palette_filename.startswith(name + '-'):
+                error_list.append(f"Invalid palette filename (expected `{ name }-*`): { palette_filename }")
+
+
+    if error_list:
+        raise TsxFileError(f"Error reading { tsx_filename }", error_list)
+
+
+    assert name and image_filename and palette_filename
+
+    dirname = os.path.dirname(tsx_filename)
+
+    return TsxFile(
+            name = name,
+            image_filename = os.path.join(dirname, image_filename),
+            palette_filename = os.path.join(dirname, palette_filename),
+            tile_properties = tile_properties,
+    )
 
 
 
@@ -179,9 +256,6 @@ def create_properties_array(tile_properties : list[TileProperty], interactive_ti
             p |= 1 << TILE_PROPERTY_SOLID_BIT
 
         data[i] = p
-
-    if error_list:
-        raise TsxFileError(error_list)
 
     return data
 
@@ -211,27 +285,24 @@ def create_tileset_data(palette_data : bytes, tile_data : bytes, metatile_map : 
 
 
 
-def convert_mt_tileset(tsx_filename : str, image_filename : str, palette_filename : str, mappings : Mappings) -> bytes:
+def convert_mt_tileset(tsx_filename : Filename, mappings : Mappings) -> bytes:
 
-    with PIL.Image.open(palette_filename) as palette_image:
-        with PIL.Image.open(image_filename) as image:
+    tsx_file = read_tsx_file(tsx_filename)
+
+    with PIL.Image.open(tsx_file.palette_filename) as palette_image:
+        with PIL.Image.open(tsx_file.image_filename) as image:
             if image.width != 256 or image.height != 256:
-                raise ImageError(image_filename, 'Tileset Image MUST BE 256x256 px in size')
+                raise ImageError(tsx_file.image_filename, 'Tileset Image MUST BE 256x256 px in size')
 
             tilemap, tile_data, palette_data = image_to_snes(image, palette_image, TILE_DATA_BPP)
 
-    with open(tsx_filename, 'r') as tsx_fp:
-        tsx_et = xml.etree.ElementTree.parse(tsx_fp)
-
     error_list : list[str] = list()
 
-    tile_properties = read_tile_properties(tsx_et, error_list)
-
-    metatile_map = create_metatile_map(tilemap, tile_properties)
-    properties = create_properties_array(tile_properties, mappings.interactive_tile_functions, error_list)
+    metatile_map = create_metatile_map(tilemap, tsx_file.tile_properties)
+    properties = create_properties_array(tsx_file.tile_properties, mappings.interactive_tile_functions, error_list)
 
     if error_list:
-        raise TsxFileError(error_list)
+        raise TsxFileError(f"Error compiling { tsx_filename }", error_list)
 
     return create_tileset_data(palette_data, tile_data, metatile_map, properties)
 
@@ -243,10 +314,6 @@ def parse_arguments() -> argparse.Namespace:
                         help='tileset output file')
     parser.add_argument('mappings_json_file', action='store',
                         help='mappings.json file')
-    parser.add_argument('image_filename', action='store',
-                        help='Indexed png image')
-    parser.add_argument('palette_filename', action='store',
-                        help='palette PNG image')
     parser.add_argument('tsx_filename', action='store',
                         help='Tiled tsx file')
 
@@ -262,7 +329,7 @@ def main() -> None:
 
         mappings = load_mappings_json(args.mappings_json_file)
 
-        tileset_data = convert_mt_tileset(args.tsx_filename, args.image_filename, args.palette_filename, mappings)
+        tileset_data = convert_mt_tileset(args.tsx_filename, mappings)
 
         with open(args.output, 'wb') as fp:
             fp.write(tileset_data)

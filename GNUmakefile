@@ -71,7 +71,8 @@ endif
 
 
 gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palette.png resources/metatiles/%.tsx resources/mappings.json tools/convert_tileset.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/convert_tileset.py -o '$@' 'resources/mappings.json' 'resources/metatiles/$*-tiles.png' 'resources/metatiles/$*-palette.png' 'resources/metatiles/$*.tsx'
+	$(PYTHON3) tools/convert_tileset.py -o '$@' 'resources/mappings.json' 'resources/metatiles/$*.tsx'
+
 
 gen/interactive-tiles.wiz: resources/mappings.json tools/generate_interactive_tiles_wiz.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate_interactive_tiles_wiz.py -o '$@' 'resources/mappings.json'

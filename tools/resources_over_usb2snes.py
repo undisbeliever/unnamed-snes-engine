@@ -280,10 +280,8 @@ class Compiler:
 
         try:
             tsx_filename     = f"metatiles/{ name }.tsx"
-            image_filename   = f"metatiles/{ name }-tiles.png"
-            palette_filename = f"metatiles/{ name }-palette.png"
 
-            data = convert_mt_tileset(tsx_filename, image_filename, palette_filename, self.mappings)
+            data = convert_mt_tileset(tsx_filename, self.mappings)
 
             return CompilerOutput(DataType.MT_TILESET, rid, name, data=data)
 
@@ -370,7 +368,7 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
         'ms-export-order.json',
     )
 
-    MT_TILESET_REGEX     : Final = re.compile(r'^metatiles/(\w+)(\.tsx|-tiles\.png|palette\.png)$')
+    MT_TILESET_REGEX     : Final = re.compile(r'^metatiles/(\w+)(\.tsx|-.+)$')
     MS_SPRITESHEET_REGEX : Final = re.compile(r'^metasprites/(\w+)/')
 
 
