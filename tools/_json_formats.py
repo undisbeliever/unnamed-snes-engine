@@ -869,7 +869,7 @@ def load_metasprites_string(text : str) -> MsSpritesheet:
 
 
 #
-# resources.json
+# other-resources.json
 #
 
 class TilesInput(NamedTuple):
@@ -878,12 +878,12 @@ class TilesInput(NamedTuple):
     source  : Filename
 
 
-class ResourcesJson(NamedTuple):
+class OtherResources(NamedTuple):
     tiles   : dict[Name, TilesInput]
 
 
 
-def load_resources_json(filename : Filename) -> ResourcesJson:
+def load_other_resources_json(filename : Filename) -> OtherResources:
     jh = _load_json_file(filename, _Helper)
 
     dirname = os.path.dirname(filename)
@@ -895,7 +895,7 @@ def load_resources_json(filename : Filename) -> ResourcesJson:
                 source = os.path.join(dirname, t.get_filename('source')),
     ))
 
-    return ResourcesJson(
+    return OtherResources(
             tiles = tiles,
     )
 

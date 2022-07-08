@@ -52,11 +52,11 @@ from _ansi_color import AnsiColors
 from convert_tileset import convert_mt_tileset
 from convert_metasprite import convert_spritesheet, generate_pattern_grids, PatternGrid, MsFsEntry, build_ms_fs_data
 from convert_rooms import get_list_of_tmx_files, extract_room_id, compile_room
-from convert_resources import convert_tiles
+from convert_other_resources import convert_tiles
 from insert_resources import read_binary_file, read_symbols_file, validate_sfc_file, ROM_HEADER_V3_ADDR
 
-from _json_formats import load_mappings_json, load_entities_json, load_ms_export_order_json, load_resources_json, load_metasprites_json, \
-                          Name, Filename, JsonError, MemoryMap, Mappings, EntitiesJson, MsExportOrder, ResourcesJson
+from _json_formats import load_mappings_json, load_entities_json, load_ms_export_order_json, load_other_resources_json, load_metasprites_json, \
+                          Name, Filename, JsonError, MemoryMap, Mappings, EntitiesJson, MsExportOrder, OtherResources
 
 from _common import MultilineError, ResourceType, MS_FS_DATA_BANK_OFFSET, USB2SNES_DATA_BANK_OFFSET, USE_RESOURCES_OVER_USB2SNES_LABEL
 
@@ -269,7 +269,7 @@ class Compiler:
         # Fixed input
         self.mappings         : Final[Mappings]          = load_mappings_json('mappings.json')
         self.entities         : Final[EntitiesJson]      = load_entities_json('entities.json')
-        self.resources        : Final[ResourcesJson]     = load_resources_json('resources.json')
+        self.other_resources  : Final[OtherResources]    = load_other_resources_json('other-resources.json')
         self.ms_export_orders : Final[MsExportOrder]     = load_ms_export_order_json('ms-export-order.json')
         self.ms_pattern_grids : Final[list[PatternGrid]] = generate_pattern_grids(self.ms_export_orders)
         self.symbols          : Final[dict[str, int]]    = read_symbols_file(sym_filename)
@@ -310,7 +310,7 @@ class Compiler:
         name = self.mappings.tiles[rid]
 
         try:
-            t = self.resources.tiles[name]
+            t = self.other_resources.tiles[name]
 
             data = convert_tiles(t)
 
@@ -364,7 +364,7 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
     FILES_THAT_CANNOT_CHANGE : Final[tuple[str, ...]] = (
         'mappings.json',
         'entities.json',
-        'resources.json',
+        'other-resources.json',
         'ms-export-order.json',
     )
 
@@ -438,7 +438,7 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
 
 
     def _search_through_tiles(self, filename : Filename) -> Optional[str]:
-        for name, t in self.compiler.resources.tiles.items():
+        for name, t in self.compiler.other_resources.tiles.items():
             if filename == t.source:
                 return name
         return None

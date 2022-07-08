@@ -15,7 +15,7 @@ SOURCES	  := $(wildcard src/*.wiz src/*/*.wiz)
 
 RESOURCES_DOT_BIN_SOURCES := $(wildcard resources/*/*8bpp-tiles.png)
 
-RESOURCES  := gen/resources.bin
+RESOURCES  := gen/other-resources.bin
 
 ROOMS_DIR  := resources/rooms
 ROOMS_SRC  := $(wildcard $(ROOMS_DIR)/*.tmx)
@@ -49,8 +49,8 @@ PYTHON3  := python3 -bb
 all: $(BINARY)
 
 
-$(BINARY): $(INTERMEDIATE_BINARY) tools/insert_resources.py tools/convert_metasprite.py tools/convert_resources.py tools/_entity_data.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/insert_resources.py -o $(BINARY) resources/mappings.json resources/entities.json gen/resources.bin $(INTERMEDIATE_BINARY:.sfc=.sym) $(INTERMEDIATE_BINARY)
+$(BINARY): $(INTERMEDIATE_BINARY) tools/insert_resources.py tools/convert_metasprite.py tools/convert_other_resources.py tools/_entity_data.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/insert_resources.py -o $(BINARY) resources/mappings.json resources/entities.json gen/other-resources.bin $(INTERMEDIATE_BINARY:.sfc=.sym) $(INTERMEDIATE_BINARY)
 	cp $(INTERMEDIATE_BINARY:.sfc=.sym) $(BINARY:.sfc=.sym)
 
 
@@ -78,8 +78,8 @@ gen/interactive-tiles.wiz: resources/mappings.json tools/generate_interactive_ti
 	$(PYTHON3) tools/generate_interactive_tiles_wiz.py -o '$@' 'resources/mappings.json'
 
 
-gen/resources.bin: resources/resources.json resources/mappings.json tools/convert_resources.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/convert_resources.py -o '$@' 'resources/mappings.json' 'resources/resources.json'
+gen/other-resources.bin: resources/other-resources.json resources/mappings.json tools/convert_other_resources.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/convert_other_resources.py -o '$@' 'resources/mappings.json' 'resources/other-resources.json'
 
 gen/rooms.bin: $(ROOMS_DIR) resources/mappings.json resources/entities.json tools/convert_rooms.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/convert_rooms.py -o '$@' 'resources/mappings.json' 'resources/entities.json' '$(ROOMS_DIR)'

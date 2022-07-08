@@ -10,40 +10,39 @@ import argparse
 from collections import OrderedDict
 from typing import Any, Callable, Iterable, NamedTuple, Optional
 
-import _json_formats
 from _common import print_error
 
 from _snes import extract_tiles_from_paletted_image, convert_mode7_tileset, convert_snes_tileset, \
                   SmallTileData
 
-from _json_formats import load_mappings_json, load_resources_json, \
-                          Name, Filename
+from _json_formats import load_mappings_json, load_other_resources_json, \
+                          Name, Filename, Mappings, TilesInput, OtherResources
 
 
 # ::TODO add images::
 # ::TODO add palettes::
 
 
-# ResourceData
-# ============
+# OtherResourcesData
+# ==================
 
 class ResourceEntry(NamedTuple):
     name : Name
     data : bytes
 
 
-class ResourceData(NamedTuple):
+class OtherResourcesData(NamedTuple):
     tiles : list[ResourceEntry]
 
 
 
 # Change the header and footer when the data format changes
-RESOURCES_DATA_FILE_HEADER = b'G9Ww60-ResourceDataFile-y5JWpM'
-RESOURCES_DATA_FILE_FOOTER = b'6eMLlE-END-6QuVUa'
+OTHER_RESOURCES_DATA_FILE_HEADER = b'G9Ww60-ResourceDataFile-y5JWpM'
+OTHER_RESOURCES_DATA_FILE_FOOTER = b'6eMLlE-END-6QuVUa'
 
 
-def save_resource_data_to_file(filename : Filename, resource_data : ResourceData) -> None:
-    assert isinstance(resource_data, ResourceData)
+def save_other_resources_data_to_file(filename : Filename, data : OtherResourcesData) -> None:
+    assert isinstance(data, OtherResourcesData)
 
     with open(filename, 'wb') as fp:
         def write_int(i : int) -> None:
@@ -64,9 +63,9 @@ def save_resource_data_to_file(filename : Filename, resource_data : ResourceData
             assert isinstance(s, str)
             write_data(s.encode('utf-8'))
 
-        fp.write(RESOURCES_DATA_FILE_HEADER)
+        fp.write(OTHER_RESOURCES_DATA_FILE_HEADER)
 
-        for re_list in resource_data:
+        for re_list in data:
             assert isinstance(re_list, list)
 
             write_int(len(re_list))
@@ -77,11 +76,11 @@ def save_resource_data_to_file(filename : Filename, resource_data : ResourceData
                 write_string(e.name)
                 write_data(e.data)
 
-        fp.write(RESOURCES_DATA_FILE_FOOTER)
+        fp.write(OTHER_RESOURCES_DATA_FILE_FOOTER)
 
 
 
-def load_resource_data_from_file(filename : Filename) -> ResourceData:
+def load_other_resources_data_from_file(filename : Filename) -> OtherResourcesData:
     out : list[list[ResourceEntry]] = list()
 
     with open(filename, 'rb') as fp:
@@ -98,14 +97,14 @@ def load_resource_data_from_file(filename : Filename) -> ResourceData:
         def read_and_confirm_fixed_value(expected : bytes) -> None:
             d = fp.read(len(expected))
             if d != expected:
-                raise RuntimeError('Not a valid ResourceData file')
+                raise RuntimeError('Not a valid OtherResourcesData file')
 
 
-        read_and_confirm_fixed_value(RESOURCES_DATA_FILE_HEADER)
+        read_and_confirm_fixed_value(OTHER_RESOURCES_DATA_FILE_HEADER)
 
         out = list()
 
-        for field in ResourceData._fields:
+        for field in OtherResourcesData._fields:
             field_list = list()
             n_elements = read_int()
             for i in range(n_elements):
@@ -117,14 +116,14 @@ def load_resource_data_from_file(filename : Filename) -> ResourceData:
                 field_list.append(ResourceEntry(name=r_name, data=r_data))
             out.append(field_list)
 
-        read_and_confirm_fixed_value(RESOURCES_DATA_FILE_FOOTER)
+        read_and_confirm_fixed_value(OTHER_RESOURCES_DATA_FILE_FOOTER)
 
         if fp.read(1):
             raise RuntimeError('Expected end of file')
 
-    assert len(out) == len(ResourceData._fields)
+    assert len(out) == len(OtherResourcesData._fields)
 
-    return ResourceData(*out)
+    return OtherResourcesData(*out)
 
 
 
@@ -144,7 +143,7 @@ TILE_FORMATS : dict[str, Callable[[Iterable[SmallTileData]], bytes]] = {
 }
 
 
-def convert_tiles(t : _json_formats.TilesInput) -> bytes:
+def convert_tiles(t : TilesInput) -> bytes:
     tile_converter = TILE_FORMATS[t.format]
 
     with PIL.Image.open(t.source) as image:
@@ -185,13 +184,13 @@ def compile_list(typename : Name, mapping : list[Name], inputs : dict[str, Any],
 
 
 
-def build_resources(mapping : _json_formats.Mappings, resources : _json_formats.ResourcesJson) -> Optional[ResourceData]:
-    tiles = compile_list('tiles', mapping.tiles, resources.tiles, convert_tiles)
+def build_other_resources(mapping : Mappings, other_resources : OtherResources) -> Optional[OtherResourcesData]:
+    tiles = compile_list('tiles', mapping.tiles, other_resources.tiles, convert_tiles)
 
     if tiles is None:
         return None
 
-    return ResourceData(
+    return OtherResourcesData(
             tiles = tiles
     )
 
@@ -203,8 +202,8 @@ def parse_arguments() -> argparse.Namespace:
                         help='output file')
     parser.add_argument('mapping_filename', action='store',
                         help='mapping json file input')
-    parser.add_argument('resources_json_file', action='store',
-                        help='resources JSON file input')
+    parser.add_argument('other_resources_json_file', action='store',
+                        help='other resources JSON file input')
 
     args = parser.parse_args()
 
@@ -216,14 +215,14 @@ def main() -> None:
     args = parse_arguments()
 
     mapping = load_mappings_json(args.mapping_filename)
-    resources = load_resources_json(args.resources_json_file)
+    other_resources = load_other_resources_json(args.other_resources_json_file)
 
-    resource_data = build_resources(mapping, resources)
+    data = build_other_resources(mapping, other_resources)
 
-    if not resource_data:
-        sys.exit('Error compiling resources')
+    if not data:
+        sys.exit('Error compiling other resources')
 
-    save_resource_data_to_file(args.output, resource_data)
+    save_other_resources_data_to_file(args.output, data)
 
 
 
