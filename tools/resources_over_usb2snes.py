@@ -49,7 +49,7 @@ from typing import cast, Any, Callable, Final, NamedTuple, Optional, Union
 
 from _ansi_color import AnsiColors
 
-from convert_tileset import convert_mt_tileset
+from convert_mt_tileset import convert_mt_tileset
 from convert_metasprite import convert_spritesheet, generate_pattern_grids, PatternGrid, MsFsEntry, build_ms_fs_data
 from convert_rooms import get_list_of_tmx_files, extract_room_id, compile_room
 from convert_other_resources import convert_tiles
