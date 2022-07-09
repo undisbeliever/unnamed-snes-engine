@@ -220,11 +220,11 @@ class _Helper:
                 self._raise_error(f"Expected hex string: { v }", key)
 
 
-    def get_bool(self, key : str) -> bool:
+    def get_bool(self, key : str, default : bool) -> bool:
         v = self._optional_get(key, bool)
 
         if v is None:
-            return False
+            return default
         return v
 
 
@@ -780,7 +780,7 @@ def __read_ms_animation(a : _Ms_Helper, name : Name) -> MsAnimation:
 
     return MsAnimation(
             name = name,
-            loop = a.get_bool('loop'),
+            loop = a.get_bool('loop', True),
             delay_type = a.get_name('delay-type'),
             fixed_delay = fixed_delay,
             frames = frames,
