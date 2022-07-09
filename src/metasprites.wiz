@@ -935,6 +935,7 @@ inline func stop_entity_animation(entityId : u8 in y) {
 inline func is_entity_animation_over(entityId : u8 in y) : bool in zero {
     // assumes DISABLED_FUNCTION_ID == 0
 
+    // ::TODO return true if current animation is a looping animation (to prevent infinite loops)::
     a = entities.SoA.msAnimationProcessFunctionIndex[unaligned y];
     return zero;
 }
@@ -953,6 +954,7 @@ inline func is_entity_animation_over(entityId : u8 in y) : bool in zero {
 inline func is_player_animation_over() : bool in zero {
     // assumes DISABLED_FUNCTION_ID == 0
 
+    // ::TODO return true if current animation is a looping animation (to prevent infinite loops)::
     a = entities.SoA.msAnimationProcessFunctionIndex[PLAYER_ENTITY_ID];
     return zero;
 }

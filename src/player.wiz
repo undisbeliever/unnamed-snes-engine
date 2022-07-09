@@ -118,6 +118,15 @@ enum State : u8 {
 
 
 
+// Maximum number of frames for various states
+// (used by the `watchdogTimer`)
+namespace Watchdog {
+    let MAX_ATTACK_FRAMES = 20;
+    let MAX_HURT_STATE_FRAMES = 30;
+}
+
+
+
 in zeropage {
     // The player's hurtbox
     var playerHurtbox : entities.U8Aabb;
@@ -164,6 +173,10 @@ var visionB                 : u8 in entities.SoA.visionB[0];
 
 var state                   : u8 in entities.SoA.state_0_l[0];
 var facingDirection         : u8 in entities.SoA.state_0_h[0];
+
+
+// Decremented once every frame.  If negative, player's state is reset.
+var watchdogTimer           : u8 in entities.SoA.state_1_l[0];
 
 }
 
@@ -227,6 +240,22 @@ inline func init() {
 // DB = 0x7e
 #[mem8, idx8]
 inline func process() {
+
+    // Decrement watchdog timer.
+    //
+    // This fixes a hard-lock that can occur when a state is waiting for a MetaSprite animation to
+    // end and the current animation loops (and thus never ends).
+    watchdogTimer--;
+    if negative {
+        a = state;
+        if a == State.ATTACKING_IN_DOORWAY as u8 {
+            set_state__walk_through_doorway__after_attacking_in_doorway();
+        }
+        else {
+            set_state__walking();
+        }
+    }
+
 
     x = state as u8;
     process__state_functions[unaligned x]();
@@ -770,6 +799,9 @@ func increment_y_velocity() {
 #[mem8, idx8]
 func set_state__walking() {
     state = State.WALKING as u8;
+
+    // No watchdog in WALKING state.
+    watchdogTimer = a = 1;
 }
 
 
@@ -777,6 +809,9 @@ func set_state__walking() {
 // DB = 0x7e
 #[mem8, idx8]
 func process__walking() {
+    // Watchdog is not required when walking.  This state can last forever
+    watchdogTimer = a = 1;
+
     process_dpad_update_velocity();
 
     move_player_with_tile_tests();
@@ -801,6 +836,8 @@ func process__walking() {
 #[mem8, idx8]
 func set_state__attacking() {
     state = a = State.ATTACKING as u8;
+
+    watchdogTimer = a = Watchdog.MAX_ATTACK_FRAMES;
 
     // Stand still while attacking
     <:xVelocity = 0;
@@ -846,6 +883,8 @@ inline func set_state_hurt__enemy_collision__inline(enemyEntityId : u8 in y) {
 #[mem8, idx8]
 func _set_state__hurt__enemy_collision(enemyEntityId : u8 in y) {
     state = a = State.HURT as u8;
+
+    watchdogTimer = a = Watchdog.MAX_HURT_STATE_FRAMES;
 
     x = calc_angle_32x2(a = entities.SoA.previousXpos[unaligned y],
                         a = entities.SoA.previousYpos[unaligned y],
@@ -914,6 +953,10 @@ inline func set_state__walk_through_doorway__inline(direction : metatiles.Collis
     walkThroughDoorway_altAxisTarget = altAxisTarget;
 
     state = a = State.WALK_THROUGH_DOORWAY as u8;
+
+    // no watchdog when walking
+    // a is non-zero
+    watchdogTimer = a;
 }
 
 
@@ -925,6 +968,10 @@ inline func set_state__walk_through_doorway__inline(direction : metatiles.Collis
 inline func set_state__walk_through_doorway__after_attacking_in_doorway() {
     state = a = State.WALK_THROUGH_DOORWAY as u8;
 
+    // no watchdog when walking
+    // a is non-zero
+    watchdogTimer = a;
+
     // ASSUMES WALKING_MS_ANIMATION_OFFSET == 0
     _set_ms_animation(facingDirection);
 }
@@ -934,6 +981,9 @@ inline func set_state__walk_through_doorway__after_attacking_in_doorway() {
 // DB = 0x7e
 #[mem8, idx8]
 func process__walk_through_doorway() {
+    // Watchdog is not required when walking.  This state can last forever
+    watchdogTimer = a = 1;
+
 
 var _mainAxisOffset : u8 in zpTmp_byte_0;
 
@@ -1150,6 +1200,9 @@ var _mainAxisOffset : u8 in zpTmp_byte_0;
 #[mem8, idx8]
 func set_state__attacking_in_doorway() {
     state = a = State.ATTACKING_IN_DOORWAY as u8;
+
+    watchdogTimer = a = Watchdog.MAX_ATTACK_FRAMES;
+
 
     // Player moves forward a bit when attacking.
     //
