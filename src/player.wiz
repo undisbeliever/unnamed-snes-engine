@@ -160,8 +160,6 @@ var tileHitbox_halfHeight   : u8 in entities.SoA.tileHitbox_halfHeight[0];
 
 var shadowSize              : metasprites.ShadowSize in entities.SoA.shadowSize[0];
 
-var metaSpriteFrameTable    : u16 in entities.SoA.metaSpriteFrameTable[0];
-
 var movementState           : u8 in entities.SoA.movementState[0];
 var iframeCounter           : u8 in entities.SoA.iframeCounter[0];
 
@@ -217,6 +215,11 @@ inline func init() {
     mem8();
 
 
+    // Reset MetaSprite Animation Id
+    entities.SoA.msAnimationId[0] = (WALKING_MS_ANIMATION_OFFSET) | (FacingDirection.DOWN as u8);
+    init_metasprites();
+
+
     facingDirection = a = FacingDirection.DOWN as u8;
 
     a = INITIAL_HEALTH;
@@ -227,6 +230,33 @@ inline func init() {
 
 
     set_state__walking();
+}
+
+
+
+// Initialise the player's MetaSprites.
+//
+// Called on init or when MetaSprite resources have changed.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func init_metasprites() {
+    // ASSUMES: player entityId is 0
+
+    mem16();
+    #[mem16] {
+        // Set player's ms_draw function
+        aa = ms_draw_function as u16;
+        entities.SoA.ms_draw_function[0] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
+
+        entities.SoA.metaSpriteFrameTable[0] = aa = metasprites.MsFsData.frameTable[unaligned MS_FS_DATA_ADDR];
+        entities.SoA.msAnimationTable[0] = aa = metasprites.MsFsData.animationTable[unaligned MS_FS_DATA_ADDR];
+    }
+    mem8();
+
+    metasprites.init_player_metasprite_animation__inline();
+
+    metasprites.init_entity_metasprite_animation__after_init(PLAYER_ENTITY_ID);
 }
 
 

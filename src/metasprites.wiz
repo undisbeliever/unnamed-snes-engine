@@ -767,13 +767,12 @@ inline func _draw_entity__inline(entityId : u8 in y) {
 
 // Initialise the MetaSprite Animation for the player entity.
 //
-// KEEP: Y
+// NOTE: This function does not set the animationId
 //
 // DB = 0x7e
-#[mem16, idx8]
+#[mem8, idx8]
 inline func init_player_metasprite_animation__inline() {
-
-    (&entities.SoA._msAnimationIdAndPfIndex as *u16)[PLAYER_ENTITY_ID] = aa = (animations.NEW_ANIMATION__FUNCTION_ID << 8);
+    entities.SoA.msAnimationProcessFunctionIndex[0] = a = animations.NEW_ANIMATION__FUNCTION_ID;
 }
 
 

@@ -34,24 +34,6 @@ func init() {
         aa = _blank_player_function as u16;
         entities.SoA.process_function[0] = aa as func(u8 in x) : bool in carry;
 
-        // Set player's ms_draw function
-        aa = player.ms_draw_function as u16;
-        entities.SoA.ms_draw_function[0] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
-
-        entities.SoA.metaSpriteFrameTable[0] = aa = metasprites.MsFsData.frameTable[unaligned player.MS_FS_DATA_ADDR];
-        entities.SoA.msAnimationTable[0] = aa = metasprites.MsFsData.animationTable[unaligned player.MS_FS_DATA_ADDR];
-
-        {
-            // ::TODO cleanup player init, this code should not be here::
-
-            metasprites.init_player_metasprite_animation__inline();
-            mem8_idx8();
-            #[mem8, idx8] {
-                metasprites.init_entity_metasprite_animation__after_init(PLAYER_ENTITY_ID);
-            }
-            mem16();
-        }
-
 
         // Set all process_functions to blank (except player)
         aa = _blank_entity_function as u16;

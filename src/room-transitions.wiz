@@ -400,6 +400,11 @@ inline func __setup_ppu_and_reset_graphics_subsystems() {
 // DB = 0x7e
 
 
+    // Reset player animation
+    // (this is required when MetaSprite resources have changed)
+    player.init_metasprites();
+
+
     // Tileset may have changed - Need to repopulate map_tile properties
     metatiles.populate_map_tile_properties();
 
