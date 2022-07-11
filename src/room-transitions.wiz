@@ -105,6 +105,13 @@ in wram7e {
     // (byte)
     var roomToLoad : u8;
 
+    // The location to place the player in a non-scrolling room transition.
+    //
+    // NOTE: This value is unused by the scrolling room transitions.
+    // (u8 position)
+    var fadeIn_playerXpos : u8;
+    var fadeIn_playerYpos : u8;
+
 
     // The past-the-end index of the sprite list.
     //
@@ -154,18 +161,19 @@ in code {
 
 // Load the room into memory, check if the MetaTile tileset has changed and populates the sprite list.
 //
-// `player.xPos.px` and `player.yPos.px` MUST contain the position of the
-// player AFTER the room transition ends and play resumes (the variables might be used by an
-// entity init routine)
+// `playerX` and `playerY` contain the expected position of the player AFTER the room transition
+// ends and play resumes (the new player position might be used by an entity init routine)
 //
 // Returns true if it is OK to preform a scroll transition into the next room without glitches.
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _load_room_and_check_if_ok_to_scroll(roomPosition : u8 in a) : bool in carry {
+func _load_room_and_check_if_ok_to_scroll(roomPosition : u8 in a, playerX : u8 in x, playerY : u8 in y) : bool in carry {
 
 var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u16 - MEMMAP_ROOMSTATE_WRAM7E as u16] : typeof(room.tileset);
 
+    push8(x);
+    push8(y);
     push8(a);
     {
         _reset_camera();
@@ -184,6 +192,15 @@ var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u1
     roomstate.currentRoom = a;
 
     carry = resources.load_room(a);
+    // Set player position after room is loaded.
+    // (safe. plx and ply does not modify carry)
+    y = pop8();
+    player.yPos.px = y;
+    player.yPos.sx = 0;
+    x = pop8();
+    player.xPos.px = x;
+    player.xPos.sx = 0;
+
     if carry {
         metatiles.populate_map_tile_properties();
         gameloop._spawn_room_entities();
@@ -425,8 +442,7 @@ inline func __setup_ppu_and_reset_graphics_subsystems() {
 #[mem8, idx8]
 func load_room__fadein() {
 
-    // ::TODO improve::
-    _load_room_and_check_if_ok_to_scroll(roomToLoad);
+    _load_room_and_check_if_ok_to_scroll(roomToLoad, fadeIn_playerXpos, fadeIn_playerYpos);
 
     return _fadein__room_in_memory();
 }
@@ -482,7 +498,7 @@ func _fadein__room_in_memory() {
 // DB = 0x7e
 #[mem8, idx8]
 func fadeout() {
-    _load_room_and_check_if_ok_to_scroll(roomToLoad);
+    _load_room_and_check_if_ok_to_scroll(roomToLoad, fadeIn_playerXpos, fadeIn_playerYpos);
 
     return _fadeout__room_in_memory();
 }
@@ -535,14 +551,10 @@ func _fadeout__room_in_memory() {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _scrolling_room_transition(roomPosition : u8 in a, _scrollDirection : u8 in x) : bool in carry {
+func _scrolling_room_transition(roomPosition : u8 in a, _scrollDirection : ScrollDirection in scrollDirection,
+                                playerX : u8 in x, playerY : u8 in y) : bool in carry {
 
-    scrollDirection = x as ScrollDirection;
-
-    player.xPos.sx = 0;
-    player.yPos.sx = 0;
-
-    carry = _load_room_and_check_if_ok_to_scroll(a);
+    carry = _load_room_and_check_if_ok_to_scroll(a, x, y);
     if !carry {
         _fadeout__room_in_memory();
         return true;
@@ -664,13 +676,13 @@ func _scrolling_room_transition__rollback(_scrollDirection_ : u8 in a, playerXpo
 // DB = 0x7e
 #[mem8, idx8]
 func scroll_right() {
-
-    player.xPos.px = a = PLAYER_XPOS_AFTER_RIGHT_TRANSITION;
+    a = ScrollDirection.RIGHT as u8;
+    scrollDirection = a as ScrollDirection;
 
     a = roomstate.currentRoom;
     a++;
 
-    carry = _scrolling_room_transition(a, ScrollDirection.RIGHT as u8);
+    carry = _scrolling_room_transition(a, scrollDirection, PLAYER_XPOS_AFTER_RIGHT_TRANSITION, player.yPos.px);
     if !carry {
         // Transition failed, rollback room transition
         return _scrolling_room_transition__rollback(ScrollDirection.ROLLBACK_RIGHT as u8,
@@ -687,13 +699,13 @@ func scroll_right() {
 // DB = 0x7e
 #[mem8, idx8]
 func scroll_left() {
-
-    player.xPos.px = a = PLAYER_XPOS_AFTER_LEFT_TRANSITION;
+    a = ScrollDirection.LEFT as u8;
+    scrollDirection = a as ScrollDirection;
 
     a = roomstate.currentRoom;
     a--;
 
-    carry = _scrolling_room_transition(a, ScrollDirection.LEFT as u8);
+    carry = _scrolling_room_transition(a, scrollDirection, PLAYER_XPOS_AFTER_LEFT_TRANSITION, player.yPos.px);
     if !carry {
         // Transition failed, rollback room transition
         return _scrolling_room_transition__rollback(ScrollDirection.ROLLBACK_LEFT as u8,
@@ -710,10 +722,11 @@ func scroll_left() {
 // DB = 0x7e
 #[mem8, idx8]
 func scroll_down() {
+    a = ScrollDirection.DOWN as u8;
+    scrollDirection = a as ScrollDirection;
 
-    player.yPos.px = a = PLAYER_YPOS_AFTER_DOWN_TRANSITION;
-
-    carry = _scrolling_room_transition(a = roomstate.currentRoom + 0x10, ScrollDirection.DOWN as u8);
+    carry = _scrolling_room_transition(a = roomstate.currentRoom + 0x10, scrollDirection,
+                                       player.xPos.px, PLAYER_YPOS_AFTER_DOWN_TRANSITION);
     if !carry {
         // Transition failed, rollback room transition
         ^return _scrolling_room_transition__rollback(ScrollDirection.UP as u8,
@@ -730,10 +743,11 @@ func scroll_down() {
 // DB = 0x7e
 #[mem8, idx8]
 func scroll_up() {
+    a = ScrollDirection.UP as u8;
+    scrollDirection = a as ScrollDirection;
 
-    player.yPos.px = a = PLAYER_YPOS_AFTER_UP_TRANSITION;
-
-    carry = _scrolling_room_transition(a = roomstate.currentRoom - 0x10, ScrollDirection.UP as u8);
+    carry = _scrolling_room_transition(a = roomstate.currentRoom - 0x10, scrollDirection,
+                                       player.xPos.px, PLAYER_YPOS_AFTER_UP_TRANSITION);
     if !carry {
         // Transition failed, rollback room transition
         ^return _scrolling_room_transition__rollback(ScrollDirection.DOWN as u8,

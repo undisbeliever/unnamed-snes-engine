@@ -37,6 +37,9 @@ inline func init() {
     roomstate.currentRoom = a;
     room_transitions.roomToLoad = a;
 
+    room_transitions.fadeIn_playerXpos = a = DISPLAY_WIDTH / 2;
+    room_transitions.fadeIn_playerYpos = a = DISPLAY_HEIGHT / 2;
+
 
     a = GameModes.LOAD_ROOM_FADEIN as u8;
     gameMode = a as GameModes;
