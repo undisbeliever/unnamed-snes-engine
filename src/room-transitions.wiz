@@ -25,6 +25,15 @@ namespace room_transitions {
 let PLAYER_MAP_TRANSITION_END_POS = 3;
 
 
+// Offset to shift the player, when rolling back a fadeout transition and the player is
+// on the edge of the screen.
+//
+// Prevents an infinite loop.
+// Ensures the player is visible when rolling back transition in the middle of a doorway.
+let FADEOUT_ROLLBACK_OFFSET_X = 8;
+let FADEOUT_ROLLBACK_OFFSET_Y = 4;
+
+
 // Value MUST BE even
 let N_TRANSITION_FRAMES_BEFORE_SOLID_CHECK = 14;
 
@@ -244,15 +253,52 @@ var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u1
 }
 
 
+// Restore the room state from backup, without moving player.
+//
+// ASSUMES: previous room is valid
+// ASSUMES: previous player position is valid
+#[mem8, idx8]
+#[fallthrough]
+func _load_room_from_backup__player_position_unchanged() {
+    var _roomStateBackup__player_xpos_px @ &roomStateBackup_wram7e[&player.xPos.px as u16 - MEMMAP_ROOMSTATE_WRAM7E as u16] : typeof(player.xPos.px);
+    var _roomStateBackup__player_ypos_px @ &roomStateBackup_wram7e[&player.yPos.px as u16 - MEMMAP_ROOMSTATE_WRAM7E as u16] : typeof(player.yPos.px);
+
+    x = _roomStateBackup__player_xpos_px;
+    y = _roomStateBackup__player_ypos_px;
+
+
+    // Move the player away from the edge to prevent an infinite loop
+    if x < FADEOUT_ROLLBACK_OFFSET_X {
+        x = FADEOUT_ROLLBACK_OFFSET_X;
+    }
+    else if x >= DISPLAY_HEIGHT - FADEOUT_ROLLBACK_OFFSET_X {
+        x = DISPLAY_HEIGHT - FADEOUT_ROLLBACK_OFFSET_X;
+    }
+
+    if y < FADEOUT_ROLLBACK_OFFSET_Y {
+        y = FADEOUT_ROLLBACK_OFFSET_Y;
+    }
+    else if y >= DISPLAY_HEIGHT - FADEOUT_ROLLBACK_OFFSET_Y {
+        y = DISPLAY_HEIGHT - FADEOUT_ROLLBACK_OFFSET_Y;
+    }
+
+// Fallthrough
+}
+
+
 
 // Restore the room state from backup, move the player to a specific location and populate the sprite list.
 //
 // ASSUMES: previous room is valid
-// ASSUMES: player position is value (not stuck inside a solid tile)
+// ASSUMES: player position is valid (not stuck inside a solid tile)
 //
 // DB = 0x7e
 #[mem8, idx8]
 func _load_room_from_backup(playerXpos : u8 in x, playerYpos : u8 in y) {
+
+    // ::TODO test for an infinite rollback loop::
+    // ::TODO What should I do when there is an infinite rollback loop? ::
+
 
     push8(x);
     push8(y);
@@ -442,6 +488,8 @@ inline func __setup_ppu_and_reset_graphics_subsystems() {
 #[mem8, idx8]
 func load_room__fadein() {
 
+    // ::TODO how do I handle a fadein to a missing room?::
+
     _load_room_and_check_if_ok_to_scroll(roomToLoad, fadeIn_playerXpos, fadeIn_playerYpos);
 
     return _fadein__room_in_memory();
@@ -477,14 +525,15 @@ func _fadein__room_in_memory() {
     }
 
 
-    // ::TODO how do I handle a fadein to an invalid room::
+    carry = _test_player_position_is_valid();
+    if !carry {
+        // Player is in an invalid position.
+        wait_one_second();
 
+        _load_room_from_backup__player_position_unchanged();
 
-    // ::TODO check if player is on a non-solid tile::
-    // ::: must be done AFTER tileset is loaded into memory::
-    // ::: ::
-    // ::: How do I handle this case? ::
-
+        ^return _fadein__room_in_memory();
+    }
 
     gameMode = GameModes.RUN_GAME;
 }
@@ -608,18 +657,12 @@ func _scrolling_room_transition__loop() : bool in carry {
 
         countdownToSolidCheck--;
         if zero {
-            negative = metatiles.test_if_player_touches_a_solid_tile();
-            if negative {
-                // Tile is solid
+            carry = _test_player_position_is_valid();
+            if !carry {
+                // Tile is solid - cannot place player here
+                wait_one_second();
 
-                // Check if it is a doorway tile
-                zero = metatiles.test_if_player_touches_a_doorway_tile();
-                if !zero {
-                    // Tile is solid - cannot place player here
-                    wait_one_second();
-
-                    return false;
-                }
+                return false;
             }
         }
 
@@ -632,6 +675,29 @@ func _scrolling_room_transition__loop() : bool in carry {
 
     gameMode = GameModes.RUN_GAME;
 
+    return true;
+}
+
+
+
+// Test if the player is in a valid location.
+//
+// Used to determine if the room transition should be rolled back.
+//
+// DB = 0x7e
+func _test_player_position_is_valid() : bool in carry {
+    negative = metatiles.test_if_player_touches_a_solid_tile();
+    if negative {
+        // Tile is solid
+
+        // Check if it is a doorway tile
+        zero = metatiles.test_if_player_touches_a_doorway_tile();
+        if !zero {
+            return false;
+        }
+    }
+
+    // Tile is not solid, return true
     return true;
 }
 
