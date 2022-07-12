@@ -958,10 +958,10 @@ class ResourcesOverUsb2Snes:
             await self.usb2snes.write_to_offset(self.response_data_offset, data)
 
         r = bytearray(RESPONSE_SIZE)
-        r[0] = response_id
-        r[1] = status.value
-        r[2] = data_size & 0xff
-        r[3] = data_size >> 8
+        r[0] = data_size & 0xff
+        r[1] = data_size >> 8
+        r[2] = status.value
+        r[3] = response_id
 
         await self.usb2snes.write_to_offset(self.response_offset, r)
 

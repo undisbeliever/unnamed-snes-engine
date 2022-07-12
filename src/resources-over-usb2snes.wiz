@@ -38,7 +38,7 @@ enum SpecialRequestType : u8 {
 //
 // `resources_over_usb2snes.py` will repeatedly read the request bytes and will process it if:
 //    * `request_type` is `SpecialRequestType.init`, or
-//    * `response_id` has changed
+//    * `request_id` has changed
 //
 // Requests with a `request_id` of 0 are ignored.
 //
@@ -85,13 +85,15 @@ enum ResponseStatus : u8 {
 // If data was requested, then the response data will be stored in `response_data` before the
 // `Response` struct is written.
 //
-// The system should wait until the `resource_id` and `status` bytes match the expected value
+// The system should wait until the `response_id` and `status` bytes match the expected value
 // before reading `response_data`.
 //
+// `response_id` is last field in this struct as the `response_id` byte should be written last.
+//
 struct Response {
-    response_id  : u8,
-    status       : ResponseStatus,
     data_size    : u16,
+    status       : ResponseStatus,
+    response_id  : u8,
 };
 
 
@@ -107,20 +109,20 @@ in wram7e {
 
 in rodata0 {
     const response = Response{
-        response_id = 0,
+        data_size   = 0,
         status      = ResponseStatus.NOT_CONNECTED,
-        data_size   = 0
+        response_id = 0,
     };
 
     // Annoying hack to get wiz to read response with long addressing
     let __far_response_u8  = far&response as far *const u8;
     let __far_response_u16 = far&response as far *const u16;
 
-    let _RESPONSE_u8_ID        = offsetof(Response, response_id);
     let _RESPONSE_u8_STATUS    = offsetof(Response, status);
+    let _RESPONSE_u8_ID        = offsetof(Response, response_id);
 
-    let _RESPONSE_u16_ID_AND_STATUS = offsetof(Response, response_id);
     let _RESPONSE_u16_DATA_SIZE     = offsetof(Response, data_size);
+    let _RESPONSE_u16_STATUS_AND_ID = offsetof(Response, status);
 }
 
 
@@ -191,9 +193,9 @@ func __send_init_request_and_wait_for_response() {
     // Wait until the response_id matches request_id and response status is INIT_OK
     mem16();
     #[mem16] {
-        aa = (INIT_REQUEST.request_id as u16) | (ResponseStatus.INIT_OK as u16 << 8);
+        aa = (INIT_REQUEST.request_id as u16 << 8) | (ResponseStatus.INIT_OK as u16);
         do {
-        } while aa != __far_response_u16[_RESPONSE_u16_ID_AND_STATUS];
+        } while aa != __far_response_u16[unaligned _RESPONSE_u16_STATUS_AND_ID];
     }
     mem8();
 
@@ -306,9 +308,10 @@ var _res : resources.ResourceEntry in resources.res;
     #[mem16, idx16] {
         // Wait until the response_id matches request_id and response status is OK
         // a = request_id
-        aa = (aa & 0xff) | (ResponseStatus.OK as u16 << 8);
+        swap_bytes(aa);
+        aa = (aa & 0xff00) | (ResponseStatus.OK as u16);
         do {
-        } while aa != __far_response_u16[_RESPONSE_u16_ID_AND_STATUS];
+        } while aa != __far_response_u16[unaligned _RESPONSE_u16_STATUS_AND_ID];
 
 
         _res.size = aa = __far_response_u16[unaligned _RESPONSE_u16_DATA_SIZE];
