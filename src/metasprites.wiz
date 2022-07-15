@@ -121,17 +121,16 @@ namespace AnimationDataFormat {
     let _base = resources.MS_FS_DATA_BANK << 16;
 
 
-    // Animation delay format.  First byte of an animation.
-    // (index into `metasprites.animations.AnimationDelayTypeFunctions`)
-    let delayType  = (_base + 0) as far *u8;
+    // Animation process function index.  First byte of an animation.
+    // (index into `metasprites.animations.AnimationProcessFunctions`)
+    let processFunction  = (_base + 0) as far *u8;
 
 
     // Each animation frame is two bytes in size.
 
         // MetaSprite FrameId to show.
         //
-        // If this value is `END_OF_LOOPING_ANIMATION_BYTE` or `END_OF_ANIMATION_BYTE`
-        // then the animation is over and there is no `delay` byte
+        // If this value is `END_OF_ANIMATION_BYTE` then the animation is over and there is no `delay` byte
         //
         // (element position in MsFramesetFormat.frameTable)
         let frame       = (_base + 1) as far *u8;
@@ -145,11 +144,8 @@ namespace AnimationDataFormat {
         let delay       = (_base + 2) as far *u8;
 
 
-    // After the last frame, the Animation Data ends in one of these two bytes.
-    //
-    // If frame is one of these values, then the animation is over.
-    let END_OF_LOOPING_ANIMATION_BYTE = 0xff;
-    let END_OF_ANIMATION_BYTE = 0xfe;
+    // After the last frame, the Animation Data ends with a 0xff byte
+    let END_OF_ANIMATION_BYTE = 0xff;
 
 
     // The shift between a 4.4 unsigned fixed point animation delay byte and a 8:8 unsigned fixed point distance
@@ -978,15 +974,27 @@ inline func process_entity_animation(entityId : u8 in y) {
 namespace animations {
 
 
-// Order MUST match `ANIMATION_DELAY_IDS` in `tools/convert-metasprite.py`
+// Order MUST match `LOOPING_ANIMATION_DELAY_IDS` and `NON_LOOPING_ANIMATION_DELAY_IDS` in `tools/convert-metasprite.py`
 const AnimationProcessFunctions = [
     disabled,
-    frame_count,
-    distance_x,
-    distance_y,
-    distance_xy,
+
+    // Looping process functions
+    frame_count__looping,
+    distance_x__looping,
+    distance_y__looping,
+    distance_xy__looping,
+
+    // Non looping process functions
+    frame_count__once,
+    distance_x__once,
+    distance_y__once,
+    distance_xy__once,
 
     // Unused delay types
+    disabled,
+    disabled,
+    disabled,
+    disabled,
     disabled,
     disabled,
     disabled,
@@ -995,14 +1003,16 @@ const AnimationProcessFunctions = [
     _new_animation,
 ];
 
-let DELAY_TYPE_MASK = 0b00001110;
+let DELAY_TYPE_MASK = 0b00011110;
 
-let FRAME_COUNT__FUNCTION_ID = 2;
+let FRAME_COUNT__LOOPING__FUNCTION_ID = 1 * 2;
+let FRAME_COUNT__ONCE__FUNCTION_ID = 5 * 2;
 
 let DISABLED_FUNCTION_ID = 0;
 let NEW_ANIMATION__FUNCTION_ID = DELAY_TYPE_MASK + 2;
 
 let entities_SoA_msAnimationCounter_u8 = &<:entities.SoA.msAnimationCounter[0] as *u8;
+
 
 
 // Animation Process Routine: Start a new animation.
@@ -1038,9 +1048,9 @@ func _new_animation(entityId : u8 in y) {
         #[mem8] {
             xx = entities.SoA.msAnimationAddr[unaligned yy];
 
-            entities.SoA.msAnimationProcessFunctionIndex[unaligned yy] = a = AnimationDataFormat.delayType[xx] & DELAY_TYPE_MASK;
+            entities.SoA.msAnimationProcessFunctionIndex[unaligned yy] = a = AnimationDataFormat.processFunction[xx] & DELAY_TYPE_MASK;
 
-            if a == FRAME_COUNT__FUNCTION_ID {
+            if a == FRAME_COUNT__LOOPING__FUNCTION_ID || a == FRAME_COUNT__ONCE__FUNCTION_ID {
                 entities_SoA_msAnimationCounter_u8[unaligned yy] = a = AnimationDataFormat.delay[xx];
             }
             else {
@@ -1069,17 +1079,18 @@ func disabled(entityId : u8 in y) {
 
 
 
-// Animation Process Routine:  Delay byte measures display frames.
+// Looping Animation Process Routine:  Delay byte measures display frames.
 //
 // KEEP: Y
 //
 // DB = 0x7e
 #[mem8, idx8]
-func frame_count(entityId : u8 in y) {
+func frame_count__looping(entityId : u8 in y) {
 
     a = entities_SoA_msAnimationCounter_u8[unaligned y];
     if zero {
-        // NOTE: If you modify this code, you MUST ALSO modify `__distance_animation__return_mem8_idx8()`
+        // NOTE: If you modify this code, you MUST ALSO modify `frame_count__once()`
+        // NOTE: If you modify this code, you MUST ALSO modify `__distance_animation__looping__return_mem8_idx8()`
 
         // Advance to the next MetaSprite frame
         idx16();
@@ -1089,18 +1100,9 @@ func frame_count(entityId : u8 in y) {
             xx++;
 
             a = AnimationDataFormat.frame[xx];
-            if a == AnimationDataFormat.END_OF_LOOPING_ANIMATION_BYTE {
+            if a == AnimationDataFormat.END_OF_ANIMATION_BYTE {
                 // Restart MetaSprite animation
                 xx = entities.SoA.msAnimationAddr[unaligned yy];
-            }
-            else if a == AnimationDataFormat.END_OF_ANIMATION_BYTE {
-                // Disable MetaSprite animation and return
-                mem8_idx8();
-                #[mem8, idx8] {
-                    x = y;
-                    entities.SoA.msAnimationProcessFunctionIndex[unaligned x] = DISABLED_FUNCTION_ID;
-                    return;
-                }
             }
 
             mem16();
@@ -1129,13 +1131,13 @@ func frame_count(entityId : u8 in y) {
 
 
 
-// Animation Process Routine:  Delay byte measures distance in the X-Axis.
+// Looping Animation Process Routine:  Delay byte measures distance in the X-Axis.
 //
 // KEEP: Y
 //
 // DB = 0x7e
 #[mem8, idx8]
-func distance_x(entityId : u8 in y) {
+func distance_x__looping(entityId : u8 in y) {
     mem16();
     #[mem16] {
         aa = entities.SoA.xVelocity[unaligned y];
@@ -1144,7 +1146,7 @@ func distance_x(entityId : u8 in y) {
                 aa = negate16(aa);
             }
 
-            return __distance_animation__return_mem8_idx8(aa as i16, y);
+            return __distance_animation__looping__return_mem8_idx8(aa as i16, y);
         }
     }
     mem8_idx8();
@@ -1152,13 +1154,13 @@ func distance_x(entityId : u8 in y) {
 
 
 
-// Animation Process Routine:  Delay byte measures distance in the Y-Axis.
+// Looping Animation Process Routine:  Delay byte measures distance in the Y-Axis.
 //
 // KEEP: Y
 //
 // DB = 0x7e
 #[mem8, idx8]
-func distance_y(entityId : u8 in y) {
+func distance_y__looping(entityId : u8 in y) {
     mem16();
     #[mem16] {
         aa = entities.SoA.yVelocity[unaligned y];
@@ -1167,7 +1169,7 @@ func distance_y(entityId : u8 in y) {
                 aa = negate16(aa);
             }
 
-            return __distance_animation__return_mem8_idx8(aa as i16, y);
+            return __distance_animation__looping__return_mem8_idx8(aa as i16, y);
         }
     }
     mem8_idx8();
@@ -1175,13 +1177,13 @@ func distance_y(entityId : u8 in y) {
 
 
 
-// Animation Process Routine:  Delay byte measures distance in the both X and Y Axises.
+// Looping Animation Process Routine:  Delay byte measures distance in the both X and Y Axises.
 //
 // KEEP: Y
 //
 // DB = 0x7e
 #[mem8, idx8]
-func distance_xy(entityId : u8 in y) {
+func distance_xy__looping(entityId : u8 in y) {
 var _tmp : u16 in zpTmp_word_0;
 
     mem16();
@@ -1198,14 +1200,14 @@ var _tmp : u16 in zpTmp_word_0;
         }
         aa += _tmp;
 
-        return __distance_animation__return_mem8_idx8(aa as i16, y) if !zero;
+        return __distance_animation__looping__return_mem8_idx8(aa as i16, y) if !zero;
     }
     mem8_idx8();
 }
 
 
 
-// Process a MetaSprite animation with a distance delay variable.
+// Process a looping MetaSprite animation with a distance delay variable.
 //
 // ASSUMES: negativeVelocity is negative and non-zero.
 //
@@ -1215,10 +1217,11 @@ var _tmp : u16 in zpTmp_word_0;
 //
 // DB = 0x7e
 #[mem16, idx8]
-func __distance_animation__return_mem8_idx8(negativeVelocity : i16 in aa, entityId : u8 in y) {
+func __distance_animation__looping__return_mem8_idx8(negativeVelocity : i16 in aa, entityId : u8 in y) {
     aa += entities.SoA.msAnimationCounter[unaligned y];
     if !carry {
-        // NOTE: If you modify this code, you MUST ALSO modify `frame_count()`
+        // NOTE: If you modify this code, you MUST ALSO modify `__distance_animation__once__return_mem8_idx8()`
+        // NOTE: If you modify this code, you MUST ALSO modify `frame_count__looping()`
 
         // Advance to the next MetaSprite frame
         idx16();
@@ -1230,19 +1233,211 @@ func __distance_animation__return_mem8_idx8(negativeVelocity : i16 in aa, entity
             mem8();
             #[mem8] {
                 a = AnimationDataFormat.frame[unaligned xx];
-                if a == AnimationDataFormat.END_OF_LOOPING_ANIMATION_BYTE {
+                if a == AnimationDataFormat.END_OF_ANIMATION_BYTE {
                     // Restart MetaSprite animation
                     xx = entities.SoA.msAnimationAddr[unaligned yy];
                 }
-                else if a == AnimationDataFormat.END_OF_ANIMATION_BYTE {
-                    // Disable MetaSprite animation and return
-                    mem8_idx8();
-                    #[mem8, idx8] {
-                        x = y;
-                        entities.SoA.msAnimationProcessFunctionIndex[unaligned x] = DISABLED_FUNCTION_ID;
-                        return;
-                    }
-                }
+            }
+
+            mem16();
+            #[mem16] {
+                entities.SoA.msAnimationPos[unaligned yy] = aa = xx;
+
+                // Delay must be processed first as calculating `msFrameAddr` clobbers xx.
+                aa = (AnimationDataFormat.delay as far *u16)[unaligned xx];
+                aa = (aa & 0xff) <<< AnimationDataFormat.DISTANCE_DELAY_SHIFT;
+                entities.SoA.msAnimationCounter[unaligned yy] = aa;
+
+                aa = (AnimationDataFormat.frame as far *u16)[unaligned xx];
+                xx = aa = ((aa & 0xff) << 1) +# entities.SoA.metaSpriteFrameTable[unaligned yy];
+                entities.SoA.msFrameAddr[unaligned yy] = aa = MetaSpriteFrameTableOffset[unaligned xx];
+            }
+        }
+        mem8_idx8();
+        return;
+    }
+    else {
+        // msAnimationCounter did not underflow
+
+        entities.SoA.msAnimationCounter[unaligned y] = aa;
+
+        mem8_idx8();
+        return;
+    }
+}
+
+
+
+// Non-Looping Animation Process Routine:  Delay byte measures display frames.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func frame_count__once(entityId : u8 in y) {
+
+    a = entities_SoA_msAnimationCounter_u8[unaligned y];
+    if zero {
+        // NOTE: If you modify this code, you MUST ALSO modify `frame_count__looping()`
+        // NOTE: If you modify this code, you MUST ALSO modify `__distance_animation__once__return_mem8_idx8()`
+
+        // Advance to the next MetaSprite frame
+        idx16();
+        #[idx16] {
+            xx = entities.SoA.msAnimationPos[unaligned yy];
+            xx++;
+            xx++;
+
+            a = AnimationDataFormat.frame[xx];
+            goto __end_of_animation__idx16 if a == AnimationDataFormat.END_OF_ANIMATION_BYTE;
+
+            mem16();
+            #[mem16] {
+                entities.SoA.msAnimationPos[unaligned yy] = aa = xx;
+
+                // Delay must be processed first as calculating `msFrameAddr` clobbers xx.
+                // (wasting 2 cycles on the 16 bit load-store is faster then reloading `msAnimationPos` back into xx later)
+                aa = (AnimationDataFormat.delay as far *u16)[unaligned xx];
+                entities.SoA.msAnimationCounter[unaligned yy] = aa;
+
+                aa = (AnimationDataFormat.frame as far *u16)[unaligned xx];
+                xx = aa = ((aa & 0xff) << 1) +# entities.SoA.metaSpriteFrameTable[unaligned yy];
+                entities.SoA.msFrameAddr[unaligned yy] = aa = MetaSpriteFrameTableOffset[unaligned xx];
+            }
+        }
+        mem8_idx8();
+        return;
+    }
+    else {
+        // msAnimationCounter is non-zero
+        a--;
+        entities_SoA_msAnimationCounter_u8[unaligned y] = a;
+    }
+}
+
+
+
+// A non-looping animation has ended.  Change animation process function to `disabled`.
+//
+// KEEP: Y
+//
+// RETURNS with mem8, idx8
+//
+// DB = 0x7e
+#[mem8, idx8]
+func __end_of_animation__idx16() {
+    // This function is called with a idx16, and it needs to return mem8, idx8
+    mem8_idx8();
+
+    x = y;
+    entities.SoA.msAnimationProcessFunctionIndex[unaligned x] = DISABLED_FUNCTION_ID;
+}
+
+
+
+// Non-Looping Animation Process Routine:  Delay byte measures distance in the X-Axis.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func distance_x__once(entityId : u8 in y) {
+    mem16();
+    #[mem16] {
+        aa = entities.SoA.xVelocity[unaligned y];
+        if !zero {
+            if !negative {
+                aa = negate16(aa);
+            }
+
+            return __distance_animation__once__return_mem8_idx8(aa as i16, y);
+        }
+    }
+    mem8_idx8();
+}
+
+
+
+// Non-Looping Animation Process Routine:  Delay byte measures distance in the Y-Axis.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func distance_y__once(entityId : u8 in y) {
+    mem16();
+    #[mem16] {
+        aa = entities.SoA.yVelocity[unaligned y];
+        if !zero {
+            if !negative {
+                aa = negate16(aa);
+            }
+
+            return __distance_animation__once__return_mem8_idx8(aa as i16, y);
+        }
+    }
+    mem8_idx8();
+}
+
+
+
+// Non-Looping Animation Process Routine:  Delay byte measures distance in the both X and Y Axises.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func distance_xy__once(entityId : u8 in y) {
+var _tmp : u16 in zpTmp_word_0;
+
+    mem16();
+    #[mem16] {
+        aa = entities.SoA.xVelocity[unaligned y];
+        if !negative {
+            aa = negate16(aa);
+        }
+        _tmp = aa;
+
+        aa = entities.SoA.yVelocity[unaligned y];
+        if !negative {
+            aa = negate16(aa);
+        }
+        aa += _tmp;
+
+        return __distance_animation__once__return_mem8_idx8(aa as i16, y) if !zero;
+    }
+    mem8_idx8();
+}
+
+
+
+// Process a non-looping MetaSprite animation with a distance delay variable.
+//
+// ASSUMES: negativeVelocity is negative and non-zero.
+//
+// KEEP: Y
+//
+// RETURNS with mem8, idx8
+//
+// DB = 0x7e
+#[mem16, idx8]
+func __distance_animation__once__return_mem8_idx8(negativeVelocity : i16 in aa, entityId : u8 in y) {
+    aa += entities.SoA.msAnimationCounter[unaligned y];
+    if !carry {
+        // NOTE: If you modify this code, you MUST ALSO modify `__distance_animation__looping__return_mem8_idx8()`
+        // NOTE: If you modify this code, you MUST ALSO modify `frame_count__once()`
+
+        // Advance to the next MetaSprite frame
+        idx16();
+        #[idx16] {
+            xx = entities.SoA.msAnimationPos[unaligned yy];
+            xx++;
+            xx++;
+
+            mem8();
+            #[mem8] {
+                a = AnimationDataFormat.frame[unaligned xx];
+                goto __end_of_animation__idx16 if a == AnimationDataFormat.END_OF_ANIMATION_BYTE;
             }
 
             mem16();

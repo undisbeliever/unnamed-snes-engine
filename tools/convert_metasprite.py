@@ -483,7 +483,7 @@ ANIMATION_DELAY_FUNCTIONS : dict[str, Callable[[Union[float, int]], int]] = {
 }
 
 # NOTE: If you modify this map, also modify the `AnimationProcessFunctions` in `metasprites.wiz`
-ANIMATION_DELAY_IDS : dict[str, int] = {
+LOOPING_ANIMATION_DELAY_IDS : Final[dict[str, int]] = {
     'none':        0,
     'frame':       2,
     'distance_x':  4,
@@ -491,9 +491,17 @@ ANIMATION_DELAY_IDS : dict[str, int] = {
     'distance_xy': 8,
 }
 
+# NOTE: If you modify this map, also modify the `AnimationProcessFunctions` in `metasprites.wiz`
+NON_LOOPING_ANIMATION_DELAY_IDS : Final[dict[str, int]] = {
+    'none':         0,
+    'frame':       10,
+    'distance_x':  12,
+    'distance_y':  14,
+    'distance_xy': 16,
+}
 
-END_OF_LOOPING_ANIMATION_BYTE = 0xff
-END_OF_ANIMATION_BYTE = 0xfe
+
+END_OF_ANIMATION_BYTE = 0xff
 
 MAX_FRAME_ID = 0xfc
 MAX_N_FRAMES = MAX_FRAME_ID + 1
@@ -507,8 +515,16 @@ def build_animation_data(ani : MsAnimation, get_frame_id : Callable[[Name], int]
 
     ani_delay_converter = ANIMATION_DELAY_FUNCTIONS[ani.delay_type]
 
+    if len(ani.frames) == 1:
+        process_function = LOOPING_ANIMATION_DELAY_IDS['none']
+    elif ani.loop:
+        process_function = LOOPING_ANIMATION_DELAY_IDS[ani.delay_type]
+    else:
+        process_function = NON_LOOPING_ANIMATION_DELAY_IDS[ani.delay_type]
+
+
     ani_data = bytearray()
-    ani_data.append(ANIMATION_DELAY_IDS[ani.delay_type])
+    ani_data.append(process_function)
 
     if ani.fixed_delay is None:
         assert ani.frame_delays is not None
@@ -523,10 +539,7 @@ def build_animation_data(ani : MsAnimation, get_frame_id : Callable[[Name], int]
             ani_data.append(get_frame_id(f))
             ani_data.append(d)
 
-    if len(ani.frames) == 1 or ani.loop == False:
-        ani_data.append(END_OF_ANIMATION_BYTE)
-    else:
-        ani_data.append(END_OF_LOOPING_ANIMATION_BYTE)
+    ani_data.append(END_OF_ANIMATION_BYTE)
 
     return ani_data
 
