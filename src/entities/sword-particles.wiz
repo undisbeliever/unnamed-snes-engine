@@ -41,12 +41,7 @@ func init(entityId : u8 in y, parameter : u8 in x) {
 #[mem8, idx8]
 func process(entityId : u8 in y) : bool in carry {
 
-    zero = is_ms_animation_over(y);
-    if zero {
-        return false;
-    }
-
-    return true;
+    return is_ms_non_looping_animation_running(y);
 }
 
 }

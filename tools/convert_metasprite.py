@@ -494,10 +494,10 @@ LOOPING_ANIMATION_DELAY_IDS : Final[dict[str, int]] = {
 # NOTE: If you modify this map, also modify the `AnimationProcessFunctions` in `metasprites.wiz`
 NON_LOOPING_ANIMATION_DELAY_IDS : Final[dict[str, int]] = {
     'none':         0,
-    'frame':       10,
-    'distance_x':  12,
-    'distance_y':  14,
-    'distance_xy': 16,
+    'frame':       24,
+    'distance_x':  26,
+    'distance_y':  28,
+    'distance_xy': 30,
 }
 
 

@@ -563,7 +563,7 @@ let set_ms_animation_and_return_true = metasprites.set_entity_animation_and_retu
 
 let stop_ms_animation = metasprites.stop_entity_animation;
 
-let is_ms_animation_over = metasprites.is_entity_animation_over;
+let is_ms_non_looping_animation_running = metasprites.is_entity_non_looping_animation_running;
 
 }
 

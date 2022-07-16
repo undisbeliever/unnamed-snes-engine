@@ -918,40 +918,46 @@ inline func stop_entity_animation(entityId : u8 in y) {
 
 
 
-// Tests if the entity's MetaSprite animation is stopped or ended.
+// Tests if the entity is running a non-looping animation.
 //
-// Returns true if a non-looping animation ends or `stop_entity_animation()` has been called.
+// Returns `true` if the animation is running and it is a non-looping animation.
+// Returns `true` if the animation process-function is NEW_ANIMATION__FUNCTION_ID.
+// Returns `false` if a non-looping animation is completed or `stop_entity_animation()` has been called.
+// Returns `false` for looping animations to prevent an infinite-loop if this function to used break a loop.
 //
 // KEEP: Y
 // KEEP: X
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func is_entity_animation_over(entityId : u8 in y) : bool in zero {
-    // assumes DISABLED_FUNCTION_ID == 0
+inline func is_entity_non_looping_animation_running(entityId : u8 in y) : bool in carry {
+    // Assumes the non-looping animations and NEW_ANIMATION__FUNCTION_ID are at the end of `AnimationProcessFunctions`
 
-    // ::TODO return true if current animation is a looping animation (to prevent infinite loops)::
     a = entities.SoA.msAnimationProcessFunctionIndex[unaligned y];
-    return zero;
+    cmp(a, metasprites.animations.FIRST_NON_LOOPING_FUNCTION_ID);
+    return carry;
 }
 
 
 
-// Tests if the player's MetaSprite animation is stopped or ended.
+// Tests if the player is running a non-looping animation.
 //
-// Returns true if a non-looping animation ends or `stop_entity_animation()` has been called.
+// Returns `true` if the animation is running and it is a non-looping animation.
+// Returns `true` if the animation process-function is NEW_ANIMATION__FUNCTION_ID.
+// Returns `false` if a non-looping animation is completed or `stop_entity_animation()` has been called.
+// Returns `false` for looping animations to prevent an infinite-loop if this function to used break a loop.
 //
 // KEEP: Y
 // KEEP: X
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func is_player_animation_over() : bool in zero {
-    // assumes DISABLED_FUNCTION_ID == 0
+inline func is_player_non_looping_animation_running() : bool in carry {
+    // Assumes the non-looping animations and NEW_ANIMATION__FUNCTION_ID are at the end of `AnimationProcessFunctions`
 
-    // ::TODO return true if current animation is a looping animation (to prevent infinite loops)::
     a = entities.SoA.msAnimationProcessFunctionIndex[PLAYER_ENTITY_ID];
-    return zero;
+    cmp(a, metasprites.animations.FIRST_NON_LOOPING_FUNCTION_ID);
+    return carry;
 }
 
 
@@ -984,12 +990,6 @@ const AnimationProcessFunctions = [
     distance_y__looping,
     distance_xy__looping,
 
-    // Non looping process functions
-    frame_count__once,
-    distance_x__once,
-    distance_y__once,
-    distance_xy__once,
-
     // Unused delay types
     disabled,
     disabled,
@@ -999,14 +999,23 @@ const AnimationProcessFunctions = [
     disabled,
     disabled,
 
-    // A special animation process function to setup the animation in memory
+    // Non looping process functions. Should be last
+    frame_count__once,
+    distance_x__once,
+    distance_y__once,
+    distance_xy__once,
+
+    // A special animation process function to setup the animation in memory.
+    // This must be the 17th function in this table
     _new_animation,
 ];
 
 let DELAY_TYPE_MASK = 0b00011110;
 
 let FRAME_COUNT__LOOPING__FUNCTION_ID = 1 * 2;
-let FRAME_COUNT__ONCE__FUNCTION_ID = 5 * 2;
+let FRAME_COUNT__ONCE__FUNCTION_ID = 12 * 2;
+
+let FIRST_NON_LOOPING_FUNCTION_ID = 12 * 2;
 
 let DISABLED_FUNCTION_ID = 0;
 let NEW_ANIMATION__FUNCTION_ID = DELAY_TYPE_MASK + 2;

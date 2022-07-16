@@ -28,7 +28,7 @@ let ms_draw_function = metasprites.drawing_functions.dynamic_pattern;
 
 let _set_ms_animation = metasprites.set_player_animation;
 let _set_ms_animation_if_changed = metasprites.set_player_animation_if_changed;
-let _is_ms_animation_over = metasprites.is_player_animation_over;
+let _is_ms_non_looping_animation_running = metasprites.is_player_non_looping_animation_running;
 
 
 let INITIAL_SWORD_ATTACK_POWER = 2;
@@ -886,8 +886,8 @@ func process__attacking() {
 
     move_player_with_tile_tests();
 
-    zero = _is_ms_animation_over();
-    if zero {
+    carry = _is_ms_non_looping_animation_running();
+    if !carry {
         return set_state__walking();
     }
 }
@@ -948,8 +948,8 @@ func process__hurt() {
     move_player_with_tile_tests();
 
     // Frozen until animation ends
-    zero = _is_ms_animation_over();
-    if zero {
+    carry = _is_ms_non_looping_animation_running();
+    if !carry {
         ^return set_state__walking();
     }
 }
@@ -1260,8 +1260,8 @@ func process__attacking_in_doorway() {
     add_velocity_to_positon_without_collsion_checks();
 
     // wait until animation is over
-    zero = _is_ms_animation_over();
-    if zero {
+    carry = _is_ms_non_looping_animation_running();
+    if !carry {
         set_state__walk_through_doorway__after_attacking_in_doorway();
     }
 }
