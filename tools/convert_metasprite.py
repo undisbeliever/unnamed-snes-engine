@@ -515,11 +515,14 @@ def build_animation_data(ani : MsAnimation, get_frame_id : Callable[[Name], int]
 
     ani_delay_converter = ANIMATION_DELAY_FUNCTIONS[ani.delay_type]
 
-    if len(ani.frames) == 1:
-        process_function = LOOPING_ANIMATION_DELAY_IDS['none']
-    elif ani.loop:
-        process_function = LOOPING_ANIMATION_DELAY_IDS[ani.delay_type]
+    if ani.loop:
+        if len(ani.frames) == 1:
+            # Do not process looping animations that have a single frame
+            process_function = LOOPING_ANIMATION_DELAY_IDS['none']
+        else:
+            process_function = LOOPING_ANIMATION_DELAY_IDS[ani.delay_type]
     else:
+        # Non-Looping animations can be used as timers.  Do not test for 1-frame animations.
         process_function = NON_LOOPING_ANIMATION_DELAY_IDS[ani.delay_type]
 
 
