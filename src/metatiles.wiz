@@ -302,9 +302,7 @@ func populate_map_tile_properties__all_tiles_solid() {
 //
 // REQUIRES: V-Blank
 //
-// DB = shadow
-//
-// DB = 0x7e
+// DB = 0x80
 #[mem16, idx8]
 inline func process_draw_tile_buffer__vblank() {
     x = drawTileBufferIndex;

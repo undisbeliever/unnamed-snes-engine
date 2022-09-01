@@ -313,9 +313,10 @@ func __transfer_tile_data__forceblank(_res : resources.ResourceEntry in resource
 
 
 
-// DB = 0x80
 // REQUIRES: VBlank or Force-Blank
 // Uses DMA channel 0
+//
+// DB = 0x80
 #[mem8, idx16]
 inline func update_oam__vblank() {
 
