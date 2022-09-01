@@ -233,7 +233,7 @@ in code {
 // REQUIRES: Force-Blank
 // DB = 0x80
 #[mem8, idx16]
-inline func setup__fblank() {
+inline func setup__forceblank() {
     {
         push8(data_bank);
 

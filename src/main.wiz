@@ -36,7 +36,7 @@ func main() {
 
     resources_over_usb2snes.init();
 
-    metasprites.setup__fblank();
+    metasprites.setup__forceblank();
 
     snes.ppu.irq_enable = a = snes.ppu.IRQ_ENABLE_AUTOJOY | snes.ppu.IRQ_ENABLE_NMI;
 

@@ -449,7 +449,7 @@ inline func __setup_ppu_and_reset_graphics_subsystems() {
         #[idx16] {
             metatiles.load_tileset__forceblank(room.tileset);
 
-            metasprites.setup__fblank();
+            metasprites.setup__forceblank();
 
             // ::TODO get spritesheet_id from somewhere::
             metasprites.load_ms_spritesheet_ppu_data__forceblank(1);
