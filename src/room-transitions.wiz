@@ -160,7 +160,7 @@ in wram7e {
     // Created on room load.
     // Restored on transition rollback.
     var roomStateBackup_shadow : [ u8 ; MEMMAP_ROOMSTATE_SHADOW_SIZE ];
-    var roomStateBackup_wram7e : [ u8 ; MEMMAP_ROOMSTATE_SHADOW_SIZE ];
+    var roomStateBackup_wram7e : [ u8 ; MEMMAP_ROOMSTATE_WRAM7E_SIZE ];
 }
 
 
