@@ -12,7 +12,7 @@ import "joypad";
 
 namespace rng {
 
-in shadow {
+in lowram {
     // The index within the RngTable.
     // (word index)
     var rng_table_index : u16;
@@ -25,7 +25,7 @@ in code {
 
 // Increment the RNG.
 //
-// DB access shadow
+// DB = lowram
 #[mem16, idx16]
 inline func increment_rng() {
     aa = rng_table_index;
@@ -49,7 +49,7 @@ inline func increment_rng() {
 //
 // KEEP: Y
 //
-// DB access shadow
+// DB = lowram
 #[mem8, idx8]
 func random() : u8 in a {
 

@@ -15,7 +15,7 @@ import "../wiz/common/snes/snes";
 let FRAMES_PER_SECOND = 60;
 
 
-in shadow {
+in lowram {
     // A shadow of the INIDISP register
     var _brightness_buffer : u8;
 
@@ -56,7 +56,7 @@ func wait_one_second() {
 //
 // REQUIRES: NMI enabled, IRQs disabled
 //
-// DB access shadow RAM
+// DB = lowram
 func wait_frame() {
 
     push8(p);
@@ -135,7 +135,7 @@ func wait_frame() {
 //
 // NOTE: Will also wait until the end of the current frame
 //
-// DB access shadow RAM
+// DB = lowram
 #[mem8]
 func wait_frame_and_change_brightness(new_brightness : u8 in a) {
     _brightness_buffer = a;

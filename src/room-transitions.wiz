@@ -67,7 +67,7 @@ enum ScrollDirection : u8 {
 //
 // (Structure of Word Arrays)
 namespace SpriteList {
-    in shadow {
+    in lowram {
         // Metasprite draw function.
         //
         // DB = 0x7e
@@ -159,7 +159,7 @@ in wram7e {
     // Backup of the room state.
     // Created on room load.
     // Restored on transition rollback.
-    var roomStateBackup_shadow : [ u8 ; MEMMAP_ROOMSTATE_SHADOW_SIZE ];
+    var roomStateBackup_lowram : [ u8 ; MEMMAP_ROOMSTATE_LOWRAM_SIZE ];
     var roomStateBackup_wram7e : [ u8 ; MEMMAP_ROOMSTATE_WRAM7E_SIZE ];
 }
 
@@ -335,15 +335,15 @@ func _load_room_from_backup(playerXpos : u8 in x, playerYpos : u8 in y) {
 #[mem8, idx8]
 inline func __backup_room_state() {
 
-let _roomstate_shadow = MEMMAP_ROOMSTATE_SHADOW as far *u8;
+let _roomstate_lowram = MEMMAP_ROOMSTATE_LOWRAM as far *u8;
 let _roomstate_wram7e = MEMMAP_ROOMSTATE_WRAM7E as far *u8;
 
     mem16_idx16();
     #[mem16, idx16] {
         // Parameter order is destination, source::
-        load_dec_repeat(#:far &roomStateBackup_shadow, yy = &roomStateBackup_shadow as u16,
-                        #:_roomstate_shadow,           xx = _roomstate_shadow as u16,
-                        aa = MEMMAP_ROOMSTATE_SHADOW_SIZE - 1);
+        load_dec_repeat(#:far &roomStateBackup_lowram, yy = &roomStateBackup_lowram as u16,
+                        #:_roomstate_lowram,           xx = _roomstate_lowram as u16,
+                        aa = MEMMAP_ROOMSTATE_LOWRAM_SIZE - 1);
 
         load_dec_repeat(#:far &roomStateBackup_wram7e, yy = &roomStateBackup_wram7e as u16,
                         #:_roomstate_wram7e,           xx = _roomstate_wram7e as u16,
@@ -362,15 +362,15 @@ let _roomstate_wram7e = MEMMAP_ROOMSTATE_WRAM7E as far *u8;
 #[mem8, idx8]
 inline func __restore_room_state_from_backup() {
 
-let _roomstate_shadow = MEMMAP_ROOMSTATE_SHADOW as far *u8;
+let _roomstate_lowram = MEMMAP_ROOMSTATE_LOWRAM as far *u8;
 let _roomstate_wram7e = MEMMAP_ROOMSTATE_WRAM7E as far *u8;
 
     mem16_idx16();
     #[mem16, idx16] {
         // Parameter order is destination, source::
-        load_dec_repeat(#:_roomstate_shadow,           yy = _roomstate_shadow as u16,
-                        #:far &roomStateBackup_shadow, xx = &roomStateBackup_shadow as u16,
-                        aa = MEMMAP_ROOMSTATE_SHADOW_SIZE - 1);
+        load_dec_repeat(#:_roomstate_lowram,           yy = _roomstate_lowram as u16,
+                        #:far &roomStateBackup_lowram, xx = &roomStateBackup_lowram as u16,
+                        aa = MEMMAP_ROOMSTATE_LOWRAM_SIZE - 1);
 
         load_dec_repeat(#:_roomstate_wram7e,           yy = _roomstate_wram7e as u16,
                         #:far &roomStateBackup_wram7e, xx = &roomStateBackup_wram7e as u16,

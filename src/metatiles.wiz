@@ -80,7 +80,7 @@ in zeropage {
 }
 
 
-in shadow {
+in lowram {
     // MetaTiles to draw on the next VBlank.
     //
     // Array of word structures
@@ -1207,7 +1207,7 @@ in wram7e {
 }
 
 
-in shadow {
+in lowram {
     // `VMAIN` register to use when transferring the buffer to VRAM.
     //
     // NOTE: If this value is 0 then no buffer will be transferred.

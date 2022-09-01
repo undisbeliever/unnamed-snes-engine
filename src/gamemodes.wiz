@@ -34,7 +34,7 @@ enum GameModes : u8 {
 
 
 
-in shadow {
+in lowram {
     var     gameMode : GameModes;
 }
 

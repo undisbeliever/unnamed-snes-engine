@@ -59,7 +59,7 @@ let ATTACK_BUFFER_FRAMES = 3;
 
 
 
-in shadow {
+in lowram {
     // The current state of the joypad
     // (uint16)
     var current : u16;

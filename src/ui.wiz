@@ -60,7 +60,7 @@ in wram7e {
 }
 
 
-in shadow {
+in lowram {
     // If non-zero then textBuffer will be uploaded to the PPU on the next VBlank.
     // (byte flag)
     var healthBarBufferFlag : u8;

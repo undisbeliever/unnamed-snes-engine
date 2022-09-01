@@ -70,7 +70,7 @@ namespace entities {
         let BA_SIZE = N_ENTITIES * 2 - 1;
 
 
-        in shadow_roomstate {
+        in lowram_roomstate {
             // Process function for the entity.  Called once per frame by the undo loop.
             //
             // INPUT: entityId: index into `entities.SoA` Structure-of-Arrays.

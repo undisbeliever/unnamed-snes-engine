@@ -7,11 +7,11 @@
 import "memmap";
 
 
-in shadow {
+in lowram {
     // Number of frames processed.
     // (incremented every `WaitFrame` call)
     //
-    // MUST be in the `shadow` bank to work correctly.
+    // MUST be in the `lowram` bank to work correctly.
     //
     // (u32)
     var frameCounter : u32;
