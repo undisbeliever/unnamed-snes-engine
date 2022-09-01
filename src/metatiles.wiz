@@ -160,17 +160,12 @@ var _res : resources.ResourceEntry in resources.res;
 //
 // REQUIRES: Force-Blank, Tileset loaded into memory.
 //
-// DB = 0x7e
+// DB = 0x80
 #[mem8, idx8]
 func draw_map__forceblank() {
 var _rowsLeft    : u8 in zpTmp_byte_0;
 var _columnsLeft : u8 in zpTmp_byte_1;
 
-    push8(data_bank);
-
-    push8(program_bank);
-    data_bank = pop8();
-// DB = 0x80
 
     snes.ppu.brightness = a = snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK;
 
@@ -228,13 +223,14 @@ var _columnsLeft : u8 in zpTmp_byte_1;
     } while !zero;
 
 
-    data_bank = pop8();
-// DB = 0x7e
-
-
     transitions._reset_state();
 
     drawTileBufferIndex = 0;
+
+
+    push8(program_bank);
+    data_bank = pop8();
+// DB = 0x80
 }
 
 

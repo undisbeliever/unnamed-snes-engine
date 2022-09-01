@@ -458,6 +458,10 @@ inline func __setup_ppu_and_reset_graphics_subsystems() {
         }
         idx8();
     }
+
+    metatiles.draw_map__forceblank();
+
+
     push8(a = 0x7e);
     data_bank = pop8();
 // DB = 0x7e
@@ -470,8 +474,6 @@ inline func __setup_ppu_and_reset_graphics_subsystems() {
 
     // Tileset may have changed - Need to repopulate map_tile properties
     metatiles.populate_map_tile_properties();
-
-    metatiles.draw_map__forceblank();
 }
 
 
