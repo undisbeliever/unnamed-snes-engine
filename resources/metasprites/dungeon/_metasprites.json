@@ -13,43 +13,29 @@
     "xorigin": 16,
     "yorigin": 23,
 
-    "shadowSize": "MEDIUM",
-    "tilehitbox": "6 3",
-
-    "pattern": "rect_16x24_three",
     "ms-export-order": "skeleton",
 
+    "frames": [
+      "south0", "south1", "south2", "south3",
+      "north0", "north1", "north2", "north3",
+      "east0",  "east1",  "east2",  "east3"
+    ],
+
+    "defaultLayout": "rect_16x24_three 8 0",
+
     "order": 2,
+    "shadowSize": "MEDIUM",
+    "tilehitbox": "6 3",
 
     "defaultHitbox":  "13 12   6  11",
     "defaultHurtbox": "12 10   8  14",
 
-    "blocks": [
-      {
-        "start": 0,
-
-        "x": 8,
-        "y": 0,
-
-        "frames": [
-          "south0", "south1", "south2", "south3",
-          "north0", "north1", "north2", "north3",
-          "east0",  "east1",  "east2",  "east3"
-        ]
-      },
-      {
-        "start": 8,
-
-        "flip": "hflip",
-
-        "x": 8,
-        "y": 0,
-
-        "frames": [
-          "west0",  "west1",  "west2",  "west3"
-        ]
-      }
-    ],
+    "clones": {
+      "west0": "east0 hflip",
+      "west1": "east1 hflip",
+      "west2": "east2 hflip",
+      "west3": "east3 hflip"
+    },
 
     "animations": {
       "walk_north": {
@@ -80,61 +66,39 @@
     "frameWidth": "32",
     "frameHeight": "32",
 
+    "frames": [
+      "crawl_right_0",  "crawl_right_1",  "crawl_right_2",  "crawl_right_3",
+      "crawl_down_0",  "crawl_down_1",  "crawl_down_2",  "crawl_down_3",
+      "crawl_up_0",  "crawl_up_1",  "crawl_up_2",  "crawl_up_3"
+    ],
+
     "xorigin": 16,
     "yorigin": 16,
 
-    "shadowSize": "NONE",
-    "tilehitbox": "4 4",
-
-    "pattern": "square_single16",
     "ms-export-order": "slime",
 
+    "defaultLayout": "square_single16 8 8",
+
     "order": 2,
+    "shadowSize": "NONE",
+    "tilehitbox": "4 4",
 
     "defaultHitbox":  "13 12   6  8",
     "defaultHurtbox": "12 11   8 10",
 
-    "blocks": [
-      {
-        "start": 0,
+    "hitboxes": {
+      "crawl_right_0 - crawl_right_3": "14 12   8  7"
+    },
+    "hurtboxes": {
+      "crawl_right_0 - crawl_right_3": "12 11  11  9"
+    },
 
-        "x": 8,
-        "y": 8,
-
-        "defaultHitbox":  "14 12   8  7",
-        "defaultHurtbox": "12 11  11  9",
-
-        "frames": [
-          "crawl_right_0",  "crawl_right_1",  "crawl_right_2",  "crawl_right_3"
-        ]
-      },
-      {
-        "start": 0,
-
-        "flip": "hflip",
-
-        "x": 8,
-        "y": 8,
-
-        "defaultHitbox":  "14 12   8  7",
-        "defaultHurtbox": "12 11  11  9",
-
-        "frames": [
-          "crawl_left_0",  "crawl_left_1",  "crawl_left_2",  "crawl_left_3"
-        ]
-      },
-      {
-        "start": 4,
-
-        "x": 8,
-        "y": 8,
-
-        "frames": [
-          "crawl_down_0",  "crawl_down_1",  "crawl_down_2",  "crawl_down_3",
-          "crawl_up_0",  "crawl_up_1",  "crawl_up_2",  "crawl_up_3"
-        ]
-      }
-    ],
+    "clones": {
+      "crawl_left_0": "crawl_right_0 hflip",
+      "crawl_left_1": "crawl_right_1 hflip",
+      "crawl_left_2": "crawl_right_2 hflip",
+      "crawl_left_3": "crawl_right_3 hflip"
+    },
 
     "animations": {
       "crawl_right": {
@@ -189,47 +153,26 @@
     "xorigin": 16,
     "yorigin": 23,
 
+    "ms-export-order": "crossbow_man",
+
+    "frames": [
+      "south0", "south1", "south2", "south3",
+      "north0", "north1", "north2", "north3",
+      "east0",  "east1",  "east2",  "east3",
+      "west0",  "west1",  "west2",  "west3"
+    ],
+
+    "order": 2,
     "shadowSize": "MEDIUM",
     "tilehitbox": "6 3",
 
-    "pattern": "rect_16x24_and_extra",
-    "ms-export-order": "crossbow_man",
+    "defaultHitbox":  "13 12   6  11",
+    "defaultHurtbox": "12 10   8  14",
 
-    "order": 2,
-
-    "blocks": [
-      {
-        "start": 0,
-
-        "x": 6,
-        "y": 2,
-
-        "defaultHitbox":  "13 12   6  11",
-        "defaultHurtbox": "12 10   8  14",
-
-        "frames": [
-          "south0", "south1", "south2", "south3"
-        ]
-      },
-      {
-        "start": 4,
-
-        "x": 8,
-        "y": 2,
-
-        "xoffset": 8,
-        "yoffset": 21,
-
-        "defaultHitbox":  "13 12   6  11",
-        "defaultHurtbox": "12 10   8  14",
-
-        "frames": [
-          "north0", "north1", "north2", "north3",
-          "east0",  "east1",  "east2",  "east3",
-          "west0",  "west1",  "west2",  "west3"
-        ]
-      }
-    ],
+    "layouts": {
+      "south0 - south3": "rect_16x24_and_extra 6 2",
+      "north0 - west3": "rect_16x24_and_extra 8 2"
+    },
 
     "animations": {
       "walk_north": {
@@ -363,28 +306,19 @@
     "xorigin": 8,
     "yorigin": 11,
 
+    "ms-export-order": "eight_direction_spinner",
+
+    "frames": [ "frame0", "frame1", "frame2", "frame3",
+                "frame4", "frame5", "frame6", "frame7" ],
+
+    "defaultLayout": "square_single16 0 0",
+
+    "order": 2,
     "shadowSize": "SMALL",
     "tilehitbox": "3 3",
 
-    "pattern": "square_single16",
-    "ms-export-order": "eight_direction_spinner",
-
-    "order": 2,
-
     "defaultHitbox":  "4   5   8  6",
     "defaultHurtbox": "4   4   8  8",
-
-    "blocks": [
-      {
-        "start": 0,
-
-        "x": 0,
-        "y": 0,
-
-        "frames": [ "frame0", "frame1", "frame2", "frame3",
-                    "frame4", "frame5", "frame6", "frame7" ]
-      }
-    ],
 
     "animations": {
       "animation": {
@@ -403,27 +337,18 @@
     "xorigin": 16,
     "yorigin": 37,
 
+    "ms-export-order": "rook",
+
+    "frames": [ "standing", "landing0", "landing1" ],
+
+    "defaultLayout": "rect_16x32_two 8 8",
+
+    "order": 2,
     "shadowSize": "LARGE",
     "tilehitbox": "8 4",
 
-    "pattern": "rect_16x32_two",
-    "ms-export-order": "rook",
-
-    "order": 2,
-
     "defaultHurtbox": "8  16  16  23",
     "defaultHitbox":  "8  16  16  22",
-
-    "blocks": [
-      {
-        "start": 0,
-
-        "x": 8,
-        "y": 8,
-
-        "frames": [ "standing", "landing0", "landing1" ]
-      }
-    ],
 
     "animations": {
       "standing": {

@@ -12,7 +12,9 @@ import tkinter as tk
 import tkinter.ttk as ttk
 from tkinter.scrolledtext import ScrolledText
 
-from typing import Any, Optional
+from typing import Any, Final, Optional
+
+from convert_metasprite import extract_frame_locations
 
 from _json_formats import load_ms_export_order_json, load_metasprites_string, \
                           Name, Filename, MsExportOrder, MsSpritesheet
@@ -198,6 +200,16 @@ class Editor:
 
         assert self.image is not None
 
+        image_width = self.image.width()
+        image_height = self.image.height()
+
+        try:
+            frame_locations : Final = extract_frame_locations(fs, self.ms_export_orders, image_width // ZOOM, image_height // ZOOM)
+        except:
+            self.print_exception_traceback()
+            return
+
+
         c.delete('all')
         c.create_image(0, 0, image=self.image, anchor=tk.NW)
 
@@ -208,17 +220,6 @@ class Editor:
         show_hurtboxes = self.show_hurtboxes.get()
         show_hitboxes = self.show_hitboxes.get()
 
-
-        if fs.pattern:
-            base_pattern = self.ms_export_orders.patterns.get(fs.pattern, None)
-        else:
-            base_pattern = None
-
-
-        # Frame grid
-        image_width = self.image.width()
-        image_height = self.image.height()
-        frames_per_row = image_width // (fs.frame_width * ZOOM)
 
         frame_width = ZOOM * fs.frame_width
         frame_height = ZOOM * fs.frame_height
@@ -232,22 +233,17 @@ class Editor:
         th_y2 = y_origin + fs.tilehitbox.half_height * ZOOM
 
 
+        # Frame grid
         for x in range(0, image_width + 1, frame_width):
             c.create_line(((x, 0), (x, image_height)), width=FRAME_WIDTH)
 
         for y in range(0, image_height + 1, frame_height):
             c.create_line(((0, y), (image_width, y)), width=FRAME_WIDTH)
 
-        for block in fs.blocks:
-            if block.pattern:
-                block_pattern = self.ms_export_orders.patterns.get(block.pattern, base_pattern)
-            else:
-                block_pattern = base_pattern
-
-            for i, frame_name in enumerate(block.frames):
-                frame_number = block.start + i
-                x = (frame_number % frames_per_row) * frame_width
-                y = (frame_number // frames_per_row) * frame_height
+        for frame_name, fl in frame_locations.items():
+            if not fl.is_clone:
+                x = fl.frame_x * ZOOM
+                y = fl.frame_y * ZOOM
 
                 # Draw origin
                 c.create_line(((x + x_origin, y), (x + x_origin, y + frame_height)), width=1)
@@ -256,12 +252,12 @@ class Editor:
                 if show_labels:
                     c.create_text(x + 5, y + 3, anchor=tk.NW, text=frame_name)
 
-                if block_pattern and show_objects:
-                    assert block.x is not None and block.y is not None
+                if show_objects and fl.pattern:
+                    assert fl.x_offset is not None and fl.y_offset is not None
 
-                    for o in block_pattern.objects:
-                        ox = x + (block.x + o.xpos) * ZOOM
-                        oy = y + (block.y + o.ypos) * ZOOM
+                    for o in fl.pattern.objects:
+                        ox = x + (fl.x_offset + o.xpos) * ZOOM
+                        oy = y + (fl.y_offset + o.ypos) * ZOOM
                         osize = o.size * ZOOM
                         c.create_rectangle(ox, oy, ox + osize, oy + osize,
                                            width=OBJ_WIDTH, outline=OBJ_COLOR)
@@ -270,14 +266,13 @@ class Editor:
                     c.create_rectangle(x + th_x1, y + th_y1, x + th_x2, y + th_y2,
                                        width=TILE_HITBOX_WIDTH, outline=TILE_HITBOX_COLOR)
 
-                if show_hurtboxes:
-                    box = fs.hurtbox_overrides.get(frame_name, block.default_hurtbox)
-                    if box is not None:
-                        c.create_rectangle(x + box.x * ZOOM, y + box.y * ZOOM, x + (box.x + box.width) * ZOOM, y + (box.y + box.height) * ZOOM,
+                if show_hurtboxes and fl.hurtbox:
+                    box = fl.hurtbox
+                    c.create_rectangle(x + box.x * ZOOM, y + box.y * ZOOM, x + (box.x + box.width) * ZOOM, y + (box.y + box.height) * ZOOM,
                                            width=HURTBOX_WIDTH, outline=HURTBOX_COLOR)
 
-                if show_hitboxes:
-                    box = fs.hitbox_overrides.get(frame_name, block.default_hitbox)
+                if show_hitboxes and fl.hitbox:
+                    box = fl.hitbox
                     if box is not None:
                         c.create_rectangle(x + box.x * ZOOM, y + box.y * ZOOM, x + (box.x + box.width) * ZOOM, y + (box.y + box.height) * ZOOM,
                                            width=HITBOX_WIDTH, outline=HITBOX_COLOR)

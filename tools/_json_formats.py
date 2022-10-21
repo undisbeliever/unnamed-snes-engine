@@ -178,6 +178,22 @@ class _Helper:
             yield name, item
 
 
+    def iterate_str_dict(self, key : str, _type : Type[_T]) -> Generator[tuple[str, _T], None, None]:
+        assert _type != dict or _type != OrderedDict
+
+        d = self.__dict.get(key)
+        if not isinstance(d, dict):
+            self._raise_error(f"Expected a JSON dict type", key)
+
+        for name, item in d.items():
+            assert isinstance(name, str)
+
+            if not isinstance(item, _type):
+                self._raise_error(f"Expected a { _type.__name__ }", key, name)
+
+            yield name, item
+
+
     # `self.__dict` MUST NOT be accessed below this line
     # --------------------------------------------------
 
@@ -633,15 +649,22 @@ class Aabb(NamedTuple):
     height  : int
 
 
-class MsBlock(NamedTuple):
-    pattern         : Optional[Name]
-    start           : int
-    x               : Optional[int]
-    y               : Optional[int]
-    flip            : Optional[str]
-    frames          : list[Name]
-    default_hitbox  : Optional[Aabb]
-    default_hurtbox : Optional[Aabb]
+class AabbOverride(NamedTuple):
+    start   : Name
+    end     : Optional[Name]
+    value   : Aabb
+
+
+class MsLayout(NamedTuple):
+    pattern  : Name
+    x_offset : int
+    y_offset : int
+
+
+class MsLayoutOverride(NamedTuple):
+    start   : Name
+    end     : Optional[Name]
+    value   : MsLayout
 
 
 class TileHitbox(NamedTuple):
@@ -658,6 +681,12 @@ class MsAnimation(NamedTuple):
     frame_delays    : Optional[list[Union[float, int]]]
 
 
+class MsClone(NamedTuple):
+    name            : Name
+    source          : Name
+    flip            : Optional[str]
+
+
 class MsFrameset(NamedTuple):
     name                : Name
     source              : Filename
@@ -669,12 +698,14 @@ class MsFrameset(NamedTuple):
     tilehitbox          : TileHitbox
     default_hitbox      : Optional[Aabb]
     default_hurtbox     : Optional[Aabb]
-    pattern             : Optional[Name]
+    default_layout      : Optional[MsLayout]
     ms_export_order     : Name
     order               : int
-    blocks              : list[MsBlock]
-    hitbox_overrides    : dict[Name, Aabb]
-    hurtbox_overrides   : dict[Name, Aabb]
+    frames              : list[Name]
+    layout_overrides    : list[MsLayoutOverride]
+    hitbox_overrides    : list[AabbOverride]
+    hurtbox_overrides   : list[AabbOverride]
+    clones              : list[MsClone]
     animations          : dict[Name, MsAnimation]
 
 
@@ -743,30 +774,92 @@ class _Ms_Helper(_Helper):
             return None
         return self.__convert_aabb(s, key)
 
+    def __convert_layout(self, s : str, *path : str) -> MsLayout:
+        v = s.split()
+        if len(v) != 3:
+            self._raise_error('Expected a string in the following format `pattern int int', *path)
+        try:
+            return MsLayout(v[0], int(v[1]), int(v[2]))
+        except ValueError:
+            self._raise_error('Expected a string in the following format `pattern int int', *path)
 
-    def get_aabb_overrides(self, key : str) -> dict[Name, Aabb]:
-        out : dict[Name, Aabb] = dict()
+
+    def get_optional_layout(self, key : str) -> Optional[MsLayout]:
+        s = self._optional_get(key, str)
+        if s is None:
+            return None
+        return self.__convert_layout(s, key)
+
+
+    RANGE_REGEX : Final = re.compile(r'([a-zA-Z0-9_]+) *- *([a-zA-Z0-9_]+)')
+
+    def __convert_range(self, s : str, key : str) -> tuple[Name, Optional[Name]]:
+        m = self.RANGE_REGEX.match(s)
+        if m:
+            return m.group(1), m.group(2)
+        elif self.NAME_REGEX.match(s):
+            return s, None
+        else:
+            self._raise_error(f"Invalid range: {s}", key)
+
+
+    def get_aabb_overrides(self, key : str) -> list[AabbOverride]:
+        out : list[AabbOverride] = list()
 
         if self.contains(key):
-            for name, i in self.iterate_dict(key, str):
-                if name in out:
-                    self._raise_error(f"Duplicate name: { name }", key)
-                out[name] = self.__convert_aabb(i, key, name)
+            for range_, s in self.iterate_str_dict(key, str):
+                start, end = self.__convert_range(range_, key)
+
+                out.append(AabbOverride(
+                    start = start,
+                    end = end,
+                    value = self.__convert_aabb(s, key, range_)
+                ))
+
+        return out
+
+
+    def get_layout_overrides(self, key : str) -> list[MsLayoutOverride]:
+        out : list[MsLayoutOverride] = list()
+
+        if self.contains(key):
+            for range_, s in self.iterate_str_dict(key, str):
+                start, end = self.__convert_range(range_, key)
+
+                out.append(MsLayoutOverride(
+                    start = start,
+                    end = end,
+                    value = self.__convert_layout(s, key, range_)
+                ))
 
         return out
 
 
     VALID_FLIPS : Final = ('hflip', 'vflip', 'hvflip')
 
-    def get_flip(self, key : str) -> Optional[str]:
-        s = self._optional_get(key, str)
-        if not s:
-            return None
+    def get_clones(self, key : str) -> list[MsClone]:
+        out : list[MsClone] = list()
 
-        if s not in self.VALID_FLIPS:
-            self._raise_error(f"Unknown flip: { s }", key)
-        return s
+        if self.contains(key):
+            for name, clone_str in self.iterate_dict(key, str):
+                v = clone_str.split()
 
+                if len(v) == 1:
+                    flip = None
+                elif len(v) == 2:
+                    flip = v[1]
+                    if flip not in self.VALID_FLIPS:
+                        self._raise_error(f"Unknown flip: { flip }", key, name)
+                else:
+                    self._raise_error('Invalid clone format (expected `name` or `name flip`)', key, name)
+
+                out.append(MsClone(
+                    name = name,
+                    source = v[0],
+                    flip = flip
+                ))
+
+        return out
 
 
 def __read_ms_animation(a : _Ms_Helper, name : Name) -> MsAnimation:
@@ -791,40 +884,6 @@ def __read_ms_animation(a : _Ms_Helper, name : Name) -> MsAnimation:
 
 
 def __read_ms_frameset(jh : _Ms_Helper, name : Name, i : int) -> MsFrameset:
-    fs_pattern         : Final = jh.get_optional_name('pattern')
-    fs_default_hitbox  : Final = jh.get_optional_aabb('defaultHitbox')
-    fs_default_hurtbox : Final = jh.get_optional_aabb('defaultHurtbox')
-
-
-    blocks = list()
-    for b in jh.iterate_list_of_dicts('blocks'):
-        pattern = b.get_optional_name('pattern')
-        if pattern or fs_pattern:
-            x = b.get_int('x')
-            y = b.get_int('y')
-        else:
-            if b.contains('x') or b.contains('y'):
-                b._raise_error('MS Blocks with no pattern must not have a `x` or `y` field')
-            x = None
-            y = None
-
-        hitbox = b.get_optional_aabb('defaultHitbox')
-        hurtbox = b.get_optional_aabb('defaultHurtbox')
-
-        blocks.append(
-            MsBlock(
-                pattern = pattern,
-                start = b.get_int('start'),
-                x = x,
-                y = y,
-                flip = b.get_flip('flip'),
-                frames = b.get_name_list('frames'),
-                default_hitbox = hitbox if hitbox else fs_default_hitbox,
-                default_hurtbox = hurtbox if hurtbox else fs_default_hurtbox,
-            )
-        )
-
-
     return MsFrameset(
             name = name,
             source              = jh.get_filename('source'),
@@ -834,14 +893,16 @@ def __read_ms_frameset(jh : _Ms_Helper, name : Name, i : int) -> MsFrameset:
             y_origin            = jh.get_int('yorigin'),
             shadow_size         = jh.get_name('shadowSize'),
             tilehitbox          = jh.get_tilehitbox('tilehitbox'),
-            default_hitbox      = fs_default_hitbox,
-            default_hurtbox     = fs_default_hurtbox,
-            pattern             = fs_pattern,
+            default_hitbox      = jh.get_optional_aabb('defaultHitbox'),
+            default_hurtbox     = jh.get_optional_aabb('defaultHurtbox'),
             ms_export_order     = jh.get_name('ms-export-order'),
             order               = jh.get_int('order'),
-            blocks              = blocks,
+            default_layout      = jh.get_optional_layout('defaultLayout'),
+            frames              = jh.get_name_list('frames'),
             hitbox_overrides    = jh.get_aabb_overrides('hitboxes'),
             hurtbox_overrides   = jh.get_aabb_overrides('hurtboxes'),
+            layout_overrides    = jh.get_layout_overrides('layouts'),
+            clones              = jh.get_clones('clones'),
             animations          = jh.build_dict_from_dict('animations', MsAnimation, 254, __read_ms_animation),
     )
 

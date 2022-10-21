@@ -10,7 +10,7 @@ import PIL.Image # type: ignore
 import argparse
 from io import StringIO
 
-from typing import Callable, Final, Iterable, Literal, NamedTuple, Optional, TextIO, Union
+from typing import overload, Callable, Final, Iterable, Literal, NamedTuple, Optional, TextIO, TypeVar, Union
 
 from _common import RomData, MemoryMapMode, MultilineError, print_error
 
@@ -22,7 +22,8 @@ from _snes import extract_small_tile, extract_large_tile, split_large_tile, \
 
 from _json_formats import load_ms_export_order_json, load_metasprites_json, \
                           Name, ScopedName, Filename, MsExportOrder, MsPattern, \
-                          Aabb, TileHitbox, MsAnimation, MsFrameset, MsSpritesheet
+                          Aabb, TileHitbox, MsAnimation, MsLayout, MsFrameset, MsSpritesheet, \
+                          MsLayoutOverride, AabbOverride
 
 
 TILE_DATA_BPP = 4
@@ -104,6 +105,19 @@ class PatternGrid(NamedTuple):
     height          : int
     data            : list[bool]
     pattern         : Optional[MsPattern]
+
+
+class FrameLocation(NamedTuple):
+    is_clone        : bool
+    flip            : Optional[str]
+    frame_x         : int
+    frame_y         : int
+    pattern         : Optional[MsPattern]
+    x_offset        : Optional[int]
+    y_offset        : Optional[int]
+    hitbox          : Optional[Aabb]
+    hurtbox         : Optional[Aabb]
+
 
 
 # MsFramesetFormat and MsFsData intermediate
@@ -328,9 +342,7 @@ def find_best_pattern(image : None, transparent_color : SnesColor, pattern_grids
     Returns tuple (pattern, xpos, ypos)
     """
 
-    if frame_width % 8 != 0 or frame_height % 8 != 0:
-        raise ValueError("find_best_pattern only works with frames that are a multiple of 8 in width and height")
-
+    assert frame_width % 8 == 0 and frame_height % 8 == 0
 
     # Convert frame image into a grid of booleans (True if tile is not 100% transparent)
     i_grid_data = [ is_small_tile_not_transparent(image, transparent_color, x, y)
@@ -402,17 +414,28 @@ def add_i8aabb(data : bytearray, box : Optional[Aabb], fs : MsFrameset) -> None:
 
 
 
-def extract_frame(image : PIL.Image.Image, pattern : MsPattern, palettes_map : list[PaletteMap], tileset : Tileset, fs : MsFrameset, frame_name : Name, frame_x : int, frame_y : int, x_offset : int, y_offset : int, hitbox : Optional[Aabb], hurtbox : Optional[Aabb]) -> bytes:
-    objects_outside_frame = list()
-    tiles_with_no_palettes = list()
+def extract_frame(fl : FrameLocation, frame_name : Name, image : PIL.Image.Image, palettes_map : list[PaletteMap], tileset : Tileset, fs : MsFrameset) -> bytes:
+    assert fl.x_offset is not None and fl.y_offset is not None
+
+    pattern : Final = fl.pattern
+    assert(pattern)
+
+    image_x : Final = fl.frame_x + fl.x_offset
+    image_y : Final = fl.frame_y + fl.y_offset
+
+    x_offset : Final = fs.x_origin - fl.x_offset
+    y_offset : Final = fs.y_origin - fl.y_offset
 
     if x_offset < 0 or x_offset >= fs.frame_width or y_offset < 0 or y_offset >= fs.frame_height:
         raise FrameError(frame_name, f"offset is outside frame: { x_offset }, { y_offset }")
 
+    objects_outside_frame = list()
+    tiles_with_no_palettes = list()
+
     data = bytearray()
 
-    add_i8aabb(data, hitbox, fs)
-    add_i8aabb(data, hurtbox, fs)
+    add_i8aabb(data, fl.hitbox, fs)
+    add_i8aabb(data, fl.hurtbox, fs)
 
     data.append(pattern.id)
     data.append(x_offset)
@@ -421,8 +444,8 @@ def extract_frame(image : PIL.Image.Image, pattern : MsPattern, palettes_map : l
     for o in pattern.objects:
         tile_id, hflip, vflip = 0, False, False
 
-        x = frame_x + o.xpos
-        y = frame_y + o.ypos
+        x = image_x + o.xpos
+        y = image_y + o.ypos
 
         if o.xpos < 0 or o.xpos > fs.frame_width or o.ypos < 0 or o.ypos > fs.frame_height:
             objects_outside_frame.append(TileError(x, y, o.size))
@@ -466,6 +489,209 @@ def extract_frame(image : PIL.Image.Image, pattern : MsPattern, palettes_map : l
 
     return data
 
+
+
+def build_frame_data(frame_locations : dict[Name, FrameLocation], fs : MsFrameset, image : PIL.Image.Image, tiles : Tileset, palettes_map : list[PaletteMap], transparent_color : SnesColor, pattern_grids : list[PatternGrid]) -> tuple[dict[Name, bytes], set[Name]]:
+    errors : list[Union[str, FrameError, AnimationError]] = list()
+
+    image_hflip : Optional[PIL.Image.Image] = None
+    image_vflip : Optional[PIL.Image.Image] = None
+    image_hvflip : Optional[PIL.Image.Image] = None
+
+    frames      : dict[Name, bytes] = dict()
+    patterns_used : set[Name] = set()
+
+    for frame_name, fl in frame_locations.items():
+        frame_image = None
+        if not fl.flip:
+            frame_image = image
+        elif fl.flip == 'hflip':
+            if image_hflip is None:
+                image_hflip = image.transpose(PIL.Image.Transpose.FLIP_LEFT_RIGHT)
+            frame_image = image_hflip
+
+        elif fl.flip == 'vflip':
+            if image_vflip is None:
+                image_vflip = image.transpose(PIL.Image.Transpose.FLIP_TOP_BOTTOM)
+            frame_image = image_vflip
+
+        elif fl.flip == 'hvflip':
+            if image_hvflip is None:
+                image_hvflip = image.transpose(PIL.Image.Transpose.ROTATE_180)
+            frame_image = image_hvflip
+        else:
+            errors.append(f"Unknown flip { fl.flip }")
+            continue
+
+        try:
+            if fl.pattern is None:
+                pattern, px, py = find_best_pattern(frame_image, transparent_color, pattern_grids, fl.frame_x, fl.frame_y, fs.frame_width, fs.frame_height)
+                fl = fl._replace(pattern=pattern, x_offset=px, y_offset=py)
+
+            assert fl.pattern
+            patterns_used.add(fl.pattern.name)
+
+            frames[frame_name] = extract_frame(fl, frame_name, frame_image, palettes_map, tiles, fs)
+
+        except FrameError as e:
+            errors.append(e)
+        except ValueError as e:
+            errors.append(FrameError(frame_name, str(e)))
+
+    if errors:
+        raise FramesetError(fs.name, errors)
+
+    return frames, patterns_used
+
+
+
+def flip_optional_aabb(aabb : Optional[Aabb], flip : Optional[str], fs : MsFrameset) -> Optional[Aabb]:
+    if not aabb or not flip:
+        return None
+
+    x = aabb.x
+    y = aabb.y
+
+    if flip == 'hflip' or flip == 'hvflip':
+        x = 2 * fs.x_origin - aabb.x - aabb.width
+    if flip == 'vflip' or flip == 'hvflip':
+        y = 2 * fs.y_origin - aabb.y - aabb.height
+
+    return Aabb(x, y, aabb.width, aabb.height)
+
+
+
+def clone_frame_location(fl : FrameLocation, flip : Optional[str], fs : MsFrameset, image_width : int, image_height : int) -> FrameLocation:
+    if not flip:
+        return fl
+
+    assert fl.flip is None
+
+    frame_x = fl.frame_x
+    frame_y = fl.frame_y
+
+    if flip == 'hflip' or flip == 'hvflip':
+        frame_x = image_width - frame_x - fs.frame_width
+    if flip == 'vflip' or flip == 'hvflip':
+        frame_y = image_height - frame_y - fs.frame_height
+
+    # ::TODO test if pattern is symmetrical::
+    # ::TODO update x_offset/y_offset::
+    return FrameLocation(
+            is_clone = True,
+            flip = flip,
+            frame_x = frame_x,
+            frame_y = frame_y,
+            pattern = fl.pattern,
+            x_offset = fl.x_offset,
+            y_offset = fl.y_offset,
+            hitbox = flip_optional_aabb(fl.hitbox, flip, fs),
+            hurtbox = flip_optional_aabb(fl.hurtbox, flip, fs),
+    )
+
+
+T = TypeVar('T', Aabb, MsLayout)
+
+def build_override_table(olist : Union[list[AabbOverride], list[MsLayoutOverride]], default_value : Optional[T], fs : MsFrameset, errors : list[Union[str, FrameError, AnimationError]]) -> list[Optional[T]]:
+    out = [ default_value ] * len(fs.frames)
+
+    for o in olist:
+        if o.end:
+            try:
+                start = fs.frames.index(o.start)
+                end = fs.frames.index(o.end)
+                for i in range(start, end + 1):
+                    out[i] = o.value  # type: ignore
+            except ValueError:
+                errors.append(f"Cannot find frames in override range: {o.start} - {o.end}")
+        else:
+            try:
+                i = fs.frames.index(o.start)
+                out[i] = o.value  # type: ignore
+            except ValueError:
+                errors.append(f"Cannot find frame: {o.start}")
+
+    return out
+
+
+# Using `image_width` and `image_height` instead of an `PIL.Image.Image` argument so I
+# can call this function with either a PIL image and a `tk.PhotoImage` image.
+def extract_frame_locations(fs : MsFrameset, ms_export_orders : MsExportOrder, image_width : int, image_height : int) -> dict[Name, FrameLocation]:
+    errors : list[Union[str, FrameError, AnimationError]] = list()
+
+    frame_locations = dict[Name, FrameLocation]()
+
+    if fs.frame_width < 0 or fs.frame_height < 0:
+        errors.append(f"Invalid frame size: { fs.frame_width } x { fs.frame_height }")
+
+    if fs.frame_width >= 256 or fs.frame_height >= 256:
+        errors.append(f"Frame size is too large: { fs.frame_width } x { fs.frame_height }")
+
+    if image_width % fs.frame_width != 0 or image_height % fs.frame_height != 0:
+        errors.append('Source image is not a multiple of frame size')
+
+    if fs.frame_width % 8 != 0 or fs.frame_height % 8 != 0:
+        errors.append("find_best_pattern only works with frames that are a multiple of 8 in width and height")
+
+    if fs.x_origin < 0 or fs.x_origin >= fs.frame_width or fs.y_origin < 0 or fs.y_origin >= fs.frame_height:
+        errors.append(f"Origin is outside frame: { fs.x_origin }, { fs.y_origin }")
+
+    layouts = build_override_table(fs.layout_overrides, fs.default_layout, fs, errors)
+    hitboxes = build_override_table(fs.hitbox_overrides, fs.default_hitbox, fs, errors)
+    hurtboxes = build_override_table(fs.hurtbox_overrides, fs.default_hurtbox, fs, errors)
+
+    if errors:
+        raise FramesetError(fs.name, errors)
+
+    frames_per_row : Final = image_width // fs.frame_width
+
+    for frame_number, frame_name in enumerate(fs.frames):
+        if frame_name in frame_locations:
+            errors.append(f"Duplicate frame name: { frame_name }")
+
+        frame_x = (frame_number % frames_per_row) * fs.frame_width
+        frame_y = (frame_number // frames_per_row) * fs.frame_height
+
+        pattern = None
+        x_offset = None
+        y_offset = None
+        layout = layouts[frame_number]
+        if layout:
+            pattern = ms_export_orders.patterns[layout.pattern]
+            x_offset = layout.x_offset
+            y_offset = layout.y_offset
+
+        frame_locations[frame_name] = FrameLocation(
+                is_clone = False,
+                flip = None,
+                frame_x = frame_x,
+                frame_y = frame_y,
+                pattern = pattern,
+                x_offset = x_offset,
+                y_offset = y_offset,
+                hitbox = hitboxes[frame_number],
+                hurtbox = hurtboxes[frame_number],
+        )
+
+
+    #
+    # Process cloned frames
+    for c in fs.clones:
+        if c.name in frame_locations:
+            errors.append(f"Duplicate cloned frame name: { c.name }")
+        else:
+            source = frame_locations.get(c.source)
+            if not source:
+                errors.append(f"Cannot clone frame: { c.name } { c.source }")
+            elif source.flip is not None:
+                errors.append(f"Cannot clone a flipped frame: { c.name } { c.source }")
+            else:
+                frame_locations[c.name] = clone_frame_location(source, c.flip, fs, image_width, image_height)
+
+    if errors:
+        raise FramesetError(fs.name, errors)
+
+    return frame_locations
 
 
 def animation_delay__distance(d : Union[float, int]) -> int:
@@ -551,16 +777,15 @@ def build_animation_data(ani : MsAnimation, get_frame_id : Callable[[Name], int]
 def build_frameset(fs : MsFrameset, ms_export_orders : MsExportOrder, ms_dir : Filename, tiles : Tileset, palettes_map : list[PaletteMap], transparent_color : SnesColor, pattern_grids : list[PatternGrid], spritesheet_name : Name) -> MsFsEntry:
     errors : list[Union[str,FrameError,AnimationError]] = list()
 
-    frames      : dict[Name, bytes] = dict()
+    image = load_image(ms_dir, fs.source)
+
+    frame_locations = extract_frame_locations(fs, ms_export_orders, image.width, image.height)
+
+    frames, patterns_used = build_frame_data(frame_locations, fs, image, tiles, palettes_map, transparent_color, pattern_grids)
     animations  : dict[Name, bytes] = dict()
 
     exported_frames    : list[bytes]     = list()
     exported_frame_ids : dict[Name, int] = dict()
-
-    if fs.pattern:
-        base_pattern = ms_export_orders.patterns[fs.pattern]
-    else:
-        base_pattern = None
 
 
     ms_export_orders.shadow_sizes[fs.shadow_size]
@@ -570,131 +795,16 @@ def build_frameset(fs : MsFrameset, ms_export_orders : MsExportOrder, ms_dir : F
     if tile_hitbox.half_width >= 128 or tile_hitbox.half_height >= 128:
         errors.append(f"Tile hitbox is too large: { tile_hitbox.half_width }, { tile_hitbox.half_height }")
 
-
-    image = load_image(ms_dir, fs.source)
-
-    image_hflip : Optional[PIL.Image.Image] = None
-    image_vflip : Optional[PIL.Image.Image] = None
-    image_hvflip : Optional[PIL.Image.Image] = None
-
-    block_pattern : Optional[MsPattern] = None
-
     export_order = ms_export_orders.animation_lists.get(fs.ms_export_order)
     if export_order is None:
         errors.append(f"Unknown export order: { fs.ms_export_order }")
-
-    if fs.frame_width < 0 or fs.frame_height < 0:
-        errors.append(f"Invalid frame size: { fs.frame_width } x { fs.frame_height }")
-
-    if fs.frame_width >= 256 or fs.frame_height >= 256:
-        errors.append(f"Frame size is too large: { fs.frame_width } x { fs.frame_height }")
-
-    if image.width % fs.frame_width != 0 or image.height % fs.frame_height != 0:
-        errors.append('Source image is not a multiple of frame size')
-
-    if errors:
-        raise FramesetError(fs.name, errors)
-
-
-    frames_per_row = image.width // fs.frame_width
-
-    all_blocks_use_the_same_pattern = base_pattern is not None
-
-    for block_id, block in enumerate(fs.blocks):
-        # ::TODO somehow handle clone blocks::
-
-        if block.pattern:
-            block_pattern = ms_export_orders.patterns[block.pattern]
-
-            if block.pattern != fs.pattern:
-                all_blocks_use_the_same_pattern = False
-        else:
-            block_pattern = base_pattern
-
-
-        block_image = None
-        if block.flip is None:
-            block_image = image
-
-        elif block.flip == 'hflip':
-            if image_hflip is None:
-                image_hflip = image.transpose(PIL.Image.Transpose.FLIP_LEFT_RIGHT)
-            block_image = image_hflip
-
-        elif block.flip == 'vflip':
-            if image_vflip is None:
-                image_vflip = image.transpose(PIL.Image.Transpose.FLIP_TOP_BOTTOM)
-            block_image = image_vflip
-
-        elif block.flip == 'hvflip':
-            if image_hvflip is None:
-                image_hvflip = image.transpose(PIL.Image.Transpose.ROTATE_180)
-            block_image = image_hvflip
-
-        else:
-            errors.append(f"Block #{ block_id }: Unknown flip: { block.flip }")
-            continue
-
-
-        if block_pattern:
-            # Test offset is inside frame.
-            # Done here to ensure error is only printed once.
-            assert block.x is not None and block.y is not None
-            block_x_offset = fs.x_origin - block.x
-            block_y_offset = fs.y_origin - block.y
-            if block_x_offset < 0 or block_x_offset >= fs.frame_width or block_y_offset < 0 or block_y_offset >= fs.frame_height:
-                errors.append(f"Block #{ block_id }: Offset is outside frame: { block_x_offset }, { block_y_offset }")
-                continue
-
-
-        for i, frame_name in enumerate(block.frames):
-            if frame_name in frames:
-                raise FramesetError(fs.name, f"Duplicate frame: { frame_name }")
-
-            frame_number = block.start + i
-            x = (frame_number % frames_per_row) * fs.frame_width
-            y = (frame_number // frames_per_row) * fs.frame_height
-
-
-            if block.flip == 'hflip' or block.flip == 'hvflip':
-                x = block_image.width - x - fs.frame_width
-            elif block.flip == 'vflip' or block.flip == 'hvflip':
-                y = block_image.width - y - fs.frame_height
-
-
-            try:
-                if block_pattern is None:
-                    pattern, pattern_x, pattern_y = find_best_pattern(block_image, transparent_color, pattern_grids, x, y, fs.frame_width, fs.frame_height)
-
-                    x += pattern_x
-                    y += pattern_y
-                    x_offset = fs.x_origin - pattern_x
-                    y_offset = fs.y_origin - pattern_y
-                else:
-                    assert block.x is not None and block.y is not None
-
-                    pattern = block_pattern
-
-                    x += block.x
-                    y += block.y
-                    x_offset = block_x_offset
-                    y_offset = block_y_offset
-
-                hitbox = fs.hitbox_overrides.get(frame_name, block.default_hitbox)
-                hurtbox = fs.hurtbox_overrides.get(frame_name, block.default_hurtbox)
-
-                frames[frame_name] = extract_frame(block_image, pattern, palettes_map, tiles, fs, frame_name, x, y, x_offset, y_offset, hitbox, hurtbox)
-            except FrameError as e:
-                errors.append(e)
-            except ValueError as e:
-                errors.append(FrameError(frame_name, str(e)))
 
     if errors:
         raise FramesetError(fs.name, errors)
 
 
     # Confirm all frames have been processed
-    assert len(frames) == sum(len(b.frames) for b in fs.blocks)
+    assert len(frames) == len(fs.frames) + len(fs.clones)
 
     for ani in fs.animations.values():
         assert ani.name not in animations
@@ -745,9 +855,8 @@ def build_frameset(fs : MsFrameset, ms_export_orders : MsExportOrder, ms_dir : F
         raise FramesetError(fs.name, errors)
 
 
-    if all_blocks_use_the_same_pattern:
-        assert fs.pattern
-        pattern_name = fs.pattern
+    if len(patterns_used) == 1:
+        pattern_name = next(iter(patterns_used))
     else:
         pattern_name = "dynamic_pattern"
 

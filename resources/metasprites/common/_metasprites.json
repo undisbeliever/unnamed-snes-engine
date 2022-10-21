@@ -13,30 +13,22 @@
     "xorigin":  16,
     "yorigin":  21,
 
-    "shadowSize": "MEDIUM",
-    "tilehitbox": "6 3",
-
-    "pattern": null,
     "ms-export-order": "player",
 
-    "order": 2,
-
-    "blocks": [
-      {
-        "start": 0,
-
-        "frames": [
-          "north0", "north1", "north2", "north3",
-          "south0", "south1", "south2", "south3",
-          "east0",  "east1",  "east2",  "east3",
-          "west0",  "west1",  "west2",  "west3",
-          "attack_north0", "attack_north1", "attack_north2", "attack_north3",
-          "attack_south0", "attack_south1", "attack_south2", "attack_south3",
-          "attack_east0",  "attack_east1",  "attack_east2",  "attack_east3",
-          "attack_west0",  "attack_west1",  "attack_west2",  "attack_west3"
-        ]
-      }
+    "frames": [
+      "north0", "north1", "north2", "north3",
+      "south0", "south1", "south2", "south3",
+      "east0",  "east1",  "east2",  "east3",
+      "west0",  "west1",  "west2",  "west3",
+      "attack_north0", "attack_north1", "attack_north2", "attack_north3",
+      "attack_south0", "attack_south1", "attack_south2", "attack_south3",
+      "attack_east0",  "attack_east1",  "attack_east2",  "attack_east3",
+      "attack_west0",  "attack_west1",  "attack_west2",  "attack_west3"
     ],
+
+    "order": 2,
+    "shadowSize": "MEDIUM",
+    "tilehitbox": "6 3",
 
     "defaultHurtbox":   "12 15    8  8",
 
@@ -128,24 +120,16 @@
 
     "xorigin": 3,
     "yorigin": 3,
-    "shadowSize": "NONE",
-    "tilehitbox": "0 0",
 
-    "pattern": "square_single8",
     "ms-export-order": "sword_particles",
 
+    "defaultLayout": "square_single8 0 0",
+
+    "frames": [ "collision0", "collision1", "collision2" ],
+
     "order": 2,
-
-    "blocks": [
-      {
-        "start": 0,
-
-        "x": 0,
-        "y": 0,
-
-        "frames": [ "collision0", "collision1", "collision2" ]
-      }
-    ],
+    "shadowSize": "NONE",
+    "tilehitbox": "0 0",
 
     "animations": {
       "animation": {
@@ -165,24 +149,15 @@
     "xorigin":  8,
     "yorigin":  13,
 
-    "shadowSize": "SMALL",
-    "tilehitbox": "4 4",
-
-    "pattern": "square_single16",
     "ms-export-order": "bomb",
 
+    "defaultLayout": "square_single16 0 0",
+
+    "frames": [ "frame0", "frame1" ],
+
     "order": 2,
-
-    "blocks": [
-      {
-        "start": 0,
-
-        "x": 0,
-        "y": 0,
-
-        "frames": [ "frame0", "frame1" ]
-      }
-    ],
+    "shadowSize": "SMALL",
+    "tilehitbox": "4 4",
 
     "animations": {
       "stationary": {
@@ -208,34 +183,18 @@
     "xorigin":  8,
     "yorigin":  8,
 
-    "shadowSize": "SMALL",
-    "tilehitbox": "3 2",
-
-    "pattern": null,
     "ms-export-order": "projectile",
 
+    "frames": [ "north", "south", "east", "west" ],
+
+    "layouts": {
+      "north - south": "rect_8x16_two 4 0",
+      "east - west":   "rect_16x8_two 0 4"
+    },
+
     "order": 2,
-
-    "blocks": [
-      {
-        "start": 0,
-        "pattern": "rect_8x16_two",
-
-        "x": 4,
-        "y": 0,
-
-        "frames": [ "north", "south" ]
-      },
-      {
-        "start": 2,
-        "pattern": "rect_16x8_two",
-
-        "x": 0,
-        "y": 4,
-
-        "frames": [ "east", "west" ]
-      }
-    ],
+    "shadowSize": "SMALL",
+    "tilehitbox": "3 2",
 
     "hitboxes": {
       "north":  " 7  0    3  8",
@@ -287,34 +246,18 @@
     "xorigin":  8,
     "yorigin":  8,
 
-    "shadowSize": "SMALL",
-    "tilehitbox": "3 2",
-
-    "pattern": null,
     "ms-export-order": "projectile",
 
+    "frames": [ "north", "south", "east", "west"],
+
+    "layouts": {
+      "north - south": "rect_8x16_two 4 0",
+      "east - west":   "rect_16x8_two 0 4"
+    },
+
     "order": 2,
-
-    "blocks": [
-      {
-        "start": 0,
-        "pattern": "rect_8x16_two",
-
-        "x": 4,
-        "y": 0,
-
-        "frames": [ "north", "south" ]
-      },
-      {
-        "start": 2,
-        "pattern": "rect_16x8_two",
-
-        "x": 0,
-        "y": 4,
-
-        "frames": [ "east", "west" ]
-      }
-    ],
+    "shadowSize": "SMALL",
+    "tilehitbox": "3 2",
 
     "hitboxes": {
       "north":  " 5  0    6  8",
