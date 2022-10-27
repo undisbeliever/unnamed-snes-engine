@@ -882,8 +882,8 @@ def __read_ms_animation(a : _Ms_Helper, name : Name) -> MsAnimation:
 
 
 
-
-def __read_ms_frameset(jh : _Ms_Helper, name : Name, i : int) -> MsFrameset:
+# IF `skip_animations` is true, then no animations will be loaded and any errors in the animations will be ignored
+def __read_ms_frameset(jh : _Ms_Helper, name : Name, i : int, skip_animations : Optional[bool] = None) -> MsFrameset:
     return MsFrameset(
             name = name,
             source              = jh.get_filename('source'),
@@ -903,7 +903,7 @@ def __read_ms_frameset(jh : _Ms_Helper, name : Name, i : int) -> MsFrameset:
             hurtbox_overrides   = jh.get_aabb_overrides('hurtboxes'),
             layout_overrides    = jh.get_layout_overrides('layouts'),
             clones              = jh.get_clones('clones'),
-            animations          = jh.build_dict_from_dict('animations', MsAnimation, 254, __read_ms_animation),
+            animations          = jh.build_dict_from_dict('animations', MsAnimation, 254, __read_ms_animation) if not skip_animations else OrderedDict(),
     )
 
 
@@ -916,6 +916,11 @@ def _load_metasprites(jh : _Ms_Helper) -> MsSpritesheet:
             framesets = jh.build_ordered_dict_from_list('framesets', MsFrameset, 256, __read_ms_frameset)
     )
 
+
+# IF `skip_animations` is true, then no animations will be loaded and any errors in the animations will be ignored
+def load_metasprite_frameset_from_dict(fs_name : Name, d : dict[str, Any], skip_animations : bool) -> MsFrameset:
+    jh = _Ms_Helper(d, fs_name)
+    return __read_ms_frameset(jh, fs_name, 0, skip_animations)
 
 
 def load_metasprites_json(filename : Filename) -> MsSpritesheet:
