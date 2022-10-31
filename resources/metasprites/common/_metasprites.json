@@ -4,302 +4,284 @@
   "firstTile": 16,
   "endTile": 192,
   "framesets": [
-  {
-    "name": "Player",
-    "source": "player.png",
-    "frameWidth": "32",
-    "frameHeight": "32",
-
-    "xorigin":  16,
-    "yorigin":  21,
-
-    "ms-export-order": "player",
-
-    "frames": [
-      "north0", "north1", "north2", "north3",
-      "south0", "south1", "south2", "south3",
-      "east0",  "east1",  "east2",  "east3",
-      "west0",  "west1",  "west2",  "west3",
-      "attack_north0", "attack_north1", "attack_north2", "attack_north3",
-      "attack_south0", "attack_south1", "attack_south2", "attack_south3",
-      "attack_east0",  "attack_east1",  "attack_east2",  "attack_east3",
-      "attack_west0",  "attack_west1",  "attack_west2",  "attack_west3"
-    ],
-
-    "order": 2,
-    "shadowSize": "MEDIUM",
-    "tilehitbox": "6 3",
-
-    "defaultHurtbox":   "12 15    8  8",
-
-    "hitboxes": {
-      "attack_north0":  "19  8   12  8",
-      "attack_north1":  "19  6    9 10",
-      "attack_north2":  "13  3    9 13",
-      "attack_north3":  "13  3    8 14",
-      "attack_south0":  " 3 14   12  8",
-      "attack_south1":  " 4 17    9 10",
-      "attack_south2":  "10 18    9 13",
-      "attack_south3":  "11 17    8 14",
-      "attack_east0":   "14 11    8 11",
-      "attack_east1":   "16 10   12  8",
-      "attack_east2":   "16 14   15  8",
-      "attack_east3":   "16 14   15  8",
-      "attack_west0":   "10 11    8 11",
-      "attack_west1":   " 4 10   12  8",
-      "attack_west2":   " 1 14   15  8",
-      "attack_west3":   " 1 14   15  8"
+    {
+      "name": "Player",
+      "source": "player.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "xorigin": 16,
+      "yorigin": 21,
+      "ms-export-order": "player",
+      "frames": [ "north0", "north1", "north2", "north3", "south0", "south1", "south2", "south3", "east0", "east1", "east2", "east3", "west0", "west1", "west2", "west3", "attack_north0", "attack_north1", "attack_north2", "attack_north3", "attack_south0", "attack_south1", "attack_south2", "attack_south3", "attack_east0", "attack_east1", "attack_east2", "attack_east3", "attack_west0", "attack_west1", "attack_west2", "attack_west3" ],
+      "order": 2,
+      "shadowSize": "MEDIUM",
+      "tilehitbox": "6 3",
+      "defaultHurtbox": "12 15    8  8",
+      "hitboxes": {
+        "attack_north0": "19  8   12  8",
+        "attack_north1": "19  6    9 10",
+        "attack_north2": "13  3    9 13",
+        "attack_north3": "13  3    8 14",
+        "attack_south0": "3 14   12  8",
+        "attack_south1": "4 17    9 10",
+        "attack_south2": "10 18    9 13",
+        "attack_south3": "11 17    8 14",
+        "attack_east0": "14 11    8 11",
+        "attack_east1": "16 10   12  8",
+        "attack_east2": "16 14   15  8",
+        "attack_east3": "16 14   15  8",
+        "attack_west0": "10 11    8 11",
+        "attack_west1": "4 10   12  8",
+        "attack_west2": "1 14   15  8",
+        "attack_west3": "1 14   15  8"
+      },
+      "animations": {
+        "walk_north": {
+          "delay-type": "distance_y",
+          "frames": [ "north0", 9.5, "north1", 9.5, "north2", 9.5, "north3", 9.5 ],
+          "loop": false
+        },
+        "walk_south": {
+          "delay-type": "distance_y",
+          "frames": [ "south0", 9.5, "south1", 9.5, "south2", 9.5, "south3", 9.5 ],
+          "loop": false
+        },
+        "walk_east": {
+          "delay-type": "distance_x",
+          "frames": [ "east0", 9.5, "east1", 9.5, "east2", 9.5, "east3", 9.5 ],
+          "loop": false
+        },
+        "walk_west": {
+          "delay-type": "distance_x",
+          "frames": [ "west0", 9.5, "west1", 9.5, "west2", 9.5, "west3", 9.5 ],
+          "loop": false
+        },
+        "attack_north": {
+          "delay-type": "frame",
+          "loop": false,
+          "frames": [ "attack_north0", 3, "attack_north1", 3, "attack_north2", 3, "attack_north3", 3 ]
+        },
+        "attack_south": {
+          "delay-type": "frame",
+          "loop": false,
+          "frames": [ "attack_south0", 3, "attack_south1", 3, "attack_south2", 3, "attack_south3", 3 ]
+        },
+        "attack_east": {
+          "delay-type": "frame",
+          "loop": false,
+          "frames": [ "attack_east0", 3, "attack_east1", 3, "attack_east2", 3, "attack_east3", 3 ]
+        },
+        "attack_west": {
+          "delay-type": "frame",
+          "loop": false,
+          "frames": [ "attack_west0", 3, "attack_west1", 3, "attack_west2", 3, "attack_west3", 3 ]
+        },
+        "hurt_north": {
+          "delay-type": "frame",
+          "loop": false,
+          "frames": [ "north0", 6 ]
+        },
+        "hurt_south": {
+          "delay-type": "frame",
+          "loop": false,
+          "frames": [ "south0", 6 ]
+        },
+        "hurt_east": {
+          "delay-type": "frame",
+          "loop": false,
+          "frames": [ "east0", 6 ]
+        },
+        "hurt_west": {
+          "delay-type": "frame",
+          "loop": false,
+          "frames": [ "west0", 6 ]
+        }
+      },
+      "defaultLayout": null,
+      "layouts": {},
+      "defaultHitbox": null,
+      "hurtboxes": {},
+      "clones": {}
     },
-
-    "animations": {
-      "walk_north": {
-         "delay-type": "distance_y",
-         "frames": [ "north0", 9.5, "north1", 9.5, "north2", 9.5, "north3", 9.5 ]
+    {
+      "name": "SwordParticles",
+      "source": "sword-particles.png",
+      "frameWidth": 8,
+      "frameHeight": 8,
+      "xorigin": 3,
+      "yorigin": 3,
+      "ms-export-order": "sword_particles",
+      "defaultLayout": "square_single8 0 0",
+      "frames": [ "collision0", "collision1", "collision2" ],
+      "order": 2,
+      "shadowSize": "NONE",
+      "tilehitbox": "0 0",
+      "animations": {
+        "animation": {
+          "loop": false,
+          "delay-type": "frame",
+          "fixed-delay": 6,
+          "frames": [ "collision0", "collision1", "collision2" ]
+        }
       },
-      "walk_south": {
-         "delay-type": "distance_y",
-         "frames": [ "south0", 9.5, "south1", 9.5, "south2", 9.5, "south3", 9.5 ]
+      "layouts": {},
+      "defaultHitbox": null,
+      "hitboxes": {},
+      "defaultHurtbox": null,
+      "hurtboxes": {},
+      "clones": {}
+    },
+    {
+      "name": "Bomb",
+      "source": "bomb.png",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "xorigin": 8,
+      "yorigin": 13,
+      "ms-export-order": "bomb",
+      "defaultLayout": "square_single16 0 0",
+      "frames": [ "frame0", "frame1" ],
+      "order": 2,
+      "shadowSize": "SMALL",
+      "tilehitbox": "4 4",
+      "animations": {
+        "stationary": {
+          "loop": false,
+          "delay-type": "frame",
+          "fixed-delay": 0,
+          "frames": [ "frame0" ]
+        },
+        "active": {
+          "loop": true,
+          "delay-type": "frame",
+          "fixed-delay": 40,
+          "frames": [ "frame0", "frame1" ]
+        }
       },
-      "walk_east": {
-         "delay-type": "distance_x",
-         "frames": [ "east0", 9.5, "east1", 9.5, "east2", 9.5, "east3", 9.5 ]
+      "layouts": {},
+      "defaultHitbox": null,
+      "hitboxes": {},
+      "defaultHurtbox": null,
+      "hurtboxes": {},
+      "clones": {}
+    },
+    {
+      "name": "Bolt",
+      "source": "bolt.png",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "xorigin": 8,
+      "yorigin": 8,
+      "ms-export-order": "projectile",
+      "frames": [ "north", "south", "east", "west" ],
+      "layouts": {
+        "north - south": "rect_8x16_two 4 0",
+        "east - west": "rect_16x8_two 0 4"
       },
-      "walk_west": {
-         "delay-type": "distance_x",
-         "frames": [ "west0", 9.5, "west1", 9.5, "west2", 9.5, "west3", 9.5 ]
+      "order": 2,
+      "shadowSize": "SMALL",
+      "tilehitbox": "3 2",
+      "hitboxes": {
+        "north": "7  0    3  8",
+        "south": "7  8    3  8",
+        "east": "8  7    8  3",
+        "west": "0  7    8  3"
       },
-
-      "attack_north": {
-         "delay-type": "frame",
-         "loop": false,
-         "frames": [ "attack_north0", 3, "attack_north1", 3, "attack_north2", 3, "attack_north3", 3 ]
+      "hurtboxes": {
+        "north": "7  0    3 10",
+        "south": "7  6    3 10",
+        "east": "6  7   10  3",
+        "west": "0  7   10  3"
       },
-      "attack_south": {
-         "delay-type": "frame",
-         "loop": false,
-         "frames": [ "attack_south0", 3, "attack_south1", 3, "attack_south2", 3, "attack_south3", 3 ]
+      "animations": {
+        "north": {
+          "loop": false,
+          "delay-type": "frame",
+          "fixed-delay": 0,
+          "frames": [ "north" ]
+        },
+        "south": {
+          "loop": false,
+          "delay-type": "frame",
+          "fixed-delay": 0,
+          "frames": [ "south" ]
+        },
+        "east": {
+          "loop": false,
+          "delay-type": "frame",
+          "fixed-delay": 0,
+          "frames": [ "east" ]
+        },
+        "west": {
+          "loop": false,
+          "delay-type": "frame",
+          "fixed-delay": 0,
+          "frames": [ "west" ]
+        }
       },
-      "attack_east": {
-         "delay-type": "frame",
-         "loop": false,
-         "frames": [ "attack_east0", 3, "attack_east1", 3, "attack_east2", 3, "attack_east3", 3 ]
+      "defaultLayout": null,
+      "defaultHitbox": null,
+      "defaultHurtbox": null,
+      "clones": {}
+    },
+    {
+      "name": "Fireball",
+      "source": "fireball.png",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "xorigin": 8,
+      "yorigin": 8,
+      "ms-export-order": "projectile",
+      "frames": [ "north", "south", "east", "west" ],
+      "layouts": {
+        "north - south": "rect_8x16_two 4 0",
+        "east - west": "rect_16x8_two 0 4"
       },
-      "attack_west": {
-         "delay-type": "frame",
-         "loop": false,
-         "frames": [ "attack_west0", 3, "attack_west1", 3, "attack_west2", 3, "attack_west3", 3 ]
+      "order": 2,
+      "shadowSize": "SMALL",
+      "tilehitbox": "3 2",
+      "hitboxes": {
+        "north": "5  0    6  8",
+        "south": "5  8    6  8",
+        "east": "8  5    8  6",
+        "west": "0  5    8  6"
       },
-
-      "hurt_north": {
-         "delay-type": "frame",
-         "loop": false,
-         "frames": [ "north0", 6 ]
+      "hurtboxes": {
+        "north": "5  0    6  8",
+        "south": "5  8    6  8",
+        "east": "8  5    8  6",
+        "west": "0  5    8  6"
       },
-      "hurt_south": {
-         "delay-type": "frame",
-         "loop": false,
-         "frames": [ "south0", 6 ]
+      "animations": {
+        "north": {
+          "loop": false,
+          "delay-type": "frame",
+          "fixed-delay": 0,
+          "frames": [ "north" ]
+        },
+        "south": {
+          "loop": false,
+          "delay-type": "frame",
+          "fixed-delay": 0,
+          "frames": [ "south" ]
+        },
+        "east": {
+          "loop": false,
+          "delay-type": "frame",
+          "fixed-delay": 0,
+          "frames": [ "east" ]
+        },
+        "west": {
+          "loop": false,
+          "delay-type": "frame",
+          "fixed-delay": 0,
+          "frames": [ "west" ]
+        }
       },
-      "hurt_east": {
-         "delay-type": "frame",
-         "loop": false,
-         "frames": [ "east0", 6 ]
-      },
-      "hurt_west": {
-         "delay-type": "frame",
-         "loop": false,
-         "frames": [ "west0", 6 ]
-      }
+      "defaultLayout": null,
+      "defaultHitbox": null,
+      "defaultHurtbox": null,
+      "clones": {}
     }
-  },
-  {
-    "name": "SwordParticles",
-    "source": "sword-particles.png",
-    "frameWidth": 8,
-    "frameHeight": 8,
-
-    "xorigin": 3,
-    "yorigin": 3,
-
-    "ms-export-order": "sword_particles",
-
-    "defaultLayout": "square_single8 0 0",
-
-    "frames": [ "collision0", "collision1", "collision2" ],
-
-    "order": 2,
-    "shadowSize": "NONE",
-    "tilehitbox": "0 0",
-
-    "animations": {
-      "animation": {
-        "loop": false,
-        "delay-type": "frame",
-        "fixed-delay": 6,
-        "frames": [ "collision0", "collision1", "collision2" ]
-      }
-    }
-  },
-  {
-    "name": "Bomb",
-    "source": "bomb.png",
-    "frameWidth": "16",
-    "frameHeight": "16",
-
-    "xorigin":  8,
-    "yorigin":  13,
-
-    "ms-export-order": "bomb",
-
-    "defaultLayout": "square_single16 0 0",
-
-    "frames": [ "frame0", "frame1" ],
-
-    "order": 2,
-    "shadowSize": "SMALL",
-    "tilehitbox": "4 4",
-
-    "animations": {
-      "stationary": {
-        "loop": false,
-        "delay-type": "frame",
-        "fixed-delay": 0,
-        "frames": [ "frame0" ]
-      },
-      "active": {
-        "loop": true,
-        "delay-type": "frame",
-        "fixed-delay": 40,
-        "frames": [ "frame0", "frame1" ]
-      }
-    }
-  },
-  {
-    "name": "Bolt",
-    "source": "bolt.png",
-    "frameWidth": "16",
-    "frameHeight": "16",
-
-    "xorigin":  8,
-    "yorigin":  8,
-
-    "ms-export-order": "projectile",
-
-    "frames": [ "north", "south", "east", "west" ],
-
-    "layouts": {
-      "north - south": "rect_8x16_two 4 0",
-      "east - west":   "rect_16x8_two 0 4"
-    },
-
-    "order": 2,
-    "shadowSize": "SMALL",
-    "tilehitbox": "3 2",
-
-    "hitboxes": {
-      "north":  " 7  0    3  8",
-      "south":  " 7  8    3  8",
-      "east":   " 8  7    8  3",
-      "west":   " 0  7    8  3"
-    },
-
-    "hurtboxes": {
-      "north":  " 7  0    3 10",
-      "south":  " 7  6    3 10",
-      "east":   " 6  7   10  3",
-      "west":   " 0  7   10  3"
-    },
-
-    "animations": {
-      "north": {
-        "loop": false,
-        "delay-type": "frame",
-        "fixed-delay": 0,
-        "frames": [ "north" ]
-      },
-      "south": {
-        "loop": false,
-        "delay-type": "frame",
-        "fixed-delay": 0,
-        "frames": [ "south" ]
-      },
-      "east": {
-        "loop": false,
-        "delay-type": "frame",
-        "fixed-delay": 0,
-        "frames": [ "east" ]
-      },
-      "west": {
-        "loop": false,
-        "delay-type": "frame",
-        "fixed-delay": 0,
-        "frames": [ "west" ]
-      }
-    }
-  },
-  {
-    "name": "Fireball",
-    "source": "fireball.png",
-    "frameWidth": "16",
-    "frameHeight": "16",
-
-    "xorigin":  8,
-    "yorigin":  8,
-
-    "ms-export-order": "projectile",
-
-    "frames": [ "north", "south", "east", "west"],
-
-    "layouts": {
-      "north - south": "rect_8x16_two 4 0",
-      "east - west":   "rect_16x8_two 0 4"
-    },
-
-    "order": 2,
-    "shadowSize": "SMALL",
-    "tilehitbox": "3 2",
-
-    "hitboxes": {
-      "north":  " 5  0    6  8",
-      "south":  " 5  8    6  8",
-      "east":   " 8  5    8  6",
-      "west":   " 0  5    8  6"
-    },
-
-    "hurtboxes": {
-      "north":  " 5  0    6  8",
-      "south":  " 5  8    6  8",
-      "east":   " 8  5    8  6",
-      "west":   " 0  5    8  6"
-    },
-
-    "animations": {
-      "north": {
-        "loop": false,
-        "delay-type": "frame",
-        "fixed-delay": 0,
-        "frames": [ "north" ]
-      },
-      "south": {
-        "loop": false,
-        "delay-type": "frame",
-        "fixed-delay": 0,
-        "frames": [ "south" ]
-      },
-      "east": {
-        "loop": false,
-        "delay-type": "frame",
-        "fixed-delay": 0,
-        "frames": [ "east" ]
-      },
-      "west": {
-        "loop": false,
-        "delay-type": "frame",
-        "fixed-delay": 0,
-        "frames": [ "west" ]
-      }
-    }
-  }
-]
+  ]
 }
-
