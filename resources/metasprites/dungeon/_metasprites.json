@@ -150,7 +150,10 @@
       "defaultHurtbox": "12 10   8  14",
       "layouts": {
         "south0 - south3": "rect_16x24_and_extra 6 2",
-        "north0 - west3": "rect_16x24_and_extra 8 2"
+        "north0 - north3": "rect_16x24_and_extra 8 2",
+        "north1": "rect_16x24_three 9 2",
+        "east0 - east3": "rect_16x24_three 9 2",
+        "west0 - west3": "rect_16x24_three 7 2"
       },
       "animations": {
         "walk_north": {
