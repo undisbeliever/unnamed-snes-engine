@@ -60,7 +60,7 @@
       "source": "slime.png",
       "frameWidth": 32,
       "frameHeight": 32,
-      "frames": [ "crawl_right_0", "crawl_right_1", "crawl_right_2", "crawl_right_3", "crawl_down_0", "crawl_down_1", "crawl_down_2", "crawl_down_3", "crawl_up_0", "crawl_up_1", "crawl_up_2", "crawl_up_3" ],
+      "frames": [ "crawl_right_0", "crawl_right_1", "crawl_right_2", "crawl_right_3", "crawl_down_0", "crawl_down_1", "crawl_down_2", "crawl_down_3", "crawl_up_0", "crawl_up_1", "crawl_up_2", "crawl_up_3", "hurt_right", "hurt_down", "hurt_up" ],
       "xorigin": 16,
       "yorigin": 16,
       "ms-export-order": "slime",
@@ -68,19 +68,25 @@
       "order": 2,
       "shadowSize": "NONE",
       "tilehitbox": "4 4",
-      "defaultHitbox": "13 12   6  8",
-      "defaultHurtbox": "12 11   8 10",
+      "defaultHitbox": null,
+      "defaultHurtbox": null,
       "hitboxes": {
-        "crawl_right_0 - crawl_right_3": "14 12   8  7"
+        "crawl_right_0 - crawl_right_3": "14 12   8  7",
+        "crawl_down_0 - crawl_up_3": "13 12   6  8",
+        "hurt_right": "14 14   5  5",
+        "hurt_down": "14 14   5  5",
+        "hurt_up": "13 13   5  5"
       },
       "hurtboxes": {
-        "crawl_right_0 - crawl_right_3": "12 11  11  9"
+        "crawl_right_0 - crawl_right_3": "12 11  11  9",
+        "crawl_down_0 - crawl_up_3": "12 11   8 10"
       },
       "clones": {
         "crawl_left_0": "crawl_right_0 hflip",
         "crawl_left_1": "crawl_right_1 hflip",
         "crawl_left_2": "crawl_right_2 hflip",
-        "crawl_left_3": "crawl_right_3 hflip"
+        "crawl_left_3": "crawl_right_3 hflip",
+        "hurt_left": "hurt_right hflip"
       },
       "animations": {
         "crawl_right": {
@@ -110,29 +116,33 @@
         "hurt_right": {
           "delay-type": "none",
           "fixed-delay": 0,
-          "frames": [ "crawl_right_2" ],
+          "frames": [ "hurt_right" ],
           "loop": false
         },
         "hurt_left": {
           "delay-type": "none",
           "fixed-delay": 0,
-          "frames": [ "crawl_left_2" ],
+          "frames": [ "hurt_left" ],
           "loop": false
         },
         "hurt_down": {
           "delay-type": "none",
           "fixed-delay": 0,
-          "frames": [ "crawl_down_0" ],
+          "frames": [ "hurt_down" ],
           "loop": false
         },
         "hurt_up": {
           "delay-type": "none",
           "fixed-delay": 0,
-          "frames": [ "crawl_up_0" ],
+          "frames": [ "hurt_up" ],
           "loop": false
         }
       },
-      "layouts": {}
+      "layouts": {
+        "hurt_right": "square_single8 12 12",
+        "hurt_down": "square_single8 12 12",
+        "hurt_up": "square_single8 12 12"
+      }
     },
     {
       "name": "CrossbowMan",
