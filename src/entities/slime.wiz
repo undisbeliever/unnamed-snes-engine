@@ -131,7 +131,8 @@ func set_state__crawl(entityId : u8 in y) : bool in carry {
     a = State.CRAWL as u8;
     SoA_state[y] = a as State;
 
-    return true;
+    a = SoA_direction[y] as u8;
+    return set_direction__crawling(y, a);
 }
 
 
