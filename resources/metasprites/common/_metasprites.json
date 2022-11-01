@@ -39,22 +39,22 @@
         "walk_north": {
           "delay-type": "distance_y",
           "frames": [ "north0", 9.5, "north1", 9.5, "north2", 9.5, "north3", 9.5 ],
-          "loop": false
+          "loop": true
         },
         "walk_south": {
           "delay-type": "distance_y",
           "frames": [ "south0", 9.5, "south1", 9.5, "south2", 9.5, "south3", 9.5 ],
-          "loop": false
+          "loop": true
         },
         "walk_east": {
           "delay-type": "distance_x",
           "frames": [ "east0", 9.5, "east1", 9.5, "east2", 9.5, "east3", 9.5 ],
-          "loop": false
+          "loop": true
         },
         "walk_west": {
           "delay-type": "distance_x",
           "frames": [ "west0", 9.5, "west1", 9.5, "west2", 9.5, "west3", 9.5 ],
-          "loop": false
+          "loop": true
         },
         "attack_north": {
           "delay-type": "frame",
