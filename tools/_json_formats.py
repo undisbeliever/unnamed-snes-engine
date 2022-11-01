@@ -236,12 +236,8 @@ class _Helper:
                 self._raise_error(f"Expected hex string: { v }", key)
 
 
-    def get_bool(self, key : str, default : bool) -> bool:
-        v = self._optional_get(key, bool)
-
-        if v is None:
-            return default
-        return v
+    def get_bool(self, key : str) -> bool:
+        return self._get(key, bool)
 
 
     def get_object_size(self, key : str) -> Literal[8, 16]:
@@ -873,7 +869,7 @@ def __read_ms_animation(a : _Ms_Helper, name : Name) -> MsAnimation:
 
     return MsAnimation(
             name = name,
-            loop = a.get_bool('loop', True),
+            loop = a.get_bool('loop'),
             delay_type = a.get_name('delay-type'),
             fixed_delay = fixed_delay,
             frames = frames,
