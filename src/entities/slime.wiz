@@ -29,7 +29,7 @@ let CRAWL_MS_ANIMATION_OFFSET   = 0;
 let HURT_MS_ANIMATION_OFFSET    = ms_animations.hurt_left;
 
 
-let HURT_KNOCKBACK_TIME_IN_FRAMES = 30;
+let HURT_KNOCKBACK_TIME_IN_FRAMES = 20;
 let KNOCKBACK_POWER = base.SwordCollisionSpeed.MEDIUM; // 4x CRAWL_SPEED (0x0200)
 
 
