@@ -333,10 +333,40 @@
       "defaultHitbox": "4   5   8  6",
       "defaultHurtbox": "4   4   8  8",
       "animations": {
-        "animation": {
+        "animation0": {
           "delay-type": "frame",
-          "fixed-delay": 4,
+          "fixed-delay": 5,
           "frames": [ "frame0", "frame1", "frame2", "frame3", "frame4", "frame5", "frame6", "frame7" ],
+          "loop": true
+        },
+        "animation1": {
+          "fixed-delay": 5,
+          "frames": [ "frame4", "frame3", "frame2", "frame1", "frame0", "frame7", "frame6", "frame5" ],
+          "loop": true,
+          "delay-type": "frame"
+        },
+        "animation2": {
+          "fixed-delay": 4,
+          "delay-type": "frame",
+          "frames": [ "frame0", "frame1", "frame2", "frame3", "frame4", "frame5", "frame6", "frame7" ],
+          "loop": true
+        },
+        "animation3": {
+          "fixed-delay": 4,
+          "delay-type": "frame",
+          "frames": [ "frame4", "frame3", "frame2", "frame1", "frame0", "frame7", "frame6", "frame5" ],
+          "loop": true
+        },
+        "animation4": {
+          "fixed-delay": 3,
+          "loop": true,
+          "delay-type": "frame",
+          "frames": [ "frame0", "frame1", "frame2", "frame3", "frame4", "frame5", "frame6", "frame7" ]
+        },
+        "animation5": {
+          "fixed-delay": 3,
+          "delay-type": "frame",
+          "frames": [ "frame4", "frame3", "frame2", "frame1", "frame0", "frame7", "frame6", "frame5" ],
           "loop": true
         }
       },

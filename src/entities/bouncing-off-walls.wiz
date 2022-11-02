@@ -29,6 +29,8 @@ let INITIAL_SPEED     = 0x0120;
 let FIRST_SWORD_SPEED = base.SwordCollisionSpeed.SLOW;
 let MAX_SWORD_SPEED   = base.SwordCollisionSpeed.FAST_FAST_FAST;
 
+let N_ANIMATIONS = 6;
+
 
 in code {
 
@@ -139,7 +141,13 @@ inline func collided_with_player_hitbox(entityId : u8 in y) {
     // ::SHOULDDO adjust velocity based on previous velocity and collisionCentre::
     base.take_damage_from_player_sword_with_knockback(y, x);
 
-    // ::SHOULDDO speed up MS animation on every 2nd bit::
+    // Advance to the next animation
+    a = SoA.msAnimationId[y];
+    a++;
+    if a >= N_ANIMATIONS {
+        a = N_ANIMATIONS - 1;
+    }
+    set_ms_animation(y, a);
 }
 
 

@@ -104,7 +104,7 @@
       "hurt_south", "hurt_north", "hurt_east", "hurt_west"
     ],
     "eight_direction_spinner": [
-      "animation"
+      "animation0", "animation1", "animation2", "animation3", "animation4", "animation5"
     ],
     "rook": [
       "standing", "rising", "falling", "landing"
