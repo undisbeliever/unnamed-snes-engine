@@ -61,6 +61,9 @@ enum State : u8 {
 };
 
 
+let HURT_MS_ANIMATION_OFFSET            = ms_animations.hurt_south;
+
+
 
 in wram7e {
 
@@ -603,12 +606,16 @@ func set_direction_east_or_west(entityId : u8 in y) : bool in carry {
 // DB = 0x7e
 #[mem8, idx8]
 func set_state__hurt(entityId : u8 in y) {
+    a = SoA_state[y] as u8 >>> 1;
+    if a >= 4 {
+        a = 0;
+    }
+    set_ms_animation(y, a = a | HURT_MS_ANIMATION_OFFSET);
+
     a = State.HURT as u8;
     SoA_state[y] = a as State;
 
     SoA_countdownTimer[y] = a = HURT_KNOCKBACK_TIME_IN_FRAMES;
-
-    stop_ms_animation(y);
 
     ^return base.take_damage_from_player_sword_with_knockback(y, base.SwordCollisionSpeed.FAST);
 }

@@ -12,7 +12,7 @@
       "xorigin": 16,
       "yorigin": 23,
       "ms-export-order": "skeleton",
-      "frames": [ "south0", "south1", "south2", "south3", "north0", "north1", "north2", "north3", "east0", "east1", "east2", "east3" ],
+      "frames": [ "south0", "south1", "south2", "south3", "north0", "north1", "north2", "north3", "east0", "east1", "east2", "east3", "hurt_south", "hurt_north", "hurt_east" ],
       "defaultLayout": "rect_16x24_three 8 0",
       "order": 2,
       "shadowSize": "MEDIUM",
@@ -23,7 +23,8 @@
         "west0": "east0 hflip",
         "west1": "east1 hflip",
         "west2": "east2 hflip",
-        "west3": "east3 hflip"
+        "west3": "east3 hflip",
+        "hurt_west": "hurt_east hflip"
       },
       "animations": {
         "walk_north": {
@@ -49,6 +50,30 @@
           "fixed-delay": 11.0,
           "frames": [ "west0", "west1", "west2", "west3" ],
           "loop": true
+        },
+        "hurt_south": {
+          "fixed-delay": 0,
+          "loop": false,
+          "delay-type": "none",
+          "frames": [ "hurt_south" ]
+        },
+        "hurt_north": {
+          "fixed-delay": 0,
+          "frames": [ "hurt_north" ],
+          "loop": false,
+          "delay-type": "none"
+        },
+        "hurt_east": {
+          "fixed-delay": 0,
+          "frames": [ "hurt_east" ],
+          "loop": false,
+          "delay-type": "none"
+        },
+        "hurt_west": {
+          "fixed-delay": 0,
+          "loop": false,
+          "delay-type": "none",
+          "frames": [ "hurt_west" ]
         }
       },
       "layouts": {},

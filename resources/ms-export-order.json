@@ -89,7 +89,8 @@
       "animation"
     ],
     "skeleton": [
-      "walk_south", "walk_north", "walk_east", "walk_west"
+      "walk_south", "walk_north", "walk_east", "walk_west",
+      "hurt_south", "hurt_north", "hurt_east", "hurt_west"
     ],
     "slime": [
       "crawl_left", "crawl_right", "crawl_up", "crawl_down",
