@@ -47,7 +47,11 @@ let X_TURNAROUND_THRESHOLD = 11;
 let Y_TURNAROUND_THRESHOLD = 8;
 
 
+let HURT_TIME_IN_FRAMES = 20;
 let HURT_KNOCKBACK_TIME_IN_FRAMES = 10;
+// Entity will be stunned for `HURT_TIME - HURT_KNOCKBACK_TIME` frames.
+
+
 let RECOIL_TIME_IN_FRAMES = 8;
 
 
@@ -615,7 +619,7 @@ func set_state__hurt(entityId : u8 in y) {
     a = State.HURT as u8;
     SoA_state[y] = a as State;
 
-    SoA_countdownTimer[y] = a = HURT_KNOCKBACK_TIME_IN_FRAMES;
+    SoA_countdownTimer[y] = a = HURT_TIME_IN_FRAMES;
 
     ^return base.take_damage_from_player_sword_with_knockback(y, base.SwordCollisionSpeed.FAST);
 }
@@ -626,16 +630,28 @@ func set_state__hurt(entityId : u8 in y) {
 #[mem8, idx8]
 func process__hurt(entityId : u8 in y) : bool in carry {
 
+let RESET_VELOCITY_TIME = HURT_TIME_IN_FRAMES - HURT_KNOCKBACK_TIME_IN_FRAMES;
+
     a = SoA_countdownTimer[y];
     if !zero {
+        if a == RESET_VELOCITY_TIME {
+            // must not modify a.
+            mem16();
+            #[mem16] {
+                x = y;
+                SoA.xVelocity[unaligned x] = 0;
+                SoA.yVelocity[unaligned x] = 0;
+            }
+            mem8();
+        }
         a--;
         SoA_countdownTimer[y] = a;
+
+        return true;
     }
     else {
         ^return _reset(y);
     }
-
-    return true;
 }
 
 
