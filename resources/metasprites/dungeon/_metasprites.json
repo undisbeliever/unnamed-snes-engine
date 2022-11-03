@@ -177,18 +177,22 @@
       "xorigin": 16,
       "yorigin": 23,
       "ms-export-order": "crossbow_man",
-      "frames": [ "south0", "south1", "south2", "south3", "north0", "north1", "north2", "north3", "east0", "east1", "east2", "east3", "west0", "west1", "west2", "west3" ],
+      "frames": [ "south0", "south1", "south2", "south3", "north0", "north1", "north2", "north3", "east0", "east1", "east2", "east3", "west0", "west1", "west2", "west3", "hurt_south", "hurt_north", "hurt_east", "hurt_west" ],
       "order": 2,
       "shadowSize": "MEDIUM",
       "tilehitbox": "6 3",
       "defaultHitbox": "13 12   6  11",
-      "defaultHurtbox": "12 10   8  14",
+      "defaultHurtbox": null,
       "layouts": {
         "south0 - south3": "rect_16x24_and_extra 6 2",
         "north0 - north3": "rect_16x24_and_extra 8 2",
         "north1": "rect_16x24_three 9 2",
         "east0 - east3": "rect_16x24_three 9 2",
-        "west0 - west3": "rect_16x24_three 7 2"
+        "west0 - west3": "rect_16x24_three 7 2",
+        "hurt_south": "rect_16x24_three 8 0",
+        "hurt_north": "rect_16x24_three 8 0",
+        "hurt_east": "rect_16x24_three 8 0",
+        "hurt_west": "rect_16x24_three 8 0"
       },
       "animations": {
         "walk_north": {
@@ -291,30 +295,32 @@
           "loop": false,
           "delay-type": "frame",
           "fixed-delay": 40,
-          "frames": [ "north0" ]
+          "frames": [ "hurt_north" ]
         },
         "hurt_south": {
           "loop": false,
           "delay-type": "frame",
           "fixed-delay": 40,
-          "frames": [ "south0" ]
+          "frames": [ "hurt_south" ]
         },
         "hurt_east": {
           "loop": false,
           "delay-type": "frame",
           "fixed-delay": 40,
-          "frames": [ "east0" ]
+          "frames": [ "hurt_east" ]
         },
         "hurt_west": {
           "loop": false,
           "delay-type": "frame",
           "fixed-delay": 40,
-          "frames": [ "west0" ]
+          "frames": [ "hurt_west" ]
         }
       },
       "defaultLayout": null,
       "hitboxes": {},
-      "hurtboxes": {},
+      "hurtboxes": {
+        "south0-west3": "12 10   8  14"
+      },
       "clones": {}
     },
     {
