@@ -659,7 +659,33 @@ func set_state__blocking(entityId : u8 in y) {
 }
 
 
-let process__blocking = process__hurt;
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__blocking(entityId : u8 in y) : bool in carry {
+
+    carry = is_ms_non_looping_animation_running(y);
+    if !carry {
+        ^return set_state__walk(y, SoA_walkingDirection[y] as u8);
+    }
+
+    a = SoA_countdownTimer[y];
+    if !zero {
+        a--;
+        SoA_countdownTimer[y] = a;
+        if zero {
+            mem16();
+            #[mem16] {
+                x = y;
+                SoA.xVelocity[unaligned x] = 0;
+                SoA.yVelocity[unaligned x] = 0;
+            }
+            mem8();
+        }
+    }
+
+    return true;
+}
 
 
 
