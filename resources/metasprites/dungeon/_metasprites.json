@@ -177,7 +177,7 @@
       "xorigin": 16,
       "yorigin": 23,
       "ms-export-order": "crossbow_man",
-      "frames": [ "south0", "south1", "south2", "south3", "north0", "north1", "north2", "north3", "east0", "east1", "east2", "east3", "west0", "west1", "west2", "west3", "hurt_south", "hurt_north", "hurt_east", "hurt_west", "attack_south", "attack_north", "attack_east", "attack_west" ],
+      "frames": [ "south0", "south1", "south2", "south3", "north0", "north1", "north2", "north3", "east0", "east1", "east2", "east3", "west0", "west1", "west2", "west3", "hurt_south", "hurt_north", "hurt_east", "hurt_west", "attack_south", "attack_north", "attack_east", "attack_west", "blocking_south", "blocking_north", "blocking_east", "blocking_west" ],
       "order": 2,
       "shadowSize": "MEDIUM",
       "tilehitbox": "6 3",
@@ -196,7 +196,11 @@
         "attack_south": "rect_16x24_three 8 2",
         "attack_north": "rect_16x24_and_extra 8 2",
         "attack_east": "rect_16x24_three 8 4",
-        "attack_west": "rect_16x24_three 8 4"
+        "attack_west": "rect_16x24_three 8 4",
+        "blocking_south": "rect_16x24_three 6 2",
+        "blocking_north": "rect_16x24_three 8 2",
+        "blocking_east": "rect_16x24_three 9 4",
+        "blocking_west": "rect_16x24_three 7 4"
       },
       "animations": {
         "walk_north": {
@@ -274,26 +278,26 @@
         "blocking_north": {
           "loop": false,
           "delay-type": "frame",
-          "fixed-delay": 20,
-          "frames": [ "north1" ]
+          "fixed-delay": 60,
+          "frames": [ "blocking_north" ]
         },
         "blocking_south": {
           "loop": false,
           "delay-type": "frame",
-          "fixed-delay": 20,
-          "frames": [ "south1" ]
+          "fixed-delay": 60,
+          "frames": [ "blocking_south" ]
         },
         "blocking_east": {
           "loop": false,
           "delay-type": "frame",
-          "fixed-delay": 20,
-          "frames": [ "east1" ]
+          "fixed-delay": 60,
+          "frames": [ "blocking_east" ]
         },
         "blocking_west": {
           "loop": false,
           "delay-type": "frame",
-          "fixed-delay": 20,
-          "frames": [ "west1" ]
+          "fixed-delay": 60,
+          "frames": [ "blocking_west" ]
         },
         "hurt_north": {
           "loop": false,
