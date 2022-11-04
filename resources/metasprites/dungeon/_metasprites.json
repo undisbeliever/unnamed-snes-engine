@@ -177,7 +177,7 @@
       "xorigin": 16,
       "yorigin": 23,
       "ms-export-order": "crossbow_man",
-      "frames": [ "south0", "south1", "south2", "south3", "north0", "north1", "north2", "north3", "east0", "east1", "east2", "east3", "west0", "west1", "west2", "west3", "hurt_south", "hurt_north", "hurt_east", "hurt_west" ],
+      "frames": [ "south0", "south1", "south2", "south3", "north0", "north1", "north2", "north3", "east0", "east1", "east2", "east3", "west0", "west1", "west2", "west3", "hurt_south", "hurt_north", "hurt_east", "hurt_west", "attack_south", "attack_north", "attack_east", "attack_west" ],
       "order": 2,
       "shadowSize": "MEDIUM",
       "tilehitbox": "6 3",
@@ -192,7 +192,11 @@
         "hurt_south": "rect_16x24_three 8 0",
         "hurt_north": "rect_16x24_three 8 0",
         "hurt_east": "rect_16x24_three 8 0",
-        "hurt_west": "rect_16x24_three 8 0"
+        "hurt_west": "rect_16x24_three 8 0",
+        "attack_south": "rect_16x24_three 8 2",
+        "attack_north": "rect_16x24_and_extra 8 2",
+        "attack_east": "rect_16x24_three 8 4",
+        "attack_west": "rect_16x24_three 8 4"
       },
       "animations": {
         "walk_north": {
@@ -222,26 +226,26 @@
         "attack_north": {
           "loop": false,
           "delay-type": "frame",
-          "fixed-delay": 10,
-          "frames": [ "north3" ]
+          "frames": [ "attack_north" ],
+          "fixed-delay": 25
         },
         "attack_south": {
           "loop": false,
           "delay-type": "frame",
-          "fixed-delay": 10,
-          "frames": [ "south3" ]
+          "fixed-delay": 25,
+          "frames": [ "attack_south" ]
         },
         "attack_east": {
           "loop": false,
           "delay-type": "frame",
-          "fixed-delay": 10,
-          "frames": [ "east3" ]
+          "fixed-delay": 25,
+          "frames": [ "attack_east" ]
         },
         "attack_west": {
           "loop": false,
           "delay-type": "frame",
-          "fixed-delay": 10,
-          "frames": [ "west3" ]
+          "fixed-delay": 25,
+          "frames": [ "attack_west" ]
         },
         "attack_recovery_north": {
           "loop": false,
@@ -319,7 +323,8 @@
       "defaultLayout": null,
       "hitboxes": {},
       "hurtboxes": {
-        "south0-west3": "12 10   8  14"
+        "south0-west3": "12 10   8  14",
+        "attack_south-attack_west": "12 10   8  14"
       },
       "clones": {}
     },
