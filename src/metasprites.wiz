@@ -1927,7 +1927,7 @@ func rect_24x16_three(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPo
 
 
 
-// Three sprites, 16x24 px rectangle:
+// Three sprites, 16x24 px rectangle, small sprites on the bottom:
 //  * 1st Sprite (large)
 //  * 2nd Sprite (small)
 //  * 3rd Sprite (small)
@@ -1939,7 +1939,7 @@ func rect_24x16_three(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPo
 //
 // DB = 0x7e
 #[mem8, idx16]
-func rect_16x24_three(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
+func rect_16x24_bottom(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
     xx = yy;
 
     _subtract_ms_offset_from_position(xx, xPos, yPos);
@@ -1995,20 +1995,87 @@ func rect_16x24_three(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPo
 
 
 
-// Four sprites, 16x24 rect + an extra small sprite on the side:
-//  * 1st Sprite (large)
-//  * 2nd Sprite (small)
-//  * 3rd Sprite (small)
-//  * 4th Sprite (small - onto side)
+// Three sprites, 16x24 px rectangle, small sprites on the top:
+//  * 1nd Sprite (small)
+//  * 2rd Sprite (small)
+//  * 3rd Sprite (large)
 //
-// ┌─┐
-// │ ├┐
-// ├┬┼┘
-// └┴┘
+// ┌┬┐
+// ├┴┤
+// │ │
+// └─┘
 //
 // DB = 0x7e
 #[mem8, idx16]
-func rect_16x24_and_extra(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
+func rect_16x24_top(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
+    xx = yy;
+
+    _subtract_ms_offset_from_position(xx, xPos, yPos);
+
+    yy = bufferPos;
+    return if negative || yy < (3 - 1) * sizeof(OamEntry);
+
+
+    a = <:xPos;
+    (&buffer[ 0].xPos)[unaligned yy] = a;
+    (&buffer[-2].xPos)[unaligned yy] = a;
+
+    _update_hi_table_size_small();
+    _update_hi_table_x8_xPos();
+
+    _update_hi_table_size_small();
+
+    (&buffer[-1].xPos)[unaligned yy] = a = (&buffer[ 0].xPos)[unaligned yy] + 8;
+    a = (>:xPos +# 0) >>> 1;
+    _update_hi_table_x8(carry);
+
+    _update_hi_table_size_large();
+    _update_hi_table_x8_xPos();
+
+
+    mem16();
+    #[mem16] {
+        aa = yPos;
+        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+            aa = -16 as u16;
+        }
+        (&buffer[ 0].yPos as *u16)[unaligned yy] = aa;
+        (&buffer[-1].yPos as *u16)[unaligned yy] = aa;
+
+        aa = yPos + 8;
+        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
+            aa = -16 as u16;
+        }
+        (&buffer[-2].yPos as *u16)[unaligned yy] = aa;
+
+
+        (&buffer[ 0].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr0[unaligned xx];
+        (&buffer[-1].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr1[unaligned xx];
+        (&buffer[-2].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr2[unaligned xx];
+
+        yy = aa = yy - 3 * sizeof(OamEntry);
+    }
+    mem8();
+
+    bufferPos = yy;
+}
+
+
+
+// Four sprites, 16x24 rect + an extra small sprite on the side:
+//  * 1st Sprite (small)
+//  * 2nd Sprite (small)
+//  * 3rd Sprite (large)
+//  * 4th Sprite (small - onto side)
+//
+// ┌┬┐
+// ├┴┼┐
+// │ ├┘
+// └─┘
+//
+// DB = 0x7e
+#[mem8, idx16]
+func rect_16x24_top_extra(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
     xx = yy;
 
     _subtract_ms_offset_from_position(xx, xPos, yPos);
@@ -2019,20 +2086,19 @@ func rect_16x24_and_extra(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in
 
     a = <:xPos;
     (&buffer[ 0].xPos)[unaligned yy] = a;
-    (&buffer[-1].xPos)[unaligned yy] = a;
+    (&buffer[-2].xPos)[unaligned yy] = a;
+
+    _update_hi_table_size_small();
+    _update_hi_table_x8_xPos();
+
+    _update_hi_table_size_small();
+
+    (&buffer[-1].xPos)[unaligned yy] = a = <:xPos + 8;
+    a = (>:xPos +# 0) >>> 1;
+    _update_hi_table_x8(carry);
 
     _update_hi_table_size_large();
     _update_hi_table_x8_xPos();
-
-    _update_hi_table_size_small();
-    _update_hi_table_x8_xPos();
-
-
-    _update_hi_table_size_small();
-
-    (&buffer[-2].xPos)[unaligned yy] = a = <:xPos + 8;
-    a = (>:xPos +# 0) >>> 1;
-    _update_hi_table_x8(carry);
 
     _update_hi_table_size_small();
 
@@ -2048,18 +2114,13 @@ func rect_16x24_and_extra(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in
             aa = -16 as u16;
         }
         (&buffer[ 0].yPos as *u16)[unaligned yy] = aa;
-
-        aa = yPos + 16;
-        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
-            aa = -16 as u16;
-        }
         (&buffer[-1].yPos as *u16)[unaligned yy] = aa;
-        (&buffer[-2].yPos as *u16)[unaligned yy] = aa;
 
         aa = yPos + 8;
         if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
             aa = -16 as u16;
         }
+        (&buffer[-2].yPos as *u16)[unaligned yy] = aa;
         (&buffer[-3].yPos as *u16)[unaligned yy] = aa;
 
 

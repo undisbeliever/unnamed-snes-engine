@@ -42,7 +42,7 @@
       ]
     },
     {
-      "name": "rect_16x24_three",
+      "name": "rect_16x24_bottom",
       "objects": [
         { "x":  0, "y":  0, "size": 16 },
         { "x":  0, "y": 16, "size":  8 },
@@ -50,11 +50,19 @@
       ]
     },
     {
-      "name": "rect_16x24_and_extra",
+      "name": "rect_16x24_top",
       "objects": [
-        { "x":  0, "y":  0, "size": 16 },
-        { "x":  0, "y": 16, "size":  8 },
-        { "x":  8, "y": 16, "size":  8 },
+        { "x":  0, "y":  0, "size":  8 },
+        { "x":  8, "y":  0, "size":  8 },
+        { "x":  0, "y":  8, "size": 16 }
+      ]
+    },
+    {
+      "name": "rect_16x24_top_extra",
+      "objects": [
+        { "x":  0, "y":  0, "size":  8 },
+        { "x":  8, "y":  0, "size":  8 },
+        { "x":  0, "y":  8, "size": 16 },
         { "x": 16, "y":  8, "size":  8 }
       ]
     },
