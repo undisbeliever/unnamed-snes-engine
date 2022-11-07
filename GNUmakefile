@@ -38,6 +38,10 @@ RESOURCES  += $(patsubst %,gen/metasprites/%.bin, $(METASPRITE_SPRITESETS))
 RESOURCES  += $(patsubst %,gen/metasprites/%.txt, $(METASPRITE_SPRITESETS))
 
 
+OTHER_RESOURCES_SRC := $(wildcard resources/tilesets/*.png)
+OTHER_RESOURCES_SRC += resources/metasprites/shadows-4bpp-tiles.png
+
+
 COMMON_PYTHON_SCRIPTS = tools/_json_formats.py tools/_snes.py tools/_ansi_color.py tools/_common.py
 
 # Python interpreter
@@ -78,7 +82,7 @@ gen/interactive-tiles.wiz: resources/mappings.json tools/generate_interactive_ti
 	$(PYTHON3) tools/generate_interactive_tiles_wiz.py -o '$@' 'resources/mappings.json'
 
 
-gen/other-resources.bin: resources/other-resources.json resources/mappings.json tools/convert_other_resources.py $(COMMON_PYTHON_SCRIPTS)
+gen/other-resources.bin: $(OTHER_RESOURCES_SRC) resources/other-resources.json resources/mappings.json tools/convert_other_resources.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/convert_other_resources.py -o '$@' 'resources/mappings.json' 'resources/other-resources.json'
 
 gen/rooms.bin: $(ROOMS_DIR) resources/mappings.json resources/entities.json tools/convert_rooms.py $(COMMON_PYTHON_SCRIPTS)
