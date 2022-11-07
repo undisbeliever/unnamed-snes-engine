@@ -18,6 +18,8 @@ namespace metasprites {
 
 let N_OBJECTS = 128;
 
+let SMALL_TILE_DATA_SIZE = 32;
+
 
 // MUST match `SHADOW_SIZES` in `tools/convert_metasprite.py`
 enum ShadowSize : u8 {
@@ -181,9 +183,9 @@ let SHADOW_ATTR = 0x20;
 
 let OFFSCREEN_YPOS = 255 - 16;
 
-let SHADOW_SMALL_CHAR  = 0;
-let SHADOW_MEDIUM_CHAR = 1;
-let SHADOW_LARGE_CHAR  = 2;
+let SHADOW_SMALL_CHAR  = 0x00;
+let SHADOW_MEDIUM_CHAR = 0x01;
+let SHADOW_LARGE_CHAR  = 0x10;
 
 
 in zeropage {
@@ -267,7 +269,10 @@ var _res : resources.ResourceEntry in resources.res;
 
 
     // Transfer shadow data to VRAM
+
+    // ::TODO Find a better way to store the shadow tiles in ROM and load them into VRAM::
     resources.load_tiles_resource_into_vram(resources.tiles.metasprite_shadows, VRAM_OBJ_WADDR);
+
 
     // Load common spritesheet tiles
     // Assumes resources.ms_spritesheets.common is 0
@@ -296,6 +301,9 @@ var _res : resources.ResourceEntry in resources.res;
 // DB = 0x80
 #[mem8, idx16]
 func __transfer_tile_data__forceblank(_res : resources.ResourceEntry in resources.res) {
+var _vramWaddr : u16 in zpTmp_word_0;
+var _firstRowSize : u16 in zpTmp_word_1;
+
     mem16();
     #[mem16] {
         // Calculate VRAM address of tile data
@@ -304,11 +312,50 @@ func __transfer_tile_data__forceblank(_res : resources.ResourceEntry in resource
         aa = **(&_res.farPtr as *far *u16);
 
         // +# safe, carry will never be set
-        snes.ppu.vram_address_hl = aa = ((aa & 0x1ff) << 4) +# VRAM_OBJ_WADDR;
+        _vramWaddr = aa = ((aa & 0x1ff) << 4) +# VRAM_OBJ_WADDR;
+        snes.ppu.vram_address_hl = aa;
+
+
+        // Transfer first row of tiles to VRAM
+        // (The first_tile can start in the middle of a VRAM row)
+
+        // Number of tiles in the first row (farPtr = _PpuDataFormat.first_tile)
+        aa = (0x1ff - **(&_res.farPtr as *far *u16)) & 0xf;
+        aa++;
+
+        // tile size
+        aa <<<= 5;
+        _firstRowSize = aa;
+
+        // DMA transfer size
+        yy = aa;
+
+        // DMA transfer address
+        xx = aa = *(&_res.farPtr as *u16) + offsetof(_PpuDataFormat, tile_data);
+
+        mem8();
+        #[mem8] {
+            dma.transfer_to_vram__forceblank(#:_res.farPtr, xx, yy);
+        }
+        mem16();
+
+
+        // Transfer the remaining tiles to VRAM
+
+        // Skip over the unused tiles in the second row
+        snes.ppu.vram_address_hl = aa = _vramWaddr + 0x10 * SMALL_TILE_DATA_SIZE / 2;
+
+        // DMA transfer address
+        xx = aa = *(&_res.farPtr as *u16) + offsetof(_PpuDataFormat, tile_data) + _firstRowSize;
+
+        // DMA transfer size
+        yy = aa = _res.size - offsetof(_PpuDataFormat, tile_data) - _firstRowSize;
     }
     mem8();
 
-    resources.transfer_resource_tail_to_vram__forceblank(_res, offsetof(_PpuDataFormat, tile_data));
+    if !negative && !zero {
+        ^return dma.transfer_to_vram__forceblank(#:_res.farPtr, xx, yy);
+    }
 }
 
 

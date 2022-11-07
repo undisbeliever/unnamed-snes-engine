@@ -1,7 +1,7 @@
 {
   "name": "common",
   "palette": "_palette.png",
-  "firstTile": 16,
+  "firstTile": 2,
   "endTile": 192,
   "framesets": [
     {

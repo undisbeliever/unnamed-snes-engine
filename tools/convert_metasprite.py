@@ -132,31 +132,45 @@ class MsFsEntry(NamedTuple):
 
 
 class Tileset:
-    def __init__(self, starting_tile : int, end_tile : int):
-        assert starting_tile < 512
-        assert end_tile <= 512
-        assert starting_tile < end_tile
+    def __init__(self, starting_tile_id : int, end_tile_id : int):
+        assert starting_tile_id < 512
+        assert end_tile_id <= 512
+        assert starting_tile_id < end_tile_id
 
-        # starting_tile must start on a VRAM row
-        assert starting_tile % 0x10 == 0
+        assert starting_tile_id & 0x01 == 0, "starting_tile is not on an even row"
+        assert starting_tile_id & 0x10 == 0, "starting_tile is not on an even column"
 
-        self.starting_tile      : int = starting_tile
-        self.max_tiles          : int = end_tile - starting_tile
+        assert end_tile_id & 0x01 == 0, "end_tile is not on an even row"
+        assert end_tile_id & 0x10 == 0, "end_tile is not on an even column"
 
+        self.starting_tile_id   : Final = starting_tile_id
+        self.end_tile_id        : Final = end_tile_id
+
+        # Offset between a tile pos and a SNES OAM tile_id
+        self.tile_id_offset     : Final = starting_tile_id & ~0x1f
+
+        # This list is always incremented 2-rows at a time.
+        # This greatly simplifies the `add_small_tile()` code
         self.tiles              : list[Optional[LargeTileData]] = [ None ] * 0x20
 
-        self.large_tile_pos     : int = 0
+        self.large_tile_pos     : int = starting_tile_id & 0x1f
+
         self.small_tile_pos     : int = 4
         self.small_tile_offset  : int = 0
 
         self.small_tiles_map    : dict[SmallTileData, tuple[int, bool, bool]] = dict()
         self.large_tiles_map    : dict[LargeTileData, tuple[int, bool, bool]] = dict()
 
+        self.first_large_tile_pos : Final = self.large_tile_pos
+
 
     def get_tiles(self) -> list[LargeTileData]:
-        # Replace unused tiles with blank data
-        blank_tile = bytearray(64)
-        tiles = [ blank_tile if t is None else t for t in self.tiles ]
+        if self.large_tile_pos == self.first_large_tile_pos:
+            raise ValueError('No tiles in tileset')
+
+        large_tile_id = self.large_tile_pos + self.tile_id_offset
+        if large_tile_id > self.end_tile_id:
+            raise ValueError(f"Too many tiles: current tile_id = { large_tile_id }, end_tile = { self.end_tile_id }")
 
         # Shrink tiles
         end_tile = 0
@@ -165,10 +179,16 @@ class Tileset:
                 end_tile = i
         n_tiles = end_tile + 1
 
-        if n_tiles > self.max_tiles:
-            raise ValueError(f"Too many tiles: { n_tiles }, max { self.max_tiles }")
+        # Skip tiles before `self.starting_tile_id`
+        flt : Final = self.first_large_tile_pos
+        if flt > 0:
+            tiles = self.tiles[flt:0x10] + self.tiles[flt+0x10:n_tiles]
+        else:
+            tiles = self.tiles
 
-        return tiles[:n_tiles]
+        # Replace unused tiles with blank data
+        blank_tile = bytearray(64)
+        return [ blank_tile if t is None else t for t in tiles ]
 
 
     def _allocate_large_tile(self) -> int:
@@ -203,7 +223,7 @@ class Tileset:
 
         self.tiles[tile_pos] = tile_data
 
-        return tile_pos + self.starting_tile
+        return tile_pos + self.tile_id_offset
 
 
     def add_large_tile(self, tile_data : LargeTileData) -> int:
@@ -218,7 +238,7 @@ class Tileset:
         self.tiles[tile_pos + 0x10] = tile3
         self.tiles[tile_pos + 0x11] = tile4
 
-        return tile_pos + self.starting_tile
+        return tile_pos + self.tile_id_offset
 
 
     def add_or_get_small_tile(self, tile_data : SmallTileData) -> tuple[int, bool, bool]:
