@@ -446,6 +446,8 @@ class FramesetEditor:
             gui.PngFilenameInput    (sf, 'source',          'Source: '),
             gui.IntInput            (sf, 'frameWidth',      'Frame Width:'),
             gui.IntInput            (sf, 'frameHeight',     'Frame Height:'),
+            gui.IntInput            (sf, 'xorigin',         'X Origin:'),
+            gui.IntInput            (sf, 'yorigin',         'Y Origin:'),
             gui.FramesInput         (sf, 'frames',          'Frames :'),
             gui.NameInput           (sf, 'ms-export-order', 'Export Order:'),
             gui.IntInput            (sf, 'order',           'Sprite Priority:'),
