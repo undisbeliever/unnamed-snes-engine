@@ -282,6 +282,37 @@
       "defaultHitbox": null,
       "defaultHurtbox": null,
       "clones": {}
+    },
+    {
+      "name": "Explosion",
+      "source": "explosion.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "xorigin": 16,
+      "yorigin": 16,
+      "frames": [ "explosion0", "explosion1", "explosion2" ],
+      "ms-export-order": "particle",
+      "order": 2,
+      "shadowSize": "NONE",
+      "tileHitbox": null,
+      "defaultLayout": null,
+      "layouts": {
+        "explosion0": "square_four_16 8 8",
+        "explosion1 - explosion2": "square_four_32 0 0"
+      },
+      "defaultHitbox": null,
+      "hitboxes": {},
+      "defaultHurtbox": null,
+      "hurtboxes": {},
+      "clones": {},
+      "animations": {
+        "animation": {
+          "delay-type": "frame",
+          "frames": [ "explosion0", 10, "explosion1", 6, "explosion2", 6, "explosion1", 5, "explosion2", 5, "explosion1", 4, "explosion2", 4 ],
+          "loop": false
+        }
+      },
+      "tilehitbox": "0 0"
     }
   ]
 }
