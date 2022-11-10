@@ -217,17 +217,15 @@ class Tileset:
         return tile_pos + self.tile_id_offset
 
 
-    def add_large_tile(self, tile_data : LargeTileData) -> int:
-        assert len(tile_data) == 256
-
-        tile1, tile2, tile3, tile4 = split_large_tile(tile_data)
+    def add_large_tile(self, small_tiles : tuple[SmallTileData, SmallTileData, SmallTileData, SmallTileData]) -> int:
+        assert all(len(st) == 64 for st in small_tiles)
 
         tile_pos = self._allocate_large_tile()
 
-        self.tiles[tile_pos] = tile1
-        self.tiles[tile_pos + 0x01] = tile2
-        self.tiles[tile_pos + 0x10] = tile3
-        self.tiles[tile_pos + 0x11] = tile4
+        self.tiles[tile_pos] = small_tiles[0]
+        self.tiles[tile_pos + 0x01] = small_tiles[1]
+        self.tiles[tile_pos + 0x10] = small_tiles[2]
+        self.tiles[tile_pos + 0x11] = small_tiles[3]
 
         return tile_pos + self.tile_id_offset
 
@@ -256,7 +254,9 @@ class Tileset:
     def add_or_get_large_tile(self, tile_data : LargeTileData) -> tuple[int, bool, bool]:
         match = self.large_tiles_map.get(tile_data)
         if match is None:
-            tile_id = self.add_large_tile(tile_data)
+            small_tiles = split_large_tile(tile_data)
+
+            tile_id = self.add_large_tile(small_tiles)
 
             match = (tile_id, False, False)
 
@@ -268,6 +268,16 @@ class Tileset:
             self.large_tiles_map.setdefault(h_tile_data, (tile_id, True, False))
             self.large_tiles_map.setdefault(v_tile_data, (tile_id, False, True))
             self.large_tiles_map.setdefault(hv_tile_data, (tile_id, True, True))
+
+            for st in small_tiles:
+                h_st = hflip_tile(st)
+                v_st = vflip_tile(st)
+                hv_st = vflip_tile(h_st)
+
+                self.small_tiles_map[st] = match
+                self.small_tiles_map.setdefault(h_st, (tile_id, True, False))
+                self.small_tiles_map.setdefault(v_st, (tile_id, False, True))
+                self.small_tiles_map.setdefault(hv_st, (tile_id, True, True))
 
         return match
 
