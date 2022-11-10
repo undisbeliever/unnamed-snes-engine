@@ -50,7 +50,7 @@ from typing import cast, Any, Callable, Final, NamedTuple, Optional, Union
 from _ansi_color import AnsiColors
 
 from convert_mt_tileset import convert_mt_tileset
-from convert_metasprite import convert_spritesheet, generate_pattern_grids, PatternGrid, MsFsEntry, build_ms_fs_data
+from convert_metasprite import convert_spritesheet, MsFsEntry, build_ms_fs_data
 from convert_rooms import get_list_of_tmx_files, extract_room_id, compile_room
 from convert_other_resources import convert_tiles
 from insert_resources import read_binary_file, read_symbols_file, validate_sfc_file, ROM_HEADER_V3_ADDR
@@ -271,7 +271,6 @@ class Compiler:
         self.entities         : Final[EntitiesJson]      = load_entities_json('entities.json')
         self.other_resources  : Final[OtherResources]    = load_other_resources_json('other-resources.json')
         self.ms_export_orders : Final[MsExportOrder]     = load_ms_export_order_json('ms-export-order.json')
-        self.ms_pattern_grids : Final[list[PatternGrid]] = generate_pattern_grids(self.ms_export_orders)
         self.symbols          : Final[dict[str, int]]    = read_symbols_file(sym_filename)
 
 
@@ -298,7 +297,7 @@ class Compiler:
             ms_input = load_metasprites_json(json_filename)
             ms_dir = os.path.dirname(json_filename)
 
-            data, msfs_entries = convert_spritesheet(ms_input, self.ms_export_orders, self.ms_pattern_grids, ms_dir)
+            data, msfs_entries = convert_spritesheet(ms_input, self.ms_export_orders, ms_dir)
 
             return CompilerOutput(DataType.MS_SPRITESHEET, rid, name, data=data, msfs_entries=msfs_entries)
 

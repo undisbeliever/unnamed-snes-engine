@@ -97,8 +97,25 @@
           "frames": [ "west0", 6 ]
         }
       },
-      "defaultLayout": null,
-      "layouts": {},
+      "defaultLayout": "square_single16 8 8",
+      "layouts": {
+        "attack_north0": "rect_24x16_three 8 8",
+        "attack_north1": "diag_two_large_overlapping_B 8 0",
+        "attack_north2": "rect_16x24_bottom 8 0",
+        "attack_north3": "rect_16x24_bottom 8 0",
+        "attack_south0": "rect_24x16_three 0 8",
+        "attack_south1": "diag_two_large_overlapping_B 0 8",
+        "attack_south2": "rect_16x24_bottom 8 8",
+        "attack_south3": "rect_16x24_bottom 8 8",
+        "attack_east0": "rect_16x24_bottom 8 0",
+        "attack_east1": "diag_two_large_overlapping_B 8 0",
+        "attack_east2": "rect_24x16_three 8 8",
+        "attack_east3": "rect_24x16_three 8 8",
+        "attack_west0": "rect_16x24_bottom 8 0",
+        "attack_west1": "diag_two_large_overlapping_A 0 0",
+        "attack_west2": "rect_24x16_three 0 8",
+        "attack_west3": "rect_24x16_three 0 8"
+      },
       "defaultHitbox": null,
       "hurtboxes": {},
       "clones": {}
