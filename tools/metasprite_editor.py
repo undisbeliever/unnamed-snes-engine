@@ -80,7 +80,7 @@ def create_blank_frameset() -> OrderedDict[Name, Any]:
         ('name', ''),
         ('source', ''),
         ('frameWidth', None),
-        ('frameHieght', None),
+        ('frameHeight', None),
         ('frames', list()),
         ('ms-export-order', ''),
         ('order', 2),
