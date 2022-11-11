@@ -269,15 +269,17 @@ class Tileset:
             self.large_tiles_map.setdefault(v_tile_data, (tile_id, False, True))
             self.large_tiles_map.setdefault(hv_tile_data, (tile_id, True, True))
 
-            for st in small_tiles:
+            for i, st in enumerate(small_tiles):
+                small_tile_id = tile_id + self._SMALL_TILE_OFFSETS[i]
+
                 h_st = hflip_tile(st)
                 v_st = vflip_tile(st)
                 hv_st = vflip_tile(h_st)
 
-                self.small_tiles_map[st] = match
-                self.small_tiles_map.setdefault(h_st, (tile_id, True, False))
-                self.small_tiles_map.setdefault(v_st, (tile_id, False, True))
-                self.small_tiles_map.setdefault(hv_st, (tile_id, True, True))
+                self.small_tiles_map[st] = (small_tile_id, False, False)
+                self.small_tiles_map.setdefault(h_st, (small_tile_id, True, False))
+                self.small_tiles_map.setdefault(v_st, (small_tile_id, False, True))
+                self.small_tiles_map.setdefault(hv_st, (small_tile_id, True, True))
 
         return match
 
