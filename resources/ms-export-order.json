@@ -109,7 +109,8 @@
     "player": [
       "walk_south", "walk_north", "walk_east", "walk_west",
       "attack_south", "attack_north", "attack_east", "attack_west",
-      "hurt_south", "hurt_north", "hurt_east", "hurt_west"
+      "hurt_south", "hurt_north", "hurt_east", "hurt_west",
+      "holding_south", "holding_north", "holding_east", "holding_west"
     ],
     "sword_particles": [
       "animation"
