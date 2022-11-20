@@ -1719,11 +1719,9 @@ func square_four_32(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos)
         (&buffer[-2].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr2[unaligned xx];
         (&buffer[-3].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr3[unaligned xx];
 
-        yy = aa = yy - 4 * sizeof(OamEntry);
+        bufferPos = aa = yy - 4 * sizeof(OamEntry);
     }
     mem8();
-
-    bufferPos = yy;
 }
 
 }

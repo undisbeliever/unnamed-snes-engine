@@ -83,11 +83,9 @@ func {pattern.name}(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos)
 
 
     out.write(f"""
-        yy = aa = yy - {4*len(pattern.objects)};
+        bufferPos = aa = yy - {4*len(pattern.objects)};
     }}
     mem8();
-
-    bufferPos = yy;
 }}
 """)
 
