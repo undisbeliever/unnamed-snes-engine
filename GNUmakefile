@@ -28,7 +28,7 @@ RESOURCES  += $(patsubst %,gen/metatiles/%.bin, $(METATILE_TILESETS))
 GEN_SOURCES  := gen/resources.wiz
 GEN_SOURCES  += gen/interactive-tiles.wiz
 GEN_SOURCES  += gen/entities.wiz
-GEN_SOURCES  += gen/ms-patterns-table.wiz
+GEN_SOURCES  += gen/ms-drawing-functions.wiz
 GEN_SOURCES  += gen/arctan-table.wiz
 GEN_SOURCES  += gen/cosine-tables.wiz
 
@@ -92,8 +92,8 @@ gen/rooms.bin: $(ROOMS_DIR) resources/mappings.json resources/entities.json tool
 gen/resources.wiz: resources/mappings.json tools/generate_resources_wiz.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate_resources_wiz.py -o '$@' 'resources/mappings.json'
 
-gen/ms-patterns-table.wiz: resources/ms-export-order.json tools/generate_ms_patterns_table_wiz.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/generate_ms_patterns_table_wiz.py -o '$@' 'resources/ms-export-order.json'
+gen/ms-drawing-functions.wiz: resources/ms-export-order.json tools/generate_ms_drawing_functions.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/generate_ms_drawing_functions.py -o '$@' 'resources/ms-export-order.json'
 
 gen/entities.wiz: resources/entities.json resources/ms-export-order.json tools/generate_entities_wiz.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate_entities_wiz.py -o '$@' 'resources/entities.json' 'resources/ms-export-order.json'
