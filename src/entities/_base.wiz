@@ -7,7 +7,7 @@ import "../memmap";
 import "_variables";
 import "_common";
 
-import "dead";
+import "smoke-particles";
 
 import "../player";
 
@@ -129,7 +129,9 @@ func take_damage_from_player_sword(entityId : u8 in y) {
     }
 
     if zero {
-        ^return entities.dead.change_to_dead_entity(y);
+        // ::TODO make configurable::
+        // ::TODO increment zPos::
+        ^return entities.smoke_particles.change_to_small_smoke_entity(y);
     }
 
     SoA.health[y] = a;
@@ -160,7 +162,9 @@ func take_damage_from_player_sword_with_knockback(entityId : u8 in y, collisionS
     }
 
     if zero {
-        ^return entities.dead.change_to_dead_entity(y);
+        // ::TODO make configurable::
+        // ::TODO increment zPos::
+        ^return entities.smoke_particles.change_to_small_smoke_entity(y);
     }
 
     SoA.health[y] = a;

@@ -1,6 +1,14 @@
 {
   "entity_functions": [
     {
+      "name": "smoke_particles",
+      "ms-export-order": "smoke",
+      "parameter": {
+        "type": "enum",
+        "values": [ "ground", "small", "none" ]
+      }
+    },
+    {
       "name": "sword_particles",
       "ms-export-order": "sword_particles",
       "parameter": {
@@ -67,6 +75,14 @@
     }
   ],
   "entities": [
+    {
+      "name": "smoke_particles",
+      "code": "smoke_particles",
+      "metasprites": "common.Smoke",
+      "zpos": "0",
+      "health": 255,
+      "attack": 0
+    },
     {
       "name": "sword_particles",
       "code": "sword_particles",

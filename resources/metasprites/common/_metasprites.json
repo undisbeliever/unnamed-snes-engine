@@ -359,6 +359,56 @@
         }
       },
       "tilehitbox": "0 0"
+    },
+    {
+      "name": "Smoke",
+      "source": "smoke.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": [ "ground1", "ground2", "ground3", "ground4", "ground5", "ground6", "ground7", "ground8", "small1", "small2", "small3", "small4", "small5", "small6" ],
+      "ms-export-order": "smoke",
+      "order": 2,
+      "shadowSize": "MEDIUM",
+      "tileHitbox": null,
+      "defaultLayout": null,
+      "layouts": {
+        "ground1": "rect_16x8_two 8 8",
+        "ground2": "two_small_sep_2 7 8",
+        "ground3": "two_small_sep_4 6 8",
+        "ground4": "two_small_sep_6 5 8",
+        "ground5": "two_small_sep_4 6 11",
+        "ground6": "two_small_sep_4 6 10",
+        "ground7": "two_small_sep_4 6  9",
+        "ground8": "two_small_sep_14 1  3",
+        "small1": "square_single8 14 14",
+        "small2": "square_single8 12 12",
+        "small3": "square_single8 12 12",
+        "small4": "four_small_sep_4 6 6",
+        "small5": "four_small_sep_6 5 5",
+        "small6": "four_small_sep_8 4 4"
+      },
+      "defaultHitbox": null,
+      "hitboxes": {},
+      "defaultHurtbox": null,
+      "hurtboxes": {},
+      "clones": {},
+      "animations": {
+        "ground": {
+          "frames": [ "ground1", "ground2", "ground3", "ground4", "ground5", "ground6", "ground7", "ground8" ],
+          "fixed-delay": 4,
+          "loop": false,
+          "delay-type": "frame"
+        },
+        "small": {
+          "fixed-delay": 5,
+          "frames": [ "small1", "small2", "small3", "small4", "small5", "small6" ],
+          "loop": false,
+          "delay-type": "frame"
+        }
+      },
+      "xorigin": 16,
+      "yorigin": 16,
+      "tilehitbox": "0 0"
     }
   ]
 }
