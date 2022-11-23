@@ -29,7 +29,7 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func change_to_ground_smoke_entity(entityId : u8 in y) : bool in carry {
+func change_to_ground_smoke_entity(entityId : u8 in y) {
     return change_to_smoke_entity(y, init_parameter.ground as u8);
 }
 
@@ -42,7 +42,7 @@ func change_to_ground_smoke_entity(entityId : u8 in y) : bool in carry {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func change_to_small_smoke_entity(entityId : u8 in y) : bool in carry {
+func change_to_small_smoke_entity(entityId : u8 in y) {
     return change_to_smoke_entity(y, init_parameter.small as u8);
 }
 
@@ -55,7 +55,7 @@ func change_to_small_smoke_entity(entityId : u8 in y) : bool in carry {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func change_to_smoke_entity(entityId : u8 in y, animation : u8 in x) : bool in carry {
+func change_to_smoke_entity(entityId : u8 in y, animation : u8 in x) {
 
     // I can change the MS animation before the MS table addresses are set
     // because the change animation functions do not immediately change animation state.
@@ -65,6 +65,9 @@ func change_to_smoke_entity(entityId : u8 in y, animation : u8 in x) : bool in c
     else {
         entities.set_ms_animation_x(y, x);
     }
+
+    // Do not kill the entity on the next frame
+    SoA.health[y] = a = 1;
 
     mem16_idx16();
     #[mem16, idx16] {
@@ -77,8 +80,6 @@ func change_to_smoke_entity(entityId : u8 in y, animation : u8 in x) : bool in c
         (&<:entities.SoA.msAnimationTable[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.animationTable[unaligned xx];
     }
     mem8_idx8();
-
-    return true;
 }
 
 
@@ -106,8 +107,11 @@ func init(entityId : u8 in y, parameter : u8 in x) {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func process(entityId : u8 in y) : bool in carry {
-    return entities.is_ms_non_looping_animation_running(y);
+func process(entityId : u8 in y) {
+    carry = entities.is_ms_non_looping_animation_running(y);
+    if !carry {
+        SoA.health[unaligned y] = a = 0;
+    }
 }
 
 }

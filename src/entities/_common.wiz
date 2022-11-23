@@ -32,7 +32,7 @@ func init() {
         // Set player's process function to a blank function.
         // Required as the player is processed before `process_active_entities()` is called.
         aa = _blank_player_function as u16;
-        entities.SoA.process_function[0] = aa as func(u8 in x) : bool in carry;
+        entities.SoA.process_function[0] = aa as func(u8 in x);
 
 
         // Set all process_functions to blank (except player)
@@ -41,7 +41,7 @@ func init() {
         x = entities.SoA.LAST_INDEX;
         do {
             // Reset process function
-            entities.SoA.process_function[unaligned x] = aa as func(u8 in x) : bool in carry;
+            entities.SoA.process_function[unaligned x] = aa as func(u8 in x);
             entities.SoA.ms_draw_function[unaligned x] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
 
             // Clear entity shadow
@@ -208,17 +208,18 @@ inline func process_active_entities()
             y = activeEntitiesTable[x];
             currentEntityId = y;
             x = y;
-            carry = entities.SoA.process_function[unaligned x](y);
-            if !carry {
-                // Entity no longer active
+            entities.SoA.process_function[unaligned x](y);
 
+            y = currentEntityId;
+            a = SoA.health[y];
+            if zero {
+                // Entity no longer active
+                // y = current entity id
 
                 // Remove entity from active entities list, preserving active entity order.
                 //
                 // Preserving entity order should be friendlier to `sort_active_entities()`.
                 numberOfActiveEntities--;
-
-                y = currentEntityId;
 
                 mem16();
                 #[mem16] {
@@ -239,10 +240,9 @@ inline func process_active_entities()
                         } while x < numberOfActiveEntities;
                     }
 
-
                     // Set process_function and ms_draw_function to a blank function (just in case they are accidentally called)
                     aa = _blank_entity_function as u16;
-                    entities.SoA.process_function[unaligned y] = aa as func(u8 in x) : bool in carry;
+                    entities.SoA.process_function[unaligned y] = aa as func(u8 in x);
                     entities.SoA.ms_draw_function[unaligned y] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
                 }
                 mem8();
@@ -257,10 +257,9 @@ inline func process_active_entities()
             else {
                 // entity is still alive, process entity animation
                 //
-                // The `!zero` test prevents the player's animations from being executed twice in single display frame.
+                // The `y != PLAYER_ENTITY_ID` test prevents the player's animations from being executed twice in single display frame.
                 // This is required as the player's hitboxes need to be calculated AFTER the player's animations have been process and BEFORE this function is called.
-                y = currentEntityId;
-                if !zero {
+                if y != PLAYER_ENTITY_ID {
                     metasprites.process_entity_animation(y);
                 }
             }
@@ -367,21 +366,21 @@ func _blank_init_function(entityId : u8 in y, parameter : u8 in x) {
 }
 
 
-// A blank entity process function that returns false (entity no-longer active)
+// A blank entity process function that sets the entity's health to 0.
 //
 // DB = 0x7e
-func _blank_entity_function(entityId : u8 in y) : bool in carry {
-    return false;
+#[mem8, idx8]
+func _blank_entity_function(entityId : u8 in y) {
+    SoA.health[unaligned y] = a = 0;
 }
 
 
-// A special blank entity process function that return true (entity is always active)
+// A special blank entity process function that does nothing.
 //
 // Used by entities that are processed outside of `process_active_entities()`.
 //
 // DB = 0x7e
-func _blank_player_function() : bool in carry {
-    return true;
+func _blank_player_function() {
 }
 
 
@@ -401,7 +400,7 @@ in rodata0 {
     const __init_funtions : [ func(u8 in y, u8 in x) ; N_ENTRIES ] = [ entities._blank_init_function ; N_ENTRIES ];
     let init_functions = far &__init_funtions;
 
-    const __process_funtions : [ func(u8 in y) : bool in carry ; N_ENTRIES ] = [ entities._blank_entity_function ; N_ENTRIES ];
+    const __process_funtions : [ func(u8 in y) ; N_ENTRIES ] = [ entities._blank_entity_function ; N_ENTRIES ];
     let process_functions = far &__process_funtions;
 
     const __metasprite_framesets : [ *const metasprites.MsFramesetFormat ; N_ENTRIES ] = [ 0xaaaa as *metasprites.MsFramesetFormat ; N_ENTRIES ];

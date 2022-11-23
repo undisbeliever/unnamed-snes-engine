@@ -71,10 +71,11 @@ namespace entities {
 
 
         in lowram_roomstate {
-            // Process function for the entity.  Called once per frame by the undo loop.
+            // Process function for the entity.  Called once per frame by the entity loop.
+            //
+            // If the entity's health is 0 after this function is returned, the entity will be removed from the entity SoA.
             //
             // INPUT: entityId: index into `entities.SoA` Structure-of-Arrays.
-            // RETURN: carry set if entity is still active in the next frame.
             //
             // NOTE: `currentEntityId` will contain a copy of `entityId` to provide an easy
             //       way to restore the X register if it gets overwritten.
@@ -83,7 +84,7 @@ namespace entities {
             //
             // DB = 0x7e
             #[mem8, idx8]
-            var process_function : [func(entityId : u8 in y) : bool in carry ; N_ENTITIES];
+            var process_function : [func(entityId : u8 in y) ; N_ENTITIES];
 
 
             // Metasprite draw function.

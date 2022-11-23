@@ -900,24 +900,6 @@ func set_entity_animation_if_changed(entityId : u8 in y, animationId : u8 in a) 
 
 
 
-// Set the entity's MetaSprite animation and return true.
-//
-// NOTE: This function will always restart the animation.
-// NOTE: This function will not immediately change the MetaSprite animation state.
-//
-// KEEP: Y
-//
-// DB = 0x7e
-#[mem8, idx8]
-func set_entity_animation_and_return_true(entityId : u8 in y, animationId : u8 in a) : bool in carry {
-    entities.SoA.msAnimationId[unaligned y] = a;
-    entities.SoA.msAnimationProcessFunctionIndex[unaligned y] = a = metasprites.animations.NEW_ANIMATION__FUNCTION_ID;
-
-    return true;
-}
-
-
-
 // Set the player's MetaSprite animation.
 //
 // NOTE: This function will always restart the animation.

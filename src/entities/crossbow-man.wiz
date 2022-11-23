@@ -111,7 +111,7 @@ func init(entityId : u8 in y, parameter : u8 in x) {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func process(entityId : u8 in y) : bool in carry {
+func process(entityId : u8 in y) {
 
     y = base.process_collisions(y);
 
@@ -149,7 +149,7 @@ const process__state_functions = [
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__walk_south(entityId : u8 in y) : bool in carry {
+func process__walk_south(entityId : u8 in y) {
 
     // Check for a tile collision in the previous frame
     a = SoA.movementState[y];
@@ -178,15 +178,13 @@ func process__walk_south(entityId : u8 in y) : bool in carry {
     // ::TODO check for solid tile 2 tiles below the entity ::
     // ::TODO lean left or right if player to the left/right ::
     // ::TODO check for player and change state to FIRING_BOLT_SOUTH ::
-
-    return true;
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__walk_north(entityId : u8 in y) : bool in carry {
+func process__walk_north(entityId : u8 in y) {
 
     // Check for a tile collision in the previous frame
     a = SoA.movementState[y];
@@ -215,15 +213,13 @@ func process__walk_north(entityId : u8 in y) : bool in carry {
     // ::TODO check for solid tile 2 tiles above the entity ::
     // ::TODO lean left or right if player to the left/right ::
     // ::TODO check for player and change state to FIRING_BOLT_NORTH ::
-
-    return true;
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__walk_east(entityId : u8 in y) : bool in carry {
+func process__walk_east(entityId : u8 in y) {
 
     // Check for a tile collision in the previous frame
     a = SoA.movementState[y];
@@ -252,15 +248,13 @@ func process__walk_east(entityId : u8 in y) : bool in carry {
     // ::TODO check for solid tile 2 tiles to the right of the entity ::
     // ::TODO lean up or down if player to the up/down ::
     // ::TODO check for player and change state to FIRING_BOLT_EAST ::
-
-    return true;
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__walk_west(entityId : u8 in y) : bool in carry {
+func process__walk_west(entityId : u8 in y) {
 
     // Check for a tile collision in the previous frame
     a = SoA.movementState[y];
@@ -289,16 +283,13 @@ func process__walk_west(entityId : u8 in y) : bool in carry {
     // ::TODO check for solid tile 2 tiles to the left of the entity ::
     // ::TODO lean up or down if player to the up/down ::
     // ::TODO check for player and change state to FIRING_BOLT_WEST ::
-
-
-    return true;
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_state__walk(entityId : u8 in y, direction : u8 in a) : bool in carry {
+func set_state__walk(entityId : u8 in y, direction : u8 in a) {
 
     if a == Direction.EAST as u8 {
         return set_direction_east(y);
@@ -312,15 +303,13 @@ func set_state__walk(entityId : u8 in y, direction : u8 in a) : bool in carry {
     else {
         return set_direction_south(y);
     }
-
-    return true;
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_south(entityId : u8 in y) : bool in carry {
+func set_direction_south(entityId : u8 in y) {
     x = y;
 
     SoA_state[x] = State.WALK_SOUTH;
@@ -334,14 +323,14 @@ func set_direction_south(entityId : u8 in y) : bool in carry {
     }
     mem8();
 
-    ^return set_ms_animation_and_return_true(y, ms_animations.walk_south);
+    ^return set_ms_animation(y, ms_animations.walk_south);
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_north(entityId : u8 in y) : bool in carry {
+func set_direction_north(entityId : u8 in y) {
     x = y;
 
     a = State.WALK_NORTH as u8;
@@ -356,14 +345,14 @@ func set_direction_north(entityId : u8 in y) : bool in carry {
     }
     mem8();
 
-    ^return set_ms_animation_and_return_true(y, ms_animations.walk_north);
+    ^return set_ms_animation(y, ms_animations.walk_north);
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_east(entityId : u8 in y) : bool in carry {
+func set_direction_east(entityId : u8 in y) {
     x = y;
 
     a = State.WALK_EAST as u8;
@@ -378,14 +367,14 @@ func set_direction_east(entityId : u8 in y) : bool in carry {
     }
     mem8();
 
-    ^return set_ms_animation_and_return_true(y, ms_animations.walk_east);
+    ^return set_ms_animation(y, ms_animations.walk_east);
 }
 
 
 
 // db = 0x7e
 #[mem8, idx8]
-func set_direction_west(entityid : u8 in y) : bool in carry {
+func set_direction_west(entityid : u8 in y) {
     x = y;
 
     a = State.WALK_WEST as u8;
@@ -400,7 +389,7 @@ func set_direction_west(entityid : u8 in y) : bool in carry {
     }
     mem8();
 
-    ^return set_ms_animation_and_return_true(y, ms_animations.walk_west);
+    ^return set_ms_animation(y, ms_animations.walk_west);
 }
 
 
@@ -413,7 +402,7 @@ func set_direction_west(entityid : u8 in y) : bool in carry {
 // KEEP: Y
 // DB = 0x7e
 #[mem8, idx8]
-func set_state__attacking(entityId : u8 in y, direction : u8 in a) : bool in carry {
+func set_state__attacking(entityId : u8 in y, direction : u8 in a) {
 
     SoA_facingDirection[y] = a as Direction;
 
@@ -430,8 +419,6 @@ func set_state__attacking(entityId : u8 in y, direction : u8 in a) : bool in car
         entities.SoA.yVelocity[unaligned x] = 0;
     }
     mem8();
-
-    return true;
 }
 
 
@@ -455,7 +442,7 @@ inline func _set_state__attacking__immediate(entityId : u8 in y) {
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__attacking(entityId : u8 in y) : bool in carry {
+func process__attacking(entityId : u8 in y) {
 
     carry = is_ms_non_looping_animation_running(y);
     if !carry {
@@ -474,8 +461,6 @@ func process__attacking(entityId : u8 in y) : bool in carry {
 
         _set_state__attack_recovery(y);
     }
-
-    return true;
 }
 
 
@@ -501,7 +486,7 @@ inline func _set_state__attack_recovery(entityId : u8 in y) {
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__attack_recovery(entityId : u8 in y) : bool in carry {
+func process__attack_recovery(entityId : u8 in y) {
 
     // ::TODO add an attack animation to the ATTACK state::
     // ::: (fire a bolt AFTER the attack animation ends)::
@@ -544,15 +529,13 @@ func process__attack_recovery(entityId : u8 in y) : bool in carry {
         // Player is still in vision code, fire bolt on next frame
         _set_state__attacking__immediate(y);
     }
-
-    return true;
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func _attack_recovery_ended(enttyId : u8 in y) : bool in carry {
+func _attack_recovery_ended(enttyId : u8 in y) {
     // Continue walking in the same direction the enemy was walking before they saw the player.
     ^return set_state__walk(y, SoA_walkingDirection[y] as u8);
 }
@@ -620,7 +603,7 @@ func set_state__hurt(entityId : u8 in y) {
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__hurt(entityId : u8 in y) : bool in carry {
+func process__hurt(entityId : u8 in y) {
 
     a = SoA_countdownTimer[y];
     if !zero {
@@ -630,8 +613,6 @@ func process__hurt(entityId : u8 in y) : bool in carry {
     else {
         ^return set_state__hurt_cooldown(y);
     }
-
-    return true;
 }
 
 
@@ -662,7 +643,7 @@ func set_state__blocking(entityId : u8 in y) {
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__blocking(entityId : u8 in y) : bool in carry {
+func process__blocking(entityId : u8 in y) {
 
     carry = is_ms_non_looping_animation_running(y);
     if !carry {
@@ -683,8 +664,6 @@ func process__blocking(entityId : u8 in y) : bool in carry {
             mem8();
         }
     }
-
-    return true;
 }
 
 
@@ -695,7 +674,7 @@ func process__blocking(entityId : u8 in y) : bool in carry {
 // KEEP: Y
 // DB = 0x7e
 #[mem8, idx8]
-func set_state__hurt_cooldown(entityId : u8 in y) : bool in carry {
+func set_state__hurt_cooldown(entityId : u8 in y) {
     a = State.HURT_COOLDOWN as u8;
     SoA_state[y] = a as State;
 
@@ -711,15 +690,13 @@ func set_state__hurt_cooldown(entityId : u8 in y) : bool in carry {
     mem8();
 
     SoA_countdownTimer[y] = a = HURT_COOLDOWN_DELAY;
-
-    return true;
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__hurt_cooldown(entityId : u8 in y) : bool in carry {
+func process__hurt_cooldown(entityId : u8 in y) {
 
     a = SoA_countdownTimer[y];
     if !zero {
@@ -730,8 +707,6 @@ func process__hurt_cooldown(entityId : u8 in y) : bool in carry {
 
         ^return set_state__walk(y, SoA_walkingDirection[y] as u8);
     }
-
-    return true;
 }
 
 

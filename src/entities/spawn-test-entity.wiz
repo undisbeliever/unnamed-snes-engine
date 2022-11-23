@@ -59,7 +59,7 @@ func init(entityId : u8 in y) {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func process(entityId : u8 in y) : bool in carry {
+func process(entityId : u8 in y) {
     metatiles.move_entity_and_collision_test(y);
 
     a = SoA.movementState[y];
@@ -106,11 +106,9 @@ func process(entityId : u8 in y) : bool in carry {
         mem8();
 
         if zero {
-            return false;
+            SoA.health[unaligned x] = 0;
         }
     }
-
-    return true;
 }
 
 

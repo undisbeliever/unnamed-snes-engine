@@ -139,7 +139,7 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func change_to_swarming_entity(entityId : u8 in y) : bool in carry {
+func change_to_swarming_entity(entityId : u8 in y) {
 
     mem16();
     #[mem16] {
@@ -161,7 +161,7 @@ func change_to_swarming_entity(entityId : u8 in y) : bool in carry {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func change_to_swarming_entity__player_sword_collision(entityId : u8 in y) : bool in carry {
+func change_to_swarming_entity__player_sword_collision(entityId : u8 in y) {
 
     mem16();
     #[mem16] {
@@ -171,8 +171,6 @@ func change_to_swarming_entity__player_sword_collision(entityId : u8 in y) : boo
 
     // `process__hurt` will call `_reset` when the countdown timer ends.
     set_state__hurt(y);
-
-    return true;
 }
 
 
@@ -186,7 +184,7 @@ let init = _reset as func(entityId : u8 in y, parameter : u8 in x);
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _reset(entityId : u8 in y) : bool in carry {
+func _reset(entityId : u8 in y) {
 
     // Read the next value in OffsetTable
     x = offsetTableIndex;
@@ -243,7 +241,7 @@ func _reset(entityId : u8 in y) : bool in carry {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func process(entityId : u8 in y) : bool in carry {
+func process(entityId : u8 in y) {
 
     y = base.process_collisions(y);
 
@@ -347,7 +345,7 @@ const process__state_functions = [
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _update_velocity__facing_north_or_south(entityId : u8 in y) : bool in carry {
+func _update_velocity__facing_north_or_south(entityId : u8 in y) {
     x = a = SoA.xPos_px[unaligned y] - _target_x;
 
     mem16();
@@ -369,8 +367,6 @@ func _update_velocity__facing_north_or_south(entityId : u8 in y) : bool in carry
         SoA.xVelocity[unaligned y] = aa;
     }
     mem8();
-
-    return true;
 }
 
 
@@ -380,7 +376,7 @@ func _update_velocity__facing_north_or_south(entityId : u8 in y) : bool in carry
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _update_velocity__facing_east_or_west(entityId : u8 in y) : bool in carry {
+func _update_velocity__facing_east_or_west(entityId : u8 in y) {
     x = a = SoA.yPos_px[unaligned y] - _target_y;
 
     mem16();
@@ -402,15 +398,13 @@ func _update_velocity__facing_east_or_west(entityId : u8 in y) : bool in carry {
         SoA.yVelocity[unaligned y] = aa;
     }
     mem8();
-
-    return true;
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__facing_south(entityId : u8 in y) : bool in carry {
+func process__facing_south(entityId : u8 in y) {
 
     a = _absDifference_y + Y_TURN_THRESHOLD;
     if a < _absDifference_x {
@@ -433,7 +427,7 @@ func process__facing_south(entityId : u8 in y) : bool in carry {
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__facing_north(entityId : u8 in y) : bool in carry {
+func process__facing_north(entityId : u8 in y) {
 
     a = _absDifference_y + Y_TURN_THRESHOLD;
     if a < _absDifference_x {
@@ -456,7 +450,7 @@ func process__facing_north(entityId : u8 in y) : bool in carry {
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__facing_east(entityId : u8 in y) : bool in carry {
+func process__facing_east(entityId : u8 in y) {
 
     a = _absDifference_x + X_TURN_THRESHOLD;
     if a < _absDifference_y {
@@ -479,7 +473,7 @@ func process__facing_east(entityId : u8 in y) : bool in carry {
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__facing_west(entityId : u8 in y) : bool in carry {
+func process__facing_west(entityId : u8 in y) {
 
     a = _absDifference_x + X_TURN_THRESHOLD;
     if a < _absDifference_y {
@@ -502,7 +496,7 @@ func process__facing_west(entityId : u8 in y) : bool in carry {
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_south(entityId : u8 in y) : bool in carry {
+func set_direction_south(entityId : u8 in y) {
     x = y;
 
     SoA_state[x] = State.FACING_SOUTH;
@@ -514,14 +508,14 @@ func set_direction_south(entityId : u8 in y) : bool in carry {
     }
     mem8();
 
-    ^return set_ms_animation_and_return_true(y, ms_animations.walk_south);
+    ^return set_ms_animation(y, ms_animations.walk_south);
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_north(entityId : u8 in y) : bool in carry {
+func set_direction_north(entityId : u8 in y) {
     x = y;
 
     a = State.FACING_NORTH as u8;
@@ -534,14 +528,14 @@ func set_direction_north(entityId : u8 in y) : bool in carry {
     }
     mem8();
 
-    ^return set_ms_animation_and_return_true(y, ms_animations.walk_north);
+    ^return set_ms_animation(y, ms_animations.walk_north);
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_east(entityId : u8 in y) : bool in carry {
+func set_direction_east(entityId : u8 in y) {
     x = y;
 
     a = State.FACING_EAST as u8;
@@ -554,14 +548,14 @@ func set_direction_east(entityId : u8 in y) : bool in carry {
     }
     mem8();
 
-    ^return set_ms_animation_and_return_true(y, ms_animations.walk_east);
+    ^return set_ms_animation(y, ms_animations.walk_east);
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_west(entityId : u8 in y) : bool in carry {
+func set_direction_west(entityId : u8 in y) {
     x = y;
 
     a = State.FACING_WEST as u8;
@@ -574,14 +568,14 @@ func set_direction_west(entityId : u8 in y) : bool in carry {
     }
     mem8();
 
-    ^return set_ms_animation_and_return_true(y, ms_animations.walk_west);
+    ^return set_ms_animation(y, ms_animations.walk_west);
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_north_or_south(entityId : u8 in y) : bool in carry {
+func set_direction_north_or_south(entityId : u8 in y) {
     a = SoA.yPos_px[y];
 
     return set_direction_south(y) if a < _target_y;
@@ -592,7 +586,7 @@ func set_direction_north_or_south(entityId : u8 in y) : bool in carry {
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_east_or_west(entityId : u8 in y) : bool in carry {
+func set_direction_east_or_west(entityId : u8 in y) {
     a = SoA.xPos_px[y];
 
     return set_direction_east(y) if a < _target_x;
@@ -628,7 +622,7 @@ func set_state__hurt(entityId : u8 in y) {
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__hurt(entityId : u8 in y) : bool in carry {
+func process__hurt(entityId : u8 in y) {
 
 let RESET_VELOCITY_TIME = HURT_TIME_IN_FRAMES - HURT_KNOCKBACK_TIME_IN_FRAMES;
 
@@ -647,7 +641,7 @@ let RESET_VELOCITY_TIME = HURT_TIME_IN_FRAMES - HURT_KNOCKBACK_TIME_IN_FRAMES;
         a--;
         SoA_countdownTimer[y] = a;
 
-        return true;
+        return;
     }
     else {
         ^return _reset(y);

@@ -563,7 +563,6 @@ import "../metasprites";
 let set_ms_animation_x               = metasprites.set_entity_animation_x;
 let set_ms_animation                 = metasprites.set_entity_animation;
 let set_ms_animation_if_changed      = metasprites.set_entity_animation_if_changed;
-let set_ms_animation_and_return_true = metasprites.set_entity_animation_and_return_true;
 
 let stop_ms_animation = metasprites.stop_entity_animation;
 

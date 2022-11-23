@@ -77,7 +77,7 @@ func init(entityId : u8 in y, parameter : u8 in x) {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func process(entityId : u8 in y) : bool in carry {
+func process(entityId : u8 in y) {
 
     y = base.process_collisions(y);
 
@@ -113,8 +113,6 @@ func process(entityId : u8 in y) : bool in carry {
         }
         mem8();
     }
-
-    return true;
 }
 
 

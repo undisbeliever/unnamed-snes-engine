@@ -72,7 +72,7 @@ func init(entityId : u8 in y, parameter : u8 in x) {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func process(entityId : u8 in y) : bool in carry {
+func process(entityId : u8 in y) {
 
     y = base.process_collisions(y);
 
@@ -104,7 +104,7 @@ const process__state_functions = [
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__walk_south(entityId : u8 in y) : bool in carry {
+func process__walk_south(entityId : u8 in y) {
 
     carry = vision_cone.test_down(y);
     if carry {
@@ -123,16 +123,13 @@ func process__walk_south(entityId : u8 in y) : bool in carry {
 
 
     // ::TODO check for solid tile 2 tiles below the entity ::
-
-
-    return true;
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__walk_north(entityId : u8 in y) : bool in carry {
+func process__walk_north(entityId : u8 in y) {
 
     carry = vision_cone.test_up(y);
     if carry {
@@ -151,16 +148,13 @@ func process__walk_north(entityId : u8 in y) : bool in carry {
 
 
     // ::TODO check for solid tile 2 tiles above the entity ::
-
-
-    return true;
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__walk_east(entityId : u8 in y) : bool in carry {
+func process__walk_east(entityId : u8 in y) {
 
     carry = vision_cone.test_right(y);
     if carry {
@@ -179,16 +173,13 @@ func process__walk_east(entityId : u8 in y) : bool in carry {
 
 
     // ::TODO check for solid tile 2 tiles to the right of the entity ::
-
-
-    return true;
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func process__walk_west(entityId : u8 in y) : bool in carry {
+func process__walk_west(entityId : u8 in y) {
 
     carry = vision_cone.test_left(y);
     if carry {
@@ -207,16 +198,13 @@ func process__walk_west(entityId : u8 in y) : bool in carry {
 
 
     // ::TODO check for solid tile 2 tiles to the left of the entity ::
-
-
-    return true;
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_south(entityId : u8 in y) : bool in carry {
+func set_direction_south(entityId : u8 in y) {
     x = y;
 
     SoA_state[x] = State.WALK_SOUTH;
@@ -228,14 +216,14 @@ func set_direction_south(entityId : u8 in y) : bool in carry {
     }
     mem8();
 
-    ^return set_ms_animation_and_return_true(y, ms_animations.walk_south);
+    ^return set_ms_animation(y, ms_animations.walk_south);
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_north(entityId : u8 in y) : bool in carry {
+func set_direction_north(entityId : u8 in y) {
     x = y;
 
     a = State.WALK_NORTH as u8;
@@ -248,14 +236,14 @@ func set_direction_north(entityId : u8 in y) : bool in carry {
     }
     mem8();
 
-    ^return set_ms_animation_and_return_true(y, ms_animations.walk_north);
+    ^return set_ms_animation(y, ms_animations.walk_north);
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_east(entityId : u8 in y) : bool in carry {
+func set_direction_east(entityId : u8 in y) {
     x = y;
 
     a = State.WALK_EAST as u8;
@@ -268,14 +256,14 @@ func set_direction_east(entityId : u8 in y) : bool in carry {
     }
     mem8();
 
-    ^return set_ms_animation_and_return_true(y, ms_animations.walk_east);
+    ^return set_ms_animation(y, ms_animations.walk_east);
 }
 
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_direction_west(entityId : u8 in y) : bool in carry {
+func set_direction_west(entityId : u8 in y) {
     x = y;
 
     a = State.WALK_WEST as u8;
@@ -288,7 +276,7 @@ func set_direction_west(entityId : u8 in y) : bool in carry {
     }
     mem8();
 
-    ^return set_ms_animation_and_return_true(y, ms_animations.walk_west);
+    ^return set_ms_animation(y, ms_animations.walk_west);
 }
 
 
