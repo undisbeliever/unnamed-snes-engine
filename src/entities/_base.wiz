@@ -127,13 +127,6 @@ func take_damage_from_player_sword(entityId : u8 in y) {
     if !carry {
         a = 0;
     }
-
-    if zero {
-        // ::TODO make configurable::
-        // ::TODO increment zPos::
-        ^return entities.smoke_particles.change_to_small_smoke_entity(y);
-    }
-
     SoA.health[y] = a;
 }
 
@@ -160,13 +153,6 @@ func take_damage_from_player_sword_with_knockback(entityId : u8 in y, collisionS
     if !carry {
         a = 0;
     }
-
-    if zero {
-        // ::TODO make configurable::
-        // ::TODO increment zPos::
-        ^return entities.smoke_particles.change_to_small_smoke_entity(y);
-    }
-
     SoA.health[y] = a;
 
     return set_velocity_after_player_sword_collision(y, x);

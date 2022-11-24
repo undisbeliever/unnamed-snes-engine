@@ -4,6 +4,7 @@
 import "../memmap";
 
 import "../../gen/entities";
+import "../../gen/death-functions-table.wiz";
 
 import "_variables";
 
@@ -107,7 +108,7 @@ var _init_function_u16 : u16 in zpTmp_word_0;
                 (&entities.SoA.process_function[0] as *u16)[unaligned y] = aa = (entity_rom_data.process_functions as far *u16)[unaligned x];
                 (&entities.SoA._visionAB[0] as *u16)[unaligned y] = aa = entity_rom_data.vision_ab[unaligned x];
 
-                (&entities.SoA._zPosAndBlank[0] as *u16)[unaligned y] = aa = entity_rom_data.initial_zpos_and_blank[unaligned x];
+                (&entities.SoA._zPosAndDeathFunction[0] as *u16)[unaligned y] = aa = entity_rom_data.initial_zpos_and_death_function[unaligned x];
 
                 (&entities.SoA._healthAndAttackPower[0] as *u16)[unaligned y] = aa = entity_rom_data.health_and_attack_power[unaligned x];
 
@@ -213,46 +214,64 @@ inline func process_active_entities()
             y = currentEntityId;
             a = SoA.health[y];
             if zero {
-                // Entity no longer active
-                // y = current entity id
-
-                // Remove entity from active entities list, preserving active entity order.
-                //
-                // Preserving entity order should be friendlier to `sort_active_entities()`.
-                numberOfActiveEntities--;
-
-                mem16();
-                #[mem16] {
-                    // ASSUMES numberOfActiveEntities <= ACTIVE_ENTITIES_TABLE__LAST_POS
-                    // ASSUMES numberOfActiveEntities < sizeof(activeEntitiesTable)
-
-                    // Must not change Y
-
-                    x = __currentEntityTablePos;
-                    if x < numberOfActiveEntities {
-                        do {
-                            // Swap activeEntitiesTable[x] and activeEntitiesTable[x + 1]
-                            aa = (&activeEntitiesTable as *u16)[unaligned x];
-                            swap_bytes(aa);
-                            (&activeEntitiesTable as *u16)[unaligned x] = aa;
-
-                            x++;
-                        } while x < numberOfActiveEntities;
-                    }
-
-                    // Set process_function and ms_draw_function to a blank function (just in case they are accidentally called)
-                    aa = _blank_entity_function as u16;
-                    entities.SoA.process_function[unaligned y] = aa as func(u8 in x);
-                    entities.SoA.ms_draw_function[unaligned y] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
+                // Entity's health is 0, call the entity's death function
+                a = SoA.deathFunction[y];
+                if a >= N_DEATH_FUNCTIONS {
+                    a = 0;
                 }
-                mem8();
+                x = a = a << 1;
+
+                carry = DeathFunctionsTable[unaligned x](y);
+                if carry {
+                    // Entity is still active
+                    y = currentEntityId;
+
+                    // Do not call the death function the next time this entity dies.
+                    SoA.deathFunction[y] = a = 0;
+                    metasprites.process_entity_animation(y);
+                }
+                else {
+                    // Entity no longer active
+                    y = currentEntityId;
+
+                    // Remove entity from active entities list, preserving active entity order.
+                    //
+                    // Preserving entity order should be friendlier to `sort_active_entities()`.
+                    numberOfActiveEntities--;
+
+                    mem16();
+                    #[mem16] {
+                        // ASSUMES numberOfActiveEntities <= ACTIVE_ENTITIES_TABLE__LAST_POS
+                        // ASSUMES numberOfActiveEntities < sizeof(activeEntitiesTable)
+
+                        // Must not change Y
+
+                        x = __currentEntityTablePos;
+                        if x < numberOfActiveEntities {
+                            do {
+                                // Swap activeEntitiesTable[x] and activeEntitiesTable[x + 1]
+                                aa = (&activeEntitiesTable as *u16)[unaligned x];
+                                swap_bytes(aa);
+                                (&activeEntitiesTable as *u16)[unaligned x] = aa;
+
+                                x++;
+                            } while x < numberOfActiveEntities;
+                        }
+
+                        // Set process_function and ms_draw_function to a blank function (just in case they are accidentally called)
+                        aa = _blank_entity_function as u16;
+                        entities.SoA.process_function[unaligned y] = aa as func(u8 in x);
+                        entities.SoA.ms_draw_function[unaligned y] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
+                    }
+                    mem8();
 
 
-                // Do not draw a shadow on unused entities.
-                //
-                // Y is currentEntityId;
-                a = metasprites.ShadowSize.NONE as u8;
-                SoA.shadowSize[unaligned y] = a as metasprites.ShadowSize;
+                    // Do not draw a shadow on unused entities.
+                    //
+                    // Y is currentEntityId;
+                    a = metasprites.ShadowSize.NONE as u8;
+                    SoA.shadowSize[unaligned y] = a as metasprites.ShadowSize;
+                }
             }
             else {
                 // entity is still alive, process entity animation
@@ -406,8 +425,8 @@ in rodata0 {
     const __metasprite_framesets : [ *const metasprites.MsFramesetFormat ; N_ENTRIES ] = [ 0xaaaa as *metasprites.MsFramesetFormat ; N_ENTRIES ];
     let metasprite_framesets = far &__metasprite_framesets;
 
-    const __initial_zpos_and_blank : [u8 ; N_ENTRIES * 2] = [ 0xaa ; N_ENTRIES * 2];
-    let initial_zpos_and_blank = far &__initial_zpos_and_blank as far *u16;
+    const __initial_zpos_and_death_function : [u8 ; N_ENTRIES * 2] = [ 0xaa ; N_ENTRIES * 2];
+    let initial_zpos_and_death_function = far &__initial_zpos_and_death_function as far *u16;
 
     const __vision_ab : [u8 ; N_ENTRIES * 2] = [ 0xaa ; N_ENTRIES * 2];
     let vision_ab = far &__vision_ab as far *u16;

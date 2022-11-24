@@ -119,11 +119,15 @@ namespace entities {
                 var previousYpos @ &_previousPosition[0].second : [u8 ; BA_SIZE];
 
 
-            var _zPosAndBlank : [_u8pair ; N_ENTITIES];
+            var _zPosAndDeathFunction : [_u8pair ; N_ENTITIES];
 
                 // Z position of the entity
                 // (byte)
-                var zPos @ &_zPosAndBlank[0].first : [u8 ; N_ENTITIES * 2];
+                var zPos @ &_zPosAndDeathFunction[0].first : [u8 ; BA_SIZE];
+
+                // Function to call when the entity's health is 0.
+                // (array index into DeathFunctionsTable)
+                var deathFunction @ &_zPosAndDeathFunction[0].second : [u8 ; BA_SIZE ];
 
 
             // ------------------------------------------------------------------------------------

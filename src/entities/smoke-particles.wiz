@@ -21,32 +21,6 @@ namespace smoke_particles {
 in code {
 
 
-// Transforms an entity into a ground smoke particle.
-//
-// ASSUMES: entityId is an active entity.
-//
-// Always returns true.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func change_to_ground_smoke_entity(entityId : u8 in y) {
-    return change_to_smoke_entity(y, init_parameter.ground as u8);
-}
-
-
-// Transforms an entity into a small smoke particle.
-//
-// ASSUMES: entityId is an active entity.
-//
-// Always returns true.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func change_to_small_smoke_entity(entityId : u8 in y) {
-    return change_to_smoke_entity(y, init_parameter.small as u8);
-}
-
-
 // Transforms an entity into a smoke particle.
 //
 // ASSUMES: entityId is an active entity.

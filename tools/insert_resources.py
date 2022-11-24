@@ -321,7 +321,7 @@ def insert_entity_rom_data(ri : ResourceInserter, entities_input : EntitiesJson,
     ri.confirm_initial_data_is_correct(ENTITY_ROM_DATA_LABEL,
                                        expected_blank_entity_rom_data(symbols, n_entities))
 
-    entity_rom_data = create_entity_rom_data(entities_input.entities, entities_input.entity_functions, symbols, metasprite_map)
+    entity_rom_data = create_entity_rom_data(entities_input, symbols, metasprite_map)
 
     ri.insert_blob_at_label(ENTITY_ROM_DATA_LABEL, entity_rom_data)
 

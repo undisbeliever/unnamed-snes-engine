@@ -885,7 +885,7 @@ var _activeEntitiesTablePos : u8 in zpTmp_byte_0;
                 #[mem16] {
                     SpriteList.xPos[unaligned x] = aa = ((&entities.SoA.xPos[0].px as *u16)[unaligned y] & 0xff) + CAMERA_ORIGIN;
                     SpriteList.yPos[unaligned x] = aa = ((&entities.SoA.yPos[0].px as *u16)[unaligned y] & 0xff) + CAMERA_ORIGIN;
-                    SpriteList.zPos[unaligned x] = aa = ((&entities.SoA._zPosAndBlank[0].first as *u16)[unaligned y] & 0xff);
+                    SpriteList.zPos[unaligned x] = aa = ((&entities.SoA._zPosAndDeathFunction[0].first as *u16)[unaligned y] & 0xff);
                     (&SpriteList.ms_draw_function[0] as *u16)[unaligned x] = aa = entities.SoA.ms_draw_function[unaligned y] as u16;
                     SpriteList.msFrameAddr[unaligned x] = aa = entities.SoA.msFrameAddr[unaligned y];
                     (&SpriteList._shadowSizeAndBlank[0] as *u16)[unaligned x] = aa = (&entities.SoA._shadowSizeAndBlank[0] as *u16)[unaligned y];
@@ -915,7 +915,7 @@ func _sprite_list_set_player_with_offset(sd : ScrollDirection in scrollDirection
 
         SpriteList.xPos[PLAYER_ID] = aa = ((&entities.SoA.xPos[0].px as *u16)[PLAYER_ID] & 0xff) + CAMERA_ORIGIN + ScrollDirectionTableX[unaligned x] as u16;
         SpriteList.yPos[PLAYER_ID] = aa = ((&entities.SoA.yPos[0].px as *u16)[PLAYER_ID] & 0xff) + CAMERA_ORIGIN + ScrollDirectionTableY[unaligned x] as u16;
-        SpriteList.zPos[PLAYER_ID] = aa = ((&entities.SoA._zPosAndBlank[0].first as *u16)[PLAYER_ID] & 0xff);
+        SpriteList.zPos[PLAYER_ID] = aa = ((&entities.SoA._zPosAndDeathFunction[0].first as *u16)[PLAYER_ID] & 0xff);
 
         (&SpriteList.ms_draw_function[0] as *u16)[PLAYER_ID] = aa = entities.SoA.ms_draw_function[PLAYER_ID] as u16;
         SpriteList.msFrameAddr[PLAYER_ID] = aa = entities.SoA.msFrameAddr[PLAYER_ID];

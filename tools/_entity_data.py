@@ -4,15 +4,16 @@
 
 import itertools
 from collections import OrderedDict
+from typing import Final
 
-from _json_formats import Name, ScopedName, Entity, EntityFunction
+from _json_formats import Name, ScopedName, EntitiesJson
 
 
 ENTITY_ROM_DATA_SOA_LABELS = (
     'entity_rom_data.__init_funtions',
     'entity_rom_data.__process_funtions',
     'entity_rom_data.__metasprite_framesets',
-    'entity_rom_data.__initial_zpos_and_blank',
+    'entity_rom_data.__initial_zpos_and_death_function',
     'entity_rom_data.__vision_ab',
     'entity_rom_data.__health_and_attack_power',
 )
@@ -46,9 +47,9 @@ def expected_blank_entity_rom_data(symbols : dict[str, int], n_entities : int) -
 
 
 
-def create_entity_rom_data(entities_input : OrderedDict[Name, Entity], entity_functions : OrderedDict[Name, EntityFunction], symbols : dict[str, int], metasprite_map : dict[ScopedName, tuple[int, Name]]) -> bytes:
+def create_entity_rom_data(entities_input : EntitiesJson, symbols : dict[str, int], metasprite_map : dict[ScopedName, tuple[int, Name]]) -> bytes:
 
-    out = bytearray(2 * len(entities_input) * len(ENTITY_ROM_DATA_SOA_LABELS))
+    out = bytearray(2 * len(entities_input.entities) * len(ENTITY_ROM_DATA_SOA_LABELS))
     i = 0
 
     def write_function_addr(fname : str) -> None:
@@ -63,7 +64,8 @@ def create_entity_rom_data(entities_input : OrderedDict[Name, Entity], entity_fu
         i += 2
 
 
-    entities = entities_input.values()
+    entities : Final = entities_input.entities.values()
+    death_functions : Final = entities_input.death_functions
 
     # init_functions
     for e in entities:
@@ -93,9 +95,15 @@ def create_entity_rom_data(entities_input : OrderedDict[Name, Entity], entity_fu
         i += 2
 
 
-    # initial_zpos_and_blank
+    # initial_zpos_and_death function
     for e in entities:
+        try:
+            death_function_id = death_functions.index(e.death_function)
+        except ValueError:
+            raise ValueError(f"Unknown death function for {e.name}: {e.death_function}")
+
         out[i] = e.zpos
+        out[i + 1] = death_function_id
         i += 2
 
 

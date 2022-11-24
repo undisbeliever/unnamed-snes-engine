@@ -431,6 +431,7 @@ class Entity(NamedTuple):
     id          : int
     code        : EntityFunction
     metasprites : ScopedName
+    death_function: Name
     zpos        : int
     vision      : Optional[EntityVision]
     health      : int
@@ -438,6 +439,7 @@ class Entity(NamedTuple):
 
 
 class EntitiesJson(NamedTuple):
+    death_functions  : list[Name]
     entity_functions : OrderedDict[Name, EntityFunction]
     entities         : OrderedDict[Name, Entity]
 
@@ -490,13 +492,18 @@ def load_entities_json(filename : Filename) -> EntitiesJson:
                 id = i,
                 code = entity_functions[e.get_name('code')],
                 metasprites = e.get_name_with_dot('metasprites'),
+                death_function = e.get_name('death_function'),
                 zpos = e.get_int('zpos'),
                 vision = e.get_entity_vision('vision'),
                 health = e.get_int('health'),
                 attack = e.get_int('attack'),
         ))
 
-    return EntitiesJson(entity_functions=entity_functions, entities=entities)
+    return EntitiesJson(
+            death_functions=jh.get_name_list('death_functions'),
+            entity_functions=entity_functions,
+            entities=entities
+    )
 
 
 

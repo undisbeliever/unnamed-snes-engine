@@ -28,6 +28,7 @@ RESOURCES  += $(patsubst %,gen/metatiles/%.bin, $(METATILE_TILESETS))
 GEN_SOURCES  := gen/resources.wiz
 GEN_SOURCES  += gen/interactive-tiles.wiz
 GEN_SOURCES  += gen/entities.wiz
+GEN_SOURCES  += gen/death-functions-table.wiz
 GEN_SOURCES  += gen/ms-drawing-functions.wiz
 GEN_SOURCES  += gen/arctan-table.wiz
 GEN_SOURCES  += gen/cosine-tables.wiz
@@ -97,6 +98,9 @@ gen/ms-drawing-functions.wiz: resources/ms-export-order.json tools/generate_ms_d
 
 gen/entities.wiz: resources/entities.json resources/ms-export-order.json tools/generate_entities_wiz.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate_entities_wiz.py -o '$@' 'resources/entities.json' 'resources/ms-export-order.json'
+
+gen/death-functions-table.wiz: resources/entities.json tools/generate_death_functions_table_wiz.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/generate_death_functions_table_wiz.py -o '$@' 'resources/entities.json'
 
 gen/arctan-table.wiz: tools/generate_arctan_table.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate_arctan_table.py -o '$@'

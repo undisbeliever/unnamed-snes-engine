@@ -350,7 +350,7 @@ class Compiler:
             return MsFsAndEntityOutput(error=e)
 
         try:
-            entity_rom_data = create_entity_rom_data(self.entities.entities, self.entities.entity_functions, self.symbols, ms_map)
+            entity_rom_data = create_entity_rom_data(self.entities, self.symbols, ms_map)
         except Exception as e:
             return MsFsAndEntityOutput(error=e)
 
