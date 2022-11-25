@@ -7,6 +7,7 @@
   "entity_functions": [
     {
       "name": "smoke_particles",
+      "is_enemy": false,
       "ms-export-order": "smoke",
       "parameter": {
         "type": "enum",
@@ -15,6 +16,7 @@
     },
     {
       "name": "sword_particles",
+      "is_enemy": false,
       "ms-export-order": "sword_particles",
       "parameter": {
         "type": "enum",
@@ -23,6 +25,7 @@
     },
     {
       "name": "bouncing_off_walls",
+      "is_enemy": true,
       "ms-export-order": "eight_direction_spinner",
       "parameter": {
         "type": "enum",
@@ -31,6 +34,7 @@
     },
     {
       "name": "crossbow_man",
+      "is_enemy": true,
       "ms-export-order": "crossbow_man",
       "parameter": {
         "type": "enum",
@@ -39,6 +43,7 @@
     },
     {
       "name": "skeleton",
+      "is_enemy": true,
       "ms-export-order": "skeleton",
       "parameter": {
         "type": "enum",
@@ -47,6 +52,7 @@
     },
     {
       "name": "slime",
+      "is_enemy": true,
       "ms-export-order": "slime",
       "parameter": {
         "type": "enum",
@@ -55,10 +61,12 @@
     },
     {
       "name": "swarming",
+      "is_enemy": true,
       "ms-export-order": "skeleton"
     },
     {
       "name": "projectile",
+      "is_enemy": false,
       "ms-export-order": "projectile",
       "parameter": {
         "type": "enum",
@@ -67,6 +75,7 @@
     },
     {
       "name": "projectile_angled",
+      "is_enemy": false,
       "uses-process-function-from": "projectile",
       "ms-export-order": "projectile",
       "parameter": {
@@ -76,6 +85,7 @@
     },
     {
       "name": "test__calc_angle",
+      "is_enemy": false,
       "ms-export-order": "eight_direction_spinner"
     }
   ],

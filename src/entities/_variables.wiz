@@ -126,6 +126,8 @@ namespace entities {
                 var zPos @ &_zPosAndDeathFunction[0].first : [u8 ; BA_SIZE];
 
                 // Function to call when the entity's health is 0.
+                // NOTE: bit 7 of this variable is unused.
+                // NOTE: bit 7 is reused by `entity_rom_data` to determine if the entity is an enemy or not.
                 // (array index into DeathFunctionsTable)
                 var deathFunction @ &_zPosAndDeathFunction[0].second : [u8 ; BA_SIZE ];
 
@@ -172,9 +174,15 @@ namespace entities {
 
 
 
-            var _shadowSizeAndBlank : [ _u8pair ; N_ENTITIES];
+            var _shadowSizeAndIsEnemy : [ _u8pair ; N_ENTITIES];
                 // The size of the shadow underneath the entity
-                var shadowSize @ &_shadowSizeAndBlank[0].first : [ metasprites.ShadowSize ; BA_SIZE ];
+                var shadowSize @ &_shadowSizeAndIsEnemy[0].first : [ metasprites.ShadowSize ; BA_SIZE ];
+
+                // If non-zero, the entity is an enemy.
+                // If this entity is an enemy, `_enemyCount` will be decremented when the entity is despawned.
+                // NOTE: This variable MUST NOT be changed by the entity code.
+                // (byte flag)
+                var _isEnemy @ &_shadowSizeAndIsEnemy[0].second : [ u8 ; BA_SIZE ];
 
 
             // Signed 16 bit X velocity
@@ -275,6 +283,14 @@ namespace entities {
         //
         // (byte counter)
         var numberOfActiveEntities : u8;
+
+
+        // The number of active enemies.
+        //
+        // Incremented on entity spawn, decremented when an enemy entity is deactivated.
+        //
+        // (byte counter)
+        var _enemyCount : i8;
 
 
         let ACTIVE_ENTITIES_TABLE__LAST_POS = sizeof(typeof(activeEntitiesTable)) - 1;

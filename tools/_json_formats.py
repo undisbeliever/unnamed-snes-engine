@@ -416,6 +416,7 @@ class EfParameter(NamedTuple):
 class EntityFunction(NamedTuple):
     name                        : Name
     id                          : int
+    is_enemy                    : bool
     ms_export_order             : Name
     parameter                   : Optional[EfParameter]
     uses_process_function_from  : Optional[Name]
@@ -481,6 +482,7 @@ def load_entities_json(filename : Filename) -> EntitiesJson:
             lambda ef, name, i : EntityFunction(
                 name = name,
                 id = i,
+                is_enemy = ef.get_bool('is_enemy'),
                 ms_export_order = ef.get_name('ms-export-order'),
                 parameter = ef.get_ef_parameter('parameter'),
                 uses_process_function_from = ef.get_optional_name('uses-process-function-from'),

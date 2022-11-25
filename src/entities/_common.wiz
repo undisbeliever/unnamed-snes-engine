@@ -46,7 +46,7 @@ func init() {
             entities.SoA.ms_draw_function[unaligned x] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
 
             // Clear entity shadow
-            (&entities.SoA._shadowSizeAndBlank as *u16)[unaligned x] = 0;
+            (&entities.SoA._shadowSizeAndIsEnemy as *u16)[unaligned x] = 0;
 
             x--;
             x--;
@@ -72,6 +72,8 @@ func init() {
         }
         while !negative;
     }
+
+    _enemyCount = 0;
 }
 
 
@@ -108,7 +110,7 @@ var _init_function_u16 : u16 in zpTmp_word_0;
                 (&entities.SoA.process_function[0] as *u16)[unaligned y] = aa = (entity_rom_data.process_functions as far *u16)[unaligned x];
                 (&entities.SoA._visionAB[0] as *u16)[unaligned y] = aa = entity_rom_data.vision_ab[unaligned x];
 
-                (&entities.SoA._zPosAndDeathFunction[0] as *u16)[unaligned y] = aa = entity_rom_data.initial_zpos_and_death_function[unaligned x];
+                (&entities.SoA._zPosAndDeathFunction[0] as *u16)[unaligned y] = aa = entity_rom_data.initial_zpos_and_death_function_and_is_enemy[unaligned x];
 
                 (&entities.SoA._healthAndAttackPower[0] as *u16)[unaligned y] = aa = entity_rom_data.health_and_attack_power[unaligned x];
 
@@ -120,7 +122,8 @@ var _init_function_u16 : u16 in zpTmp_word_0;
                 // MetaSprite Data
                 xx = aa;
 
-                (&entities.SoA._shadowSizeAndBlank[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.shadowSize__u16[unaligned xx] & 0xff;
+                // The _isEnemy byte will be set or cleared at the end of this function. 
+                (&entities.SoA._shadowSizeAndIsEnemy[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.shadowSize__u16[unaligned xx];
                 (&entities.SoA.tileHitbox[0].first as *u16)[unaligned yy] = aa = metasprites.MsFsData.tileHitbox[unaligned xx];
 
                 (&<:entities.SoA.ms_draw_function[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.drawFunction[unaligned xx];
@@ -152,6 +155,12 @@ var _init_function_u16 : u16 in zpTmp_word_0;
             }
             mem8_idx8();
 
+            // Retrieve bit 7 from `entity_rom_data.initial_zpos_and_death_function_and_is_enemy`
+            entities.SoA._isEnemy[unaligned y] = a = entities.SoA.deathFunction[unaligned y] & 0x80;
+            if !zero {
+                _enemyCount++;
+            }
+
             // x & y = entityId
 
             a = xPos;
@@ -176,6 +185,16 @@ var _init_function_u16 : u16 in zpTmp_word_0;
             ^return metasprites.init_entity_metasprite_animation__after_init(y);
         }
     }
+}
+
+
+
+// Retrieve the enemy count
+//
+// DB = 0x7e
+#[mem8]
+inline func get_enemy_count_a() : u8 in a {
+    return _enemyCount;
 }
 
 
@@ -215,11 +234,11 @@ inline func process_active_entities()
             a = SoA.health[y];
             if zero {
                 // Entity's health is 0, call the entity's death function
-                a = SoA.deathFunction[y];
-                if a >= N_DEATH_FUNCTIONS {
+                a = SoA.deathFunction[y] << 1;
+                if a >= N_DEATH_FUNCTIONS * 2{
                     a = 0;
                 }
-                x = a = a << 1;
+                x = a;
 
                 carry = DeathFunctionsTable[unaligned x](y);
                 if carry {
@@ -233,6 +252,15 @@ inline func process_active_entities()
                 else {
                     // Entity no longer active
                     y = currentEntityId;
+
+                    // Decrement enemy count (if the entity is an enemy)
+                    a = SoA._isEnemy[unaligned y];
+                    if !zero {
+                        _enemyCount--;
+                        if negative {
+                            _enemyCount = 0;
+                        }
+                    }
 
                     // Remove entity from active entities list, preserving active entity order.
                     //
@@ -425,8 +453,9 @@ in rodata0 {
     const __metasprite_framesets : [ *const metasprites.MsFramesetFormat ; N_ENTRIES ] = [ 0xaaaa as *metasprites.MsFramesetFormat ; N_ENTRIES ];
     let metasprite_framesets = far &__metasprite_framesets;
 
-    const __initial_zpos_and_death_function : [u8 ; N_ENTRIES * 2] = [ 0xaa ; N_ENTRIES * 2];
-    let initial_zpos_and_death_function = far &__initial_zpos_and_death_function as far *u16;
+    // bit 7 of the second byte signifies if the entity is an enemy or not.
+    const __initial_zpos_and_death_function_and_is_enemy : [u8 ; N_ENTRIES * 2] = [ 0xaa ; N_ENTRIES * 2];
+    let initial_zpos_and_death_function_and_is_enemy = far &__initial_zpos_and_death_function_and_is_enemy as far *u16;
 
     const __vision_ab : [u8 ; N_ENTRIES * 2] = [ 0xaa ; N_ENTRIES * 2];
     let vision_ab = far &__vision_ab as far *u16;

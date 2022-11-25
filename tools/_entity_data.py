@@ -13,7 +13,7 @@ ENTITY_ROM_DATA_SOA_LABELS = (
     'entity_rom_data.__init_funtions',
     'entity_rom_data.__process_funtions',
     'entity_rom_data.__metasprite_framesets',
-    'entity_rom_data.__initial_zpos_and_death_function',
+    'entity_rom_data.__initial_zpos_and_death_function_and_is_enemy',
     'entity_rom_data.__vision_ab',
     'entity_rom_data.__health_and_attack_power',
 )
@@ -95,12 +95,17 @@ def create_entity_rom_data(entities_input : EntitiesJson, symbols : dict[str, in
         i += 2
 
 
-    # initial_zpos_and_death function
+    # initial_zpos_and_death function and is enemy
+    if len(death_functions) >= 128:
+        raise RuntimeError("Too many death functions")
     for e in entities:
         try:
             death_function_id = death_functions.index(e.death_function)
         except ValueError:
             raise ValueError(f"Unknown death function for {e.name}: {e.death_function}")
+
+        if e.code.is_enemy:
+            death_function_id |= 0x80
 
         out[i] = e.zpos
         out[i + 1] = death_function_id
