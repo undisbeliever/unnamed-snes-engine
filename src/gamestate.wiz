@@ -23,4 +23,66 @@ in lowram {
 }
 
 
+namespace gamestate {
+
+in wram7e_roomstate {
+    // Game State flags
+    // (256 bit bitfield)
+    var gameFlags : [ u8 ; 256 / 8 ];
+}
+
+
+in code {
+
+// Initialize the gamestate
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func init() {
+    // Clear all the game flags
+    x = sizeof(typeof(gameFlags)) - 1;
+    do {
+        gameFlags[x] = 0;
+        x--;
+    } while !negative;
+}
+
+
+
+// Returns true if the game flag is clear
+//
+// DB = 0x7e
+#[mem8, idx8]
+func is_flag_clear(flag_id : u8 in x) : bool in zero {
+    y = a = x >>> 3;
+    x = a = x & 7;
+
+    a = gameFlags[y] & _BitTable[x];
+    return zero;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_game_flag(flag_id : u8 in x) {
+    y = a = x >>> 3;
+    x = a = x & 7;
+
+    gameFlags[y] = a = gameFlags[y] | _BitTable[x];
+}
+
+
+}
+
+
+in rodata0 {
+
+const __BitTable : [ u8 ; 8 ] = [ 1 << i for let i in 0..7 ];
+
+let _BitTable = far &__BitTable as far *u8;
+
+}
+
+}
 
