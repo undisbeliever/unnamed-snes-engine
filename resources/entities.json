@@ -84,6 +84,14 @@
       }
     },
     {
+      "name": "key",
+      "is_enemy": false,
+      "ms-export-order": "single_animation",
+      "parameter": {
+        "type": "gamestateflag"
+      }
+    },
+    {
       "name": "test__calc_angle",
       "is_enemy": false,
       "ms-export-order": "eight_direction_spinner"
@@ -161,6 +169,15 @@
       "metasprites": "common.Bolt",
       "death_function": "none",
       "zpos": "4",
+      "health": 255,
+      "attack": 2
+    },
+    {
+      "name": "key",
+      "code": "key",
+      "metasprites": "common.Key",
+      "death_function": "none",
+      "zpos": "0",
       "health": 255,
       "attack": 2
     },

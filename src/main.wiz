@@ -8,6 +8,7 @@ import "common/reset";
 import "common/dma";
 
 import "gameloop";
+import "gamestate";
 import "gamemodes";
 import "metatiles";
 import "metasprites";
@@ -18,6 +19,7 @@ import "resources-over-usb2snes";
 import "src/entities/sword-particles";
 import "src/entities/bouncing-off-walls";
 import "src/entities/crossbow-man";
+import "src/entities/key";
 import "src/entities/skeleton";
 import "src/entities/slime";
 import "src/entities/swarming";
@@ -48,6 +50,8 @@ func main() {
 
     idx8();
     #[idx8] {
+        gamestate.init();
+
         gameloop.init();
 
 

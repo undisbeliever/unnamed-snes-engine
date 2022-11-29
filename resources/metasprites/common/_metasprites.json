@@ -409,6 +409,35 @@
       "xorigin": 16,
       "yorigin": 16,
       "tilehitbox": "0 0"
+    },
+    {
+      "name": "Key",
+      "source": "key.png",
+      "frameWidth": 8,
+      "frameHeight": 16,
+      "frames": [ "key" ],
+      "ms-export-order": "single_animation",
+      "order": 2,
+      "shadowSize": "SMALL",
+      "tileHitbox": null,
+      "defaultLayout": "rect_8x16_two 0 0",
+      "layouts": {},
+      "defaultHitbox": null,
+      "hitboxes": {},
+      "defaultHurtbox": null,
+      "hurtboxes": {},
+      "clones": {},
+      "animations": {
+        "animation": {
+          "fixed-delay": 0,
+          "loop": false,
+          "delay-type": "none",
+          "frames": [ "key" ]
+        }
+      },
+      "xorigin": 3,
+      "yorigin": 12,
+      "tilehitbox": "5 5"
     }
   ]
 }

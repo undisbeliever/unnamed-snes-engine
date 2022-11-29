@@ -410,7 +410,7 @@ def _load_json_file(filename : Filename, cls : Type[_Helper._Self]) -> _Helper._
 
 class EfParameter(NamedTuple):
     type    : str
-    values  : list[Name]
+    values  : Optional[list[Name]]
 
 
 class EntityFunction(NamedTuple):
@@ -470,6 +470,8 @@ class _Entities_Helper(_Helper):
 
         if t == 'enum':
             return EfParameter('enum', p.get_name_list('values'))
+        elif t == 'gamestateflag':
+            return EfParameter(t, None)
         else:
             self._raise_error(f"Unknown function parameter type: { t }", key)
 
@@ -608,6 +610,7 @@ class Mappings(NamedTuple):
     ms_spritesheets             : list[Name]
     tiles                       : list[Name]
     interactive_tile_functions  : list[Name]
+    gamestate_flags             : list[Name]
     memory_map                  : MemoryMap
 
 
@@ -638,6 +641,7 @@ def load_mappings_json(filename : Filename) -> Mappings:
             ms_spritesheets = jh.get_name_list('ms_spritesheets'),
             tiles = jh.get_name_list('tiles'),
             interactive_tile_functions = jh.get_name_list('interactive_tile_functions'),
+            gamestate_flags = jh.get_name_list('gamestate_flags'),
             memory_map = jh.get_memory_map('memory_map'),
     )
 

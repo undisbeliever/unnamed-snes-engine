@@ -7,6 +7,7 @@ import "../wiz/common/snes/snes";
 import "resources";
 
 import "player";
+import "gamestate";
 import "common/dma";
 
 
@@ -17,6 +18,10 @@ let HEALTH_BAR_MAX = 32;
 
 let HEALTH_BAR_TILE_X = 1;
 let HEALTH_BAR_TILE_Y = 1;
+
+let KEYS_TILE_X = HEALTH_BAR_TILE_X + 1;
+let KEYS_TILE_Y = HEALTH_BAR_TILE_Y + 1;
+
 
 let X_BG_OFFSET = -4;
 let Y_BG_OFFSET = -4;
@@ -34,6 +39,12 @@ let HB_FULL_TILE    = 6;
 let HB_SHIFT = 2;
 
 let MAX_HB_TILES = HEALTH_BAR_MAX >> HB_SHIFT;
+
+
+let KEY_TILE         = 7;
+let KEY_TILE_PALETTE = 1;
+
+let MAX_UI_KEYS      = 5;
 
 
 in wram7e {
@@ -57,6 +68,11 @@ in wram7e {
 
     // Countdown timer for healthbar increment/decrement animation.
     var healthBarTimer : i8;
+
+
+    // Tile buffer for the key counter UI
+    // (low byte of the tilemap entries)
+    var keyBuffer : [u8 ; MAX_UI_KEYS];
 }
 
 
@@ -64,6 +80,10 @@ in lowram {
     // If non-zero then textBuffer will be uploaded to the PPU on the next VBlank.
     // (byte flag)
     var healthBarBufferFlag : u8;
+
+    // If non-zero then `keyBuffer` will be uploaded to the PPU on the next VBlank.
+    // (byte flag)
+    var keyBufferFlag : u8;
 }
 
 
@@ -83,6 +103,7 @@ inline func init() {
     healthBarTimer = 0;
 
     max_player_health_changed();
+    draw_key_bar(gamestate._keyCount);
 
     _redraw_health_bar(player.health);
 }
@@ -105,6 +126,20 @@ inline func setup_ppu__forceblank() {
     dma.set_tilemap__forceblank(VRAM_BG3_MAP_WADDR, 0x2000);
 
 
+    // Set palette and order bits for Key UI
+    {
+        snes.ppu.vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
+        snes.ppu.vram_address_hl = xx = VRAM_BG3_MAP_WADDR + KEYS_TILE_Y * 32 + KEYS_TILE_X;
+
+        a = 0x20 | KEY_TILE_PALETTE << 2;
+        xx = MAX_UI_KEYS;
+        do {
+            snes.ppu.vram_write_data_h = a;
+            xx--;
+        } while !zero;
+    }
+
+
     snes.ppu.bg3_scroll_x = a = <:X_BG_OFFSET;
     snes.ppu.bg3_scroll_x = a = >:X_BG_OFFSET;
     // Set Y scroll to -1;
@@ -112,7 +147,9 @@ inline func setup_ppu__forceblank() {
     snes.ppu.bg3_scroll_y = a = >:(Y_BG_OFFSET - 1);
 
 
+    // Write UI back to VRAM after it has been erased by `dma.set_tilemap__forceblank`
     healthBarBufferFlag = 0;
+    keyBufferFlag = 0;
 }
 
 
@@ -143,6 +180,26 @@ inline func transfer_buffer__vblank() {
         snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
 
         healthBarBufferFlag = a;
+    }
+
+    a = keyBufferFlag;
+    if zero {
+        debug_break();
+        snes.ppu.vram_control = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_1;
+
+        snes.ppu.vram_address_hl = xx = VRAM_BG3_MAP_WADDR + KEYS_TILE_Y * 32 + KEYS_TILE_X;
+
+        snes.dma0.control = a = snes.dma.CONTROL_MODE_A;
+        snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
+
+        snes.dma0.src_address_hl = xx = &keyBuffer as u16;
+        snes.dma0.src_address_bank = a = #:far &keyBuffer;
+
+        snes.dma0.mdma_size_hl = xx = sizeof(typeof(keyBuffer));
+
+        snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+
+        keyBufferFlag = a;
     }
 }
 
@@ -259,6 +316,39 @@ func _redraw_health_bar(newValue : u8 in a) {
 
     // Upload to VRAM on next VBlank
     healthBarBufferFlag = 0;
+}
+
+
+
+// Redraw the key bar UI.
+//
+// MUST be called then the key count changes.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func draw_key_bar(nKeys : u8 in x) {
+    if x >= MAX_UI_KEYS + 1 {
+        x = MAX_UI_KEYS;
+    }
+
+    y = x;
+    if !zero {
+        a = KEY_TILE;
+        do {
+            y--;
+            keyBuffer[y] = a;
+        } while !zero;
+    }
+
+    // Clear tiles after keys
+    if x < MAX_UI_KEYS {
+        do {
+            keyBuffer[x] = 0;
+            x++;
+        } while x < MAX_UI_KEYS;
+    }
+
+    keyBufferFlag = 0;
 }
 
 

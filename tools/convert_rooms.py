@@ -244,7 +244,7 @@ class RoomIntermediate(NamedTuple):
 
 
 
-def process_room_entities(room_entities : list[TmxEntity], all_entities : OrderedDict[str, Entity], error_list : list[str]) -> list[RoomEntity]:
+def process_room_entities(room_entities : list[TmxEntity], all_entities : OrderedDict[str, Entity], mapping : Mappings, error_list : list[str]) -> list[RoomEntity]:
     if len(room_entities) > ENTITIES_IN_MAP:
         error_list.append(f"Too many entities in room ({ len(room_entities) }, max: { ENTITIES_IN_MAP }");
 
@@ -280,7 +280,13 @@ def process_room_entities(room_entities : list[TmxEntity], all_entities : Ordere
                     add_error(f"Missing parameter value for { p.type }")
                 elif p.type == 'enum':
                     try:
+                        assert p.values
                         parameter = p.values.index(tmx_entity.parameter)
+                    except ValueError:
+                        add_error(f"Invalid parameter for { tmx_entity.type } enum: { tmx_entity.parameter }")
+                elif p.type == 'gamestateflag':
+                    try:
+                        parameter = mapping.gamestate_flags.index(tmx_entity.parameter)
                     except ValueError:
                         add_error(f"Invalid parameter for { tmx_entity.type } enum: { tmx_entity.parameter }")
                 else:
@@ -314,7 +320,7 @@ def process_room(tmx_map : TmxMap, mapping : Mappings, all_entities : OrderedDic
     except ValueError:
         error_list.append("Unknown tile in map.  There must be a maximum of 256 tiles in the tileset and no transparent or flipped tiles in the map.")
 
-    room_entities = process_room_entities(tmx_map.entities, all_entities, error_list)
+    room_entities = process_room_entities(tmx_map.entities, all_entities, mapping, error_list)
 
 
     if error_list:

@@ -168,6 +168,9 @@
     "LARGE"
   ],
   "animation_lists": {
+    "single_animation": [
+      "animation"
+    ],
     "player": [
       "walk_south", "walk_north", "walk_east", "walk_west",
       "attack_south", "attack_north", "attack_east", "attack_west",

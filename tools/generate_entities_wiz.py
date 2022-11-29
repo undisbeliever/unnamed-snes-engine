@@ -42,6 +42,8 @@ def generate_wiz_code(entities_input : EntitiesJson, ms_export_orders : MsExport
             p = ef.parameter
             if p:
                 if p.type == 'enum':
+                    assert p.values and len(p.values) > 0
+
                     out.write('enum init_parameter : u8 {\n')
                     for v in p.values:
                         out.write(f"  { v },\n")

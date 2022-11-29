@@ -5,6 +5,7 @@
 
 
 import "memmap";
+import "ui";
 
 
 in lowram {
@@ -29,6 +30,12 @@ in wram7e_roomstate {
     // Game State flags
     // (256 bit bitfield)
     var gameFlags : [ u8 ; 256 / 8 ];
+
+
+    // Number of keys held by the player
+    //
+    // NOTE: This function should not be modified by game code
+    var _keyCount : u8;
 }
 
 
@@ -45,6 +52,8 @@ inline func init() {
         gameFlags[x] = 0;
         x--;
     } while !negative;
+
+    _keyCount = 0;
 }
 
 
@@ -62,6 +71,28 @@ func is_flag_clear(flag_id : u8 in x) : bool in zero {
 }
 
 
+// Returns true if the game flag is clear (without clobbering the Y register)
+//
+// KEEP: y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func is_flag_clear__keep_y(flag_id : u8 in x) : bool in zero {
+var _tmp : u8 in zpTmp_byte_0;
+
+    _tmp = y;
+
+    y = a = x >>> 3;
+    x = a = x & 7;
+
+    a = gameFlags[y];
+
+    y = _tmp;
+
+    a &= _BitTable[x];
+    return zero;
+}
+
 
 // DB = 0x7e
 #[mem8, idx8]
@@ -70,6 +101,42 @@ func set_game_flag(flag_id : u8 in x) {
     x = a = x & 7;
 
     gameFlags[y] = a = gameFlags[y] | _BitTable[x];
+}
+
+
+
+// Increment the key counter
+// DB = 0x7e
+#[mem8, idx8]
+func increment_key_count() {
+    x = _keyCount;
+    x++;
+    if negative {
+        x = 127;
+    }
+    _keyCount = x;
+
+    return ui.draw_key_bar(x);
+}
+
+
+
+// Decrement the key counter.
+//
+// Return true if there was a key to decrement.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func test_and_decrement_key_count() : bool in carry{
+    x = _keyCount;
+    if !zero {
+        x--;
+        x = _keyCount;
+
+        ui.draw_key_bar(x);
+        return true;
+    }
+    return false;
 }
 
 

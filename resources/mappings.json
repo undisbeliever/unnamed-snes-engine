@@ -23,5 +23,9 @@
    "doorway",
    "heal"
  ],
- "starting_room": "01-02-dungeon-gf"
+ "starting_room": "01-02-dungeon-gf",
+ "gamestate_flags": [
+   "key_lv1_1",
+   "key_lv1_2"
+ ]
 }
