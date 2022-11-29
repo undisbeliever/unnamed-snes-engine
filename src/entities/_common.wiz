@@ -36,13 +36,13 @@ func init() {
         entities.SoA.process_function[0] = aa as func(u8 in x);
 
 
-        // Set all process_functions to blank (except player)
-        aa = _blank_entity_function as u16;
-
         x = entities.SoA.LAST_INDEX;
         do {
-            // Reset process function
+            // Reset entity functions
+            aa = _blank_entity_function as u16;
             entities.SoA.process_function[unaligned x] = aa as func(u8 in x);
+
+            aa = _blank_ms_draw_function as u16;
             entities.SoA.ms_draw_function[unaligned x] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
 
             // Clear entity shadow
@@ -289,6 +289,8 @@ inline func process_active_entities()
                         // Set process_function and ms_draw_function to a blank function (just in case they are accidentally called)
                         aa = _blank_entity_function as u16;
                         entities.SoA.process_function[unaligned y] = aa as func(u8 in x);
+
+                        aa = _blank_ms_draw_function as u16;
                         entities.SoA.ms_draw_function[unaligned y] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
                     }
                     mem8();
@@ -430,6 +432,12 @@ func _blank_entity_function(entityId : u8 in y) {
 func _blank_player_function() {
 }
 
+
+// A special blank MS drawing function that does nothing.
+//
+// DB = 0x7e
+func _blank_ms_draw_function(msFrame : u16 in yy, xPos : u16 in metasprites.xPos, yPos : u16 in metasprites.yPos) {
+}
 
 }
 
