@@ -182,7 +182,29 @@ var _init_function_u16 : u16 in zpTmp_word_0;
             __spawn_entity__call_init_function_ptr(y, x, _init_function_u16);
 
             y = pop8();
-            ^return metasprites.init_entity_metasprite_animation__after_init(y);
+
+            a = entities.SoA.health[y];
+            if !zero {
+                ^return metasprites.init_entity_metasprite_animation__after_init(y);
+            }
+            else {
+                // Entity's heath is 0.
+                // We cannot remove the entity from the list by decrementing `numberOfActiveEntities`, the entity's init function might spawn more entities.
+                // Instead, the entity functions are changed to blank functions so the entity is not drawn during room transitions.
+                mem16();
+                #[mem16] {
+                    aa = _blank_entity_function as u16;
+                    entities.SoA.process_function[unaligned y] = aa as func(u8 in x);
+
+                    aa = _blank_ms_draw_function as u16;
+                    entities.SoA.ms_draw_function[unaligned y] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
+                }
+                mem8();
+
+                // Clear entity shadow
+                x = y;
+                entities.SoA.shadowSize[x] = metasprites.ShadowSize.NONE;
+            }
         }
     }
 }
