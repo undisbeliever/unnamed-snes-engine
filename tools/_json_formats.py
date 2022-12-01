@@ -596,11 +596,26 @@ def load_ms_export_order_json(filename : Filename) -> MsExportOrder:
 # mappings.json
 # =============
 
+MAX_ROOM_EVENTS = 128
+MAX_ROOM_EVENT_PARAMETERS = 4
 
 class MemoryMap(NamedTuple):
     mode                : MemoryMapMode
     first_resource_bank : int
     n_resource_banks    : int
+
+
+class RoomEventParameter(NamedTuple):
+    name                : Name
+    comment             : str
+    type                : Name
+    default_value       : Optional[str]
+
+class RoomEvent(NamedTuple):
+    name                : Name
+    id                  : int
+    source              : str
+    parameters          : list[RoomEventParameter]
 
 
 class Mappings(NamedTuple):
@@ -611,6 +626,7 @@ class Mappings(NamedTuple):
     tiles                       : list[Name]
     interactive_tile_functions  : list[Name]
     gamestate_flags             : list[Name]
+    room_events                 : OrderedDict[Name, RoomEvent]
     memory_map                  : MemoryMap
 
 
@@ -631,8 +647,33 @@ class _Mappings_Helper(_Helper):
         )
 
 
+    def get_room_event_parameters(self, key : str) -> list[RoomEventParameter]:
+        out = list()
+
+        for p in self.iterate_list_of_dicts(key):
+            out.append(RoomEventParameter(
+                    name = p.get_name('name'),
+                    comment = p.get_string('comment'),
+                    type = p.get_name('type'),
+                    default_value = p.get_optional_string('default')
+            ))
+
+        if len(out) > MAX_ROOM_EVENT_PARAMETERS:
+            self._raise_error(f"Too many room parameters, max: { MAX_ROOM_EVENT_PARAMETERS }", key)
+        return out
+
+
+
 def load_mappings_json(filename : Filename) -> Mappings:
     jh = _load_json_file(filename, _Mappings_Helper)
+
+    room_events = jh.build_ordered_dict_from_list('room_events', RoomEvent, MAX_ROOM_EVENTS,
+            lambda rj, name, i : RoomEvent(
+                    name = name,
+                    id = i,
+                    source = rj.get_string('source'),
+                    parameters = rj.get_room_event_parameters('parameters'),
+    ))
 
     return Mappings(
             game_title = jh.get_string('game_title'),
@@ -642,6 +683,7 @@ def load_mappings_json(filename : Filename) -> Mappings:
             tiles = jh.get_name_list('tiles'),
             interactive_tile_functions = jh.get_name_list('interactive_tile_functions'),
             gamestate_flags = jh.get_name_list('gamestate_flags'),
+            room_events = room_events,
             memory_map = jh.get_memory_map('memory_map'),
     )
 

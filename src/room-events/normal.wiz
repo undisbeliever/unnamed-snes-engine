@@ -1,0 +1,27 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "_common";
+
+namespace room_events {
+namespace normal {
+
+in code {
+
+
+let init = spawn_room_entities;
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process() {
+
+}
+
+}
+
+}
+}
+

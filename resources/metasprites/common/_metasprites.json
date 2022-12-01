@@ -368,7 +368,7 @@
       "frames": [ "ground1", "ground2", "ground3", "ground4", "ground5", "ground6", "ground7", "ground8", "small1", "small2", "small3", "small4", "small5", "small6" ],
       "ms-export-order": "smoke",
       "order": 2,
-      "shadowSize": "MEDIUM",
+      "shadowSize": "NONE",
       "tileHitbox": null,
       "defaultLayout": null,
       "layouts": {

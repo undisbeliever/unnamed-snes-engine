@@ -27,6 +27,8 @@ RESOURCES  += $(patsubst %,gen/metatiles/%.bin, $(METATILE_TILESETS))
 
 GEN_SOURCES  := gen/resources.wiz
 GEN_SOURCES  += gen/interactive-tiles.wiz
+GEN_SOURCES  += gen/room-events-function-tables.wiz
+GEN_SOURCES  += gen/room-events.wiz
 GEN_SOURCES  += gen/entities.wiz
 GEN_SOURCES  += gen/death-functions-table.wiz
 GEN_SOURCES  += gen/ms-drawing-functions.wiz
@@ -82,6 +84,11 @@ gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palet
 gen/interactive-tiles.wiz: resources/mappings.json tools/generate_interactive_tiles_wiz.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate_interactive_tiles_wiz.py -o '$@' 'resources/mappings.json'
 
+gen/room-events-function-tables.wiz: resources/mappings.json tools/generate_room_events_function_tables.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/generate_room_events_function_tables.py -o '$@' 'resources/mappings.json'
+
+gen/room-events.wiz: resources/mappings.json tools/generate_room_events_wiz.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/generate_room_events_wiz.py -o '$@' 'resources/mappings.json'
 
 gen/other-resources.bin: $(OTHER_RESOURCES_SRC) resources/other-resources.json resources/mappings.json tools/convert_other_resources.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/convert_other_resources.py -o '$@' 'resources/mappings.json' 'resources/other-resources.json'

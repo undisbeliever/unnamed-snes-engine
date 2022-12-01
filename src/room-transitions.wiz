@@ -17,6 +17,7 @@ import "common/reset";
 import "player";
 import "entities/_variables";
 import "entities/_common";
+import "room-events/_callers";
 
 
 namespace room_transitions {
@@ -212,7 +213,7 @@ var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u1
 
     if carry {
         metatiles.populate_map_tile_properties();
-        gameloop._spawn_room_entities();
+        room_events.init__inline();
     }
     else {
         // room is missing from map - create an empty dummy map

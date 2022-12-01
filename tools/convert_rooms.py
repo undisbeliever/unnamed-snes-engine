@@ -15,7 +15,7 @@ import posixpath
 from collections import OrderedDict
 
 from _json_formats import load_entities_json, load_mappings_json, \
-                          Filename, Mappings, EntitiesJson, Entity
+                          Filename, Mappings, EntitiesJson, Entity, RoomEvent, Name
 from _common import MultilineError, SimpleMultilineError, print_error
 
 from typing import Final, NamedTuple, Optional, Union
@@ -51,9 +51,11 @@ class TmxEntity(NamedTuple):
     parameter   : Optional[str]
 
 class TmxMap(NamedTuple):
+    map_class   : str
     tileset     : TmxTileset
     map         : list[int]
     entities    : list[TmxEntity]
+    parameters  : OrderedDict[Name, str]
 
 
 
@@ -168,6 +170,29 @@ def parse_objectgroup_tag(tag : xml.etree.ElementTree.Element, error_list : list
 
 
 
+def parse_map_parameters_tag(tag : xml.etree.ElementTree.Element, error_list : list[str]) -> OrderedDict[Name, str]:
+    out = OrderedDict[Name, str]()
+
+    for child in tag:
+        if child.tag == 'property':
+            name = child.attrib.get('name')
+            value = child.attrib.get('value')
+
+            if name and value:
+                out[name] = value
+            else:
+                if not name:
+                    error_list.append("<property>: missing 'name' attribute")
+                if not value:
+                    error_list.append("<property>: missing 'value' attribute")
+        else:
+            error_list.append(f"Unknown tag: {child.tag}")
+
+
+    return out
+
+
+
 def parse_tmx_map(et : xml.etree.ElementTree.ElementTree) -> TmxMap:
     error_list : list[str] = list()
 
@@ -184,9 +209,14 @@ def parse_tmx_map(et : xml.etree.ElementTree.ElementTree) -> TmxMap:
     validate_tag_attr(root, 'tileheight', str(TILE_SIZE), error_list)
     validate_tag_attr(root, 'infinite', '0', error_list)
 
+    map_class = root.attrib.get('class', root.attrib.get('type')) # Tiled 1.9 renamed 'type' attribute to 'class'
+    if not map_class:
+        error_list.append('<map>: Missing class/type attribute')
+
     tileset = None
     tiles = None
     entities = None
+    parameters = OrderedDict[Name, str]()
 
     for child in root:
         if child.tag == 'tileset':
@@ -210,6 +240,11 @@ def parse_tmx_map(et : xml.etree.ElementTree.ElementTree) -> TmxMap:
                 error_list.append('Expected only one <objectgroup> tag')
             entities = parse_objectgroup_tag(child, error_list)
 
+        elif child.tag == 'properties':
+            if parameters:
+                error_list.append('Expected only one <properties> tag')
+            parameters = parse_map_parameters_tag(child, error_list)
+
     if entities is None:
         entities = list()
 
@@ -222,11 +257,12 @@ def parse_tmx_map(et : xml.etree.ElementTree.ElementTree) -> TmxMap:
     if error_list:
         raise RoomError('Error reading TMX file', error_list)
 
+    assert map_class
     assert tileset
     assert tiles
     assert entities is not None
 
-    return TmxMap(tileset, tiles, entities)
+    return TmxMap(map_class, tileset, tiles, entities, parameters)
 
 
 
@@ -238,9 +274,10 @@ class RoomEntity(NamedTuple):
 
 
 class RoomIntermediate(NamedTuple):
-    map_data    : bytes
-    tileset_id  : int
-    entities    : list[RoomEntity]
+    map_data              : bytes
+    tileset_id            : int
+    entities              : list[RoomEntity]
+    room_event_data       : bytes
 
 
 
@@ -307,6 +344,56 @@ def process_room_entities(room_entities : list[TmxEntity], all_entities : Ordere
     return out
 
 
+
+def parse_int(value : str, max_value : int, error_list : list[str]) -> int:
+    try:
+        int_value = int(value)
+    except ValueError as e:
+        error_list.append(str(e))
+        return 0
+
+    if int_value > max_value:
+        error_list.append(f"Parameter is too large: got { int_value }, max: { max_value }")
+        return 0
+
+    return int_value
+
+
+
+
+def process_room_event_data(tmx_map : TmxMap, mapping : Mappings, error_list : list[str]) -> bytes:
+
+    out = bytearray()
+
+    room_event = mapping.room_events.get(tmx_map.map_class)
+    if not room_event:
+        error_list.append("Unknown room event: { tmx_map.map_class }")
+        return out
+
+    out.append(room_event.id * 2)
+
+    for p in room_event.parameters:
+        value = tmx_map.parameters.get(p.name, p.default_value)
+
+        if not value:
+            error_list.append(f"Room Event {room_event.name}: Missing parameter {p.name}")
+        else:
+            if p.type == 'u8':
+                out.append(parse_int(value, 0xff, error_list))
+            else:
+                error_list.append(f"Unknown Room Event parameter type: {p.type}")
+
+    if len(out) < 5:
+        out += bytes(5 - len(out))
+
+    if len(out) > 5:
+        error_list.append("CRITICAL ERROR: Room event data is too large")
+        return bytes(5)
+
+    return out
+
+
+
 def process_room(tmx_map : TmxMap, mapping : Mappings, all_entities : OrderedDict[str, Entity]) -> RoomIntermediate:
     error_list : list[str] = list()
 
@@ -322,11 +409,12 @@ def process_room(tmx_map : TmxMap, mapping : Mappings, all_entities : OrderedDic
 
     room_entities = process_room_entities(tmx_map.entities, all_entities, mapping, error_list)
 
+    room_event_data = process_room_event_data(tmx_map, mapping, error_list)
 
     if error_list:
         raise RoomError('Error compiling room', error_list)
 
-    return RoomIntermediate(map_data, tileset_id, room_entities)
+    return RoomIntermediate(map_data, tileset_id, room_entities, room_event_data)
 
 
 
@@ -367,6 +455,10 @@ def create_map_data(room : RoomIntermediate) -> bytes:
 
     # Tileset byte
     data.append(room.tileset_id)
+
+    # Room event
+    assert len(room.room_event_data) == 5
+    data += room.room_event_data
 
     data += create_room_entities_soa(room.entities)
 

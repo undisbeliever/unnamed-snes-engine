@@ -27,5 +27,29 @@
  "gamestate_flags": [
    "key_lv1_1",
    "key_lv1_2"
+ ],
+ "room_events": [
+   {
+     "name": "normal",
+     "source": "normal",
+     "parameters": []
+   },
+   {
+     "name": "delayed_spawn",
+     "source": "delayed-spawn",
+     "parameters": [
+       {
+         "name": "first_delay",
+         "comment": "Delay before spawning the first entity",
+         "type": "u8"
+       },
+       {
+         "name": "entity_delay",
+         "comment": "Delay before spawning the next entity",
+         "type": "u8",
+         "default": "0"
+       }
+     ]
+   }
  ]
 }

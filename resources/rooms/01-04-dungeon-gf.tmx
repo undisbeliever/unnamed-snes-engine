@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="3" nextobjectid="10">
+<map version="1.9" tiledversion="1.9.2" class="normal" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="3" nextobjectid="10">
  <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
  <layer id="1" name="Tile Layer 1" width="16" height="14">
   <data encoding="base64" compression="gzip">
@@ -7,49 +7,49 @@
   </data>
  </layer>
  <objectgroup id="2" name="Enemies">
-  <object id="1" type="skull" x="80" y="64">
+  <object id="1" class="skull" x="80" y="64">
    <properties>
     <property name="parameter" value="up_left"/>
    </properties>
    <point/>
   </object>
-  <object id="8" type="skull" x="128" y="80">
+  <object id="8" class="skull" x="128" y="80">
    <properties>
     <property name="parameter" value="up"/>
    </properties>
    <point/>
   </object>
-  <object id="9" type="skull" x="128" y="144">
+  <object id="9" class="skull" x="128" y="144">
    <properties>
     <property name="parameter" value="down"/>
    </properties>
    <point/>
   </object>
-  <object id="3" type="skull" x="176" y="64">
+  <object id="3" class="skull" x="176" y="64">
    <properties>
     <property name="parameter" value="up_right"/>
    </properties>
    <point/>
   </object>
-  <object id="4" type="skull" x="176" y="160">
+  <object id="4" class="skull" x="176" y="160">
    <properties>
     <property name="parameter" value="down_right"/>
    </properties>
    <point/>
   </object>
-  <object id="7" type="skull" x="192" y="112">
+  <object id="7" class="skull" x="192" y="112">
    <properties>
     <property name="parameter" value="right"/>
    </properties>
    <point/>
   </object>
-  <object id="5" type="skull" x="80" y="160">
+  <object id="5" class="skull" x="80" y="160">
    <properties>
     <property name="parameter" value="down_left"/>
    </properties>
    <point/>
   </object>
-  <object id="6" type="skull" x="64" y="112">
+  <object id="6" class="skull" x="64" y="112">
    <properties>
     <property name="parameter" value="left"/>
    </properties>

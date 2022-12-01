@@ -15,6 +15,7 @@ import "wait-frame";
 import "player";
 import "entities/_variables";
 import "entities/_common";
+import "room-events/_callers";
 
 
 namespace gameloop {
@@ -47,33 +48,6 @@ inline func init() {
 
 
 
-// Spawn the room entities
-//
-// ASSUMES: entities subsystem is initialised.
-// ASSUMES: room entities have not been spawned.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func _spawn_room_entities() {
-
-    x = N_ENTITIES_IN_ROOM_DATA - 1;
-    do {
-        push8(x);
-
-        entities.spawn_entity(a = room.entity_xPos[x],
-                              a = room.entity_yPos[x],
-                              a = room.entity_type[x],
-                              y = room.entity_parameter[x]);
-
-        x = pop8();
-
-        x--;
-    } while !negative;
-
-}
-
-
-
 // Process the game loop
 //
 // ASSUMES: PPU setup and screen enabled
@@ -83,6 +57,8 @@ func _spawn_room_entities() {
 func run_game {
 
     ^do {
+        room_events.process__inline();
+
         // Always process player entity first
         entities.currentEntityId = PLAYER_ENTITY_ID;
         player.process();

@@ -17,6 +17,14 @@ struct RoomData {
 
     tileset     : u8,
 
+    // The room event for this room
+    // (index into room event function tables)
+    roomEventFunction : u8,
+
+    // Room event parameters.
+    // The behaviour of these variables depends on `roomEventFunction`.
+    roomEventParameters : [u8 ; 4],
+
     // Entities in the map
     // (Structure of Arrays)
     // If the entity does not spawn then the array elements MUST be 0xff;
