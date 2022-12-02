@@ -184,7 +184,6 @@ inline func transfer_buffer__vblank() {
 
     a = keyBufferFlag;
     if zero {
-        debug_break();
         snes.ppu.vram_control = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_1;
 
         snes.ppu.vram_address_hl = xx = VRAM_BG3_MAP_WADDR + KEYS_TILE_Y * 32 + KEYS_TILE_X;
