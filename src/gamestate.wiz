@@ -131,7 +131,7 @@ func test_and_decrement_key_count() : bool in carry{
     x = _keyCount;
     if !zero {
         x--;
-        x = _keyCount;
+        _keyCount = x;
 
         ui.draw_key_bar(x);
         return true;
