@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<tileset version="1.9" tiledversion="1.9.0" name="dungeon" tilewidth="16" tileheight="16" tilecount="256" columns="16">
+<tileset version="1.9" tiledversion="1.9.2" name="dungeon" tilewidth="16" tileheight="16" tilecount="256" columns="16">
  <properties>
   <property name="palette" value="dungeon-palette.png"/>
  </properties>
@@ -295,17 +295,17 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="144">
+ <tile id="144" class="locked_door">
   <properties>
-   <property name="priority" value="1"/>
+   <property name="priority" value="0"/>
   </properties>
   <objectgroup draworder="index" id="2">
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="145">
+ <tile id="145" class="locked_door">
   <properties>
-   <property name="priority" value="1"/>
+   <property name="priority" value="0"/>
   </properties>
   <objectgroup draworder="index" id="2">
    <object id="1" x="0" y="0" width="16" height="16"/>
@@ -327,17 +327,17 @@
    <object id="2" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="160">
+ <tile id="160" class="locked_door">
   <properties>
-   <property name="priority" value="1"/>
+   <property name="priority" value="0"/>
   </properties>
   <objectgroup draworder="index" id="2">
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="161">
+ <tile id="161" class="locked_door">
   <properties>
-   <property name="priority" value="1"/>
+   <property name="priority" value="0"/>
   </properties>
   <objectgroup draworder="index" id="2">
    <object id="1" x="0" y="0" width="16" height="16"/>
@@ -399,9 +399,9 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="193">
+ <tile id="193" class="locked_door">
   <properties>
-   <property name="priority" value="1"/>
+   <property name="priority" value="0"/>
   </properties>
   <objectgroup draworder="index" id="2">
    <object id="1" x="0" y="0" width="16" height="16"/>
@@ -431,9 +431,9 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="209">
+ <tile id="209" class="locked_door">
   <properties>
-   <property name="priority" value="1"/>
+   <property name="priority" value="0"/>
   </properties>
   <objectgroup draworder="index" id="3">
    <object id="2" x="0" y="0" width="16" height="16"/>
@@ -455,9 +455,9 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="224">
+ <tile id="224" class="locked_door">
   <properties>
-   <property name="priority" value="1"/>
+   <property name="priority" value="0"/>
   </properties>
   <objectgroup draworder="index" id="2">
    <object id="1" x="0" y="0" width="16" height="16"/>
@@ -487,9 +487,9 @@
    <object id="1" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
- <tile id="240">
+ <tile id="240" class="locked_door">
   <properties>
-   <property name="priority" value="1"/>
+   <property name="priority" value="0"/>
   </properties>
   <objectgroup draworder="index" id="2">
    <object id="1" x="0" y="0" width="16" height="16"/>

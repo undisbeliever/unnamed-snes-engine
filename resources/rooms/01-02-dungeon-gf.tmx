@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.9" tiledversion="1.9.2" class="normal" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="3" nextobjectid="6">
+<map version="1.9" tiledversion="1.9.2" class="locked_door" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="3" nextobjectid="6">
+ <properties>
+  <property name="flag" value="door_lv1_1"/>
+ </properties>
  <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
  <layer id="1" name="Tile Layer 1" width="16" height="14">
   <data encoding="base64" compression="gzip">
-   H4sIAAAAAAAAA83RuxGCUBCF4VuArwJELACpANACBGnARwMIDWAiqSTYgXagHUgH2IF0IAX4J84QXALvTQy+aPfM7JntCSH6GEgckXXMhhhhDAMTiQLnjpmJKSzMYP/ohVoj/0aDB0qFfIoDKjwV8ifkGvd/6eZV+6+x0egfYf8H/3fg4oIrPGyxk3T1WntzLLCEjxvuCBAjkXQNWnsrhPgAsU7Ok4ADAAA=
+   H4sIAAAAAAAAA83Ryw2CUBCF4VuArwJELACpANACBGnARwMIDWAie0mwBe1AO5AOsAPpQArw35iwuCy8d+PiW82cZE6mJ4ToYyBxRNYxG2KEMQxMJAqcO2YmprAwg/2jF2qN/BsNHigV8ikOqPBUyJ+Qa9z/pZtX7b/GRqN/hP0f/N+Biwuu8LDFTtLVa+3NscASPm64I0CMRNI1aO2tEOIDnxxk94ADAAA=
   </data>
  </layer>
  <objectgroup id="2" name="Enemies">

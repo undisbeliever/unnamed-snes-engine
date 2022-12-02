@@ -13,12 +13,16 @@ from _json_formats import load_mappings_json, Mappings, Name, RoomEvent
 
 # Mapping of parameter types to wiz types
 PARAM_TYPES = {
-    'u8': 'u8'
+    'u8':               'u8',
+    'gamestate_flag':   'u8',
+    'locked_door':      'u8',
 }
 
 # Size of each parameter type in bytes
 PARAM_SIZE = {
-    'u8': 1,
+    'u8':               1,
+    'gamestate_flag':   1,
+    'locked_door':      1,
 }
 
 

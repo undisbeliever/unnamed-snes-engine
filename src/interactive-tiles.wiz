@@ -118,6 +118,39 @@ func player_touches_tile(tileIndex : u8 in y) {
 }
 
 
+// locked_door
+// ===========
+//
+// The locked door tile writes to the `playerTouchedLockedDoor` variable when the player
+// runs into the locked door tile.
+//
+// The `locked_door` room event is responsible for opening the locked door.
+//
+// REQUIRES: The locked door cannot be at room map location 0, 0.
+//
+namespace locked_door {
+
+in wram7e_roomstate {
+    // Set to the collision tileIndex if the player touches the door
+    //
+    // NOTE: This variable is not reset on room load.
+    var playerTouchedLockedDoor : u8;
+}
+
+let player_touches_tile = null_function;
+
+
+// Called when the player is touching the locked_door tile
+//
+// DB = 0x7e
+#[mem8, idx8]
+func player_tile_collision(tileIndex : u8 in y, direction : metatiles.CollisionDirection in a) {
+    playerTouchedLockedDoor = y;
+}
+
+}
+
+
 
 // doorway
 // =======

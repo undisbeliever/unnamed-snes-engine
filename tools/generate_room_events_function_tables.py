@@ -44,7 +44,10 @@ in code {
             out.write('];\n\n')
 
         out.write('// Called when the room is loaded, in room transition code\n')
+        out.write('// This function is allowed to modify the map data.\n')
+        out.write('// This function MUST NOT call a MetaTile function.\n')
         generate_table('init_function_table', 'func()', 'init')
+
         out.write('// Called once per frame\n')
         generate_table('process_function_table', 'func()', 'process')
 

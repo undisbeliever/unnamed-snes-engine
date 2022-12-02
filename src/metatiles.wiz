@@ -401,7 +401,106 @@ var _tmp : u16 in zpTmp_word_0;
 
 
 
-// ::TODO add set_tile_4by4(tileIndex : y) ::
+// Sets a 2x2 tile block of tiles.
+//
+// `topLeftTile` is the tileset index of the top-left tile of the 2x2 MT grid.
+// The other three tile indexes are relative to `topLeftTile`.
+//
+// NOTE: This function may fail if DrawTileBuffer cannot hold 4 entries.
+//
+// NOTE: This function returns true if `tileIndex` is out of bounds.
+//       The map will remain unchanged.
+//
+// ASSUMES: `tileIndex` is not on the rightmost tile column.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_2x2_tiles(tileIndex : u8 in y, topLeftTile : u8 in a) : bool in carry {
+let N_MT_TILES_CHANGED = 4;
+
+var _tmp : u16 in zpTmp_word_0;
+
+    if y >= sizeof(typeof(map)) - MAP_WIDTH - 1 {
+        // Ignore all out of bounds writes.
+        return true;
+    }
+
+    // Test if 4 tiles can be added to DrawTileBuffer
+    x = drawTileBufferIndex;
+    if x >= sizeof(typeof(DrawTileBuffer.vramWordAddr)) - N_MT_TILES_CHANGED * 2 + 1 {
+        return false;
+    }
+
+    // Set the four tiles
+
+    (&map[0x00] as *u8)[y] = a;
+    a++;
+    (&map[0x01] as *u8)[y] = a;
+    a += 0x10 - 1;
+    (&map[0x10] as *u8)[y] = a;
+    a++;
+    (&map[0x11] as *u8)[y] = a;
+
+
+    // Calculate VRAM word address for the four tiles
+    mem16();
+    #[mem16] {
+        #[idx16] { aa = yy; }
+        _tmp = aa = (aa & 0x0f) << 1;
+
+        #[idx16] { aa = yy; }
+        aa = ((aa & 0xf0) << 2) | _tmp;
+        _tmp = aa;
+        aa = (aa + transitions.vramVerticalWoffset) & 0x3ff;
+        aa |= transitions.currentTilemap_vramWaddr;
+
+        // X = end of drawTileBufferIndex
+        (&DrawTileBuffer.vramWordAddr[0] as *u16)[unaligned x] = aa;
+        aa++;
+        aa++;
+        (&DrawTileBuffer.vramWordAddr[1] as *u16)[unaligned x] = aa;
+
+        aa = _tmp + (0x10 << 2);
+        aa = (aa + transitions.vramVerticalWoffset) & 0x3ff;
+        aa |= transitions.currentTilemap_vramWaddr;
+        (&DrawTileBuffer.vramWordAddr[2] as *u16)[unaligned x] = aa;
+        aa++;
+        aa++;
+        (&DrawTileBuffer.vramWordAddr[3] as *u16)[unaligned x] = aa;
+    }
+    mem8_idx8();
+
+
+    // Update mapTileProperties
+    x = map[y];
+    (&mapTileProperties[0x00])[y] = a = (&tileset.properties[0x00])[x];
+    (&mapTileProperties[0x01])[y] = a = (&tileset.properties[0x01])[x];
+    (&mapTileProperties[0x10])[y] = a = (&tileset.properties[0x10])[x];
+    (&mapTileProperties[0x11])[y] = a = (&tileset.properties[0x11])[x];
+
+
+    y = drawTileBufferIndex;
+
+    inline func __populate_buffer(let _bi : u8, let _ti : u8) {
+        (&<:DrawTileBuffer.topLeft[_bi] as *u8)[unaligned y] = a = (&tileset.topLeft_low[_ti])[x];
+        (&>:DrawTileBuffer.topLeft[_bi] as *u8)[unaligned y] = a = (&tileset.topLeft_high[_ti])[x];
+        (&<:DrawTileBuffer.topRight[_bi] as *u8)[unaligned y] = a = (&tileset.topRight_low[_ti])[x];
+        (&>:DrawTileBuffer.topRight[_bi] as *u8)[unaligned y] = a = (&tileset.topRight_high[_ti])[x];
+        (&<:DrawTileBuffer.bottomLeft[_bi] as *u8)[unaligned y] = a = (&tileset.bottomLeft_low[_ti])[x];
+        (&>:DrawTileBuffer.bottomLeft[_bi] as *u8)[unaligned y] = a = (&tileset.bottomLeft_high[_ti])[x];
+        (&<:DrawTileBuffer.bottomRight[_bi] as *u8)[unaligned y] = a = (&tileset.bottomRight_low[_ti])[x];
+        (&>:DrawTileBuffer.bottomRight[_bi] as *u8)[unaligned y] = a = (&tileset.bottomRight_high[_ti])[x];
+    }
+    __populate_buffer(0, 0x00);
+    __populate_buffer(1, 0x01);
+    __populate_buffer(2, 0x10);
+    __populate_buffer(3, 0x11);
+
+    drawTileBufferIndex = a = y + N_MT_TILES_CHANGED * 2;
+
+    return true;
+}
+
 
 
 

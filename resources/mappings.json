@@ -21,12 +21,14 @@
  "interactive_tile_functions": [
    "player_tile_collision_test",
    "doorway",
+   "locked_door",
    "heal"
  ],
  "starting_room": "01-02-dungeon-gf",
  "gamestate_flags": [
    "key_lv1_1",
-   "key_lv1_2"
+   "key_lv1_2",
+   "door_lv1_1"
  ],
  "room_events": [
    {
@@ -48,6 +50,22 @@
          "comment": "Delay before spawning the next entity",
          "type": "u8",
          "default": "0"
+       }
+     ]
+   },
+   {
+     "name": "locked_door",
+     "source": "locked-door",
+     "parameters": [
+       {
+         "name": "flag",
+         "comment": "Delay before spawning the first entity",
+         "type": "gamestate_flag"
+       },
+       {
+         "name": "doorLocation",
+         "comment": "Location of the locked door",
+         "type": "locked_door"
        }
      ]
    }

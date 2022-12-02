@@ -214,6 +214,9 @@ var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u1
     if carry {
         metatiles.populate_map_tile_properties();
         room_events.init__inline();
+
+        // room event may modify the map, rebuild map tile properties
+        metatiles.populate_map_tile_properties();
     }
     else {
         // room is missing from map - create an empty dummy map
