@@ -48,6 +48,21 @@ func spawn_room_entities() {
 
 
 
+// Spawn a room enemy
+//
+// NOTE: `enemyIndex` MUST BE < N_ENTITIES_IN_ROOM_DATA
+//
+// DB = 0x7e
+#[mem8, idx8]
+func spawn_room_enemy(enemyIndex : u8 in x) {
+    ^return entities.spawn_entity(a = room.entity_xPos[x],
+                                 a = room.entity_yPos[x],
+                                 a = room.entity_type[x],
+                                 y = room.entity_parameter[x]);
+}
+
+
+
 // Unlock a 2x2 door inside an `init()` function.
 //
 // MUST NOT be called in the `process()` function.
@@ -106,6 +121,21 @@ func unlock_door(doorLocation : u8 in y) : bool in carry {
     a |= 2;
 
     ^return metatiles.set_2x2_tiles(y, a);
+}
+
+
+
+// Spawn small smoke at the location of a room enemy
+//
+// NOTE: `enemyIndex` MUST BE < N_ENTITIES_IN_ROOM_DATA
+//
+// DB = 0x7e
+#[mem8, idx8]
+func spawn_small_smoke_at_room_enemy_position(enemyIndex : u8 in x) {
+    ^return entities.spawn_entity(a = room.entity_xPos[x],
+                                 a = room.entity_yPos[x],
+                                 a = entities.EntityTypes.smoke_particles as u8,
+                                 y = entities.smoke_particles.init_parameter.small as u8);
 }
 
 

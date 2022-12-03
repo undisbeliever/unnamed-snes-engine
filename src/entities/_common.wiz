@@ -221,6 +221,17 @@ inline func get_enemy_count_a() : u8 in a {
 
 
 
+// Return true if there are no enemies alive
+//
+// DB = 0x7e
+#[mem8]
+inline func is_all_enemies_defeated() : bool in zero {
+    a = _enemyCount as u8;
+    return zero;
+}
+
+
+
 // Call the entity's init function (which is located in the temporary variable `zpTmp_word_0`)
 //
 // MUST ONLY BE CALLED BY `spawn_entity()`

@@ -6,7 +6,7 @@
  <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
  <layer id="1" name="Tile Layer 1" width="16" height="14">
   <data encoding="base64" compression="gzip">
-   H4sIAAAAAAAAA83Ryw2CUBCF4VuArwJELACpANACBGnARwMIDWAie0mwBe1AO5AOsAPpQArw35iwuCy8d+PiW82cZE6mJ4ToYyBxRNYxG2KEMQxMJAqcO2YmprAwg/2jF2qN/BsNHigV8ikOqPBUyJ+Qa9z/pZtX7b/GRqN/hP0f/N+Biwuu8LDFTtLVa+3NscASPm64I0CMRNI1aO2tEOIDnxxk94ADAAA=
+   H4sIAAAAAAAAA+NhYGDgBWI+LLgRiJtwyPEDsQAQywCxLBDLYcETgXgSDjl5IFYAYh0g1gViPRLxYyB+QoH+z0D8BYgPA/ERMvTXAnEdEF8G4itk6O8F4j4K3A/DlOon1/+xQBxHgf9zgThvEMS/DRDbAvFiIF4CxHZIGJ+YPRA7ALEPEPsC8WYg3gLEfkgYn5g/EAcAMQAqn83EgAMAAA==
   </data>
  </layer>
  <objectgroup id="2" name="Enemies">

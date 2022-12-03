@@ -113,8 +113,8 @@ enum State : u8 {
     WALKING                 = 0,
     ATTACKING               = 2,
     HURT                    = 4,
-    WALK_THROUGH_DOORWAY    = 6,
-    ATTACKING_IN_DOORWAY    = 8,
+    WALK_THROUGH_DOORWAY    = 6,    // NOTE: Read by the monster_doors room event
+    ATTACKING_IN_DOORWAY    = 8,    // NOTE: Read by the monster_doors room event
 };
 
 
