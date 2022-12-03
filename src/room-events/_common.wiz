@@ -4,6 +4,7 @@
 import "../memmap";
 
 import "../room";
+import "../metatiles";
 import "../entities/_common";
 
 namespace room_events {
@@ -44,6 +45,69 @@ func spawn_room_entities() {
         x--;
     } while !negative;
 }
+
+
+
+// Unlock a 2x2 door inside an `init()` function.
+//
+// MUST NOT be called in the `process()` function.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func init__unlock_door(doorLocation : u8 in y) {
+    // Get the top-left door tile and determine which door it is a part of.
+    a = metatiles.map[y] & (0x13 ^ 0xff);
+
+    // The unlocked door tiles are 2 tiles to the right of the locked door tile.
+    a |= 2;
+
+    // Set map tiles to the unlocked door tiles
+    (&room.map[0x00])[y] = a;
+    a++;
+    (&room.map[0x01])[y] = a;
+    a += 0x10 - 1;
+    (&room.map[0x10])[y] = a;
+    a++;
+    (&room.map[0x11])[y] = a;
+}
+
+
+
+// Lock a 2x2 door.
+//
+// MUST NOT be called in the `init()` function.
+//
+// Return true if the door was locked.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func lock_door(doorLocation : u8 in y) : bool in carry {
+    // Get the top-left door tile and determine which door it is a part of
+    a = metatiles.map[y] & (0x13 ^ 0xff);
+
+    ^return metatiles.set_2x2_tiles(y, a);
+}
+
+
+
+// Unlock a 2x2 door.
+//
+// MUST NOT be called in the `init()` function.
+//
+// Return true if the door was unlocked.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func unlock_door(doorLocation : u8 in y) : bool in carry {
+    // Get the top-left door tile and determine which door it is a part of
+    a = metatiles.map[y] & (0x13 ^ 0xff);
+
+    // The unlocked door tiles are 2 tiles to the right of the locked door tile.
+    a |= 2;
+
+    ^return metatiles.set_2x2_tiles(y, a);
+}
+
 
 }
 }

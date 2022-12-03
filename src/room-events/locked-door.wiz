@@ -5,7 +5,6 @@ import "../memmap";
 
 import "_common";
 import "../room";
-import "../metatiles";
 import "../gamestate";
 import "../interactive-tiles";
 
@@ -38,21 +37,7 @@ func init() {
     if !zero {
         // The door has already been unlocked.
         // Change the map tiles to an unlocked door before the room transition starts.
-
-        // Get the top-left door tile.
-        // The unlocked door tiles are 2 tiles to the right of the locked door tile.
-        y = parameter__doorLocation;
-        a = metatiles.map[y] + 2;
-
-        // Set map tiles to the unlocked door tiles
-        (&room.map[0x00])[y] = a;
-        a++;
-        (&room.map[0x01])[y] = a;
-        a += 0x10 - 1;
-        (&room.map[0x10])[y] = a;
-        a++;
-        (&room.map[0x11])[y] = a;
-
+        init__unlock_door(parameter__doorLocation);
 
         // Do not check door/key state in process()
         a = State.DOOR_UNLOCKED as u8;
@@ -80,25 +65,20 @@ func process() {
             if carry {
                 // key was consumed, set flag and unlocked door
                 gamestate.set_game_flag(parameter__flag);
-                return _unlock_door();
+                return _process__unlock_door();
             }
         }
     }
     else if a == State.UNLOCKING_DOOR as u8 {
-        return _unlock_door();
+        return _process__unlock_door();
     }
 }
 
 
 // DB = 0x7e
 #[mem8, idx8]
-func _unlock_door() {
-    // Get the top-left door tile.
-    // The unlocked door tiles are 2 tiles to the right of the locked door tile.
-    y = parameter__doorLocation;
-    a = metatiles.map[y] + 2;
-
-    carry = metatiles.set_2x2_tiles(y, a);
+func _process__unlock_door() {
+    carry = unlock_door(parameter__doorLocation);
     if carry {
         // Door successfully unlocked.
 
