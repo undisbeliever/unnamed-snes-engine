@@ -23,6 +23,7 @@ import "src/entities/key";
 import "src/entities/skeleton";
 import "src/entities/slime";
 import "src/entities/swarming";
+import "src/entities/rook";
 import "src/entities/smoke-particles";
 import "src/entities/projectile";
 import "src/entities/projectile-angled";

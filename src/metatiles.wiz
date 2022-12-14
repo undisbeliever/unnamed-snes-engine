@@ -289,6 +289,59 @@ func populate_map_tile_properties__all_tiles_solid() {
 }
 
 
+// Entity functions
+// ================
+
+
+// Return the tile index of the current entity
+//
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+func get_tile_index_under_entity(entityId : u8 in y) : u8 in x {
+var _tmp : u8 in zpTmp_byte_0;
+
+    _tmp = a = entities.SoA.xPos_px[y] >>> 4;
+    a = (entities.SoA.yPos_px[y] & 0xf0) | _tmp;
+
+    return a;
+}
+
+
+
+// Map manipulation functions
+// ==========================
+
+
+// Makes the tile solid without changing its appearance.
+//
+// NOTE: This function MUST not be called in the room-event init() or entity init() routines.
+//       Room transition code calls `populate_map_tile_properties()` after entity/room init.
+//
+// DB = 0x80
+#[mem8, idx8]
+func set_tile_solid(tileIndex : u8 in x) {
+    if x < sizeof(typeof(map)) {
+        mapTileProperties[x] = a = mapTileProperties[x] | (1 << TILE_PROPERTY_SOLID_BIT);
+    }
+}
+
+
+
+// Resets a tile's properties.
+//
+// Used to reset a tile's solid properties after a `set_tile_solid()` call.
+//
+// DB = 0x80
+#[mem8, idx8]
+func reset_tile_properties(tileIndex : u8 in x) {
+    if x < sizeof(typeof(map)) {
+        y = map[x];
+        mapTileProperties[x] = a = tileset.properties[y];
+    }
+}
+
+
 
 // DrawTileBuffer functions
 // ========================

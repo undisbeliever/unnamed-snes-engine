@@ -1,9 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.9" tiledversion="1.9.2" class="normal" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="2" nextobjectid="1">
+<map version="1.9" tiledversion="1.9.2" class="normal" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="3" nextobjectid="3">
  <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
  <layer id="1" name="Tile Layer 1" width="16" height="14">
   <data encoding="base64" compression="gzip">
-   H4sIAAAAAAAAA73RRwoCMRSA4RzAtrSX3dh1Z3dmZ9cLWS5guaPeQA/gL4zwCGOYCLr4yOK9H0ISUUpFERP2OKDh22Kn7cSRQBY55IUzLqI/4qTtFFBEDXWxG1YTrR/0JUMjZ1fcAvq2fyaRQhoZbfZyx8PQOyijgmpA/+n+750Ouuih/0U/wRQzzC16z/B+Xoj+3/8/wBAjS2O4WGCJlaU1NngC3sfL+4ADAAA=
+   H4sIAAAAAAAAA+3PwRFDUBRG4bcXkQIIBYgoAFGAoCGSBoQe6YACHJOYefPGglhkk8W3+8/MvZoQQlO4uMD7uMJf2E0O0HGUPPCU+gKlsjFwggkLZ0mNRuorvJSNDWfh1rXmn77tW3Q7+h7DD+//9+8+QIhooxtiJLgj3ShDjhFN1a68gAMAAA==
   </data>
  </layer>
+ <objectgroup id="2" name="Enemies">
+  <object id="1" class="rook" x="120" y="46">
+   <point/>
+  </object>
+  <object id="2" class="rook" x="136" y="46">
+   <point/>
+  </object>
+ </objectgroup>
 </map>
