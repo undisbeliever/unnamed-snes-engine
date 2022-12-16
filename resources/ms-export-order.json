@@ -211,7 +211,7 @@
       "south", "north", "east", "west"
     ],
     "smoke": [
-      "ground", "small"
+      "ground", "small", "explosion"
     ]
   }
 }

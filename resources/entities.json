@@ -2,7 +2,8 @@
   "death_functions": [
     "none",
     "small_smoke",
-    "ground_smoke"
+    "ground_smoke",
+    "explosion_smoke"
   ],
   "entity_functions": [
     {
@@ -11,7 +12,7 @@
       "ms-export-order": "smoke",
       "parameter": {
         "type": "enum",
-        "values": [ "ground", "small", "none" ]
+        "values": [ "ground", "small", "explosion", "none" ]
       }
     },
     {

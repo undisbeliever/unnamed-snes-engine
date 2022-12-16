@@ -330,42 +330,11 @@
       "clones": {}
     },
     {
-      "name": "Explosion",
-      "source": "explosion.png",
-      "frameWidth": 32,
-      "frameHeight": 32,
-      "xorigin": 16,
-      "yorigin": 16,
-      "frames": [ "explosion0", "explosion1", "explosion2" ],
-      "ms-export-order": "particle",
-      "order": 2,
-      "shadowSize": "NONE",
-      "tileHitbox": null,
-      "defaultLayout": null,
-      "layouts": {
-        "explosion0": "square_four_16 8 8",
-        "explosion1 - explosion2": "square_four_32 0 0"
-      },
-      "defaultHitbox": null,
-      "hitboxes": {},
-      "defaultHurtbox": null,
-      "hurtboxes": {},
-      "clones": {},
-      "animations": {
-        "animation": {
-          "delay-type": "frame",
-          "frames": [ "explosion0", 10, "explosion1", 6, "explosion2", 6, "explosion1", 5, "explosion2", 5, "explosion1", 4, "explosion2", 4 ],
-          "loop": false
-        }
-      },
-      "tilehitbox": "0 0"
-    },
-    {
       "name": "Smoke",
       "source": "smoke.png",
       "frameWidth": 32,
       "frameHeight": 32,
-      "frames": [ "ground1", "ground2", "ground3", "ground4", "ground5", "ground6", "ground7", "ground8", "small1", "small2", "small3", "small4", "small5", "small6" ],
+      "frames": [ "ground1", "ground2", "ground3", "ground4", "ground5", "ground6", "ground7", "ground8", "small1", "small2", "small3", "small4", "small5", "small6", "explosion0", "explosion1", "explosion2" ],
       "ms-export-order": "smoke",
       "order": 2,
       "shadowSize": "NONE",
@@ -385,7 +354,9 @@
         "small3": "square_single8 12 12",
         "small4": "four_small_sep_4 6 6",
         "small5": "four_small_sep_6 5 5",
-        "small6": "four_small_sep_8 4 4"
+        "small6": "four_small_sep_8 4 4",
+        "explosion0": "square_four_16 8 8",
+        "explosion1 - explosion2": "square_four_32 0 0"
       },
       "defaultHitbox": null,
       "hitboxes": {},
@@ -402,6 +373,11 @@
         "small": {
           "fixed-delay": 5,
           "frames": [ "small1", "small2", "small3", "small4", "small5", "small6" ],
+          "loop": false,
+          "delay-type": "frame"
+        },
+        "explosion": {
+          "frames": [ "explosion0", 12, "explosion1", 6, "explosion2", 6, "explosion1", 4, "explosion2", 4, "explosion1", 4, "explosion2", 4, "explosion1", 3, "explosion2", 3, "explosion1", 3, "explosion2", 3 ],
           "loop": false,
           "delay-type": "frame"
         }

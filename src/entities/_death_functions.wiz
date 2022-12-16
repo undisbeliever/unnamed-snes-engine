@@ -45,6 +45,18 @@ func ground_smoke(entityId : u8 in y) : bool in carry {
     return true;
 }
 
+
+// Transform the entity into an explosion smoke particle.
+//
+// Returns true if the entity is still active
+//
+// DB = 0x7e
+#[mem8, idx8]
+func explosion_smoke(entityId : u8 in y) : bool in carry {
+    entities.smoke_particles.change_to_smoke_entity(y, smoke_particles.init_parameter.explosion as u8);
+    return true;
+}
+
 }
 
 
