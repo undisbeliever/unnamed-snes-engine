@@ -13,10 +13,7 @@
    </properties>
    <point/>
   </object>
-  <object id="2" class="skeleton" x="160" y="112">
-   <properties>
-    <property name="parameter" value="up"/>
-   </properties>
+  <object id="2" class="player_bomb" x="128" y="128">
    <point/>
   </object>
   <object id="5" class="skeleton" x="64" y="128">

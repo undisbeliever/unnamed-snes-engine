@@ -6,6 +6,7 @@ import "memmap";
 import "entities/_variables";
 import "entities/_common";
 import "entities/_base";
+import "entities/player-bomb";
 
 import "joypad";
 import "metatiles";
@@ -110,11 +111,12 @@ let FACING_DIRECTION_SHIFT = 3;
 
 
 enum State : u8 {
-    WALKING                 = 0,
-    ATTACKING               = 2,
-    HURT                    = 4,
-    WALK_THROUGH_DOORWAY    = 6,    // NOTE: Read by the monster_doors room event
-    ATTACKING_IN_DOORWAY    = 8,    // NOTE: Read by the monster_doors room event
+    WALKING                 =  0,
+    ATTACKING               =  2,
+    HURT                    =  4,
+    WALK_THROUGH_DOORWAY    =  6,   // NOTE: Read by the monster_doors room event
+    ATTACKING_IN_DOORWAY    =  8,   // NOTE: Read by the monster_doors room event
+    HOLDING_BOMB            = 10,   // NOTE: Used by player_bomb entity
 };
 
 
@@ -304,6 +306,7 @@ const process__state_functions = [
     process__hurt,
     process__walk_through_doorway,
     process__attacking_in_doorway,
+    process__holding_bomb,
 ];
 
 
@@ -965,6 +968,9 @@ func process__hurt() {
         if a == State.WALK_THROUGH_DOORWAY as u8 || a == State.ATTACKING_IN_DOORWAY as u8 {
             set_state__walk_through_doorway__after_attacking_in_doorway();
         }
+        else if a == State.HOLDING_BOMB as u8 {
+            set_state__holding_bomb__after_hurt();
+        }
         else {
             ^return set_state__walking();
         }
@@ -1281,6 +1287,56 @@ func process__attacking_in_doorway() {
     if !carry {
         set_state__walk_through_doorway__after_attacking_in_doorway();
     }
+}
+
+
+
+// HOLDING_BOMB STATE
+// ==================
+
+
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func pickup_bomb__inline(bomb_entityId : u8 in y) {
+    a = player.state as u8;
+    if zero {
+        player.state = a = State.HOLDING_BOMB as u8;
+    }
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+inline func set_state__holding_bomb__after_hurt() {
+    player.state = a = State.HOLDING_BOMB as u8;
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__holding_bomb() {
+    // Watchdog is not required when holding a bomb.  This state can last forever
+    watchdogTimer = a = 1;
+
+    process_dpad_update_velocity();
+
+    move_player_with_tile_tests();
+
+
+    a = joypad.pressed_l;
+    if a & joypad.DROP_BOMB_BUTTON_L != 0 {
+        // Spawn active bomb
+        entities.spawn_entity(a = xPos.px,
+                              a = yPos.px,
+                              a = entities.EntityTypes.player_bomb as u8,
+                              y = entities.player_bomb.DROP_ACTIVE_BOMB_PARAMETER);
+
+        ^return set_state__walking();
+    }
+
+    ^return _set_ms_animation_if_changed(facingDirection | HOLDING_MS_ANIMATION_OFFSET);
 }
 
 

@@ -200,7 +200,7 @@
         "active": {
           "loop": true,
           "delay-type": "frame",
-          "fixed-delay": 40,
+          "fixed-delay": 10,
           "frames": [ "frame0", "frame1" ]
         }
       },

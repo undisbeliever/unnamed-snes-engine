@@ -8,6 +8,7 @@ import "_variables";
 import "_common";
 
 import "smoke-particles";
+import "player-bomb";
 
 import "../player";
 
@@ -232,6 +233,23 @@ func process_collisions(entityId : u8 in y) : u8 in y {
     a = SoA.iframeCounter[y];
     if zero {
         // Only test for a player collision if not in iframe
+
+        a = player_bomb.explosion_xPos;
+        if !zero {
+            // The player bomb exploded
+            a = __player_bomb_manhattan_distance__inline(y, a);
+            if a < player_bomb.BOMB_EXPLOSION_DISTANCE {
+                // ::TODO fix broken bomb knockback::
+                collisionCentre_x = a = player_bomb.explosion_xPos;
+                collisionCentre_y = a = player_bomb.explosion_yPos;
+
+                // ::TODO differentiate between sword and bomb attacks::
+                // ::TODO bomb should do more damage then a sword::
+                collisionState = a = CollisionState.PLAYER_WEAPON;
+                return y;
+            }
+        }
+
 
         idx16();
         #[mem8, idx16] {
@@ -530,6 +548,75 @@ var _tmp       : u8 in zpTmp_byte_3;
     }
 
     return false;
+}
+
+
+// Distance tests
+// ==============
+
+
+// Calculate the manhattan distance
+//
+// NOTE: This value is clipped to a maximum output of 255
+//
+// ASSUMES: `explosion_xPos == player_bomb.explosion_xPos` and `explosion_xPos != 0`.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func __player_bomb_manhattan_distance__inline(entityId : u8 in y, explosion_xPos : u8 in a) : u8 in a {
+var _tmp       : u8 in zpTmp_byte_0;
+
+    a = a - SoA.xPos_px[y];
+    if !carry {
+        a = negate8(a);
+    }
+    _tmp = a;
+
+    a = player_bomb.explosion_yPos - SoA.yPos_px[y];
+    if !carry {
+        a = negate8(a);
+    }
+
+    a += _tmp;
+    if carry {
+        a = 0xff;
+    }
+
+    return a;
+}
+
+
+
+// Calculate the Manhattan distance to the player
+//
+// NOTE: This value is clipped to a maximum output of 255
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func manhattan_distance_to_player(entityId : u8 in y) : u8 in a {
+var _tmp       : u8 in zpTmp_byte_0;
+
+    a = SoA.xPos_px[y] - player.xPos.px;
+    if !carry {
+        a = negate8(a);
+    }
+    _tmp = a;
+
+    a = SoA.yPos_px[y] - player.yPos.px;
+    if !carry {
+        a = negate8(a);
+    }
+
+    a += _tmp;
+    if carry {
+        a = 0xff;
+    }
+
+    return a;
 }
 
 }

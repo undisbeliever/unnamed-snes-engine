@@ -54,6 +54,9 @@ namespace JOYH {
 // Joypad buttons
 let ATTACK_BUTTON_H = joypad.JOYH.Y;
 
+let DROP_BOMB_BUTTON_L = joypad.JOYL.X | joypad.JOYL.A;
+
+
 // An attack button press lasts 3 frames.
 let ATTACK_BUFFER_FRAMES = 3;
 
