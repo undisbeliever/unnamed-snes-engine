@@ -16,6 +16,12 @@ import "../../gen/entities";
 namespace entities {
 namespace player_bomb {
 
+// ::TODO adjust:;
+let BOMB_ATTACK_POWER = 6;
+
+let BOMB_EXPLOSION_DISTANCE = 48;
+
+
 
 let DROP_ACTIVE_BOMB_PARAMETER = 123;
 
@@ -25,7 +31,7 @@ let BOMB_DROP_HEIGHT = 14;
 
 let EXPLOSION_TIMER = 80;
 
-let BOMB_EXPLOSION_DISTANCE = 48;
+
 
 let BOMB_RESPAWN_TIMER = EXPLOSION_TIMER + 120;
 

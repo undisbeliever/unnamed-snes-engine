@@ -111,20 +111,30 @@ var _tmp : u8 in zpTmp_byte_0;
 }
 
 
-
-// Take damage from the player's sword.
+// ASSUMES: `collisionState` is valid.
 //
-// KEEP: Y
+// KEEY: Y
 //
 // DB = 0x7e
 #[mem8, idx8]
-func take_damage_from_player_sword(entityId : u8 in y) {
+inline func __take_damage_from_player_attack__inline(entityId : u8 in y) {
+    // ::TODO add more types of attacks and defences::
 
-    // ::TODO add different types of attacks and defences::
+    // MUST NOT modify X
 
-    // NOTE: If I change this function I MUST also change `take_damage_from_player_sword_with_knockback`
+    a = collisionState;
+    if a & CollisionState.PLAYER_BOMB != 0 {
+        a = player_bomb.BOMB_ATTACK_POWER;
+    }
+    else {
+        a = player.swordAttackPower;
+    }
 
-    a = SoA.health[y] - player.swordAttackPower;
+    // rsb (ie, a = health - a)
+    carry = true;
+    a ^= 0xff;
+    a += SoA.health[y];
+
     if !carry {
         a = 0;
     }
@@ -133,8 +143,24 @@ func take_damage_from_player_sword(entityId : u8 in y) {
 
 
 
+// Take damage from the player's attack.
+//
+// ASSUMES: `collisionState` is valid.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func take_damage_from_player_attack(entityId : u8 in y) {
+
+    __take_damage_from_player_attack__inline(y);
+}
+
+
+
 // Take damage from the player's sword and then call `set_velocity_after_player_sword_collision`.
 //
+// ASSUMES: `collisionState` is valid.
 // ASSUMES: `collisionCentre` is valid if the entity collided with the sword hitbox.
 //
 // KEEP: Y
@@ -143,19 +169,8 @@ func take_damage_from_player_sword(entityId : u8 in y) {
 #[mem8, idx8, fallthrough]
 func take_damage_from_player_attack_with_knockback(entityId : u8 in y, collisionSpeed : u8 in x) {
 
-    // ::TODO add different types of attacks and defences::
-
-
-    // NOTE: If I change this function I MUST also change `take_damage_from_player_sword`
-
     // MUST NOT modify X
-
-    a = SoA.health[y] - player.swordAttackPower;
-    if !carry {
-        a = 0;
-    }
-    SoA.health[y] = a;
-
+    __take_damage_from_player_attack__inline(y);
     return set_velocity_after_player_attack_collision(y, x);
 }
 
