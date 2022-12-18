@@ -552,6 +552,13 @@ func _attack_recovery_ended(enttyId : u8 in y) {
 // DB = 0x7e
 #[mem8, idx8]
 func collided_with_player_weapon(entityId : u8 in y) {
+    // Bombs can go through shields
+    a = collisionState;
+    if a & CollisionState.PLAYER_BOMB != 0 {
+        return set_state__hurt(y);
+    }
+
+
     // Change state to HURT if player is not facing the enemy's shield.
 
     x = player.facingDirection;
