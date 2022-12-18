@@ -26,11 +26,17 @@ namespace entities {
     };
 
     namespace CollisionState {
-        let PLAYER_WEAPON   = 1 << 7;
-        let PLAYER_HURTBOX  = 1 << 6;
+        let PLAYER_SWORD       = 1 << 1;
+        let PLAYER_BOMB        = 1 << 2;
 
-        let PLAYER_WEAPON_BIT   = 7;
-        let PLAYER_HURTBOX_BIT  = 6;
+        let ANY_PLAYER_WEAPON  = 1 << 6;
+
+
+        let PLAYER_HURTBOX     = 1 << 7;
+
+
+        let ANY_PLAYER_WEAPON_BIT = 6;
+        let PLAYER_HURTBOX_BIT    = 7;
     };
 
 

@@ -77,7 +77,7 @@ func process(entityId : u8 in y) {
     y = base.process_collisions(y);
 
 
-    if collisionState $ CollisionState.PLAYER_WEAPON_BIT {
+    if collisionState $ CollisionState.ANY_PLAYER_WEAPON_BIT {
         ^return swarming.change_to_swarming_entity__player_sword_collision(y);
     }
 

@@ -246,7 +246,7 @@ func process(entityId : u8 in y) {
     y = base.process_collisions(y);
 
 
-    if collisionState $ CollisionState.PLAYER_WEAPON_BIT {
+    if collisionState $ CollisionState.ANY_PLAYER_WEAPON_BIT {
         set_state__hurt(y);
     }
 
@@ -615,7 +615,7 @@ func set_state__hurt(entityId : u8 in y) {
 
     SoA_countdownTimer[y] = a = HURT_TIME_IN_FRAMES;
 
-    ^return base.take_damage_from_player_sword_with_knockback(y, base.SwordCollisionSpeed.FAST);
+    ^return base.take_damage_from_player_attack_with_knockback(y, base.SwordCollisionSpeed.FAST);
 }
 
 

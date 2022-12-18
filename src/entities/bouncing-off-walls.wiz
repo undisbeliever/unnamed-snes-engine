@@ -83,7 +83,7 @@ func process(entityId : u8 in y) {
 
 
     // React to colliding with player's weapon
-    if collisionState $ CollisionState.PLAYER_WEAPON_BIT {
+    if collisionState $ CollisionState.ANY_PLAYER_WEAPON_BIT {
         collided_with_player_hitbox(y);
     }
 
@@ -137,7 +137,7 @@ inline func collided_with_player_hitbox(entityId : u8 in y) {
     }
 
     // ::SHOULDDO adjust velocity based on previous velocity and collisionCentre::
-    base.take_damage_from_player_sword_with_knockback(y, x);
+    base.take_damage_from_player_attack_with_knockback(y, x);
 
     // Advance to the next animation
     a = SoA.msAnimationId[y];
