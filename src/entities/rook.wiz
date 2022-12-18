@@ -85,8 +85,11 @@ func init(entityId : u8 in y, parameter : u8 in x) {
 // DB = 0x7e
 #[mem8, idx8]
 func process(entityId : u8 in y) {
-    // ::TODO check for bomb explosion::
-
+    carry = base.test_player_bomb_collision(y);
+    if carry {
+        set_state__dead__inline(y);
+        return;
+    }
 
     x = SoA_state[y] as u8;
     return process__state_functions[unaligned x](y);
@@ -233,7 +236,7 @@ func process__falling(entityId : u8 in y) {
 
 // DB = 0x7e
 #[mem8, idx8]
-func set_state__dead(entityId : u8 in y) {
+func set_state__dead__inline(entityId : u8 in y) {
     a = State.DEAD as u8;
     SoA_state[y] = a as State;
 

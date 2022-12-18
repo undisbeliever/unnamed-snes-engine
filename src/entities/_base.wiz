@@ -235,6 +235,33 @@ var _farPtr : far *u16 in zpTmp_farPtr;
 
 
 
+// Test for a player bomb collision.
+//
+// NOTE: This function does not modify `collisionState`
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func test_player_bomb_collision(entityId : u8 in y) : bool in carry {
+    a = SoA.iframeCounter[y];
+    if zero {
+        // Only test for a bomb collision if not in iframe
+
+        a = player_bomb.explosion_xPos;
+        if !zero {
+            // The player bomb exploded
+            a = __player_bomb_manhattan_distance__inline(y, a);
+            if a < player_bomb.BOMB_EXPLOSION_DISTANCE {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+
 
 
 // Test for player collisions and tile collisions.
@@ -267,7 +294,6 @@ func process_collisions(entityId : u8 in y) : u8 in y {
             // The player bomb exploded
             a = __player_bomb_manhattan_distance__inline(y, a);
             if a < player_bomb.BOMB_EXPLOSION_DISTANCE {
-                // ::TODO bomb should do more damage then a sword::
                 collisionState = a = CollisionState.ANY_PLAYER_WEAPON | CollisionState.PLAYER_BOMB;
                 return y;
             }
