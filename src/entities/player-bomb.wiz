@@ -11,6 +11,7 @@ import "../player";
 import "../metasprites";
 
 import "../../gen/entities";
+import "../../gen/ms-drawing-functions";
 
 
 namespace entities {
@@ -159,7 +160,15 @@ func set_state__invisible(entityid : u8 in y) {
     a = State.INVISIBLE as u8;
     SoA_state[y] = a as State;
 
-    SoA.zPos[y] = a = 0xff;
+    // Do not draw entity's MetaSprite.
+    //
+    // Setting `ms_draw_function` to null.
+    // The previous method (zPos = 255) created a glitched bomb sprite in the middle of a scroll-up room transition.
+    mem16();
+    #[mem16] {
+        (&SoA.ms_draw_function as *u16)[unaligned y] = aa = &metasprites.drawing_functions.null_function as u16;
+    }
+    mem8();
 
     // A is non-zero
     SoA_timer[y] = a;
@@ -201,6 +210,13 @@ func set_state__falling(entityId : u8 in y) {
     SoA_state[y] = a as State;
 
     SoA.zPos[y] = a = SoA.yPos_px[y] + 8;
+
+    // Make the entity visible again.
+    mem16();
+    #[mem16] {
+        (&SoA.ms_draw_function as *u16)[unaligned y] = aa = &metasprites.drawing_functions.square_single16 as u16;
+    }
+    mem8();
 
     a = metasprites.ShadowSize.SMALL as u8;
     SoA.shadowSize[y] = a as metasprites.ShadowSize;
