@@ -412,13 +412,13 @@
       "xorigin": 16,
       "yorigin": 37,
       "ms-export-order": "rook",
-      "frames": [ "standing", "landing0", "landing1" ],
+      "frames": [ "standing", "landing0", "landing1", "dead" ],
       "defaultLayout": "rect_16x32_two 8 8",
       "order": 2,
       "shadowSize": "LARGE",
       "tilehitbox": "8 4",
-      "defaultHurtbox": "8  16  16  23",
-      "defaultHitbox": "8  16  16  22",
+      "defaultHurtbox": null,
+      "defaultHitbox": null,
       "animations": {
         "standing": {
           "delay-type": "frame",
@@ -442,10 +442,17 @@
           "loop": false,
           "delay-type": "frame",
           "frames": [ "landing0", 8, "landing1", 6, "landing0", 4, "standing", 0 ]
+        },
+        "dead": {
+          "frames": [ "dead", 0 ],
+          "loop": false,
+          "delay-type": "none"
         }
       },
       "layouts": {},
-      "hitboxes": {},
+      "hitboxes": {
+        "standing - landing1": "8  16  16  22"
+      },
       "hurtboxes": {},
       "clones": {}
     }

@@ -242,7 +242,7 @@ func set_state__dead__inline(entityId : u8 in y) {
 
     SoA_timer[y] = a = DEAD_WAIT;
 
-    // ::TODO Draw dead metasprite frames::
+    set_ms_animation(y, ms_animations.dead);
 
     // Remove tile solid flag
     ^return metatiles.reset_tile_properties(SoA_tileIndex[y]);
