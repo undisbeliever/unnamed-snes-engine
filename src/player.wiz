@@ -23,8 +23,6 @@ namespace player {
 // Address of the player's `metasprites.MsFramesetFormat` data
 let MS_FS_DATA_ADDR = 0x0000;
 
-let ms_draw_function = metasprites.drawing_functions.dynamic_pattern;
-
 
 
 let _set_ms_animation = metasprites.set_player_animation;
@@ -43,6 +41,11 @@ let DOORWAY_LEAVE_DISTANCE = 14;
 
 // Offset to add to the `altAxisTarget` when entering a door from the left or right.
 let DOORWAY_X_DIRECTION_OFFSET = 4;
+
+
+
+// Distance between the player's y-position and the item above their head (if any)
+let ITEM_ABOVE_HEAD_Y_OFFSET = 13;
 
 
 
@@ -139,7 +142,7 @@ in zeropage {
 }
 
 
-in wram7e {
+in wram7e_roomstate {
     // The amount of health on a full HP
     //
     // MUST be a multiple of 4
@@ -184,6 +187,12 @@ var facingDirection         : u8 in entities.SoA.state_1_l[0];
 // Decremented once every frame.  If negative, player's state is reset.
 var watchdogTimer           : u8 in entities.SoA.state_1_h[0];
 
+
+// MetaSprite to draw above the player's head.
+// Used by the `HOLDING_BOMB` state.
+// (word address pointing to a `metasprites.MsDataFormat` data structure)
+var itemAboveHead_msFrameAddr @ &entities.SoA.state_2[0] : u16;
+
 }
 
 
@@ -219,6 +228,8 @@ inline func init() {
     #[mem16] {
         xVelocity = 0;
         yVelocity = 0;
+
+        itemAboveHead_msFrameAddr = 0;
     }
     mem8();
 
@@ -265,6 +276,43 @@ func init_metasprites() {
     metasprites.init_player_metasprite_animation__inline();
 
     metasprites.init_entity_metasprite_animation__after_init(PLAYER_ENTITY_ID);
+}
+
+
+
+// Metasprite drawing function.
+//
+// Draws the player and the `itemAboveHead_msFrameAddr` MetaSprite (if non-zero)
+//
+// DB = 0x7e
+#[mem8, idx16]
+func ms_draw_function(msFrame : u16 in yy, ms_xPos : u16 in metasprites.xPos, ms_yPos : u16 in metasprites.yPos) {
+
+// Safe (for now) - MS drawing functions do not use zpTmp variables.
+var _tmpX : u16 in zpTmp_word_0;
+var _tmpY : u16 in zpTmp_word_1;
+
+    // I need to save a copy of metasprite position
+    // Required when holding items during room transitions (cannot calculate metasprite position from player position).
+    _tmpX = xx = metasprites.xPos;
+    _tmpY = xx = metasprites.yPos;
+
+    metasprites.drawing_functions.dynamic_pattern(yy, metasprites.xPos, metasprites.yPos);
+
+    // The metasprite drawing function changes the metasprite xPos/yPos variables
+
+
+    yy = itemAboveHead_msFrameAddr;
+    if !zero {
+        mem16();
+        #[mem16] {
+            metasprites.xPos = aa = _tmpX;
+            metasprites.yPos = aa = _tmpY - ITEM_ABOVE_HEAD_Y_OFFSET;
+        }
+        mem8();
+
+        ^return metasprites.drawing_functions.dynamic_pattern(yy, metasprites.xPos, metasprites.yPos);
+    }
 }
 
 
@@ -1303,6 +1351,12 @@ inline func pickup_bomb__inline(bomb_entityId : u8 in y) {
     a = player.state as u8;
     if zero {
         player.state = a = State.HOLDING_BOMB as u8;
+
+        mem16();
+        #[mem16] {
+            itemAboveHead_msFrameAddr = aa = entities.SoA.msFrameAddr[unaligned y];
+        }
+        mem8();
     }
 }
 
@@ -1327,6 +1381,10 @@ func process__holding_bomb() {
 
     a = joypad.pressed_l;
     if a & joypad.DROP_BOMB_BUTTON_L != 0 {
+        // Stop drawing item above the player's head
+        <:itemAboveHead_msFrameAddr = 0;
+        >:itemAboveHead_msFrameAddr = 0;
+
         // Spawn active bomb
         entities.spawn_entity(a = xPos.px,
                               a = yPos.px,

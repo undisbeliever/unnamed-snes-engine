@@ -141,7 +141,7 @@ func process__on_ground(entityId : u8 in y) {
         if a < PICKUP_DISTANCE {
             set_state__invisible(y);
 
-            player.pickup_bomb__inline(a);
+            player.pickup_bomb__inline(y);
         }
     }
 }
