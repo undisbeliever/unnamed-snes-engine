@@ -103,7 +103,7 @@ inline func init() {
     healthBarTimer = 0;
 
     max_player_health_changed();
-    draw_key_bar(gamestate._keyCount);
+    draw_key_bar(gamestate.data._keyCount);
 
     _redraw_health_bar(player.health);
 }

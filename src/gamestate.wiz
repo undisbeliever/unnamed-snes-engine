@@ -26,16 +26,21 @@ in lowram {
 
 namespace gamestate {
 
-in wram7e_roomstate {
+struct GameStateData {
     // Game State flags
     // (256 bit bitfield)
-    var gameFlags : [ u8 ; 256 / 8 ];
-
+    gameFlags : [ u8 ; 256 / 8 ],
 
     // Number of keys held by the player
     //
     // NOTE: This function should not be modified by game code
-    var _keyCount : u8;
+    _keyCount : u8,
+};
+
+
+in wram7e_roomstate {
+    var __fardata : GameStateData;
+        var data @ &__fardata : GameStateData;
 }
 
 
@@ -47,13 +52,13 @@ in code {
 #[mem8, idx8]
 inline func init() {
     // Clear all the game flags
-    x = sizeof(typeof(gameFlags)) - 1;
+    x = sizeof(typeof(data.gameFlags)) - 1;
     do {
-        gameFlags[x] = 0;
+        data.gameFlags[x] = 0;
         x--;
     } while !negative;
 
-    _keyCount = 0;
+    data._keyCount = 0;
 }
 
 
@@ -66,7 +71,7 @@ func is_flag_clear(flag_id : u8 in x) : bool in zero {
     y = a = x >>> 3;
     x = a = x & 7;
 
-    a = gameFlags[y] & _BitTable[x];
+    a = data.gameFlags[y] & _BitTable[x];
     return zero;
 }
 
@@ -85,7 +90,7 @@ var _tmp : u8 in zpTmp_byte_0;
     y = a = x >>> 3;
     x = a = x & 7;
 
-    a = gameFlags[y];
+    a = data.gameFlags[y];
 
     y = _tmp;
 
@@ -100,7 +105,7 @@ func set_game_flag(flag_id : u8 in x) {
     y = a = x >>> 3;
     x = a = x & 7;
 
-    gameFlags[y] = a = gameFlags[y] | _BitTable[x];
+    data.gameFlags[y] = a = data.gameFlags[y] | _BitTable[x];
 }
 
 
@@ -117,7 +122,7 @@ var _tmp : u8 in zpTmp_byte_0;
     y = a = x >>> 3;
     x = a = x & 7;
 
-    gameFlags[y] = a = gameFlags[y] | _BitTable[x];
+    data.gameFlags[y] = a = data.gameFlags[y] | _BitTable[x];
 
     y = _tmp;
 }
@@ -128,12 +133,12 @@ var _tmp : u8 in zpTmp_byte_0;
 // DB = 0x7e
 #[mem8, idx8]
 func increment_key_count() {
-    x = _keyCount;
+    x = data._keyCount;
     x++;
     if negative {
         x = 127;
     }
-    _keyCount = x;
+    data._keyCount = x;
 
     return ui.draw_key_bar(x);
 }
@@ -147,10 +152,10 @@ func increment_key_count() {
 // DB = 0x7e
 #[mem8, idx8]
 func test_and_decrement_key_count() : bool in carry{
-    x = _keyCount;
+    x = data._keyCount;
     if !zero {
         x--;
-        _keyCount = x;
+        data._keyCount = x;
 
         ui.draw_key_bar(x);
         return true;
