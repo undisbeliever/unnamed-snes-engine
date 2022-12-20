@@ -7,6 +7,7 @@ import "../wiz/common/snes/snes";
 import "room";
 import "gameloop";
 import "gamemodes";
+import "gamestate";
 import "metasprites";
 import "metatiles";
 import "resources";
@@ -106,22 +107,6 @@ in wram7e {
 
 
 in wram7e {
-    // The room to load in a non-scrolling room transition.
-    //
-    // Is not used by scrolling room transition.
-    //
-    // Will only be read by the ROOM_TRANSITION_FADEOUT and LOAD_ROOM_FADEIN transitions.
-    //
-    // (byte)
-    var roomToLoad : u8;
-
-    // The location to place the player in a non-scrolling room transition.
-    //
-    // NOTE: This value is unused by the scrolling room transitions.
-    // (u8 position)
-    var fadeIn_playerXpos : u8;
-    var fadeIn_playerYpos : u8;
-
 
     // The past-the-end index of the sprite list.
     //
@@ -199,17 +184,21 @@ var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u1
     }
 
     a = pop8();
-    roomstate.currentRoom = a;
+    gamestate.data.currentRoom = a;
 
     carry = resources.load_room(a);
     // Set player position after room is loaded.
     // (safe. plx and ply does not modify carry)
     y = pop8();
-    player.yPos.px = y;
-    player.yPos.sx = 0;
     x = pop8();
+    gamestate.data.playerStartingX = y;
     player.xPos.px = x;
     player.xPos.sx = 0;
+
+    gamestate.data.playerStartingY = y;
+    player.yPos.px = y;
+    player.yPos.sx = 0;
+
 
     if carry {
         metatiles.populate_map_tile_properties();
@@ -496,7 +485,8 @@ func load_room__fadein() {
 
     // ::TODO how do I handle a fadein to a missing room?::
 
-    _load_room_and_check_if_ok_to_scroll(roomToLoad, fadeIn_playerXpos, fadeIn_playerYpos);
+    _load_room_and_check_if_ok_to_scroll(gamestate.data.roomToLoad,
+                                         gamestate.data.roomToLoad_xPos, gamestate.data.roomToLoad_yPos);
 
     return _fadein__room_in_memory();
 }
@@ -553,7 +543,8 @@ func _fadein__room_in_memory() {
 // DB = 0x7e
 #[mem8, idx8]
 func fadeout() {
-    _load_room_and_check_if_ok_to_scroll(roomToLoad, fadeIn_playerXpos, fadeIn_playerYpos);
+    _load_room_and_check_if_ok_to_scroll(gamestate.data.roomToLoad,
+                                         gamestate.data.roomToLoad_xPos, gamestate.data.roomToLoad_yPos);
 
     return _fadeout__room_in_memory();
 }
@@ -751,7 +742,7 @@ func scroll_right() {
     a = ScrollDirection.RIGHT as u8;
     scrollDirection = a as ScrollDirection;
 
-    a = roomstate.currentRoom;
+    a = gamestate.data.currentRoom;
     a++;
 
     carry = _scrolling_room_transition(a, scrollDirection, PLAYER_XPOS_AFTER_RIGHT_TRANSITION, player.yPos.px);
@@ -774,7 +765,7 @@ func scroll_left() {
     a = ScrollDirection.LEFT as u8;
     scrollDirection = a as ScrollDirection;
 
-    a = roomstate.currentRoom;
+    a = gamestate.data.currentRoom;
     a--;
 
     carry = _scrolling_room_transition(a, scrollDirection, PLAYER_XPOS_AFTER_LEFT_TRANSITION, player.yPos.px);
@@ -797,7 +788,7 @@ func scroll_down() {
     a = ScrollDirection.DOWN as u8;
     scrollDirection = a as ScrollDirection;
 
-    carry = _scrolling_room_transition(a = roomstate.currentRoom + 0x10, scrollDirection,
+    carry = _scrolling_room_transition(a = gamestate.data.currentRoom + 0x10, scrollDirection,
                                        player.xPos.px, PLAYER_YPOS_AFTER_DOWN_TRANSITION);
     if !carry {
         // Transition failed, rollback room transition
@@ -818,7 +809,7 @@ func scroll_up() {
     a = ScrollDirection.UP as u8;
     scrollDirection = a as ScrollDirection;
 
-    carry = _scrolling_room_transition(a = roomstate.currentRoom - 0x10, scrollDirection,
+    carry = _scrolling_room_transition(a = gamestate.data.currentRoom - 0x10, scrollDirection,
                                        player.xPos.px, PLAYER_YPOS_AFTER_UP_TRANSITION);
     if !carry {
         // Transition failed, rollback room transition

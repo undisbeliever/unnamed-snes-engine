@@ -5,6 +5,9 @@
 
 
 import "memmap";
+
+import "metasprites";
+import "resources";
 import "ui";
 
 
@@ -27,6 +30,30 @@ in lowram {
 namespace gamestate {
 
 struct GameStateData {
+    // The location of the current room
+    currentRoom : u8,
+
+    // The player's starting position when they entered the room.
+    // (u8 position)
+    playerStartingX : u8,
+    playerStartingY : u8,
+
+
+    // The room to load in a non-scrolling room transition.
+    //
+    // Is not used by scrolling room transition.
+    //
+    // Will only be read by the ROOM_TRANSITION_FADEOUT and LOAD_ROOM_FADEIN transitions.
+    roomToLoad : u8,
+
+    // The location to place the player in a non-scrolling room transition.
+    //
+    // NOTE: This value is unused by the scrolling room transitions.
+    // (u8 position)
+    roomToLoad_xPos : u8,
+    roomToLoad_yPos : u8,
+
+
     // Game State flags
     // (256 bit bitfield)
     gameFlags : [ u8 ; 256 / 8 ],
@@ -51,6 +78,19 @@ in code {
 // DB = 0x7e
 #[mem8, idx8]
 inline func init() {
+    a = resources.rooms.STARTING_ROOM;
+    data.currentRoom = a;
+    data.roomToLoad = a;
+
+    a = DISPLAY_WIDTH / 2;
+    data.playerStartingX = a;
+    data.roomToLoad_xPos = a;
+
+    a = DISPLAY_HEIGHT / 2;
+    data.playerStartingY = a;
+    data.roomToLoad_yPos = a;
+
+
     // Clear all the game flags
     x = sizeof(typeof(data.gameFlags)) - 1;
     do {

@@ -5,6 +5,7 @@ import "memmap";
 
 import "room";
 import "gamemodes";
+import "gamestate";
 import "metatiles";
 import "metasprites";
 import "resources";
@@ -35,13 +36,9 @@ inline func init() {
     ui.init();
 
 
-    a = resources.rooms.STARTING_ROOM;
-    roomstate.currentRoom = a;
-    room_transitions.roomToLoad = a;
-
-    room_transitions.fadeIn_playerXpos = a = DISPLAY_WIDTH / 2;
-    room_transitions.fadeIn_playerYpos = a = DISPLAY_HEIGHT / 2;
-
+    gamestate.data.roomToLoad = a = gamestate.data.currentRoom;
+    gamestate.data.roomToLoad_xPos = a = gamestate.data.playerStartingX;
+    gamestate.data.roomToLoad_yPos = a = gamestate.data.playerStartingY;
 
     a = GameModes.LOAD_ROOM_FADEIN as u8;
     gameMode = a as GameModes;
@@ -139,7 +136,7 @@ inline func _check_for_room_transition() {
     a = player.yPos.px;
     if zero {
         // Check if there is a room above this one
-        a = roomstate.currentRoom - 0x10;
+        a = gamestate.data.currentRoom - 0x10;
         if carry {
             a = GameModes.ROOM_TRANSITION_SCROLL_UP as u8;
             gameMode = a as GameModes;
@@ -150,7 +147,7 @@ inline func _check_for_room_transition() {
     }
     else if a >= DISPLAY_HEIGHT - 1 {
         // Check if there is a room below this one
-        a = roomstate.currentRoom + 0x10;
+        a = gamestate.data.currentRoom + 0x10;
         if !carry {
             a = GameModes.ROOM_TRANSITION_SCROLL_DOWN as u8;
             gameMode = a as GameModes;
@@ -163,7 +160,7 @@ inline func _check_for_room_transition() {
     a = player.xPos.px;
     if zero {
         // Check if there is a room to the left of this one
-        a = roomstate.currentRoom & 0x0f;
+        a = gamestate.data.currentRoom & 0x0f;
         if !zero {
             a = GameModes.ROOM_TRANSITION_SCROLL_LEFT as u8;
             gameMode = a as GameModes;
@@ -171,7 +168,7 @@ inline func _check_for_room_transition() {
     }
     else if a >= DISPLAY_WIDTH - 1 {
         // Check if there is a room to the right of this one
-        a = roomstate.currentRoom & 0x0f;
+        a = gamestate.data.currentRoom & 0x0f;
         if a != 0x0f {
             a = GameModes.ROOM_TRANSITION_SCROLL_RIGHT as u8;
             gameMode = a as GameModes;

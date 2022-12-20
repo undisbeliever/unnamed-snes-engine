@@ -48,10 +48,6 @@ namespace roomstate {
 
 in wram7e_roomstate {
 
-    // The location of the current room
-    var currentRoom : u8;
-
-
     // If non-zero, the next room transition will be a fadeout room transition.
     //
     // A Fadeout room transition will always reload MetaTile and MetaSprite resources.
