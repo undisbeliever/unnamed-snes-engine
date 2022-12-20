@@ -105,6 +105,25 @@ func set_game_flag(flag_id : u8 in x) {
 
 
 
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_game_flag__keep_y(flag_id : u8 in x) {
+var _tmp : u8 in zpTmp_byte_0;
+
+    _tmp = y;
+
+    y = a = x >>> 3;
+    x = a = x & 7;
+
+    gameFlags[y] = a = gameFlags[y] | _BitTable[x];
+
+    y = _tmp;
+}
+
+
+
 // Increment the key counter
 // DB = 0x7e
 #[mem8, idx8]

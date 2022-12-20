@@ -8,9 +8,15 @@
  </layer>
  <objectgroup id="2" name="Enemies">
   <object id="1" class="rook" x="120" y="46">
+   <properties>
+    <property name="parameter" value="rook_left"/>
+   </properties>
    <point/>
   </object>
   <object id="2" class="rook" x="136" y="46">
+   <properties>
+    <property name="parameter" value="rook_right"/>
+   </properties>
    <point/>
   </object>
   <object id="3" class="player_bomb" x="64" y="80">

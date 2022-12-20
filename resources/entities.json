@@ -68,7 +68,10 @@
     {
       "name": "rook",
       "is_enemy": true,
-      "ms-export-order": "rook"
+      "ms-export-order": "rook",
+      "parameter": {
+        "type": "gamestateflag"
+      }
     },
     {
       "name": "projectile",

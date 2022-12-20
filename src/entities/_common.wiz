@@ -191,6 +191,7 @@ var _init_function_u16 : u16 in zpTmp_word_0;
                 // Entity's heath is 0.
                 // We cannot remove the entity from the list by decrementing `numberOfActiveEntities`, the entity's init function might spawn more entities.
                 // Instead, the entity functions are changed to blank functions so the entity is not drawn during room transitions.
+                // We may also need to decrement the `_enemyCount` (if the entity is an enemy), which is done in `process_active_entities()`.
                 mem16();
                 #[mem16] {
                     aa = _blank_entity_function as u16;

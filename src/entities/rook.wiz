@@ -6,6 +6,7 @@ import "../memmap";
 import "_variables";
 import "_base";
 import "_common";
+import "../gamestate";
 import "../metatiles";
 
 import "../../gen/entities";
@@ -57,17 +58,31 @@ var SoA_zVelocity        : [ u16       ; N_ENTITIES ]  in SoA.state_2;
 var SoA_zVelocity_sx     : [ u8        ; SoA.BA_SIZE ] in SoA.state_2_l;
 var SoA_zVelocity_px     : [ u8        ; SoA.BA_SIZE ] in SoA.state_2_h;
 
+// The gamestate flag for the rook enemy
+var SoA_gameStateFlag    : [ u8        ; SoA.BA_SIZE ] in SoA.state_3_l;
+
 }
 
 
 in code {
 
 
+// parameter = rook destroyed gamestate flag
+//
 // DB = 0x7e
 #[mem8, idx8]
 func init(entityId : u8 in y, parameter : u8 in x) {
-    // ::TODO add "rook destroyed" gamestate flag::
+    SoA_gameStateFlag[y] = a = x;
 
+    zero = gamestate.is_flag_clear__keep_y(x);
+    if !zero {
+        // The rook was destroyed up by a bomb on a previous visit.
+        // Do not show the 'entity dead' smoke particle.
+        a = 0;
+        SoA.health[y] = a;
+        SoA.deathFunction[y] = a;
+        return;
+    }
 
     // Force entity to the middle of a tile
     SoA.xPos_px[y] = a = (SoA.xPos_px[y] & 0xf0) |  8;
@@ -243,6 +258,8 @@ func set_state__dead__inline(entityId : u8 in y) {
     SoA_timer[y] = a = DEAD_WAIT;
 
     set_ms_animation(y, ms_animations.dead);
+
+    gamestate.set_game_flag__keep_y(SoA_gameStateFlag[y]);
 
     // Remove tile solid flag
     ^return metatiles.reset_tile_properties(SoA_tileIndex[y]);

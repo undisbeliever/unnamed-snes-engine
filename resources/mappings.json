@@ -28,7 +28,9 @@
  "gamestate_flags": [
    "key_lv1_1",
    "key_lv1_2",
-   "door_lv1_1"
+   "door_lv1_1",
+   "rook_left",
+   "rook_right"
  ],
  "room_events": [
    {
