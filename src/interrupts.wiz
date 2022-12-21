@@ -2,6 +2,9 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "memmap";
+import "common/reset";
+import "../wiz/common/snes/snes";
+
 
 
 in lowram {
@@ -43,8 +46,41 @@ func irq_handler() {
 
 #[irq]
 func break_handler() {
-    // ::TODO show Blue Screen of Death::
-    while true {
+    nointerrupt = true;
+    decimal = false;
+    carry = false;
+    swap_carry_emulation();
+
+    push8(program_bank);
+    data_bank = pop8();
+
+    mem8_idx8();
+    #[mem8, idx8] {
+        reset_registers();
+
+        // Change BG colour to dark BLUE
+        snes.ppu.cgram_address = 0;
+        snes.ppu.cgram_write_data = 0;
+        snes.ppu.cgram_write_data = a = 12 << 2;
+
+        // Enable the screen
+        snes.ppu.brightness = a = 0x0f;
+
+
+        // Wait two-third of a second
+        x = 40;
+        do {
+            do {
+            } while snes.ppu.hvbjoy_status $ snes.ppu.HVBJOY_STATUS_VBLANK_BIT;
+            do {
+            } while !snes.ppu.hvbjoy_status $ snes.ppu.HVBJOY_STATUS_VBLANK_BIT;
+
+            x--;
+        } while !zero;
+
+
+        // Reset the game
+        goto reset_far;
     }
 }
 
