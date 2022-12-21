@@ -59,7 +59,8 @@ far func reset_far() {
         snes.dma.mdma_enable = a;
 
         // Clear second 64K of WRAM
-        // snes.dma0.mdma_size_hl is 0, no need to set it again
+        // (not resetting all of bank 0x7f, the end of WRAM contains the gamestate backup)
+        snes.dma0.mdma_size_hl = xx = MEMMAP_WRAM7F_BYTES_TO_RESET;
         snes.dma.mdma_enable = a;
 
 

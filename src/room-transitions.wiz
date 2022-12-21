@@ -191,11 +191,9 @@ var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u1
     // (safe. plx and ply does not modify carry)
     y = pop8();
     x = pop8();
-    gamestate.data.playerStartingX = y;
     player.xPos.px = x;
     player.xPos.sx = 0;
 
-    gamestate.data.playerStartingY = y;
     player.yPos.px = y;
     player.yPos.sx = 0;
 
@@ -531,6 +529,10 @@ func _fadein__room_in_memory() {
         ^return _fadein__room_in_memory();
     }
 
+
+    // The player is in a valid position.  Make a backup of the game state.
+    gamestate.backup_gamestate();
+
     gameMode = GameModes.RUN_GAME;
 }
 
@@ -669,6 +671,10 @@ func _scrolling_room_transition__loop() : bool in carry {
         MetaTileTransition_Process_FunctionTable[unaligned x]();
     }
     while !carry;
+
+
+    // Room transition was successful.  Make a backup of the game state.
+    gamestate.backup_gamestate();
 
     gameMode = GameModes.RUN_GAME;
 
