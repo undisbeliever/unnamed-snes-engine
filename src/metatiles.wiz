@@ -102,7 +102,7 @@ in lowram {
 }
 
 
-in wram7e {
+in wram7e_roomstate {
     // The map for the current room.
     //
     // NOTE: Whenever the map is updated the corresponding `mapTileProperties` cells must be changed.
@@ -116,8 +116,10 @@ in wram7e {
     // Whenever the map is updated the corresponding `mapTileProperties` cells must be changed.
     #[align(256)]
     var mapTileProperties : [u8 ; 256];
+}
 
 
+in wram7e {
     // this hack allows me to write `tileset.topLeft[y]` without a compile error.
     #[align(256)]
     var __far_tileset : _Tileset;
