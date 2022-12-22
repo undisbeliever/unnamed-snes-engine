@@ -161,6 +161,11 @@ in code {
 //
 // Returns true if it is OK to preform a scroll transition into the next room without glitches.
 //
+// NOTE: This function DOES NOT update map tile properties, process entities or start room events.
+//       `_finish_loading_room()` MUST be called to do so.  If this function returns
+//       false, `_finish_loading_room() must be called AFTER the MetaSprites and
+//       MetaTiles are loaded into memory.
+//
 // DB = 0x7e
 #[mem8, idx8]
 func _load_room_and_check_if_ok_to_scroll(roomPosition : u8 in a, playerX : u8 in x, playerY : u8 in y) : bool in carry {
@@ -177,10 +182,6 @@ var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u1
 
 
         __backup_room_state();
-
-
-        // Reset entity subsystem
-        entities.init();
     }
 
     a = pop8();
@@ -197,15 +198,7 @@ var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u1
     player.yPos.px = y;
     player.yPos.sx = 0;
 
-
-    if carry {
-        metatiles.populate_map_tile_properties();
-        room_events.init__inline();
-
-        // room event may modify the map, rebuild map tile properties
-        metatiles.populate_map_tile_properties();
-    }
-    else {
+    if !carry {
         // room is missing from map - create an empty dummy map
         //
         // `metatiles.populate_map_tile_properties()` will fill the dummy
@@ -217,13 +210,15 @@ var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u1
         room.tileset = a = 0xff;
 
         metatiles.populate_map_tile_properties__all_tiles_solid();
+
+        // Always prefer a scrolling room transition
+        return true;
     }
 
 
     // Get the tileset id from the backup and test if the tileset has changed.
-    // (the "empty dummy" room has a tileset id of 0xff)
     a = room.tileset;
-    if a != 0xff && a != _roomStateBackup__room_tileset {
+    if a != _roomStateBackup__room_tileset {
         return false;
     }
 
@@ -234,14 +229,42 @@ var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u1
         return false;
     }
 
+    return true;
+}
+
+
+
+// Finish loading and initialising the room.
+//   * Starts entities
+//   * Starts room events
+//   * Populates the MetaTile tile properties
+//   * Load sprites into the sprite list
+//
+// ASSUMES: The room was just loaded
+// ASSUMES: This function HAS NOT been called on this room before
+#[mem8, idx8]
+func _finish_loading_room() {
+
+    // Reset entity subsystem
+    entities.init();
+
+    // Only process room events and map-tile properties if the room exists
+    // A tileset of 0xff means the room is the empty dummy room.
+    a = room.tileset;
+    if a != 0xff {
+        metatiles.populate_map_tile_properties();
+        room_events.init__inline();
+
+        // The room event have modified the map, rebuild map tile properties
+        metatiles.populate_map_tile_properties();
+    }
 
     entities.sort_active_entities();
 
     _add_entities_to_sprite_list_with_offset(scrollDirection);
     _sprite_list_set_player_with_offset(scrollDirection);
-
-    return true;
 }
+
 
 
 // Restore the room state from backup, without moving player.
@@ -301,8 +324,7 @@ func _load_room_from_backup(playerXpos : u8 in x, playerYpos : u8 in y) {
 
     __restore_room_state_from_backup();
 
-    // Assumes previous room is valid
-    metatiles.populate_map_tile_properties();
+    // Assumes previous map tile properties are still valid.
 
 
     y = pop8();
@@ -401,7 +423,7 @@ inline func __clear_room_memory() {
 //  * MetaTiles
 //  * MetaSprite
 //
-// ASSUMES: room and entities are loaded into memory
+// ASSUMES: room is partially or completely loaded into memory.
 //
 // NOTE: Enables Force-Blank.
 // NOTE: MUST ONLY BE CALLED ONCE IN THE CODE
@@ -458,13 +480,15 @@ inline func __setup_ppu_and_reset_graphics_subsystems() {
 // DB = 0x7e
 
 
-    // Reset player animation
-    // (this is required when MetaSprite resources have changed)
-    player.init_metasprites();
-
-
-    // Tileset may have changed - Need to repopulate map_tile properties
-    metatiles.populate_map_tile_properties();
+    a = *far &resources.UseResourcesOverUsb2Snes;
+    if !zero {
+        // If resources-over-usb2snes is active, the MetaSprite data may have changed and the
+        // player's MetaSprite animations must be reset.
+        //
+        // This is only done if resources-over-usb2snes is active as resetting player animations
+        // could cause glitches (ie, resetting the player's sword animation mid-swing).
+        player.init_metasprites();
+    }
 }
 
 
@@ -486,20 +510,56 @@ func load_room__fadein() {
     _load_room_and_check_if_ok_to_scroll(gamestate.data.roomToLoad,
                                          gamestate.data.roomToLoad_xPos, gamestate.data.roomToLoad_yPos);
 
-    return _fadein__room_in_memory();
+    return _fadein__room_partially_loaded();
 }
 
 
 
 // Blank the screen, load graphics to PPU, fade in the screen, set gameMode to RUN_GAME.
 //
-// ASSUMES: room is loaded in memory
+// ASSUMES: room is completely loaded into memory and the room was previously active.
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _fadein__room_in_memory() {
+func _fadein__room_completly_loaded() {
+    return __fadein__(0);
+}
+
+
+
+// Blank the screen, load graphics to PPU, fade in the screen, set gameMode to RUN_GAME.
+//
+// ASSUMES: room is partially loaded into memory.
+//
+// DB = 0x7e
+#[mem8, idx8, fallthrough]
+func _fadein__room_partially_loaded() {
+    return __fadein__(1);
+}
+
+
+
+// Blank the screen, load graphics to PPU, fade in the screen, set gameMode to RUN_GAME.
+//
+// ASSUMES: room is partially or completely loaded in memory
+//
+// INPUT: partiallyLoadedRoom:
+//          if zero: The room is loaded and was previously active in memory.
+//          non-zero: The room is partially loaded and `_finish_loading_room()` will be called.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func __fadein__(partiallyLoadedRoom : u8 in a) {
+
+    push8(a);
 
     __setup_ppu_and_reset_graphics_subsystems();
+
+    a = pop8();
+    if !zero {
+        // This is a new room and some subsystems are still uninitialised.
+        _finish_loading_room();
+    }
     gameloop.draw_entities();
 
     // Ensure next room transition is a normal transition.
@@ -526,7 +586,7 @@ func _fadein__room_in_memory() {
 
         _load_room_from_backup__player_position_unchanged();
 
-        ^return _fadein__room_in_memory();
+        ^return _fadein__room_completly_loaded();
     }
 
 
@@ -548,18 +608,18 @@ func fadeout() {
     _load_room_and_check_if_ok_to_scroll(gamestate.data.roomToLoad,
                                          gamestate.data.roomToLoad_xPos, gamestate.data.roomToLoad_yPos);
 
-    return _fadeout__room_in_memory();
+    return __fadeout__room_partially_loaded();
 }
 
 
 
 // Blank the screen, then load the next room and resources.
 //
-// ASSUMES: next room is loaded in memory
+// ASSUMES: The room was just loaded into memory and `_finish_loading_room()` has not been called.
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _fadeout__room_in_memory() {
+func __fadeout__room_partially_loaded() {
 
     // Fadeout
     a = 15;
@@ -572,7 +632,8 @@ func _fadeout__room_in_memory() {
     } while !negative;
 
 
-    _fadein__room_in_memory();
+    // ::TODO how do I handle a fadeout/fadein when the room is already loaded and active in memory?::
+    _fadein__room_partially_loaded();
 
 
     // ::TODO how do I handle a fadein to an invalid room::
@@ -604,9 +665,13 @@ func _scrolling_room_transition(roomPosition : u8 in a, _scrollDirection : Scrol
 
     carry = _load_room_and_check_if_ok_to_scroll(a, x, y);
     if !carry {
-        _fadeout__room_in_memory();
+        __fadeout__room_partially_loaded();
         return true;
     }
+
+    // No need to load MetaTiles and MetaSprites into memory
+    // continue loading the room.
+    _finish_loading_room();
 
     x = scrollDirection as u8;
     MetaTileTransition_Setup_FunctionTable[unaligned x]();
