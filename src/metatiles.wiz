@@ -7,6 +7,7 @@ import "room";
 import "resources";
 import "gameloop";
 import "wait-frame";
+import "common/dma";
 
 import "player";
 
@@ -147,13 +148,15 @@ var _res : resources.ResourceEntry in resources.res;
     // Transfer header to WorkRAM
     resources.transfer_resource_header_to_wram7e(_res, &tileset as u16, sizeof(_Tileset));
 
+    dma.set_dma0_source__res_plus_offset(_res, offsetof(_DataFormat, palette_data));
+
     // Transfer palette to CGRAM
     snes.ppu.cgram_address = 0;
-    resources.transfer_resource_palette__forceblank(_res, offsetof(_DataFormat, palette_data), 256);
+    dma.continue_transfer_to_cgram__forceblank(256);
 
     // Transfer tiles to VRAM
     snes.ppu.vram_address_hl = xx = VRAM_BG1_TILES_WADDR;
-    resources.transfer_resource_tail_to_vram__forceblank(_res, offsetof(_DataFormat, tile_data));
+    dma.transfer_remaining_res_data_to_vram__forceblank(_res);
 }
 
 

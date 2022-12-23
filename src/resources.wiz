@@ -258,61 +258,6 @@ func transfer_resource_header_to_wram7e(_resourceData : ResourceEntry in res, pt
     snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
 }
 
-
-
-// Transfer palette data from resource data into CGRAM.
-//
-// NOTE: The size and location of the palette data is fixed.
-//
-// ASSUMES: _resourceData.size >= offset + size
-//
-// REQUIRES: Force-Blank
-// REQUIRES: `snes.ppu.cgram_address` set
-// Uses DMA channel 0
-//
-// DB = 0x80
-#[mem8, idx16]
-inline func transfer_resource_palette__forceblank(_resourceData : ResourceEntry in res,
-                                                  let offset : u16, let size : u16) {
-    mem16();
-    #[mem16] {
-        xx = aa = *(&res.farPtr as *u16) + offset;
-    }
-    mem8();
-
-    dma.transfer_to_cgram__forceblank(#:res.farPtr, xx, size);
-}
-
-
-
-// Transfer the tail-end of the resource data to VRAM, starting at `offset`.
-//
-// NOTE: The number of bytes to transfer is determined by the resource data size (`_resourceData.size - offset`
-//
-// ASSUMES: _resourceData.size > offset.
-//
-// REQUIRES: Force-Blank
-// REQUIRES: `snes.ppu.vram_address_hl` set
-// Uses DMA Channel 0
-//
-// DB = 0x80
-#[mem8, idx16]
-inline func transfer_resource_tail_to_vram__forceblank(_resourceData : ResourceEntry in res, let offset : u16)
-{
-    mem16();
-    #[mem16] {
-        // addr
-        xx = aa = *(&res.farPtr as *u16) + offset;
-
-        // size
-        yy = aa = res.size - offset;
-    }
-    mem8();
-
-    dma.transfer_to_vram__forceblank(#:res.farPtr, xx, yy);
-}
-
-
 }
 
 
