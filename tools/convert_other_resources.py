@@ -8,15 +8,15 @@ import sys
 import argparse
 
 from collections import OrderedDict
-from typing import Any, Callable, Iterable, NamedTuple, Optional
+from typing import Any, Callable, Final, Iterable, NamedTuple, Optional
 
 from _common import print_error
 
 from _snes import extract_tiles_from_paletted_image, convert_mode7_tileset, convert_snes_tileset, \
-                  SmallTileData
+                  image_to_snes, create_tilemap_data, SmallTileData
 
 from _json_formats import load_mappings_json, load_other_resources_json, \
-                          Name, Filename, Mappings, TilesInput, OtherResources
+                          Name, Filename, Mappings, TilesInput, BackgroundImageInput, OtherResources
 
 
 # ::TODO add images::
@@ -32,13 +32,14 @@ class ResourceEntry(NamedTuple):
 
 
 class OtherResourcesData(NamedTuple):
-    tiles : list[ResourceEntry]
+    tiles       : list[ResourceEntry]
+    bg_images   : list[ResourceEntry]
 
 
 
 # Change the header and footer when the data format changes
-OTHER_RESOURCES_DATA_FILE_HEADER = b'G9Ww60-ResourceDataFile-y5JWpM'
-OTHER_RESOURCES_DATA_FILE_FOOTER = b'6eMLlE-END-6QuVUa'
+OTHER_RESOURCES_DATA_FILE_HEADER = b'he4Iez-ResourceDataFile-muVei0'
+OTHER_RESOURCES_DATA_FILE_FOOTER = b'eeTei8-END-aiLix8'
 
 
 def save_other_resources_data_to_file(filename : Filename, data : OtherResourcesData) -> None:
@@ -152,6 +153,62 @@ def convert_tiles(t : TilesInput) -> bytes:
     return tile_converter(extract_tiles_from_paletted_image(image))
 
 
+#
+# Background Images
+# =================
+#
+
+BI_BPP_FORMATS : dict[str, int] = {
+    '2bpp': 2,
+    '4bpp': 4,
+    '8bpp': 8,
+}
+
+NAMETABLE_SIZE_BYTES : Final = 32 * 32 * 2
+VALID_BGI_HEADER_TM_SIZES : Final = (1, 2, 4)
+
+def convert_bg_image(bgi : BackgroundImageInput ) -> bytes:
+
+    bpp = BI_BPP_FORMATS[bgi.format]
+
+    with PIL.Image.open(bgi.source) as image:
+        image.load()
+
+    with PIL.Image.open(bgi.palette) as pal_image:
+        pal_image.load()
+
+    tilemap, tile_data, palette_data = image_to_snes(image, pal_image, bpp)
+
+    tilemap_data = create_tilemap_data(tilemap, bgi.tile_priority)
+
+
+    n_palette_rows = len(palette_data) // 32
+    assert len(palette_data) % 32 == 0
+    assert 1 < n_palette_rows < 8
+
+    tm_size = len(tilemap_data) // NAMETABLE_SIZE_BYTES
+
+    if tm_size not in VALID_BGI_HEADER_TM_SIZES:
+        raise ValueError(f"Invalid number of nametables, expected { VALID_BGI_HEADER_TM_SIZES }, got { tm_size }.")
+
+    header_byte = (n_palette_rows << 4) | (tm_size << 2)
+
+
+    out = bytearray()
+    out.append(header_byte)
+    out += palette_data
+    out += tilemap_data
+    out += tile_data
+
+    return out
+
+
+
+
+#
+# convert_resources
+# =================
+#
 
 def compile_list(typename : Name, mapping : list[Name], inputs : dict[str, Any], func : Callable[[Any], bytes]) -> Optional[list[ResourceEntry]]:
     valid = True
@@ -177,21 +234,16 @@ def compile_list(typename : Name, mapping : list[Name], inputs : dict[str, Any],
 
 
 
-#
-# convert_resources
-# =================
-#
-
-
-
 def build_other_resources(mapping : Mappings, other_resources : OtherResources) -> Optional[OtherResourcesData]:
     tiles = compile_list('tiles', mapping.tiles, other_resources.tiles, convert_tiles)
+    bg_images = compile_list('bg_images', mapping.bg_images, other_resources.bg_images, convert_bg_image)
 
-    if tiles is None:
+    if tiles is None or bg_images is None:
         return None
 
     return OtherResourcesData(
-            tiles = tiles
+            tiles = tiles,
+            bg_images = bg_images,
     )
 
 

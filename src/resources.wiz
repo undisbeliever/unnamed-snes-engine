@@ -17,6 +17,7 @@ enum ResourceType : u8 {
   mt_tileset,
   ms_spritesheet,
   tiles,
+  bg_image,
 };
 
 
@@ -229,6 +230,72 @@ func load_tiles_resource_into_vram(resourceId : resources.tiles in a, vramWordAd
 
 
 let load_tiles_resource_into_vram_a = load_tiles_resource_into_vram as func(u8 in a, u16 in xx);
+
+
+
+// Load a bg_image resource into VRAM.
+//
+// REQUIRES: Force-Blank
+// Uses DMA Channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+func load_bg_image_resource_into_vram(resourceId : resources.bg_images in a, vramTilemapWaddr : u16 in xx, vramTilesWaddr : u16 in yy) {
+var _vramTilesWaddr : u16 in zpTmp_word_0;
+var _tileMapByteSize   : u16 in zpTmp_word_1;
+
+    // BG Image Data format:
+    //  * Single byte header: %pppptt00
+    //      pppp = palette size (number of 16 colour palettes)
+    //      tt   = tilemap size (number of 32x32 nametables)
+    //
+    //  * paletteData
+    //  * tilemapData
+    //  * tileData
+
+
+    // ::TODO Add palette resource type, remove palette from BgImage::
+    // ::TODO Lookup VRAM word addresses from a table in memory::
+
+    snes.ppu.vram_address_hl = xx;
+    _vramTilesWaddr = yy;
+
+    res = __load_resource(ResourceType.bg_image as u16, a);
+
+    dma.set_dma0_source__res_plus_offset(res, 1);
+
+    mem16();
+    #[mem16] {
+        // Calculate tilemap size
+        aa = (**(&res.farPtr as *far *u16) & 0b00001100);
+        swap_bytes(aa); // left shift by 8
+        aa <<<= (11 - 8 - 2);
+        if zero {
+            // Don't override all of VRAM with a 64 KiB VRAM write
+            aa = 0x800;
+        }
+        _tileMapByteSize = aa;
+
+        // Calculate palette byte size
+        yy = aa = (**(&res.farPtr as *far *u16) & 0xf0) <<< 1;
+    }
+    mem8();
+
+    // Transfer palette to CGRAM
+    snes.ppu.cgram_address = 0;
+    dma.continue_transfer_to_cgram__forceblank(yy);
+
+    // Transfer tilemap to VRAM
+    // VRAM address set at the top of this function
+    dma.continue_transfer_to_vram__forceblank(_tileMapByteSize);
+
+    // Transfer tiles to VRAM
+    snes.ppu.vram_address_hl = xx = _vramTilesWaddr;
+    dma.transfer_remaining_res_data_to_vram__forceblank(res);
+}
+
+
+let load_bg_image_resource_into_vram_a = load_bg_image_resource_into_vram as func(u8 in a, u16 in xx, u16 in yy);
 
 
 

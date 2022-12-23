@@ -17,6 +17,9 @@
    "ui",
    "metasprite_shadows"
  ],
+ "bg_images": [
+   "title_screen"
+ ],
 
  "interactive_tile_functions": [
    "player_tile_collision_test",

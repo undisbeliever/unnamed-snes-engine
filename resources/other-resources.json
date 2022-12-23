@@ -9,5 +9,13 @@
       "format": "4bpp",
       "source": "metasprites/shadows-4bpp-tiles.png"
     }
+  },
+  "bg_images": {
+    "title_screen": {
+      "format": "2bpp",
+      "source": "images/title-screen.png",
+      "palette": "images/title-screen-palette.png",
+      "tile_priority": 1
+    }
   }
 }

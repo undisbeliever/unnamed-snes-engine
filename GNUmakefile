@@ -42,6 +42,7 @@ RESOURCES  += $(patsubst %,gen/metasprites/%.txt, $(METASPRITE_SPRITESETS))
 
 
 OTHER_RESOURCES_SRC := $(wildcard resources/tilesets/*.png)
+OTHER_RESOURCES_SRC += $(wildcard resources/images/*.png)
 OTHER_RESOURCES_SRC += resources/metasprites/shadows-4bpp-tiles.png
 
 

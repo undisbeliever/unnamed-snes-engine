@@ -240,6 +240,15 @@ class _Helper:
         return self._get(key, bool)
 
 
+    def get_int1(self, key : str) -> bool:
+        i = self.get_int(key)
+        if i == 0:
+            return False
+        elif i == 1:
+            return True
+        self._raise_error(f"Expected a 1 or a 0: { i }", key)
+
+
     def get_object_size(self, key : str) -> Literal[8, 16]:
         i = self.get_int(key)
         if i == 8:
@@ -624,6 +633,7 @@ class Mappings(NamedTuple):
     mt_tilesets                 : list[Name]
     ms_spritesheets             : list[Name]
     tiles                       : list[Name]
+    bg_images                   : list[Name]
     interactive_tile_functions  : list[Name]
     gamestate_flags             : list[Name]
     room_events                 : OrderedDict[Name, RoomEvent]
@@ -681,6 +691,7 @@ def load_mappings_json(filename : Filename) -> Mappings:
             mt_tilesets = jh.get_name_list('mt_tilesets'),
             ms_spritesheets = jh.get_name_list('ms_spritesheets'),
             tiles = jh.get_name_list('tiles'),
+            bg_images = jh.get_name_list('bg_images'),
             interactive_tile_functions = jh.get_name_list('interactive_tile_functions'),
             gamestate_flags = jh.get_name_list('gamestate_flags'),
             room_events = room_events,
@@ -995,8 +1006,17 @@ class TilesInput(NamedTuple):
     source  : Filename
 
 
+class BackgroundImageInput(NamedTuple):
+    name            : Name
+    format          : str
+    source          : Filename
+    palette         : Filename
+    tile_priority   : bool
+
+
 class OtherResources(NamedTuple):
-    tiles   : dict[Name, TilesInput]
+    tiles      : dict[Name, TilesInput]
+    bg_images  : dict[Name, BackgroundImageInput]
 
 
 
@@ -1012,8 +1032,18 @@ def load_other_resources_json(filename : Filename) -> OtherResources:
                 source = os.path.join(dirname, t.get_filename('source')),
     ))
 
+    bg_images = jh.build_dict_from_dict('bg_images', BackgroundImageInput, 256,
+            lambda t, name: BackgroundImageInput(
+                name = name,
+                format = t.get_string('format'),
+                source = os.path.join(dirname, t.get_filename('source')),
+                palette = os.path.join(dirname, t.get_filename('palette')),
+                tile_priority = t.get_int1('tile_priority')
+    ))
+
     return OtherResources(
             tiles = tiles,
+            bg_images = bg_images,
     )
 
 

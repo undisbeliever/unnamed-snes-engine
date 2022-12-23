@@ -52,7 +52,7 @@ from _ansi_color import AnsiColors
 from convert_mt_tileset import convert_mt_tileset
 from convert_metasprite import convert_spritesheet, MsFsEntry, build_ms_fs_data
 from convert_rooms import get_list_of_tmx_files, extract_room_id, compile_room
-from convert_other_resources import convert_tiles
+from convert_other_resources import convert_tiles, convert_bg_image
 from insert_resources import read_binary_file, read_symbols_file, validate_sfc_file, ROM_HEADER_V3_ADDR
 
 from _json_formats import load_mappings_json, load_entities_json, load_ms_export_order_json, load_other_resources_json, load_metasprites_json, \
@@ -157,6 +157,7 @@ class DataType(IntEnum):
     MT_TILESET           = ResourceType.mt_tilesets
     MS_SPRITESHEET       = ResourceType.ms_spritesheets
     TILE                 = ResourceType.tiles
+    BG_IMAGE             = ResourceType.bg_images
     ROOM                 = SpecialRequestType.rooms
 
 
@@ -319,6 +320,20 @@ class Compiler:
             return CompilerOutput(DataType.TILE, rid, name, error=e)
 
 
+    def compile_bg_image(self, rid : int) -> CompilerOutput:
+        name = self.mappings.bg_images[rid]
+
+        try:
+            bgi = self.other_resources.bg_images[name]
+
+            data = convert_bg_image(bgi)
+
+            return CompilerOutput(DataType.BG_IMAGE, rid, name, data=data)
+
+        except Exception as e:
+            return CompilerOutput(DataType.BG_IMAGE, rid, name, error=e)
+
+
     def compile_room(self, basename : Filename) -> CompilerOutput:
         room_id = -1
         name = os.path.splitext(basename)[0]
@@ -435,10 +450,21 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
             self.process_resource('tile', compiler.compile_tiles, mappings.tiles, tile_name)
             return
 
+        elif (bgi_name := self._search_through_bg_images(filename)) is not None:
+            self.process_resource('bg_image', compiler.compile_bg_image, mappings.bg_images, bgi_name)
+            return
+
 
     def _search_through_tiles(self, filename : Filename) -> Optional[str]:
         for name, t in self.compiler.other_resources.tiles.items():
             if filename == t.source:
+                return name
+        return None
+
+
+    def _search_through_bg_images(self, filename : Filename) -> Optional[str]:
+        for name, bgi in self.compiler.other_resources.bg_images.items():
+            if filename == bgi.source or filename == bgi.palette:
                 return name
         return None
 
@@ -509,6 +535,7 @@ def compile_all_resources(data_store : DataStore, compiler : Compiler, n_process
             mp.imap_unordered(compiler.compile_mt_tileset,     range(len(mappings.mt_tilesets))),
             mp.imap_unordered(compiler.compile_ms_spritesheet, range(len(mappings.ms_spritesheets))),
             mp.imap_unordered(compiler.compile_tiles,          range(len(mappings.tiles))),
+            mp.imap_unordered(compiler.compile_bg_image,       range(len(mappings.bg_images))),
             mp.imap_unordered(compiler.compile_room,           room_filenames),
         )
 

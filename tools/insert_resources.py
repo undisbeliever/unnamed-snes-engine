@@ -348,6 +348,7 @@ def insert_resources(sfc_view : memoryview, symbols : dict[str, Address], mappin
 
     ri.insert_binary_file_resources(ResourceType.ms_spritesheets, mappings.ms_spritesheets, "gen/metasprites/{}.bin")
 
+
     ri.insert_other_resources(other_resources_data, mappings)
 
 

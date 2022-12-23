@@ -29,6 +29,7 @@ class ResourceType(IntEnum):
     mt_tilesets     = 0
     ms_spritesheets = 1
     tiles           = 2
+    bg_images       = 3
 
 
 
