@@ -149,17 +149,45 @@ func wait_frame_and_change_brightness(new_brightness : u8 in a) {
 //
 // NOTE: If the system is in force-blank, this function will not fadeout.
 //
-// RETURNS: System in force-blank
+// RETURNS: Force-blank
 //
 // DB = lowram
 #[mem8, idx8]
 func wait_multiple_frames_and_fadeout() {
     a = _brightness_buffer;
+    if negative {
+        ^return wait_frame();
+    }
+    if a >= 15 + 1 {
+        a = 15;
+    }
     do {
+        a--;
         wait_frame_and_change_brightness(a);
         a = _brightness_buffer;
-        a--;
     } while !negative;
+
+// In force blank.
+}
+
+
+// Preform a fade-in animation.
+//
+// NOTE: If the screen's brightness if full, this function will not do anything.
+//
+// DB = lowram
+#[mem8, idx8]
+func wait_multiple_frames_and_fadein() {
+    a = _brightness_buffer;
+    if a >= 15 {
+        a = 0;
+    }
+    do {
+        wait_frame_and_change_brightness(a);
+
+        a = _brightness_buffer;
+        a++;
+    } while a < 15 + 1;
 }
 
 

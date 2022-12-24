@@ -1,0 +1,86 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+import "../common/reset";
+
+import "../../wiz/common/snes/snes";
+
+import "../gamemodes";
+import "../joypad";
+import "../resources";
+import "../wait-frame";
+
+
+namespace gamemodes {
+namespace title_screen {
+
+in code {
+
+
+
+// Title-screen
+//
+// DB = 0x7e
+#[mem8, idx8]
+func exec() {
+    wait_multiple_frames_and_fadeout();
+
+
+    push16(0x7e80);
+    data_bank = pop8();
+// DB = 0x80
+
+    idx16();
+    #[idx16] {
+        setup_ppu();
+    }
+    mem8_idx8();
+
+    data_bank = pop8();
+// DB = 0x7e
+
+
+    wait_multiple_frames_and_fadein();
+
+
+    // Wait until the player pressed start
+    do {
+        wait_frame();
+
+        a = joypad.pressed_h;
+    } while a & joypad.JOYH.START == 0;
+
+
+    gamestate.new_game();
+
+    a = GameModes.START_GAMELOOP as u8;
+    gameMode = a as GameModes;
+}
+
+
+
+// Setup the PPU
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func setup_ppu() {
+    // Setup PPU
+    reset_registers();
+
+    snes.ppu.bg_mode = a = 0;
+    snes.ppu.bg1_tilemap = a = (VRAM_BG1_MAP_WADDR >> snes.ppu.BG_TILEMAP_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT) | snes.ppu.BG_TILEMAP_MIRROR_X;
+    snes.ppu.bg12_tileset = a = (VRAM_BG1_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG1_SHIFT);
+    snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_BG1;
+
+    resources.load_bg_image_resource_into_vram_a(0, VRAM_BG1_MAP_WADDR, VRAM_BG1_TILES_WADDR);
+}
+
+}
+
+}
+}
+
+// Fixes a circular dependency
+import "../gamestate";
+

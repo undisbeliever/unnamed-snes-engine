@@ -111,19 +111,24 @@ in wram7f_gamestatebackup {
 
 in code {
 
+// Returns true if the gamestate backup is valid.
+//
 // DB = 0x7e
 #[mem8, idx8]
-inline func init() {
+inline func init() : bool in carry {
     mem16_idx16();
     #[mem16, idx16] {
         carry = restore_gamestate_backup__inline();
     }
     mem8_idx8();
 
-    if !carry {
-        // gamestate backup is missing or corrupt.  Start a new game.
-        new_game();
+    if carry {
+        return carry;
     }
+
+    // gamestate backup is missing or corrupt.  Start a new game.
+    new_game();
+    return false;
 }
 
 

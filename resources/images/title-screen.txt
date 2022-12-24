@@ -1,3 +1,5 @@
 
-Font: DejaVuSans, size 16
+Title Font: DejaVuSans, size 16
+
+Copyright and Press Start Font: DejaVuSans, size 11, manually tweaked
 

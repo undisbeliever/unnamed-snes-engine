@@ -5,12 +5,15 @@ import "memmap";
 
 
 import "gameloop";
+import "gamemodes/title-screen";
 import "gamemodes/game-over";
 import "room-transitions";
 
 
 enum GameModes : u8 {
     RUN_GAME,
+
+    TITLE_SCREEN,
 
     GAME_OVER,
 
@@ -53,6 +56,7 @@ in code {
 #[mem8, idx8]
 const gamemode_function_table : [func()] = [
     gameloop.run_game,
+    gamemodes.title_screen.exec,
     gamemodes.game_over.exec,
     room_transitions.start_gameloop,
     room_transitions.load_room__fadein,
