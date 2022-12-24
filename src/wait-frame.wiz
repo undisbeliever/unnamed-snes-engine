@@ -144,5 +144,24 @@ func wait_frame_and_change_brightness(new_brightness : u8 in a) {
 }
 
 
+
+// Preform a fadeout animation until the display is disabled (force-blank).
+//
+// NOTE: If the system is in force-blank, this function will not fadeout.
+//
+// RETURNS: System in force-blank
+//
+// DB = lowram
+#[mem8, idx8]
+func wait_multiple_frames_and_fadeout() {
+    a = _brightness_buffer;
+    do {
+        wait_frame_and_change_brightness(a);
+        a = _brightness_buffer;
+        a--;
+    } while !negative;
+}
+
+
 }
 

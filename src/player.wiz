@@ -223,7 +223,7 @@ in code {
 
 // Initialize player.
 //
-// Only called once at the start of the game.
+// Must be called after gamestate is setup.
 //
 // DB = 0x7e
 #[mem8, idx8]

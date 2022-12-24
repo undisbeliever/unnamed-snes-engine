@@ -77,7 +77,8 @@ func main() {
     #[idx8] {
         gamestate.init();
 
-        gameloop.init();
+        a = GameModes.START_GAMELOOP as u8;
+        gameMode = a as GameModes;
 
 
         while true {

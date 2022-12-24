@@ -25,30 +25,6 @@ namespace gameloop {
 
 in code {
 
-// Initialize the game loop
-//
-// DB = 0x7e
-#[mem8, idx8]
-inline func init() {
-
-    // Player cannot be initialised in a room transition.
-    // No easy way to save/restore player gamestate when the Tileset or MetaSprites change
-    // (especially if the fadein/fadeout room transition was invalid and had to be rolled back)
-    // Also causes the player's MetaSprite frame to be reset in a scrolling room transition.
-    player.init();
-
-    ui.init();
-
-
-    gamestate.data.roomToLoad = a = gamestate.data.currentRoom;
-    gamestate.data.roomToLoad_xPos = a = gamestate.data.playerState.xPos;
-    gamestate.data.roomToLoad_yPos = a = gamestate.data.playerState.yPos;
-
-    a = GameModes.LOAD_ROOM_FADEIN as u8;
-    gameMode = a as GameModes;
-}
-
-
 
 // Process the game loop
 //
