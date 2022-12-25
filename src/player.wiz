@@ -33,7 +33,7 @@ let _is_ms_non_looping_animation_running = metasprites.is_player_non_looping_ani
 
 in rodata0 {
 
-const InitialPlayerState = gamestate.PlayerState{
+let InitialPlayerState = gamestate.PlayerState{
 
     xPos                = DISPLAY_WIDTH / 2,
     yPos                = DISPLAY_HEIGHT / 2,

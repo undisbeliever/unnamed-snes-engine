@@ -15,10 +15,12 @@
  ],
  "tiles": [
    "ui",
-   "metasprite_shadows"
+   "metasprite_shadows",
+   "menu_sprites"
  ],
  "bg_images": [
-   "title_screen"
+   "title_screen",
+   "game_over"
  ],
 
  "interactive_tile_functions": [

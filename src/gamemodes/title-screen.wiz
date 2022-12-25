@@ -68,12 +68,20 @@ inline func setup_ppu() {
     // Setup PPU
     reset_registers();
 
+    // ::TODO move elsewhere::
+    mem16();
+    #[mem16] {
+        bg1_scrollX = 0;
+        bg1_scrollY = 0;
+    }
+    mem8();
+
     snes.ppu.bg_mode = a = 0;
     snes.ppu.bg1_tilemap = a = (VRAM_BG1_MAP_WADDR >> snes.ppu.BG_TILEMAP_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT) | snes.ppu.BG_TILEMAP_MIRROR_X;
     snes.ppu.bg12_tileset = a = (VRAM_BG1_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG1_SHIFT);
     snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_BG1;
 
-    resources.load_bg_image_resource_into_vram_a(0, VRAM_BG1_MAP_WADDR, VRAM_BG1_TILES_WADDR);
+    resources.load_bg_image_resource_into_vram(resources.bg_images.title_screen, VRAM_BG1_MAP_WADDR, VRAM_BG1_TILES_WADDR);
 }
 
 }

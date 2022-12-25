@@ -3,11 +3,42 @@
 
 import "../memmap";
 
+import "../../wiz/common/snes/snes";
+
+import "../gamemodes";
+import "../gamestate";
+import "../joypad";
+import "../metasprites";
+import "../resources";
 import "../wait-frame";
+import "../common/reset";
 
 
 namespace gamemodes {
 namespace game_over {
+
+
+let MIN_HEALTH_ON_RESTART_ROOM = 6;
+
+
+let CURSOR_X_POS = 95;
+let CURSOR_Y_POS = 127;
+
+
+enum MenuItem : u8 {
+    CONTINUE,
+    RESTART_ROOM,
+    TITLE_SCREEN,
+    // ::TODO add link to credits::
+};
+
+let N_MENU_ITEMS = 3;
+
+
+in wram7e {
+    // The currently selected menu item
+    var selectedItem : MenuItem;
+}
 
 
 in code {
@@ -19,12 +50,135 @@ in code {
 #[mem8, idx8]
 func exec() {
 
-    // ::TODO implement a game over screen::
+    wait_one_second();
+
+    wait_multiple_frames_and_fadeout();
+
+    idx16();
+    #[idx16] {
+        metasprites.reset_buffers();
+
+        push16(0x7e80);
+        data_bank = pop8();
+    // DB = 0x80
+
+        setup_ppu();
+
+        data_bank = pop8();
+    // DB = 0x7e
+    }
+    mem8_idx8();
+
+
+    selectedItem = MenuItem.CONTINUE;
+
+    update_cursor();
+
+    wait_multiple_frames_and_fadein();
+
 
     while true {
         wait_frame();
-    }
 
+        a = joypad.pressed_h;
+        if a & joypad.JOYH.UP != 0 {
+            a = selectedItem as u8;
+            a--;
+            if negative {
+                a = N_MENU_ITEMS - 1;
+            }
+            selectedItem = a as MenuItem;
+        }
+        else if a & joypad.JOYH.DOWN != 0 {
+            a = selectedItem as u8;
+            a++;
+            if a >= N_MENU_ITEMS {
+                a = 0;
+            }
+            selectedItem = a as MenuItem;
+        }
+        else if a & joypad.JOYH.START != 0 {
+            a = selectedItem as u8;
+            if a == MenuItem.TITLE_SCREEN as u8{
+                a = GameModes.TITLE_SCREEN as u8;
+            }
+            else if a == MenuItem.RESTART_ROOM as u8 {
+                // Restart gamestate (which will load the gamestate backup if it exists)
+                gamestate.init();
+
+                // Increment health (if it is too low)
+                a = gamestate.data.playerState.health;
+                if a < MIN_HEALTH_ON_RESTART_ROOM {
+                    gamestate.data.playerState.health = a = MIN_HEALTH_ON_RESTART_ROOM;
+                }
+
+                a = GameModes.START_GAMELOOP as u8;
+            }
+            else {
+                gamestate.continue_game();
+                a = GameModes.START_GAMELOOP as u8;
+            }
+
+            // A = new gamemode
+            gameMode = a as GameModes;
+            return;
+        }
+
+        update_cursor();
+    }
+}
+
+
+
+// Update the menu cursor position
+//
+// DB = 0x80
+#[mem8, idx8]
+func update_cursor() {
+    metasprites.buffer[0].xPos = a = CURSOR_X_POS;
+    metasprites.buffer[0].yPos = a = (selectedItem as u8 << 4) + CURSOR_Y_POS;
+    metasprites.buffer[0].char = 0;
+    metasprites.buffer[0].attr = 0;
+
+    metasprites.hiTableBuffer[0] = 0;
+}
+
+
+
+// Setup the PPU
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func setup_ppu() {
+    // ::TODO create some kind of system for setting PPU registers::
+
+    reset_registers();
+
+    // ::TODO move elsewhere::
+    mem16();
+    #[mem16] {
+        bg1_scrollX = 0;
+        bg1_scrollY = 0;
+    }
+    mem8();
+
+    snes.ppu.bg_mode = a = 0;
+    snes.ppu.obj_control = a = (VRAM_OBJ_WADDR / 8192) | (snes.ppu.OBJ_CONTROL_8x8_16x16 << 4);
+    snes.ppu.bg1_tilemap = a = (VRAM_BG1_MAP_WADDR >> snes.ppu.BG_TILEMAP_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT) | snes.ppu.BG_TILEMAP_MIRROR_X;
+    snes.ppu.bg12_tileset = a = (VRAM_BG1_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG1_SHIFT);
+    snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_BG1 | snes.ppu.SCREEN_ENABLE_OBJ;
+
+    resources.load_bg_image_resource_into_vram(resources.bg_images.game_over, VRAM_BG1_MAP_WADDR, VRAM_BG1_TILES_WADDR);
+
+    resources.load_tiles_resource_into_vram(resources.tiles.menu_sprites, VRAM_OBJ_WADDR);
+
+    // Set sprite palette
+    // ::TODO add menu sprites palette into the resources subsystem::
+    snes.ppu.cgram_address = a = 129;
+
+    a = 0xff;
+    snes.ppu.cgram_write_data = a;
+    snes.ppu.cgram_write_data = a;
 }
 
 

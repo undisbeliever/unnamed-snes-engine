@@ -1,0 +1,7 @@
+
+GAME OVER Font: NimbusRoman-Bold, size 35, with some manual tweaks
+ * Cleaned up corners
+ * Increased width of the long thin lines to 2px
+
+Options Font: DejaVuSans, size 11, manually tweaked
+

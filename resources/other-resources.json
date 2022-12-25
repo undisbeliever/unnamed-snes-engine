@@ -8,6 +8,11 @@
     "metasprite_shadows": {
       "format": "4bpp",
       "source": "metasprites/shadows-4bpp-tiles.png"
+    },
+
+    "menu_sprites": {
+      "format": "4bpp",
+      "source": "tilesets/menu-sprites.png"
     }
   },
   "bg_images": {
@@ -15,6 +20,12 @@
       "format": "2bpp",
       "source": "images/title-screen.png",
       "palette": "images/title-screen-palette.png",
+      "tile_priority": 1
+    },
+    "game_over": {
+      "format": "2bpp",
+      "source": "images/game-over.png",
+      "palette": "images/game-over-palette.png",
       "tile_priority": 1
     }
   }

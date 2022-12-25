@@ -26,6 +26,8 @@ namespace JOY {
     let SELECT      = 0x2000;
     let Y           = 0x4000;
     let B           = 0x8000;
+
+    let DPAD        = UP | DOWN | LEFT | RIGHT;
 }
 
 
@@ -48,6 +50,9 @@ namespace JOYH {
     let SELECT  = 0x20;
     let Y       = 0x40;
     let B       = 0x80;
+
+
+    let DPAD    = UP | DOWN | LEFT | RIGHT;
 }
 
 

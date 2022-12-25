@@ -115,7 +115,7 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func init() : bool in carry {
+func init() : bool in carry {
     mem16_idx16();
     #[mem16, idx16] {
         carry = restore_gamestate_backup__inline();
@@ -150,7 +150,7 @@ func new_game() {
 
         // Load initial player state
         load_dec_repeat(#:far &__fardata, yy = &data.playerState as u16,
-                        #:far &player.InitialPlayerState, xx = &player.InitialPlayerState as u16,
+                        #:far &InitialPlayerState, xx = &InitialPlayerState as u16,
                         aa = sizeof(typeof(data.playerState)) - 1);
         // DB = 0x7e
     }
@@ -159,6 +159,28 @@ func new_game() {
     a = resources.rooms.STARTING_ROOM;
     data.currentRoom = a;
     data.roomToLoad = a;
+}
+
+
+
+// Continue current game
+//
+// Moves player back to the start and resets health.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func continue_game() {
+
+    data.playerState.health = a = data.playerState.maxHealth;
+
+    // ::TODO create some kind of checkpoint system::
+    a = resources.rooms.STARTING_ROOM;
+    data.currentRoom = a;
+    data.roomToLoad = a;
+
+    data.playerState.xPos = a = player.InitialPlayerState.xPos;
+    data.playerState.yPos = a = player.InitialPlayerState.yPos;
+    data.playerState.zPos = player.InitialPlayerState.zPos;
 }
 
 
@@ -381,6 +403,9 @@ in rodata0 {
 const __BitTable : [ u8 ; 8 ] = [ 1 << i for let i in 0..7 ];
 
 let _BitTable = far &__BitTable as far *u8;
+
+
+const InitialPlayerState = player.InitialPlayerState;
 
 }
 
