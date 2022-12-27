@@ -27,7 +27,8 @@
    "player_tile_collision_test",
    "doorway",
    "locked_door",
-   "heal"
+   "heal",
+   "poison"
  ],
  "starting_room": "01-02-dungeon-gf",
  "gamestate_flags": [

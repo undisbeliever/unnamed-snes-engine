@@ -118,6 +118,36 @@ func player_touches_tile(tileIndex : u8 in y) {
 }
 
 
+
+// poison
+// ======
+namespace poison {
+
+
+let player_tile_collision = tile_collision_null_function;
+
+
+// Hurt the player when the player touches a poison tile.
+//
+// Called when the player is touching the tile.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func player_touches_tile(tileIndex : u8 in y) {
+    // Player takes 1HP damage every 16 frame
+    // ::TODO (important) confirm this is a good damage counter::
+    a = frameCounter_lobyte;
+    if a & 0xf == 0 {
+        carry = player.take_environmental_damage(1);
+        if carry {
+            // ::TODO play sound effect::
+        }
+    }
+}
+
+}
+
+
 // locked_door
 // ===========
 //
