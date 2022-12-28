@@ -36,7 +36,8 @@
    "key_lv1_2",
    "door_lv1_1",
    "rook_left",
-   "rook_right"
+   "rook_right",
+   "monster_key"
  ],
  "room_events": [
    {
@@ -67,7 +68,7 @@
      "parameters": [
        {
          "name": "flag",
-         "comment": "Delay before spawning the first entity",
+         "comment": "Gamestate flag for door locked/unlocked state",
          "type": "gamestate_flag"
        },
        {
@@ -100,6 +101,22 @@
          "name": "door3",
          "comment": "Location of the fourth (optional) door",
          "type": "optional_open_door"
+       }
+     ]
+   },
+   {
+     "name": "defeat_enemies_get_key",
+     "source": "defeat-enemies-get-key",
+     "parameters": [
+       {
+         "name": "flag",
+         "comment": "Gamestate flag for key",
+         "type": "gamestate_flag"
+       },
+       {
+         "name": "keyPos",
+         "comment": "The position to spawn the key",
+         "type": "u8pos"
        }
      ]
    }

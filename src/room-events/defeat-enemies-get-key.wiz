@@ -1,0 +1,76 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "_common";
+import "../gamestate";
+import "../entities/_common";
+
+import "gen/room-events";
+
+
+// Spawns a key when all the enemies are defeated
+namespace room_events {
+namespace defeat_enemies_get_key {
+
+
+in wram7e_roomstate {
+    var keyHidden : u8 in <:state_0;
+}
+
+
+in code {
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func init() {
+    zero = gamestate.is_flag_clear(parameter__flag);
+    if zero {
+        keyHidden = a = 1;
+        ^return spawn_room_entities();
+    }
+    else {
+        // Key has been collected, do not spawn entities for check enemy count.
+        keyHidden = 0;
+    }
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process() {
+    a = keyHidden;
+    if !zero {
+        zero = entities.is_all_enemies_defeated();
+        if zero {
+            // All enemies defeated, spawn the key and smoke particles
+            keyHidden = 0;
+
+            entities.spawn_entity(a = parameter__keyPos.xPos,
+                                  a = parameter__keyPos.yPos,
+                                  a = entities.EntityTypes.key as u8,
+                                  y = parameter__flag);
+
+
+            // Spawn smoke 1px below key so the smoke particle's sprites are above the key
+            x = parameter__keyPos.xPos;
+            y = parameter__keyPos.yPos;
+            y++;
+
+            ^return entities.spawn_entity(x, y,
+                                          a = entities.EntityTypes.smoke_particles as u8,
+                                          y = entities.smoke_particles.init_parameter.small as u8);
+        }
+    }
+}
+
+}
+
+
+}
+
+}
+

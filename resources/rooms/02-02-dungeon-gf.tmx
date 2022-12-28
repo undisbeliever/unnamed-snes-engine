@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.9" tiledversion="1.9.2" class="normal" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="3" nextobjectid="2">
+<map version="1.9" tiledversion="1.9.2" class="defeat_enemies_get_key" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="3" nextobjectid="4">
+ <properties>
+  <property name="flag" value="monster_key"/>
+  <property name="keyPos" value="192 112"/>
+ </properties>
  <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
  <layer id="1" name="Tile Layer 1" width="16" height="14">
   <data encoding="base64" compression="gzip">
@@ -8,6 +12,12 @@
  </layer>
  <objectgroup id="2" name="Enemies">
   <object id="1" class="test__calc_angle" x="128" y="112">
+   <point/>
+  </object>
+  <object id="2" class="skeleton" x="84" y="74">
+   <properties>
+    <property name="parameter" value="down"/>
+   </properties>
    <point/>
   </object>
  </objectgroup>

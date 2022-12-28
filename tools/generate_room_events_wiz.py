@@ -14,6 +14,7 @@ from _json_formats import load_mappings_json, Mappings, Name, RoomEvent
 # Mapping of parameter types to wiz types
 PARAM_TYPES = {
     'u8':                   'u8',
+    'u8pos':                'U8Position',
     'gamestate_flag':       'u8',
     'locked_door':          'u8',
     'open_door':            'u8',
@@ -23,6 +24,7 @@ PARAM_TYPES = {
 # Size of each parameter type in bytes
 PARAM_SIZE = {
     'u8':                   1,
+    'u8pos':                2,
     'gamestate_flag':       1,
     'locked_door':          1,
     'open_door':            1,
@@ -41,6 +43,11 @@ import "src/memmap";
 import "src/room";
 
 namespace room_events {
+
+struct U8Position {
+    xPos : u8,
+    yPos : u8,
+};
 
 in wram7e_roomstate {
 """)
