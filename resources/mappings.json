@@ -119,6 +119,32 @@
          "type": "u8pos"
        }
      ]
+   },
+   {
+     "name": "repeatedly_spawn_enemies",
+     "source": "repeatedly-spawn-enemies",
+     "parameters": [
+       {
+         "name": "delay",
+         "comment": "Delay between spawns",
+         "type": "u8"
+       },
+       {
+         "name": "maxEnemies",
+         "comment": "Only spawn enemies if nActiveEnemies < maximumEnemies",
+         "type": "u8"
+       },
+       {
+         "name": "firstEnemyIndex",
+         "comment": "The first room enemy index (0-7) to repeatedly spawn",
+         "type": "u8"
+       },
+       {
+         "name": "lastEnemyIndex",
+         "comment": "The last room enemy index (0-7) to repeatedly spawn",
+         "type": "u8"
+       }
+     ]
    }
  ]
 }
