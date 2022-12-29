@@ -263,6 +263,28 @@ func test_player_bomb_collision(entityId : u8 in y) : bool in carry {
 
 
 
+// Test a projectile entity for tile and player collisions.
+//
+// This function preforms the same tests as `process_collisions()`, except
+// it uses the projectile version of the MetaTile collision tests.
+//
+// See `process_collisions()` for the behaviour of this function.
+//
+// ASSUMES: The entity is a projectile
+//
+// KEEP: Y
+// RETURN: collisionState
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process_collisions__projectile(entityId : u8 in y) {
+    metatiles.move_entity_and_collision_test__projectile_bounded(y);
+
+    return __process_collisions__after_metatile_checks(y);
+}
+
+
+
 
 // Test for player collisions and tile collisions.
 //
@@ -279,11 +301,19 @@ func test_player_bomb_collision(entityId : u8 in y) : bool in carry {
 // RETURN: collisionState
 //
 // DB = 0x7e
-#[mem8, idx8]
+#[mem8, idx8, fallthrough]
 func process_collisions(entityId : u8 in y) {
 
     metatiles.move_entity_and_collision_test__bounded(y);
 
+// fallthrough
+}
+
+
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+func __process_collisions__after_metatile_checks(entityId : u8 in y) {
 
     a = SoA.iframeCounter[y];
     if zero {

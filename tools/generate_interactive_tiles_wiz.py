@@ -5,8 +5,12 @@
 
 import argparse
 from io import StringIO
+from typing import Final
 
 from _json_formats import load_mappings_json, Mappings
+
+
+MAX_INTERACTIVE_FUNCTIONS : Final = 1 << 6;
 
 
 
@@ -21,9 +25,10 @@ def generate_wiz_code(interactive_tile_functions : list[str]) -> str:
         table_size *= 2
 
 
-    if table_size > 32:
+    if table_size > MAX_INTERACTIVE_FUNCTIONS:
         raise ValueError("Too many interactive tile types: { len(interactive_tile_functions) }")
 
+    table_mask : Final = (table_size - 1) * 2
 
     doorway_index = interactive_tile_functions.index('doorway') + 1;
 
@@ -42,9 +47,9 @@ namespace interactive_tiles {
 in code {
 
 """)
-        out.write(f"let DOORWAY_FUNCTION_TABLE_INDEX = 0x{ doorway_index * 2 :02x};\n\n")
+        out.write(f"let DOORWAY_FUNCTION_TABLE_UNALIGNED_INDEX = 0x{ doorway_index * 2 :02x};\n\n")
 
-        out.write(f"let FUNCTION_TABLE_MASK = 0x{ (table_size - 1) * 2 :02x};\n\n")
+        out.write(f"let FUNCTION_TABLE_MASK = 0x{ table_mask :02x};\n\n")
 
 
         def generate_table(table_name : str, fn_type : str, fn_name : str) -> None:

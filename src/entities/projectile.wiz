@@ -86,7 +86,7 @@ func process(entityId : u8 in y) {
     }
 
 
-    base.process_collisions(y);
+    base.process_collisions__projectile(y);
 
 
     if collisionState $ CollisionState.ANY_PLAYER_WEAPON_BIT {

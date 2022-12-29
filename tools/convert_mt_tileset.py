@@ -22,13 +22,16 @@ TILE_DATA_BPP = 4
 DEFAULT_PRIORITY = 0
 
 
-TILE_PROPERTY_SOLID_BIT = 7
+TILE_PROPERTY_SOLID_MASK                : Final = 0b10000000
+TILE_PROPERTY_PROJECTILE_SOLID_MASK     : Final = 0b01000000
+TILE_PROPERTY_INTERACTIVE_TILES_MASK    : Final = 0b00111111
 
 
 class TileProperty(NamedTuple):
-    solid       : bool
-    type        : Optional[str]
-    priority    : int           # integer bitfield (4 bits wide), one priority bit for each 8px tile
+    solid            : bool
+    projectile_solid : bool
+    type             : Optional[str]
+    priority         : int           # integer bitfield (4 bits wide), one priority bit for each 8px tile
 
 
 class TsxFile(NamedTuple):
@@ -125,8 +128,9 @@ def read_tile_tag(tile_tag : xml.etree.ElementTree.Element, error_list : list[st
         tile_id = -1
 
 
-    tile_solid = False
-    tile_priority = 0
+    tile_solid       : bool = False
+    projectile_solid : Optional[bool] = None
+    tile_priority    : int = 0
 
     tile_type = tile_tag.attrib.get('class', tile_tag.attrib.get('type')) # Tiled 1.9 renamed 'type' attribute to 'class'
 
@@ -140,13 +144,30 @@ def read_tile_tag(tile_tag : xml.etree.ElementTree.Element, error_list : list[st
             for ptag in tag:
                 if ptag.tag == 'property':
                     p_name = ptag.attrib.get('name')
+                    p_value = ptag.attrib.get('value')
+
                     if p_name == 'priority':
                         try:
-                            tile_priority = read_tile_priority_value(ptag.attrib.get('value'))
+                            tile_priority = read_tile_priority_value(p_value)
                         except ValueError as e:
                             error_list.append(f"Tile {tile_id}: { e }")
 
-    return tile_id, TileProperty(solid=tile_solid, type=tile_type, priority=tile_priority)
+                    elif p_name == 'not_projectile_solid':
+                        # ::TODO find a better name for this property::
+
+                        if p_value == 'true':
+                            projectile_solid = False
+                        elif p_value == 'false':
+                            # If the override is false, projectile_solid will the same value as tile_solid
+                            projectile_solid = None
+                        else:
+                            error_list.append(f"Tile {tile_id}: Invalid '{p_name}' property value: {p_value}")
+
+    if projectile_solid is None:
+        # if `projecile_solid` is not overridden; projectile uses same solidity as regular enemies.
+        projectile_solid = tile_solid
+
+    return tile_id, TileProperty(solid=tile_solid, projectile_solid=projectile_solid, type=tile_type, priority=tile_priority)
 
 
 
@@ -160,7 +181,7 @@ def read_tsx_file(tsx_filename : Filename) -> TsxFile:
     palette_filename : Optional[Filename] = None
 
     read_tiles : set[int] = set()
-    tile_properties = [ TileProperty(solid=False, type=None, priority=DEFAULT_PRIORITY) ] * N_TILES
+    tile_properties = [ TileProperty(solid=False, projectile_solid=False, type=None, priority=DEFAULT_PRIORITY) ] * N_TILES
 
 
     root_tag = tsx_et.getroot()
@@ -248,12 +269,15 @@ def create_properties_array(tile_properties : list[TileProperty], interactive_ti
         if tile.type:
             try:
                 tile_type_id = interactive_tile_functions.index(tile.type) + 1
-                p |= tile_type_id << 1
+                p |= tile_type_id
             except ValueError:
                 error_list.append(f"Tile { i }: Invalid interactive_tile_function { tile.type }")
 
         if tile.solid:
-            p |= 1 << TILE_PROPERTY_SOLID_BIT
+            p |= TILE_PROPERTY_SOLID_MASK
+
+        if tile.projectile_solid:
+            p |= TILE_PROPERTY_PROJECTILE_SOLID_MASK
 
         data[i] = p
 
