@@ -95,7 +95,7 @@ func init(entityId : u8 in y, parameter : u8 in x) {
 #[mem8, idx8]
 func process(entityId : u8 in y) {
 
-    y = base.process_collisions(y);
+    base.process_collisions(y);
 
 
     if collisionState $ CollisionState.ANY_PLAYER_WEAPON_BIT {

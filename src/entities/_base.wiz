@@ -280,9 +280,9 @@ func test_player_bomb_collision(entityId : u8 in y) : bool in carry {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func process_collisions(entityId : u8 in y) : u8 in y {
+func process_collisions(entityId : u8 in y) {
 
-    y = metatiles.move_entity_and_collision_test__bounded(y);
+    metatiles.move_entity_and_collision_test__bounded(y);
 
 
     a = SoA.iframeCounter[y];
@@ -295,7 +295,7 @@ func process_collisions(entityId : u8 in y) : u8 in y {
             a = __player_bomb_manhattan_distance__inline(y, a);
             if a < player_bomb.BOMB_EXPLOSION_DISTANCE {
                 collisionState = a = CollisionState.ANY_PLAYER_WEAPON | CollisionState.PLAYER_BOMB;
-                return y;
+                return;
             }
         }
 
@@ -326,7 +326,7 @@ func process_collisions(entityId : u8 in y) : u8 in y {
 
                     collisionState = a = CollisionState.ANY_PLAYER_WEAPON | CollisionState.PLAYER_SWORD;
 
-                    return y;
+                    return;
                 }
             }
 
@@ -338,7 +338,7 @@ func process_collisions(entityId : u8 in y) : u8 in y {
                 #[mem8, idx8] {
                     collisionState = a = CollisionState.PLAYER_HURTBOX;
 
-                    return y;
+                    return;
                 }
             }
         }
@@ -351,7 +351,7 @@ func process_collisions(entityId : u8 in y) : u8 in y {
 
     collisionState = 0;
 
-    return y;
+    return;
 }
 
 

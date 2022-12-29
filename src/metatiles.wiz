@@ -789,14 +789,12 @@ var _tmp : u8 in zpTmp_byte_0;
 // KEEP: Y
 // DB = 0x7e
 #[mem8, idx8]
-func move_entity_and_collision_test__unbounded(entityId : u8 in y) : u8 in y {
+func move_entity_and_collision_test__unbounded(entityId : u8 in y) {
     // Clear movementState flags;
     entities.SoA.movementState[y] = a = 0;
 
-    y = _move_entity_and_collision_test__unbounded__x_axis(y);
-    y = _move_entity_and_collision_test__unbounded__y_axis(y);
-
-    return y;
+    _move_entity_and_collision_test__unbounded__x_axis(y);
+    _move_entity_and_collision_test__unbounded__y_axis(y);
 }
 
 
@@ -808,7 +806,7 @@ func move_entity_and_collision_test__unbounded(entityId : u8 in y) : u8 in y {
 // OUTPUT: entities.SoA.movementState bits will be set if there is a collision, otherwise cleared.
 // KEEP: Y
 #[mem8, idx8]
-inline func _move_entity_and_collision_test__unbounded__x_axis(entityId : u8 in y) : u8 in y {
+inline func _move_entity_and_collision_test__unbounded__x_axis(entityId : u8 in y) {
 var _tmp    : u8 in zpTmp_byte_0;
 var _top    : u8 in zpTmp_byte_1;
 var _left   : u8 in zpTmp_byte_2;
@@ -908,8 +906,6 @@ var _right  : u8 in zpTmp_byte_3;
             }
         }
     }
-
-    return y;
 }
 
 
@@ -922,7 +918,7 @@ var _right  : u8 in zpTmp_byte_3;
 // KEEP: Y
 // DB = 0x7e
 #[mem8, idx8]
-inline func _move_entity_and_collision_test__unbounded__y_axis(entityId : u8 in y) : u8 in y {
+inline func _move_entity_and_collision_test__unbounded__y_axis(entityId : u8 in y) {
 var _tmp    : u8 in zpTmp_byte_0;
 var _left   : u8 in zpTmp_byte_1;
 var _top    : u8 in zpTmp_byte_2;
@@ -1026,8 +1022,6 @@ var _bottom : u8 in zpTmp_byte_3;
             }
         }
     }
-
-    return y;
 }
 
 
@@ -1044,14 +1038,12 @@ var _bottom : u8 in zpTmp_byte_3;
 // KEEP: Y
 // DB = 0x7e
 #[mem8, idx8]
-func move_entity_and_collision_test__bounded(entityId : u8 in y) : u8 in y {
+func move_entity_and_collision_test__bounded(entityId : u8 in y) {
     // Clear movementState flags;
     entities.SoA.movementState[y] = a = 0;
 
-    y = _move_entity_and_collision_test__bounded__x_axis(y);
-    y = _move_entity_and_collision_test__bounded__y_axis(y);
-
-    return y;
+    _move_entity_and_collision_test__bounded__x_axis(y);
+    _move_entity_and_collision_test__bounded__y_axis(y);
 }
 
 
@@ -1063,7 +1055,7 @@ func move_entity_and_collision_test__bounded(entityId : u8 in y) : u8 in y {
 // OUTPUT: entities.SoA.movementState bits will be set if there is a collision, otherwise cleared.
 // KEEP: Y
 #[mem8, idx8]
-inline func _move_entity_and_collision_test__bounded__x_axis(entityId : u8 in y) : u8 in y {
+inline func _move_entity_and_collision_test__bounded__x_axis(entityId : u8 in y) {
 var _tmp    : u8 in zpTmp_byte_0;
 var _top    : u8 in zpTmp_byte_1;
 var _left   : u8 in zpTmp_byte_2;
@@ -1090,7 +1082,7 @@ var _right  : u8 in zpTmp_byte_3;
             // Collided with left edge of the screen
             entities.SoA.xPos_px[y] = a = entities.SoA.tileHitbox_halfWidth[y];
             entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.LEFT_COLLISION;
-            ^return y;
+            ^return;
         }
         _left = a;
 
@@ -1138,7 +1130,7 @@ var _right  : u8 in zpTmp_byte_3;
             // Collided with right edge of the screen
             entities.SoA.xPos_px[y] = a = (MAP_WIDTH_PIXELS - 1) - entities.SoA.tileHitbox_halfWidth[y];
             entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.RIGHT_COLLISION;
-            return y;
+            return;
         }
         _right = a;
 
@@ -1173,8 +1165,6 @@ var _right  : u8 in zpTmp_byte_3;
             }
         }
     }
-
-    return y;
 }
 
 
@@ -1187,7 +1177,7 @@ var _right  : u8 in zpTmp_byte_3;
 // KEEP: Y
 // DB = 0x7e
 #[mem8, idx8]
-inline func _move_entity_and_collision_test__bounded__y_axis(entityId : u8 in y) : u8 in y {
+inline func _move_entity_and_collision_test__bounded__y_axis(entityId : u8 in y) {
 var _tmp    : u8 in zpTmp_byte_0;
 var _left   : u8 in zpTmp_byte_1;
 var _top    : u8 in zpTmp_byte_2;
@@ -1211,7 +1201,7 @@ var _bottom : u8 in zpTmp_byte_3;
             // Collided with top edge of screen
             entities.SoA.yPos_px[y] = a = entities.SoA.tileHitbox_halfHeight[y];
             entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.UP_COLLISION;
-            ^return y;
+            ^return;
         }
         _top = a;
 
@@ -1263,7 +1253,7 @@ var _bottom : u8 in zpTmp_byte_3;
             // Collided with bottom edge of the screen
             entities.SoA.yPos_px[y] = a = (MAP_HEIGHT_PIXELS - 1) - entities.SoA.tileHitbox_halfHeight[y];
             entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.DOWN_COLLISION;
-            ^return y;
+            return;
         }
         _bottom = a;
 
@@ -1301,8 +1291,6 @@ var _bottom : u8 in zpTmp_byte_3;
             }
         }
     }
-
-    return y;
 }
 
 }
