@@ -3,7 +3,7 @@
  <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
  <layer id="1" name="Tiles" class="normal" width="16" height="14">
   <data encoding="base64" compression="gzip">
-   H4sIAAAAAAAAA93PyQ1AUBRG4bcWUwGmAkwFmAow9UwHdEAHFOAsXyQSz4ZYfKv/nsXVhRAGTEUWbDhw4SnyESBEhFiiXZBvEqQ/6AeMp+2OBSsmzA/6DfsH/n+7z5CjUFSiQo0GraIOPQ7hGXThgAMAAA==
+   H4sIAAAAAAAAA93PuRFAUBRG4RcbWwG2AmwF2AqwFaQ7OqADOqAAJ3xjRvAkjOCL7n+CqwshDJiKLNhw4MJT5CNAiAixRLshbxKkP+hHTJfbcEPerNgwY3nQ7zg+8P/bfYYchaISFWo0aBV16HECP/ASaoADAAA=
   </data>
  </layer>
  <objectgroup id="2" name="Enemies">
