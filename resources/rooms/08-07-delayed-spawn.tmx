@@ -10,37 +10,37 @@
   </data>
  </layer>
  <objectgroup id="2" name="Enemies">
-  <object id="20" class="skeleton" x="72" y="152">
+  <object id="20" class="skeleton" x="168" y="152">
    <properties>
     <property name="parameter" value="swarm"/>
    </properties>
    <point/>
   </object>
-  <object id="18" class="skeleton" x="56" y="152">
+  <object id="18" class="skeleton" x="168" y="136">
    <properties>
     <property name="parameter" value="swarm"/>
    </properties>
    <point/>
   </object>
-  <object id="19" class="skeleton" x="88" y="152">
+  <object id="19" class="skeleton" x="168" y="168">
    <properties>
     <property name="parameter" value="swarm"/>
    </properties>
    <point/>
   </object>
-  <object id="12" class="skeleton" x="72" y="72">
+  <object id="12" class="skeleton" x="72" y="56">
    <properties>
     <property name="parameter" value="swarm"/>
    </properties>
    <point/>
   </object>
-  <object id="16" class="skeleton" x="56" y="72">
+  <object id="16" class="skeleton" x="56" y="56">
    <properties>
     <property name="parameter" value="swarm"/>
    </properties>
    <point/>
   </object>
-  <object id="13" class="skeleton" x="88" y="72">
+  <object id="13" class="skeleton" x="88" y="56">
    <properties>
     <property name="parameter" value="swarm"/>
    </properties>
