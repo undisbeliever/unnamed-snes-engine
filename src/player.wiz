@@ -20,6 +20,8 @@ import "../gen/cosine-tables";
 
 namespace player {
 
+// ::TODO adjust sword hitbox (I'm not sure if it is too big or not)::
+
 
 // Address of the player's `metasprites.MsFramesetFormat` data
 let MS_FS_DATA_ADDR = 0x0000;
