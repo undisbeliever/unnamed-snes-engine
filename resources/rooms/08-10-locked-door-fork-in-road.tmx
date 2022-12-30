@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.9" tiledversion="1.9.2" class="locked_door" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="4" nextobjectid="12">
+ <properties>
+  <property name="flag" value="second_locked_door"/>
+ </properties>
+ <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
+ <layer id="1" name="Tiles" class="normal" width="16" height="14">
+  <data encoding="base64" compression="gzip">
+   H4sIAAAAAAAAA93PSxWCUBRG4RtA0QAKBlAhACABQC0gUIBHBWwAlaCBNIAGEIA9vIsFA5ngcvCNzr8HZyOE2EKZkOE9c9thjwOOUCfkKGZuGk4444Lrl3QYf9CXqBb0DVp8UC/oO/Q/8P/avQkLtiRAKG1f8EebGxy48HCXJEilPkI82jzwxABLixJsgAMAAA==
+  </data>
+ </layer>
+ <objectgroup id="2" name="Enemies"/>
+</map>

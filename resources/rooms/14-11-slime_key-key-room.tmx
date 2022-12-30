@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.9" tiledversion="1.9.2" class="defeat_enemies_get_key" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="4" nextobjectid="21">
+ <properties>
+  <property name="flag" value="slime_key"/>
+  <property name="keyPos" value="207 112"/>
+ </properties>
+ <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
+ <layer id="1" name="Tiles" class="normal" width="16" height="14">
+  <data encoding="base64" compression="gzip">
+   H4sIAAAAAAAAA5XSRw7CMBCF4eypB6AdAAIHoB2AtqeENf0ClAtQjsyPFEujkQcni0+JF8+jZ7sYRVEJ5YAKqigoNdTRCGii5cm30cEuoItehnwsvrFYW/k7Hp6M3ueKm+c83vj8ybn/J16e89AzQ5ZYiT7WXN/6Z4+DyCfYZpi7xgbD1AhjnHExOktHnDBLzbEw7k/vk+f+876fPgail8X11fkJpqKXxfXV+S/R3GTTgAMAAA==
+  </data>
+ </layer>
+ <objectgroup id="2" name="Enemies">
+  <object id="12" class="slime" x="120" y="120">
+   <properties>
+    <property name="parameter" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="13" class="slime" x="88" y="56">
+   <properties>
+    <property name="parameter" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="14" class="slime" x="136" y="88">
+   <properties>
+    <property name="parameter" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="15" class="slime" x="120" y="168">
+   <properties>
+    <property name="parameter" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="17" class="slime" x="88" y="152">
+   <properties>
+    <property name="parameter" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="16" class="slime" x="120" y="74">
+   <properties>
+    <property name="parameter" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="18" class="slime" x="55" y="121">
+   <properties>
+    <property name="parameter" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="19" class="slime" x="88" y="88">
+   <properties>
+    <property name="parameter" value="random"/>
+   </properties>
+   <point/>
+  </object>
+ </objectgroup>
+</map>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.9" tiledversion="1.9.2" class="normal" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="4" nextobjectid="20">
+ <properties>
+  <property name="entity_delay" type="int" value="5"/>
+  <property name="first_delay" type="int" value="40"/>
+ </properties>
+ <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
+ <layer id="1" name="Tiles" class="normal" width="16" height="14">
+  <data encoding="base64" compression="gzip">
+   H4sIAAAAAAAAA8XSuRFAUBhF4ZdbC7BVgAJsBdg6oAM6oAN6pAMKcAQK+OcFgi88Mze4hlLK+JEJC7aQAxcefARCISIsWBELJUixYdfopd3nwKnRX7gxYNTYP2HW6DPkKIRKVKjRoBXq0Kt/v/96ANQsMC2AAwAA
+  </data>
+ </layer>
+ <objectgroup id="2" name="Enemies">
+  <object id="15" class="skull" x="160" y="112">
+   <properties>
+    <property name="parameter" value="up_right"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="17" class="skull" x="160" y="112">
+   <properties>
+    <property name="parameter" value="down_right"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="16" class="skull" x="96" y="112">
+   <properties>
+    <property name="parameter" value="down_left"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="18" class="skull" x="96" y="112">
+   <properties>
+    <property name="parameter" value="up_left"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="19" class="skull" x="128" y="112">
+   <properties>
+    <property name="parameter" value="up"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="14" class="skull" x="128" y="112">
+   <properties>
+    <property name="parameter" value="down"/>
+   </properties>
+   <point/>
+  </object>
+ </objectgroup>
+</map>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.9" tiledversion="1.9.2" class="normal" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="4" nextobjectid="21">
+ <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
+ <layer id="1" name="Tiles" class="normal" width="16" height="14">
+  <data encoding="base64" compression="gzip">
+   H4sIAAAAAAAAA9NhYGDQBWIuLFgPirHJ1QJxHRDrkKm/F4j7kPTroenRI6AfhmmlH58eeulHNwub3wZCP6nuxxcf9NBPjPuxqcGnPxaI4wjox5cfcoE4D4gByG2qVYADAAA=
+  </data>
+ </layer>
+ <objectgroup id="2" name="Enemies">
+  <object id="12" class="crossbow_man" x="120" y="160">
+   <properties>
+    <property name="parameter" value="down"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="17" class="crossbow_man" x="160" y="160">
+   <properties>
+    <property name="parameter" value="right"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="19" class="crossbow_man" x="160" y="160">
+   <properties>
+    <property name="parameter" value="right"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="15" class="crossbow_man" x="136" y="160">
+   <properties>
+    <property name="parameter" value="up"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="20" class="crossbow_man" x="40" y="144">
+   <properties>
+    <property name="parameter" value="down"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="16" class="crossbow_man" x="40" y="80">
+   <properties>
+    <property name="parameter" value="down"/>
+   </properties>
+   <point/>
+  </object>
+ </objectgroup>
+</map>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.9" tiledversion="1.9.2" class="normal" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="4" nextobjectid="16">
+ <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
+ <layer id="1" name="Tiles" class="normal" width="16" height="14">
+  <data encoding="base64" compression="gzip">
+   H4sIAAAAAAAAA93QRw2AQBRF0RFAE0ATQBNAE0DTMTbBATgAByCAq4DkD2HD4ixvXvIspZQNR8iFBx8BQqEIMRKkyIRyFB/0+qHRH+zPWAz6HQdWbAb9iesH/73tS1SohRq06NBjEBox4Qa6+anigAMAAA==
+  </data>
+ </layer>
+ <objectgroup id="2" name="Enemies">
+  <object id="12" class="slime" x="72" y="72">
+   <properties>
+    <property name="parameter" value="down"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="15" class="slime" x="184" y="72">
+   <properties>
+    <property name="parameter" value="down"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="13" class="slime" x="72" y="152">
+   <properties>
+    <property name="parameter" value="up"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="14" class="slime" x="184" y="152">
+   <properties>
+    <property name="parameter" value="up"/>
+   </properties>
+   <point/>
+  </object>
+ </objectgroup>
+</map>

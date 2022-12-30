@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.9" tiledversion="1.9.2" class="monster_doors" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="4" nextobjectid="20">
+ <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
+ <layer id="1" name="Tiles" class="normal" width="16" height="14">
+  <data encoding="base64" compression="gzip">
+   H4sIAAAAAAAAA83RyQ1AUBhF4bcWUwGmAkwFmAow9UwHdEAHFOA08CS/RFh8y7O4uaZSyoIt5MCFBx+BUIgIMRIYQhnyl/pU441+wnzT6GzYsWB90B84f7D/6/8LlKiEajRo0aEXGjDiAsLpVR6AAwAA
+  </data>
+ </layer>
+ <objectgroup id="2" name="Enemies">
+  <object id="12" class="slime" x="56" y="104">
+   <properties>
+    <property name="parameter" value="right"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="19" class="slime" x="56" y="112">
+   <properties>
+    <property name="parameter" value="right"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="14" class="slime" x="56" y="120">
+   <properties>
+    <property name="parameter" value="right"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="13" class="skeleton" x="112" y="112">
+   <properties>
+    <property name="parameter" value="swarm"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="17" class="skeleton" x="128" y="80">
+   <properties>
+    <property name="parameter" value="down"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="18" class="skeleton" x="128" y="144">
+   <properties>
+    <property name="parameter" value="up"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="15" class="skeleton" x="96" y="80">
+   <properties>
+    <property name="parameter" value="down"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="16" class="skeleton" x="96" y="144">
+   <properties>
+    <property name="parameter" value="up"/>
+   </properties>
+   <point/>
+  </object>
+ </objectgroup>
+</map>

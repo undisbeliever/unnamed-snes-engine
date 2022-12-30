@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.9" tiledversion="1.9.2" class="normal" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="4" nextobjectid="13">
+ <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
+ <layer id="1" name="Tiles" class="normal" width="16" height="14">
+  <data encoding="base64" compression="gzip">
+   H4sIAAAAAAAAA93PyQ1AUBRG4bcWUwGmAkwFmAow9UwHdEAHFOAsXyQSz4ZYfKv/nsXVhRAGTEUWbDhw4SnyESBEhFiiXZBvEqQ/6AeMp+2OBSsmzA/6DfsH/n+7z5CjUFSiQo0GraIOPQ7hGXThgAMAAA==
+  </data>
+ </layer>
+ <objectgroup id="2" name="Enemies">
+  <object id="12" class="slime" x="200" y="72">
+   <properties>
+    <property name="parameter" value="random"/>
+   </properties>
+   <point/>
+  </object>
+ </objectgroup>
+</map>
