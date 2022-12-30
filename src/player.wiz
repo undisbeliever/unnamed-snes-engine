@@ -319,7 +319,16 @@ inline func save_player_state__inline() {
 
     gamestate.data.playerState.swordAttackPower = a = swordAttackPower;
 
-    gamestate.data.playerState.state = a = state as u8;
+    a = state as u8;
+    if a == State.HURT as u8 {
+        // Ensure the previous state does not disappear when restoring a gamestate backup.
+        //
+        // (required to ensure a player holding a bomb in the HURT state will still hold the
+        //  bomb when restoring the gamestate backup)
+        a = previousState as u8;
+    }
+    gamestate.data.playerState.state = a;
+
     gamestate.data.playerState.facingDirection = a = facingDirection;
 }
 
