@@ -39,7 +39,7 @@
       "ms-export-order": "crossbow_man",
       "parameter": {
         "type": "enum",
-        "values": [ "down", "up", "left", "right" ]
+        "values": [ "down", "up", "right", "left" ]
       }
     },
     {
