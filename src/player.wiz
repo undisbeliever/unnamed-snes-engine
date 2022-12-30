@@ -334,6 +334,23 @@ inline func save_player_state__inline() {
 
 
 
+// Reset the player state
+//
+// Called by `gamestate.continue_game()`
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func continue_player_gamestate__inline() {
+
+    gamestate.data.playerState.health = a = gamestate.data.playerState.maxHealth;
+
+    gamestate.data.playerState.state = State.WALKING as u8;
+
+    gamestate.data.playerState.facingDirection = InitialPlayerState.facingDirection;
+}
+
+
+
 // restore player state from the GameStateData
 //
 // DB = 0x7e

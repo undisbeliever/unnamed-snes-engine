@@ -171,8 +171,6 @@ func new_game() {
 #[mem8, idx8]
 func continue_game() {
 
-    data.playerState.health = a = data.playerState.maxHealth;
-
     // ::TODO create some kind of checkpoint system::
     a = resources.rooms.STARTING_ROOM;
     data.currentRoom = a;
@@ -181,6 +179,8 @@ func continue_game() {
     data.playerState.xPos = a = player.InitialPlayerState.xPos;
     data.playerState.yPos = a = player.InitialPlayerState.yPos;
     data.playerState.zPos = player.InitialPlayerState.zPos;
+
+    player.continue_player_gamestate__inline();
 }
 
 
