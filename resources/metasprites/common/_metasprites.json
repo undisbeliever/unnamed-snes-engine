@@ -79,22 +79,22 @@
         "hurt_north": {
           "delay-type": "frame",
           "loop": false,
-          "frames": [ "north0", 6 ]
+          "frames": [ "south0", 6 ]
         },
         "hurt_south": {
           "delay-type": "frame",
           "loop": false,
-          "frames": [ "south0", 6 ]
+          "frames": [ "north0", 6 ]
         },
         "hurt_east": {
           "delay-type": "frame",
           "loop": false,
-          "frames": [ "east0", 6 ]
+          "frames": [ "west0", 6 ]
         },
         "hurt_west": {
           "delay-type": "frame",
           "loop": false,
-          "frames": [ "west0", 6 ]
+          "frames": [ "east0", 6 ]
         },
         "holding_south": {
           "fixed-delay": 9.5,
