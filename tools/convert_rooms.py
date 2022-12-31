@@ -326,6 +326,11 @@ def process_room_entities(room_entities : list[TmxEntity], all_entities : Ordere
                         parameter = mapping.gamestate_flags.index(tmx_entity.parameter)
                     except ValueError:
                         add_error(f"Invalid parameter for { tmx_entity.type } enum: { tmx_entity.parameter }")
+                elif p.type == 'u8':
+                    try:
+                        parameter = parse_int(tmx_entity.parameter, 0xff, error_list)
+                    except ValueError:
+                        add_error(f"Invalid parameter for { tmx_entity.type } enum: { tmx_entity.parameter }")
                 else:
                     add_error(f"Unknown parameter type: { p.type }")
             else:

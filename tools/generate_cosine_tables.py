@@ -22,6 +22,12 @@ COSINE_TABLES = (
     ('SwordStrike_Fast',         0x0280),
     ('SwordStrike_ExtraFast',    0x0300),
     ('SwordStrike_FastFastFast', 0x0380),
+
+    ('Boss_Fastest',             0x0400),
+    ('Boss_Fast',                0x0240),
+    ('Boss_Slow',                0x0180),       # Should be the same speed or faster then the player
+
+    ('BossBombVelocity',         0x0260),
 )
 
 

@@ -202,12 +202,18 @@
           "delay-type": "frame",
           "fixed-delay": 10,
           "frames": [ "frame0", "frame1" ]
+        },
+        "active_fast": {
+          "fixed-delay": 2,
+          "delay-type": "frame",
+          "loop": true,
+          "frames": [ "frame0", "frame1" ]
         }
       },
       "layouts": {},
       "defaultHitbox": null,
       "hitboxes": {},
-      "defaultHurtbox": null,
+      "defaultHurtbox": "4 9 8 7",
       "hurtboxes": {},
       "clones": {}
     },

@@ -698,6 +698,25 @@ var _tmp       : u8 in zpTmp_byte_0;
     return a;
 }
 
+
+// Other functions
+// ===============
+
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+func calc_angle_to_player_32x2(entityId : u8 in y) : u8 in x {
+
+    x = calc_angle_32x2(a = SoA.xPos_px[y],
+                        a = SoA.yPos_px[y],
+                        x = player.xPos.px,
+                        y = player.yPos.px);
+    y = currentEntityId;
+
+    return x;
+}
+
+
 }
 
 }

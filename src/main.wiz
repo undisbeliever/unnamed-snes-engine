@@ -24,6 +24,8 @@ import "src/entities/skeleton";
 import "src/entities/slime";
 import "src/entities/swarming";
 import "src/entities/rook";
+import "src/entities/boss";
+import "src/entities/boss-bomb";
 import "src/entities/smoke-particles";
 import "src/entities/player-bomb";
 import "src/entities/projectile";

@@ -74,6 +74,23 @@
       }
     },
     {
+      "name": "boss",
+      "is_enemy": true,
+      "ms-export-order": "boss",
+      "parameter": {
+        "type": "gamestateflag"
+      }
+    },
+    {
+      "name": "boss_bomb",
+      "is_enemy": false,
+      "ms-export-order": "bomb",
+      "parameter": {
+        "comment": "Angle to launch the bomb",
+        "type": "u8"
+      }
+    },
+    {
       "name": "projectile",
       "is_enemy": false,
       "ms-export-order": "projectile",
@@ -178,6 +195,15 @@
       "attack": 0
     },
     {
+      "name": "boss",
+      "code": "boss",
+      "metasprites": "dungeon.Boss",
+      "death_function": "none",
+      "zpos": "0",
+      "health": 4,
+      "attack": 2
+    },
+    {
       "name": "bolt_straight",
       "code": "projectile",
       "metasprites": "common.Bolt",
@@ -212,6 +238,15 @@
       "zpos": "0",
       "health": 255,
       "attack": 0
+    },
+    {
+      "name": "boss_bomb",
+      "code": "boss_bomb",
+      "metasprites": "common.Bomb",
+      "death_function": "none",
+      "zpos": "24",
+      "health": 255,
+      "attack": 2
     },
     {
       "name": "test__calc_angle",

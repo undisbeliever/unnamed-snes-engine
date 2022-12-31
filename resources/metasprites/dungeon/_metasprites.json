@@ -455,6 +455,47 @@
       },
       "hurtboxes": {},
       "clones": {}
+    },
+    {
+      "name": "Boss",
+      "source": "boss.png",
+      "frameWidth": 32,
+      "frameHeight": 48,
+      "frames": [ "standing", "hurt", "dead" ],
+      "ms-export-order": "boss",
+      "order": 3,
+      "shadowSize": "LARGE",
+      "tileHitbox": null,
+      "defaultLayout": "rect_16x40_top 8 0",
+      "layouts": {},
+      "defaultHitbox": null,
+      "hitboxes": {
+        "standing": "9 30 14 9"
+      },
+      "defaultHurtbox": null,
+      "hurtboxes": {},
+      "clones": {},
+      "animations": {
+        "standing": {
+          "fixed-delay": 1,
+          "frames": [ "standing" ],
+          "loop": false,
+          "delay-type": "none"
+        },
+        "hurt": {
+          "frames": [ "hurt", 60 ],
+          "loop": false,
+          "delay-type": "frame"
+        },
+        "dead": {
+          "frames": [ "dead", 90 ],
+          "delay-type": "frame",
+          "loop": false
+        }
+      },
+      "xorigin": 16,
+      "yorigin": 37,
+      "tilehitbox": "8 4"
     }
   ]
 }

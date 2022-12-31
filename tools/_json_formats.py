@@ -481,6 +481,8 @@ class _Entities_Helper(_Helper):
             return EfParameter('enum', p.get_name_list('values'))
         elif t == 'gamestateflag':
             return EfParameter(t, None)
+        elif t == 'u8':
+            return EfParameter(t, None)
         else:
             self._raise_error(f"Unknown function parameter type: { t }", key)
 

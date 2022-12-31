@@ -23,6 +23,8 @@ namespace entities {
 
         let X_AXIS_COLLISION = RIGHT_COLLISION | LEFT_COLLISION;
         let Y_AXIS_COLLISION = UP_COLLISION | DOWN_COLLISION;
+
+        let TILE_COLLISION = X_AXIS_COLLISION | Y_AXIS_COLLISION;
     };
 
     namespace CollisionState {

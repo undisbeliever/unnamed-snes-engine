@@ -41,7 +41,8 @@
    "tutorial_rook_1",
    "tutorial_rook_2",
    "key_guarding_rook_1",
-   "key_guarding_rook_2"
+   "key_guarding_rook_2",
+   "boss_defeated"
  ],
  "room_events": [
    {
