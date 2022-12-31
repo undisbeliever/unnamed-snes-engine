@@ -88,13 +88,9 @@ let STATIONARY_PLAYER__ENVIRONMENTAL_DAMAGE_VELOCITY = 0x0180;
 // Number of iframes to give player after rolling back a room transition.
 let N_IFRAMES_AFTER_ROOM_TRANSITION_ROLLBACK = 40;
 
-// Number of iframes to give player after the hurt push-back ends
-// SHOULD BE < HURT_STATE_DURATION.
-let N_IFRAMES_AFTER_HURT_PUSHBACK   = 3;
-
 
 // Number of iframes after the player has been attacked
-let N_IFRAMES_AFTER_ATTACKED = 30;
+let N_IFRAMES_AFTER_ATTACKED = 40;
 
 // Number of iframes after the player has been hurt by environmental damage
 let N_IFRAMES_AFTER_ENVIRONMENTAL_DAMAGE = 30;
