@@ -259,90 +259,90 @@ inline func process_active_entities()
             x--;
             __currentEntityTablePos = x;
 
+            // The `!zero` below test prevents the player from being processed or animated by the function.
+            // (it also stops this function from despawning the player when the player's health is 0)
+
             y = activeEntitiesTable[x];
-            currentEntityId = y;
-            x = y;
-            entities.SoA.process_function[unaligned x](y);
+            if !zero {
+                currentEntityId = y;
+                x = y;
+                entities.SoA.process_function[unaligned x](y);
 
-            y = currentEntityId;
-            a = SoA.health[y];
-            if zero {
-                // Entity's health is 0, call the entity's death function
-                a = SoA.deathFunction[y] << 1;
-                if a >= N_DEATH_FUNCTIONS * 2{
-                    a = 0;
-                }
-                x = a;
+                y = currentEntityId;
+                a = SoA.health[y];
+                if zero {
+                    // Entity's health is 0, call the entity's death function
+                    a = SoA.deathFunction[y] << 1;
+                    if a >= N_DEATH_FUNCTIONS * 2{
+                        a = 0;
+                    }
+                    x = a;
 
-                carry = DeathFunctionsTable[unaligned x](y);
-                if carry {
-                    // Entity is still active
-                    y = currentEntityId;
+                    carry = DeathFunctionsTable[unaligned x](y);
+                    if carry {
+                        // Entity is still active
+                        y = currentEntityId;
 
-                    // Do not call the death function the next time this entity dies.
-                    SoA.deathFunction[y] = a = 0;
-                    metasprites.process_entity_animation(y);
+                        // Do not call the death function the next time this entity dies.
+                        SoA.deathFunction[y] = a = 0;
+                        metasprites.process_entity_animation(y);
+                    }
+                    else {
+                        // Entity no longer active
+                        y = currentEntityId;
+
+                        // Decrement enemy count (if the entity is an enemy)
+                        a = SoA._isEnemy[unaligned y];
+                        if !zero {
+                            _enemyCount--;
+                            if negative {
+                                _enemyCount = 0;
+                            }
+                        }
+
+                        // Remove entity from active entities list, preserving active entity order.
+                        //
+                        // Preserving entity order should be friendlier to `sort_active_entities()`.
+                        numberOfActiveEntities--;
+
+                        mem16();
+                        #[mem16] {
+                            // ASSUMES numberOfActiveEntities <= ACTIVE_ENTITIES_TABLE__LAST_POS
+                            // ASSUMES numberOfActiveEntities < sizeof(activeEntitiesTable)
+
+                            // Must not change Y
+
+                            x = __currentEntityTablePos;
+                            if x < numberOfActiveEntities {
+                                do {
+                                    // Swap activeEntitiesTable[x] and activeEntitiesTable[x + 1]
+                                    aa = (&activeEntitiesTable as *u16)[unaligned x];
+                                    swap_bytes(aa);
+                                    (&activeEntitiesTable as *u16)[unaligned x] = aa;
+
+                                    x++;
+                                } while x < numberOfActiveEntities;
+                            }
+
+                            // Set process_function and ms_draw_function to a blank function (just in case they are accidentally called)
+                            aa = _blank_entity_function as u16;
+                            entities.SoA.process_function[unaligned y] = aa as func(u8 in x);
+
+                            aa = _blank_ms_draw_function as u16;
+                            entities.SoA.ms_draw_function[unaligned y] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
+                        }
+                        mem8();
+
+
+                        // Do not draw a shadow on unused entities.
+                        //
+                        // Y is currentEntityId;
+                        a = metasprites.ShadowSize.NONE as u8;
+                        SoA.shadowSize[unaligned y] = a as metasprites.ShadowSize;
+                    }
                 }
                 else {
-                    // Entity no longer active
-                    y = currentEntityId;
-
-                    // Decrement enemy count (if the entity is an enemy)
-                    a = SoA._isEnemy[unaligned y];
-                    if !zero {
-                        _enemyCount--;
-                        if negative {
-                            _enemyCount = 0;
-                        }
-                    }
-
-                    // Remove entity from active entities list, preserving active entity order.
-                    //
-                    // Preserving entity order should be friendlier to `sort_active_entities()`.
-                    numberOfActiveEntities--;
-
-                    mem16();
-                    #[mem16] {
-                        // ASSUMES numberOfActiveEntities <= ACTIVE_ENTITIES_TABLE__LAST_POS
-                        // ASSUMES numberOfActiveEntities < sizeof(activeEntitiesTable)
-
-                        // Must not change Y
-
-                        x = __currentEntityTablePos;
-                        if x < numberOfActiveEntities {
-                            do {
-                                // Swap activeEntitiesTable[x] and activeEntitiesTable[x + 1]
-                                aa = (&activeEntitiesTable as *u16)[unaligned x];
-                                swap_bytes(aa);
-                                (&activeEntitiesTable as *u16)[unaligned x] = aa;
-
-                                x++;
-                            } while x < numberOfActiveEntities;
-                        }
-
-                        // Set process_function and ms_draw_function to a blank function (just in case they are accidentally called)
-                        aa = _blank_entity_function as u16;
-                        entities.SoA.process_function[unaligned y] = aa as func(u8 in x);
-
-                        aa = _blank_ms_draw_function as u16;
-                        entities.SoA.ms_draw_function[unaligned y] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
-                    }
-                    mem8();
-
-
-                    // Do not draw a shadow on unused entities.
-                    //
-                    // Y is currentEntityId;
-                    a = metasprites.ShadowSize.NONE as u8;
-                    SoA.shadowSize[unaligned y] = a as metasprites.ShadowSize;
-                }
-            }
-            else {
-                // entity is still alive, process entity animation
-                //
-                // The `y != PLAYER_ENTITY_ID` test prevents the player's animations from being executed twice in single display frame.
-                // This is required as the player's hitboxes need to be calculated AFTER the player's animations have been process and BEFORE this function is called.
-                if y != PLAYER_ENTITY_ID {
+                    // entity is still alive, process entity animation
                     metasprites.process_entity_animation(y);
                 }
             }
