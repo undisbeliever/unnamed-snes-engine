@@ -7,7 +7,7 @@ import re
 import os.path
 import argparse
 
-from typing import Callable
+from typing import Callable, Final
 
 from _json_formats import load_mappings_json, load_entities_json, \
                           Name, Filename, MemoryMap, Mappings, EntitiesJson
@@ -357,6 +357,41 @@ def insert_resources(sfc_view : memoryview, symbols : dict[str, Address], mappin
 
 
 
+def update_checksum(sfc_view : memoryview, memory_map : MemoryMap) -> None:
+    """
+    Update the SFC header checksum in `sfc_view` (in place).
+    """
+
+    mm_mode : Final = memory_map.mode
+    cs_header_offset : Final = mm_mode.address_to_rom_offset(0x00ffdc)
+
+
+    if len(sfc_view) % mm_mode.bank_size != 0:
+        raise RuntimeError(f"sfc file has an invalid size (expected a multiple of { mm_mode.bank_size })")
+
+    if len(sfc_view).bit_count() != 1:
+        # ::TODO handle non-power of two ROM sizes::
+        raise RuntimeError(f"Invalid sfc file size (must be a power of two in size)")
+
+    checksum = sum(sfc_view)
+
+    # Remove the old checksum/complement
+    checksum -= sum(sfc_view[cs_header_offset : cs_header_offset + 4])
+
+    # Add the expected `checksum + complement` value to checksum
+    checksum += 0xff + 0xff
+
+    checksum = checksum & 0xffff
+    complement = checksum ^ 0xffff
+
+    # Write checksum to `sfc_view`
+    sfc_view[cs_header_offset + 0] = complement & 0xff
+    sfc_view[cs_header_offset + 1] = complement >> 8
+    sfc_view[cs_header_offset + 2] = checksum & 0xff
+    sfc_view[cs_header_offset + 3] = checksum >> 8
+
+
+
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output', required=True,
@@ -387,8 +422,11 @@ def main() -> None:
     other_resources_data = load_other_resources_data_from_file(args.other_resources_bin_file)
 
     sfc_data = bytearray(read_binary_file(args.sfc_input, 4 * 1024 * 1024))
+    sfc_memoryview = memoryview(sfc_data)
 
-    insert_resources(memoryview(sfc_data), symbols, mappings, entities, other_resources_data)
+    insert_resources(sfc_memoryview, symbols, mappings, entities, other_resources_data)
+
+    update_checksum(sfc_memoryview, mappings.memory_map)
 
     with open(args.output, 'wb') as fp:
         fp.write(sfc_data)
