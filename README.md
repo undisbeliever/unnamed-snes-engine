@@ -9,7 +9,7 @@ A simple single-screen top-down game-demo for the SNES.
 
 Build Requirements
 ==================
- * [https://github.com/wiz-lang/wiz](Wiz) (included as a git submodule)
+ * [Wiz](https://github.com/wiz-lang/wiz), a high level assembly language (included as a git submodule)
  * A C++17 compiler (see the [wiz README](https://github.com/wiz-lang/wiz#building-source) for more details)
  * GNU Make
  * Python 3
