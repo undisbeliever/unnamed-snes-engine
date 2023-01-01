@@ -28,6 +28,7 @@ import "src/entities/boss";
 import "src/entities/boss-bomb";
 import "src/entities/smoke-particles";
 import "src/entities/player-bomb";
+import "src/entities/credits-orb";
 import "src/entities/projectile";
 import "src/entities/projectile-angled";
 import "src/entities/test--calc-angle";

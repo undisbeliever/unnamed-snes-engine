@@ -496,6 +496,35 @@
       "xorigin": 16,
       "yorigin": 37,
       "tilehitbox": "8 4"
+    },
+    {
+      "name": "CreditsOrb",
+      "source": "credits-orb.png",
+      "frameWidth": 16,
+      "frameHeight": 8,
+      "frames": [ "frame" ],
+      "ms-export-order": "particle",
+      "order": 3,
+      "shadowSize": "SMALL",
+      "tileHitbox": null,
+      "defaultLayout": "rect_16x8_two 0 0",
+      "layouts": {},
+      "defaultHitbox": "6 0 4 2",
+      "hitboxes": {},
+      "defaultHurtbox": null,
+      "hurtboxes": {},
+      "clones": {},
+      "animations": {
+        "animation": {
+          "fixed-delay": 0,
+          "frames": [ "frame" ],
+          "loop": false,
+          "delay-type": "none"
+        }
+      },
+      "xorigin": 8,
+      "yorigin": 6,
+      "tilehitbox": "3 2"
     }
   ]
 }

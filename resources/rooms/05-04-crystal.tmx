@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.9" tiledversion="1.9.2" class="normal" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="4" nextobjectid="12">
+<map version="1.9" tiledversion="1.9.2" class="normal" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="4" nextobjectid="13">
  <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
  <layer id="1" name="Tiles" class="normal" width="16" height="14">
   <data encoding="base64" compression="gzip">
    H4sIAAAAAAAAA63QOQ6CUBCA4dfjVrprqSJoibulK3oBEy8Aeie9gRzQv6AwhjeYicWXTPMnM+MYY5w/KaCIkkUZFaFvooW2RQddoR/Cg28xwvjHvooa6mgo+h76GMBV9AEmmGKm6DfYYoe9otf8b44FrhntBSushf6AG+4ZfYQYZ6GXbsjb/fuGJR54pnPe7p83HBHihSSdT5bd3/pLozmAAwAA
   </data>
  </layer>
- <objectgroup id="2" name="Enemies"/>
+ <objectgroup id="2" name="Enemies">
+  <object id="12" class="credits_orb" x="128" y="96">
+   <point/>
+  </object>
+ </objectgroup>
 </map>

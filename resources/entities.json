@@ -123,6 +123,11 @@
       "ms-export-order": "bomb"
     },
     {
+      "name": "credits_orb",
+      "is_enemy": false,
+      "ms-export-order": "particle"
+    },
+    {
       "name": "test__calc_angle",
       "is_enemy": false,
       "ms-export-order": "eight_direction_spinner"
@@ -247,6 +252,15 @@
       "zpos": "24",
       "health": 255,
       "attack": 2
+    },
+    {
+      "name": "credits_orb",
+      "code": "credits_orb",
+      "metasprites": "dungeon.CreditsOrb",
+      "death_function": "none",
+      "zpos": "8",
+      "health": 255,
+      "attack": 0
     },
     {
       "name": "test__calc_angle",
