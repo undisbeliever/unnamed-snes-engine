@@ -103,7 +103,8 @@ let N_FALLING_ANTICIPATION_FRAMES = 30;
 let N_FALLING_SEEKING_FRAMES = 16;
 
 
-let N_ON_GROUND_SHAKING_FRAMES = 20;
+// Needs to be longer then shaking in the air, player needs more reaction time to dodge.
+let N_ON_GROUND_SHAKING_FRAMES = 40;
 
 
 // Number of frames after landing before starting the next action
