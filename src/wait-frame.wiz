@@ -25,6 +25,12 @@ in lowram {
     // (2x u16 words)
     var bg1_scrollX : u16;
     var bg1_scrollY : u16;
+
+    // A shadow of the BG2 scroll registers.
+    //
+    // (2x u16 words)
+    var bg2_scrollX : u16;
+    var bg2_scrollY : u16;
 }
 
 
@@ -94,6 +100,11 @@ func wait_frame() {
         snes.ppu.bg1_scroll_x = a = *(&>:bg1_scrollX as *u8);
         snes.ppu.bg1_scroll_y = a = *(&<:bg1_scrollY as *u8);
         snes.ppu.bg1_scroll_y = a = *(&>:bg1_scrollY as *u8);
+
+        snes.ppu.bg2_scroll_x = a = *(&<:bg2_scrollX as *u8);
+        snes.ppu.bg2_scroll_x = a = *(&>:bg2_scrollX as *u8);
+        snes.ppu.bg2_scroll_y = a = *(&<:bg2_scrollY as *u8);
+        snes.ppu.bg2_scroll_y = a = *(&>:bg2_scrollY as *u8);
 
 
         snes.ppu.brightness = a = _brightness_buffer;
@@ -168,6 +179,34 @@ func wait_multiple_frames_and_fadeout() {
     } while !negative;
 
 // In force blank.
+}
+
+
+
+// Preform a fadeout animation until the display is disabled (force-blank) at one-third speed.
+//
+// NOTE: If the system is in force-blank, this function will not fadeout.
+//
+// RETURNS: Force-blank
+//
+// DB = lowram
+#[mem8, idx8]
+func wait_multiple_frames_and_fadeout__slow() {
+    while true {
+        a = _brightness_buffer;
+        if negative {
+            // In force blank.
+            return;
+        }
+        if a >= 15 + 1 {
+            a = 15;
+        }
+        a--;
+        wait_frame_and_change_brightness(a);
+
+        wait_frame();
+        wait_frame();
+    }
 }
 
 

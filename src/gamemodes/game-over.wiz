@@ -29,10 +29,10 @@ enum MenuItem : u8 {
     CONTINUE,
     RESTART_ROOM,
     TITLE_SCREEN,
-    // ::TODO add link to credits::
+    SHOW_CREDITS,
 };
 
-let N_MENU_ITEMS = 3;
+let N_MENU_ITEMS = 4;
 
 
 in wram7e {
@@ -113,6 +113,9 @@ func exec() {
                 }
 
                 a = GameModes.START_GAMELOOP as u8;
+            }
+            else if a == MenuItem.SHOW_CREDITS as u8 {
+                a = GameModes.CREDITS as u8;
             }
             else {
                 gamestate.continue_game();

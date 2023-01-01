@@ -27,6 +27,24 @@
       "source": "images/game-over.png",
       "palette": "images/game-over-palette.png",
       "tile_priority": 1
+    },
+    "credits": {
+      "format": "2bpp",
+      "source": "images/credits.png",
+      "palette": "images/credits-palette.png",
+      "tile_priority": 1
+    },
+    "licenses_bg1": {
+      "format": "2bpp",
+      "source": "images/licenses-bg1.png",
+      "palette": "images/licenses-palette.png",
+      "tile_priority": 1
+    },
+    "licenses_bg2": {
+      "format": "2bpp",
+      "source": "images/licenses-bg2.png",
+      "palette": "images/licenses-palette.png",
+      "tile_priority": 1
     }
   }
 }

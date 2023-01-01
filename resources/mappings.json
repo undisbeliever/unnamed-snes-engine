@@ -20,7 +20,10 @@
  ],
  "bg_images": [
    "title_screen",
-   "game_over"
+   "game_over",
+   "credits",
+   "licenses_bg1",
+   "licenses_bg2"
  ],
 
  "interactive_tile_functions": [
