@@ -38,7 +38,7 @@ in rodata0 {
 let InitialPlayerState = gamestate.PlayerState{
 
     xPos                = DISPLAY_WIDTH / 2,
-    yPos                = DISPLAY_HEIGHT / 2,
+    yPos                = DISPLAY_HEIGHT * 2 / 3,
     zPos                = 0,
 
     swordAttackPower    = 2,
@@ -46,7 +46,7 @@ let InitialPlayerState = gamestate.PlayerState{
     maxHealth           = 16,
 
     state               = State.WALKING as u8,
-    facingDirection     = FacingDirection.DOWN as u8,
+    facingDirection     = FacingDirection.UP as u8,
 };
 
 }
@@ -344,7 +344,7 @@ inline func continue_player_gamestate__inline() {
 
     gamestate.data.playerState.state = State.WALKING as u8;
 
-    gamestate.data.playerState.facingDirection = InitialPlayerState.facingDirection;
+    gamestate.data.playerState.facingDirection = a = InitialPlayerState.facingDirection;
 }
 
 
