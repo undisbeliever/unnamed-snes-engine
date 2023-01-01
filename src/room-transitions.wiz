@@ -505,6 +505,8 @@ inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
 //
 // REQUIRES: gamestate loaded or restarted
 //
+// ASSUMES: currentRoom and player position are valid.
+//
 // DB = 0x7e
 #[mem8, idx8]
 func start_gameloop() {
@@ -519,6 +521,8 @@ func start_gameloop() {
     // Load the room the player was last in
     _load_room_and_check_if_ok_to_scroll(gamestate.data.currentRoom,
                                          gamestate.data.playerState.xPos, gamestate.data.playerState.yPos);
+
+    // ::TODO what should happen if the room/position is not valid??::
 
     return _fadein__room_partially_loaded();
 

@@ -24,6 +24,8 @@ enum GameModes : u8 {
     // Fadeout the screen, initialise the player and gameloop, and start the game.
     //
     // MUST BE used when the gamestate is loaded/reset, before any other room transitions occur.
+    //
+    // Assumes the current room/position is valid.  Will softlock if invalid.
     START_GAMELOOP,
 
     // Fadeout the screen, load a room, fadein the screen and start the gameloop.
