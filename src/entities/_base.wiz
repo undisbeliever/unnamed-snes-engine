@@ -293,7 +293,7 @@ func process_collisions__projectile(entityId : u8 in y) {
 // If there is a player collision, the `player.hitbox_collided_with_entity__inline()`
 // or `player.hurtbox_collided_with_entity__inline()` function will be called.
 //
-// Also updates `SoA.movementState`, `SoA.iframeCounter` and `SoA.health`.
+// Also updates `SoA.movementState`, `SoA.iframeCounter`.
 //
 // ASSUMES `entityId` is not player.
 //
@@ -349,9 +349,6 @@ func __process_collisions__after_metatile_checks(entityId : u8 in y) {
                     // ::TODO Different iframe intervals for different entities::
                     // ::TODO Different iframe intervals for NTSC/PAL::
                     SoA.iframeCounter[y] = a = N_INVINCIBILITY_FRAMES;
-
-
-                    // ::TODO decrement health::
 
 
                     collisionState = a = CollisionState.ANY_PLAYER_WEAPON | CollisionState.PLAYER_SWORD;
