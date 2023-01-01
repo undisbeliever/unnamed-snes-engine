@@ -1,7 +1,7 @@
 
 BINARY := game.sfc
 
-INTERMEDIATE_BINARY := game-no-resources.sfc
+INTERMEDIATE_BINARY := gen/game-no-resources.sfc
 
 
 .DELETE_ON_ERROR:
