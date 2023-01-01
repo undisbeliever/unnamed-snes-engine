@@ -12,7 +12,8 @@ config {
     region = "ntsc",
 
     // ::TODO give this game a name::
-    title = "UNNAMED SNES GAME",
+    title = "UNNAMED TECH DEMO",
+    version = 1,
 }
 
 
