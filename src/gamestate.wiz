@@ -172,13 +172,32 @@ func new_game() {
 func continue_game() {
 
     // ::TODO create some kind of checkpoint system::
-    a = resources.rooms.STARTING_ROOM;
+    // ::HACK Hardcoded checkpoint (just before the boss)::
+
+    let LAST_HEALING_ROOM = 0x75;
+
+    a = data.currentRoom;
+    if a >= LAST_HEALING_ROOM + 1 {
+        // Game over before the boss
+        a = resources.rooms.STARTING_ROOM;
+        x = player.InitialPlayerState.xPos;
+        y = player.InitialPlayerState.yPos;
+    }
+    else {
+        // Game over after the final healing room (at the boss)
+        a = LAST_HEALING_ROOM;
+        x = DISPLAY_WIDTH / 2;
+        y = DISPLAY_HEIGHT / 2;
+
+    }
+
     data.currentRoom = a;
     data.roomToLoad = a;
 
-    data.playerState.xPos = a = player.InitialPlayerState.xPos;
-    data.playerState.yPos = a = player.InitialPlayerState.yPos;
+    data.playerState.xPos = x;
+    data.playerState.yPos = y;
     data.playerState.zPos = player.InitialPlayerState.zPos;
+
 
     player.continue_player_gamestate__inline();
 }
