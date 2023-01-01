@@ -140,9 +140,10 @@ $(BINARY): $(RESOURCES)
 .PHONY: resources
 resources: $(RESOURCES)
 
-DIRS := $(sort $(dir $(RESOURCES)))
+DIRS := $(sort $(dir $(RESOURCES) $(GEN_SOURCES)))
 
 $(RESOURCES): $(DIRS)
+$(GEN_SOURCES): $(DIRS)
 $(DIRS):
 	mkdir -p '$@'
 
