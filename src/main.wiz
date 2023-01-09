@@ -8,6 +8,7 @@ import "common/reset";
 import "common/dma";
 
 import "gameloop";
+import "audio";
 import "gamestate";
 import "gamemodes";
 import "metatiles";
@@ -43,6 +44,8 @@ func main() {
     snes.ppu.brightness = a = snes.ppu.BRIGHTNESS_FORCE_BLANK;
 
     resources_over_usb2snes.init();
+
+    audio.setup();
 
     metasprites.setup__forceblank();
 

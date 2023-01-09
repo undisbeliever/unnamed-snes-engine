@@ -1,0 +1,147 @@
+// Copyright (c) 2023, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "memmap";
+import "resources";
+
+import "../wiz/common/snes/snes";
+
+
+namespace audio {
+
+
+// Address to store the AudioDriver (in Audio-RAM)
+// Address (in Audio-RAM) to execute after loading the AudioDriver.
+let AUDIO_DRIVER_ARAM_ADDR = 0x200;
+
+
+in rodata0 {
+    const AudioDriver = embed "gen/audio-driver.bin";
+}
+
+
+in code {
+
+
+// REQUIRES: S-SMP reset
+//
+// This function MUST only be called once.
+//
+// DB = 0x80
+#[mem8, idx16]
+func setup() {
+var _res : resources.ResourceEntry in resources.res;
+
+    // ::TODO add a first-call check::
+
+
+    // ::TODO add audio driver and music data to resources::
+    *(&_res.farPtr as *u16) = xx = &AudioDriver as u16;
+    #:_res.farPtr = a = #:far &AudioDriver;
+    _res.size = yy = sizeof(typeof(AudioDriver));
+
+    __initialise_ipl();
+    transfer_data_to_aram(_res, AUDIO_DRIVER_ARAM_ADDR);
+
+    // ::TODO transfer music data::
+
+    __execute_audio_driver();
+}
+
+
+
+// REQUIRES: S-SMP reset and no data has been written to it yet
+//
+// This function MUST only be called once.
+//
+// DB = 0x80
+#[mem8, idx16]
+func __initialise_ipl() {
+    // Initialize the transfer
+    yy = 0xbbaa;
+    snes.apu.output10 = yy;
+
+    // Wait for a response from the IPL
+    do {
+    } while yy != snes.apu.input10;
+}
+
+
+
+// REQUIRES: S-SMP is running the IPL and `__initialise_ipl()` has been called.
+//
+// DB = 0x80
+#[mem8, idx16]
+func transfer_data_to_aram(_res : resources.ResourceEntry in resources.res, aramAddr : u16 in xx) {
+
+    // ::TODO add a 'running IPL' check::
+
+
+    // A transfer data command occurs when `APUIO0` is incremented by more than 2 and non-zero.
+    // However the first transfer command requires an `APUIO0` of 0xcc.
+    //
+    // Since the IPL sets `APUIO0` to 0xaa, we can increment `APUIO0` by 0x22 and use the same
+    // code on the first and subsequent data transfers.
+    //
+    // Source: SNESdev wiki: https://snes.nesdev.org/wiki/Booting_the_SPC700
+
+    a = snes.apu.input0;
+    a += 0x22;
+    if zero {
+        a++;
+    }
+
+    snes.apu.output32 = xx;     // destination ARAM address
+    snes.apu.output1 = a;       // non-zero = write data to address
+    snes.apu.output0 = a;       // New data command (non-zero and APUIO0 + more than 2, or 0xcc on the first transfer)
+
+
+    // Wait for a response form the IPL
+    do {
+    } while a != snes.apu.input0;
+
+
+    // Transfer the data
+    yy = 0;
+    do {
+        // Send the next byte to the IPL
+        snes.apu.output1 = a = _res.farPtr[unaligned yy];
+
+        // Increase output0 by 1 (starting at 0)
+        // Tell the IPL the next data is ready
+        snes.apu.output0 = a = y;
+
+        // Increment yy here, while the IPL is busy
+        yy++;
+
+        // Wait for a response from the IPL
+        do {
+        } while a != snes.apu.input0;
+
+    } while yy < _res.size;
+}
+
+
+
+// REQUIRES: S-SMP is running the IPL and the driver has been transferred to the A-RAM
+//
+// DB = 0x80
+#[mem8, idx16]
+func __execute_audio_driver() {
+
+    a = snes.apu.input0;
+    a++;
+    a++;
+    if zero {
+        a++;
+    }
+
+    snes.apu.output32 = xx = AUDIO_DRIVER_ARAM_ADDR;    // A-RAM address
+    snes.apu.output1 = 0;                               // zero = execute program at A-RAM address
+    snes.apu.output0 = a;                               // New data command (non-zero and APUIO0 + more than 2, or 0xcc on the first transfer)
+}
+
+}
+
+}
+

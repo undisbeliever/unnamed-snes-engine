@@ -1,0 +1,161 @@
+// Copyright (c) 2023, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+
+import "registers";
+
+
+// Memory Map
+// ==========
+
+config {
+    // Don't output the full 64K file
+    trim = true
+}
+
+bank zeropage   @ 0x0000 : [vardata;     0x00f0];
+// addresses 0x00f0 - 0x00ff contain registers
+bank stack      @ 0x0100 : [vardata;     0x0100];
+bank prg        @ 0x0200 : [varinitdata; 0xFE00];   // code + data
+
+
+
+// Variables
+// =========
+
+
+
+
+// Macros
+// ======
+
+// KEEP: a, x, y
+inline func write_dsp(addr : GlobalDspAddr in a, data : u8 in y) {
+    smp.dsp_addr_and_data = ya;
+}
+
+
+inline func write_voice_dsp(let voice : u8, let reg : VoiceDspAddr, data : u8 in y) {
+    a = voice | reg as u8;
+    smp.dsp_addr_and_data = ya;
+}
+
+
+
+// Code
+// ====
+
+in prg {
+
+// MUST be the first thing in the `prg` bank (so the starting address is consistent across builds).
+#[fallthrough]
+func main() {
+    sp = x = 0xff;
+
+    // Reset the DSP
+    write_dsp(GlobalDspAddr.FLG,    dsp.FLG__SOFT_RESET | dsp.FLG__MUTE_ALL | dsp.FLG__ECHO_DISABLE);
+
+    write_dsp(GlobalDspAddr.KOFF,   0xff);  // all keys off
+
+    y = 0;
+    write_dsp(GlobalDspAddr.EFB,    y);     // No echo feedback
+    write_dsp(GlobalDspAddr.PMON,   y);     // No pitch modulation
+    write_dsp(GlobalDspAddr.NON,    y);     // No noise
+    write_dsp(GlobalDspAddr.EON,    y);     // No echo
+
+
+    // Set main volume to full volume
+    y = 0x7f;
+    write_dsp(GlobalDspAddr.MVOL_L, y);
+    write_dsp(GlobalDspAddr.MVOL_R, y);
+
+    y = 0;
+    write_dsp(GlobalDspAddr.EVOL_L, y);
+    write_dsp(GlobalDspAddr.EVOL_R, y);
+
+
+
+    // Set directory table
+    write_dsp(GlobalDspAddr.DIR, >:&samples.SampleDirectory);
+
+
+    // Unmute the audio (keep echo disabled)
+    write_dsp(GlobalDspAddr.FLG,    dsp.FLG__ECHO_DISABLE);
+    write_dsp(GlobalDspAddr.KOFF,   0);
+
+
+    // Voice Sample settings
+    write_voice_dsp(0, VoiceDspAddr.SCRN, 0);   // First sample
+
+    // ADSR
+    write_voice_dsp(0, VoiceDspAddr.ADSR1, 0b1_001_1100);
+    write_voice_dsp(0, VoiceDspAddr.ADSR2, 0b001__10000);
+
+    // ::TODO what does this do?::
+    write_voice_dsp(0, VoiceDspAddr.GAIN, 0);
+
+
+    // Set Volume
+    y = 127;
+    write_voice_dsp(0, VoiceDspAddr.VOL_L, y);
+    write_voice_dsp(0, VoiceDspAddr.VOL_R, y);
+
+    while true {
+        let NOTE_1_PITCH = 0x1000;
+        write_voice_dsp(0, VoiceDspAddr.PITCH_L, <:NOTE_1_PITCH);
+        write_voice_dsp(0, VoiceDspAddr.PITCH_H, >:NOTE_1_PITCH);
+
+        write_dsp(GlobalDspAddr.KON, 1 << 0);
+
+        delay();
+
+        let NOTE_2_PITCH = 0x1000 * 10594631 / 10000000;
+        write_voice_dsp(0, VoiceDspAddr.PITCH_L, <:NOTE_2_PITCH);
+        write_voice_dsp(0, VoiceDspAddr.PITCH_H, >:NOTE_2_PITCH);
+
+        write_dsp(GlobalDspAddr.KON, 1 << 0);
+
+        delay();
+    }
+}
+
+
+func delay() {
+    a = 3;
+    do {
+        x = 0;
+        do {
+            y = 0;
+            do {
+                y--;
+            } while !zero;
+
+            x--;
+        } while !zero;
+
+        a--;
+    } while !zero;
+}
+
+}
+
+
+in prg {
+
+namespace samples {
+    const Sine220 = embed "../gen/audio-samples/sine-220.brr";
+
+    struct DirItem {
+        start : *const u8,
+        loop  : *const u8
+    };
+
+    #[align(256)]
+    const SampleDirectory = [
+        DirItem{ start = &Sine220[0],      loop = &Sine220[0] },
+    ];
+}
+
+}
+
+
