@@ -46,14 +46,6 @@ OTHER_RESOURCES_SRC += $(wildcard resources/images/*.png)
 OTHER_RESOURCES_SRC += resources/metasprites/shadows-4bpp-tiles.png
 
 
-AUDIO_SOURCES	= $(wildcard audio/*.wiz)
-
-AUDIO_SAMPLES	= $(wildcard audio/samples/*.wav)
-AUDIO_RESOURCES = $(patsubst audio/samples/%.wav,gen/audio-samples/%.brr, $(AUDIO_SAMPLES))
-
-AUDIO_DRIVER	= gen/audio-driver.bin
-
-
 COMMON_PYTHON_SCRIPTS = tools/_json_formats.py tools/_snes.py tools/_ansi_color.py tools/_common.py
 
 # Python interpreter
@@ -70,12 +62,8 @@ $(BINARY): $(INTERMEDIATE_BINARY) tools/insert_resources.py tools/convert_metasp
 	cp $(INTERMEDIATE_BINARY:.sfc=.sym) $(BINARY:.sfc=.sym)
 
 
-$(INTERMEDIATE_BINARY): wiz/bin/wiz $(SOURCES) $(GEN_SOURCES) $(AUDIO_DRIVER)
+$(INTERMEDIATE_BINARY): wiz/bin/wiz $(SOURCES) $(GEN_SOURCES)
 	wiz/bin/wiz -s wla -I src src/main.wiz -o $(INTERMEDIATE_BINARY)
-
-
-$(AUDIO_DRIVER): wiz/bin/wiz $(AUDIO_SOURCES) $(AUDIO_RESOURCES)
-	wiz/bin/wiz -s wla -I src --system=spc700 audio/audio-driver.wiz -o $(AUDIO_DRIVER)
 
 
 .PHONY: wiz
@@ -139,26 +127,27 @@ endef
 $(foreach d, $(METASPRITE_SPRITESETS), $(eval $(call __update_metasprite_dependencies, $d, $(wildcard resources/metasprites/$d/*.png))))
 
 
-gen/audio-samples/%.brr: audio/samples/%.wav audio_tools/wav2brr.py
-	$(PYTHON3) audio_tools/wav2brr.py --loop -o '$@' 'audio/samples/$*.wav'
+
+# Test if the audio driver needs recompiling
+__UNUSED2__ := $(shell $(MAKE) --quiet --question -C 'audio')
+ifneq ($(.SHELLSTATUS), 0)
+audio/audio-driver.bin:
+	$(MAKE) -C audio
+endif
+
+$(INTERMEDIATE_BINARY): audio/audio-driver.bin
 
 
 
 .PHONY: resources
 resources: $(RESOURCES)
-$(BINARIES): $(RESOURCES)
-
-
 $(BINARY): $(RESOURCES)
 
 
-.PHONY: resources
-resources: $(RESOURCES)
 
-DIRS := $(sort $(dir $(RESOURCES) $(AUDIO_RESOURCES) $(GEN_SOURCES)))
+DIRS := $(sort $(dir $(RESOURCES) $(GEN_SOURCES)))
 
 $(RESOURCES): $(DIRS)
-$(AUDIO_RESOURCES): $(DIRS)
 $(GEN_SOURCES): $(DIRS)
 $(DIRS):
 	mkdir -p '$@'
@@ -166,6 +155,7 @@ $(DIRS):
 
 .PHONY: clean
 clean:
+	$(MAKE) -C audio clean
 	$(RM) $(BINARY) $(INTERMEDIATE_BINARY)
 	$(RM) $(GEN_SOURCES)
 	$(RM) $(RESOURCES)

@@ -1,5 +1,9 @@
 *.sfc
 *.sym
-gen
+*.bin
+
 *.sh
+
+gen
+audio/gen
 

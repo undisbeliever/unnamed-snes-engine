@@ -16,7 +16,7 @@ let AUDIO_DRIVER_ARAM_ADDR = 0x200;
 
 
 in rodata0 {
-    const AudioDriver = embed "gen/audio-driver.bin";
+    const AudioDriver = embed "../audio/audio-driver.bin";
 }
 
 
