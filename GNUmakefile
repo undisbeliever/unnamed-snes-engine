@@ -78,6 +78,21 @@ ifneq ($(.SHELLSTATUS), 0)
 endif
 
 
+
+# Test if the audio driver needs recompiling
+__UNUSED2__ := $(shell $(MAKE) --quiet --question -C 'audio')
+ifneq ($(.SHELLSTATUS), 0)
+  $(INTERMEDIATE_BINARY): audio
+endif
+
+.PHONY: audio
+audio audio/audio-driver.bin:
+	$(MAKE) -C audio
+
+$(INTERMEDIATE_BINARY): audio/audio-driver.bin
+
+
+
 gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palette.png resources/metatiles/%.tsx resources/mappings.json tools/convert_mt_tileset.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/convert_mt_tileset.py -o '$@' 'resources/mappings.json' 'resources/metatiles/$*.tsx'
 
@@ -125,17 +140,6 @@ gen/metasprites/$(firstword $1).wiz gen/metasprites/$(firstword $1).bin: $2
 endef
 
 $(foreach d, $(METASPRITE_SPRITESETS), $(eval $(call __update_metasprite_dependencies, $d, $(wildcard resources/metasprites/$d/*.png))))
-
-
-
-# Test if the audio driver needs recompiling
-__UNUSED2__ := $(shell $(MAKE) --quiet --question -C 'audio')
-ifneq ($(.SHELLSTATUS), 0)
-audio/audio-driver.bin:
-	$(MAKE) -C audio
-endif
-
-$(INTERMEDIATE_BINARY): audio/audio-driver.bin
 
 
 

@@ -12,7 +12,8 @@ MAKEFLAGS      += --no-builtin-rules
 SOURCES	       := $(wildcard src/*.wiz src/*/*.wiz)
 
 
-AUDIO_SAMPLES	= $(wildcard samples/*.wav)
+AUDIO_SAMPLES   = $(wildcard samples/*.wav)
+
 RESOURCES	= $(patsubst samples/%.wav,gen/%.brr, $(AUDIO_SAMPLES))
 
 
