@@ -9,20 +9,95 @@ import "registers";
 // ==========
 
 config {
-    // Don't output the full 64K file
     trim = true
 }
 
-bank zeropage   @ 0x0000 : [vardata;     0x00f0];
+bank zeropage       @ 0x0000 : [vardata;     0x00f0];
 // addresses 0x00f0 - 0x00ff contain registers
-bank stack      @ 0x0100 : [vardata;     0x0100];
-bank prg        @ 0x0200 : [varinitdata; 0xFE00];   // code + data
+bank stack          @ 0x0100 : [vardata;     0x0100];
+bank code           @ 0x0200 : [varinitdata; 0x0200];
+
+let EXTERNAL_DATA_ADDR = 0x400;
+
+
+// Data Structures
+// ===============
+
+let N_BRR_SAMPLES   = 64;
+let N_INSTRUMENTS   = 64;
+let N_SOUND_EFFECTS = 128;
+
+
+let INSTRUMENT_MASK = N_INSTRUMENTS - 1;
+
+
+struct DirItem {
+    start : *const u8,
+    loop  : *const u8
+};
+
+struct InstrumentsSoA {
+    scrn            : [u8 ; N_INSTRUMENTS],
+    adsr1           : [u8 ; N_INSTRUMENTS],
+    adsr2           : [u8 ; N_INSTRUMENTS],
+    gain            : [u8 ; N_INSTRUMENTS],
+
+    // offset between note c0 and `ExternalData.pitchTable[0]`
+    // (pitch_offset + pitch is allowed to overflow and underflow)
+    pitchOffset    : [u8 ; N_INSTRUMENTS],
+};
+
+struct ExternalData {
+    brrDirectory   : [DirItem ; N_BRR_SAMPLES],
+
+    pitchTable_l   : [u8; 256],
+    pitchTable_h   : [u8; 256],
+
+    instruments    : InstrumentsSoA,
+};
+
+extern const external_data @ EXTERNAL_DATA_ADDR : ExternalData;
+
+
+bank data @ EXTERNAL_DATA_ADDR : [constdata; 0x8000];
+
+in data {
+    const __external_data = embed "../gen/common_data.bin";
+}
 
 
 
 // Variables
 // =========
 
+let N_CHANNELS = 8;
+
+let CHANNEL_INDEX_INCREMENT = 16;
+let MAX_CHANNEL_INDEX = (N_CHANNELS - 1) * CHANNEL_INDEX_INCREMENT;
+
+
+in zeropage {
+    // MUST be 16 bytes in size
+    struct ChannelState {
+        pitchOffset : u8,
+
+        padding : [u8 ; 15],
+    };
+
+    var channels : [ChannelState ; N_CHANNELS];
+
+
+    // Also doubles as an offset into VoiceDspAddr
+    var currentChannelIndex : u8;
+
+    // Used for the DSP enable-flags
+    var currentChannelBit : u8;
+
+
+    // Used by the octave playing loop.
+    var __instrumentCounter : u8;
+    var __noteCounter : u8;
+}
 
 
 
@@ -35,19 +110,13 @@ inline func write_dsp(addr : GlobalDspAddr in a, data : u8 in y) {
 }
 
 
-inline func write_voice_dsp(let voice : u8, let reg : VoiceDspAddr, data : u8 in y) {
-    a = voice | reg as u8;
-    smp.dsp_addr_and_data = ya;
-}
-
-
 
 // Code
 // ====
 
-in prg {
+in code {
 
-// MUST be the first thing in the `prg` bank (so the starting address is consistent across builds).
+// MUST be the first thing in the `code` bank (so the starting address is consistent across builds).
 #[fallthrough]
 func main() {
     sp = x = 0xff;
@@ -76,7 +145,7 @@ func main() {
 
 
     // Set directory table
-    write_dsp(GlobalDspAddr.DIR, >:&samples.SampleDirectory);
+    write_dsp(GlobalDspAddr.DIR, >:&external_data.brrDirectory[0]);
 
 
     // Unmute the audio (keep echo disabled)
@@ -84,78 +153,126 @@ func main() {
     write_dsp(GlobalDspAddr.KOFF,   0);
 
 
-    // Voice Sample settings
-    write_voice_dsp(0, VoiceDspAddr.SCRN, 0);   // First sample
+    // Reset volume of all channels
+    y = 0;
+    do {
+        set_channel_volume(y, 96);
+        set_instrument(y, 0);
 
-    // ADSR
-    write_voice_dsp(0, VoiceDspAddr.ADSR1, 0b1_001_1100);
-    write_voice_dsp(0, VoiceDspAddr.ADSR2, 0b001__10000);
-
-    // ::TODO what does this do?::
-    write_voice_dsp(0, VoiceDspAddr.GAIN, 0);
+        y = a = y + CHANNEL_INDEX_INCREMENT;
+    } while y < MAX_CHANNEL_INDEX + 1;
 
 
-    // Set Volume
-    y = 127;
-    write_voice_dsp(0, VoiceDspAddr.VOL_L, y);
-    write_voice_dsp(0, VoiceDspAddr.VOL_R, y);
+    currentChannelIndex = a = 0;
+    currentChannelBit   = a = 1 << 0;
 
     while true {
-        let NOTE_1_PITCH = 0x1000;
-        write_voice_dsp(0, VoiceDspAddr.PITCH_L, <:NOTE_1_PITCH);
-        write_voice_dsp(0, VoiceDspAddr.PITCH_H, >:NOTE_1_PITCH);
+        a = 0;
+        do {
+            __instrumentCounter = a;
+            set_instrument(currentChannelIndex, a);
 
-        write_dsp(GlobalDspAddr.KON, 1 << 0);
+            a = 4 * 12;
+            do {
+                __noteCounter = a;
 
-        delay();
+                play_note(currentChannelIndex, a);
 
-        let NOTE_2_PITCH = 0x1000 * 10594631 / 10000000;
-        write_voice_dsp(0, VoiceDspAddr.PITCH_L, <:NOTE_2_PITCH);
-        write_voice_dsp(0, VoiceDspAddr.PITCH_H, >:NOTE_2_PITCH);
+                delay();
 
-        write_dsp(GlobalDspAddr.KON, 1 << 0);
+                // Required to prevent popping
+                key_off(currentChannelIndex);
 
-        delay();
+                a = __noteCounter;
+                a++;
+            } while a < 5 * 12;
+
+            delay();
+            delay();
+
+            a = __instrumentCounter;
+            a++;
+        } while a < 4;
     }
 }
 
 
 func delay() {
-    a = 3;
+    x = 0x80;
     do {
-        x = 0;
+        y = 0;
         do {
-            y = 0;
-            do {
-                y--;
-            } while !zero;
-
-            x--;
+            y--;
         } while !zero;
 
-        a--;
+        x--;
     } while !zero;
 }
 
+
+// KEEP: Y
+func set_instrument(channelIndex : u8 in y, instrumentId : u8 in a) {
+    // Using addr,y addressing mode for `channels`, 1 cycle faster then transferring y to x.
+
+    x = a = a & INSTRUMENT_MASK;
+
+    (&channels[0].pitchOffset)[unaligned y] = a = external_data.instruments.pitchOffset[x];
+
+    smp.dsp_addr = a = y + VoiceDspAddr.SCRN as u8;
+    smp.dsp_data = a = external_data.instruments.scrn[x];
+
+    smp.dsp_addr++;
+    smp.dsp_data = a = external_data.instruments.adsr1[x];
+
+    smp.dsp_addr++;
+    smp.dsp_data = a = external_data.instruments.adsr2[x];
+
+    smp.dsp_addr++;
+    smp.dsp_data = a = external_data.instruments.gain[x];
 }
 
 
-in prg {
+// KEEP: Y
+func set_channel_volume(channelIndex : u8 in y, volume : u8 in a) {
+    smp.dsp_addr = y + VoiceDspAddr.VOL_L as u8;
+    smp.dsp_data = a;
 
-namespace samples {
-    const Sine220 = embed "../gen/sine-220.brr";
+    smp.dsp_addr++;
+    smp.dsp_data = a;
+}
 
-    struct DirItem {
-        start : *const u8,
-        loop  : *const u8
-    };
 
-    #[align(256)]
-    const SampleDirectory = [
-        DirItem{ start = &Sine220[0],      loop = &Sine220[0] },
-    ];
+func key_off(channelIndex : u8 in y) {
+    write_dsp(GlobalDspAddr.KOFF, currentChannelBit);
+
+    // This delay is required to prevent popping
+    a = 0;
+    do {
+        nop();
+        nop();
+        nop();
+        nop();
+        a--;
+    } while !zero;
+
+    // Must clear the KOFF register or else the notes will not play
+    write_dsp(GlobalDspAddr.KOFF, 0);
+}
+
+
+// ASSUMES: y == currentChannelIndex
+func play_note(channelIndex : u8 in y, note : u8 in a) {
+    x = currentChannelIndex;
+    x = a = a + (&channels[0].pitchOffset)[unaligned x];
+
+    smp.dsp_addr = a = currentChannelIndex + VoiceDspAddr.PITCH_L as u8;
+    smp.dsp_data = a = external_data.pitchTable_l[x];
+
+    smp.dsp_addr++;
+    smp.dsp_data = a = external_data.pitchTable_h[x];
+
+    write_dsp(GlobalDspAddr.KON, currentChannelBit);
 }
 
 }
-
 

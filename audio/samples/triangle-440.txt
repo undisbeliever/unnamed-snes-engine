@@ -1,0 +1,7 @@
+Generated with Audacity.
+
+Waveform:           Triangle
+Frequency (Hz):     440
+Amplitude (0-1):    0.8
+Duration:           256 samples
+

@@ -1,0 +1,44 @@
+{
+  "instruments": [
+    {
+      "name": "sine_220",
+      "source": "sine-220.wav",
+      "freq": 220,
+      "looping": true,
+      "first_octave": 1,
+      "last_octave": 4,
+      "adsr": "E 12 1 1 16",
+      "gain": 0
+    },
+    {
+      "name": "square_500",
+      "source": "square-500.wav",
+      "freq": 500,
+      "looping": true,
+      "first_octave": 2,
+      "last_octave": 5,
+      "adsr": "E 12 1 1 16",
+      "gain": 0
+    },
+    {
+      "name": "sawtooth_333",
+      "source": "sawtooth-333.wav",
+      "freq": 333.33333333333,
+      "looping": true,
+      "first_octave": 2,
+      "last_octave": 5,
+      "adsr": "E 12 1 1 16",
+      "gain": 0
+    },
+    {
+      "name": "triangle_440",
+      "source": "triangle-440.wav",
+      "freq": 440,
+      "looping": true,
+      "first_octave": 2,
+      "last_octave": 5,
+      "adsr": "E 12 1 1 16",
+      "gain": 0
+    }
+  ]
+}

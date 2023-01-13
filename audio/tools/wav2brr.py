@@ -13,6 +13,8 @@ from typing import Callable, Final, NamedTuple, Sequence, TypeAlias
 
 
 SAMPLES_PER_BLOCK: Final = 16
+BYTES_PER_BRR_BLOCK: Final = 9
+
 MAX_SHIFT: Final = 12
 
 
