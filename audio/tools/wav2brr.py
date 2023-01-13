@@ -146,7 +146,7 @@ def encode_brr(wave_file: WaveFile, loop_flag: bool) -> bytes:
 
         out.append(header)
         for i in range(0, SAMPLES_PER_BLOCK, 2):
-            out.append((best.nibbles[i] & 0xf) | ((best.nibbles[i+1] & 0xf) << 4))
+            out.append(((best.nibbles[i] & 0xf) << 4) | (best.nibbles[i+1] & 0xf))
 
         prev_sample_1: int = best.decoded_samples[-1]
         prev_sample_2: int = best.decoded_samples[-2]
