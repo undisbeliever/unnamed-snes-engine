@@ -72,26 +72,17 @@ in data {
 
 let N_CHANNELS = 8;
 
-let CHANNEL_INDEX_INCREMENT = 16;
-let MAX_CHANNEL_INDEX = (N_CHANNELS - 1) * CHANNEL_INDEX_INCREMENT;
-
-
 in zeropage {
-    // MUST be 16 bytes in size
-    struct ChannelState {
-        pitchOffset : u8,
+    namespace channelSoA {
+        var pitchOffset : [u8 ; N_CHANNELS];
 
-        padding : [u8 ; 15],
-    };
+    }
 
-    var channels : [ChannelState ; N_CHANNELS];
-
-
-    // Also doubles as an offset into VoiceDspAddr
+    // Index into channelSoA
+    // Index into ChannelVoiceOffset
+    // Index into ChannelVoiceBit
+    // (byte index < N_CHANNELS)
     var currentChannelIndex : u8;
-
-    // Used for the DSP enable-flags
-    var currentChannelBit : u8;
 
 
     // Used by the octave playing loop.
@@ -153,18 +144,17 @@ func main() {
     write_dsp(GlobalDspAddr.KOFF,   0);
 
 
-    // Reset volume of all channels
-    y = 0;
+    // Reset all channels
+    x = N_CHANNELS - 1;
     do {
-        set_channel_volume(y, 96);
-        set_instrument(y, 0);
+        set_channel_volume(x, 96);
+        set_instrument(x, 0);
 
-        y = a = y + CHANNEL_INDEX_INCREMENT;
-    } while y < MAX_CHANNEL_INDEX + 1;
+        x--;
+    } while !negative;
 
 
     currentChannelIndex = a = 0;
-    currentChannelBit   = a = 1 << 0;
 
     while true {
         a = 0;
@@ -210,40 +200,45 @@ func delay() {
 }
 
 
-// KEEP: Y
-func set_instrument(channelIndex : u8 in y, instrumentId : u8 in a) {
+// KEEP: X
+func set_instrument(channelIndex : u8 in x, instrumentId : u8 in a) {
     // Using addr,y addressing mode for `channels`, 1 cycle faster then transferring y to x.
 
-    x = a = a & INSTRUMENT_MASK;
+    y = a = a & INSTRUMENT_MASK;
 
-    (&channels[0].pitchOffset)[unaligned y] = a = external_data.instruments.pitchOffset[x];
+    channelSoA.pitchOffset[x] = a = external_data.instruments.pitchOffset[y];
 
-    smp.dsp_addr = a = y + VoiceDspAddr.SCRN as u8;
-    smp.dsp_data = a = external_data.instruments.scrn[x];
-
-    smp.dsp_addr++;
-    smp.dsp_data = a = external_data.instruments.adsr1[x];
+    smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.SCRN as u8;
+    smp.dsp_data = a = external_data.instruments.scrn[y];
 
     smp.dsp_addr++;
-    smp.dsp_data = a = external_data.instruments.adsr2[x];
+    smp.dsp_data = a = external_data.instruments.adsr1[y];
 
     smp.dsp_addr++;
-    smp.dsp_data = a = external_data.instruments.gain[x];
+    smp.dsp_data = a = external_data.instruments.adsr2[y];
+
+    smp.dsp_addr++;
+    smp.dsp_data = a = external_data.instruments.gain[y];
 }
 
 
-// KEEP: Y
-func set_channel_volume(channelIndex : u8 in y, volume : u8 in a) {
-    smp.dsp_addr = y + VoiceDspAddr.VOL_L as u8;
-    smp.dsp_data = a;
+// KEEP: X
+func set_channel_volume(channelIndex : u8 in x, volume : u8 in a) {
+    y = a;
+
+    // ASSUMES VoiceDspAddr.VOL_L == 0
+    smp.dsp_addr = a = ChannelVoiceOffset[x];
+    smp.dsp_data = y;
 
     smp.dsp_addr++;
-    smp.dsp_data = a;
+    smp.dsp_data = y;
 }
 
 
-func key_off(channelIndex : u8 in y) {
-    write_dsp(GlobalDspAddr.KOFF, currentChannelBit);
+// KEEP: X
+func key_off(channelIndex : u8 in x) {
+    smp.dsp_addr = a = GlobalDspAddr.KOFF as u8;
+    smp.dsp_data = a = ChannelVoiceBit[x];
 
     // This delay is required to prevent popping
     a = 0;
@@ -254,25 +249,41 @@ func key_off(channelIndex : u8 in y) {
         nop();
         a--;
     } while !zero;
-
-    // Must clear the KOFF register or else the notes will not play
-    write_dsp(GlobalDspAddr.KOFF, 0);
 }
 
 
-// ASSUMES: y == currentChannelIndex
-func play_note(channelIndex : u8 in y, note : u8 in a) {
-    x = currentChannelIndex;
-    x = a = a + (&channels[0].pitchOffset)[unaligned x];
+// KEEP: x
+func play_note(channelIndex : u8 in x, note : u8 in a) {
 
-    smp.dsp_addr = a = currentChannelIndex + VoiceDspAddr.PITCH_L as u8;
-    smp.dsp_data = a = external_data.pitchTable_l[x];
+    y = a = a + channelSoA.pitchOffset[x];
+
+    smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.PITCH_L as u8;
+    smp.dsp_data = a = external_data.pitchTable_l[y];
 
     smp.dsp_addr++;
-    smp.dsp_data = a = external_data.pitchTable_h[x];
+    smp.dsp_data = a = external_data.pitchTable_h[y];
 
-    write_dsp(GlobalDspAddr.KON, currentChannelBit);
+    // Must clear the KOFF register or else the notes will not play
+    smp.dsp_addr = a = GlobalDspAddr.KOFF as u8;
+    smp.dsp_data = a = 0;
+
+    // Send KON command
+    smp.dsp_addr = a = GlobalDspAddr.KON as u8;
+    smp.dsp_data = a = ChannelVoiceBit[x];
 }
 
+}
+
+
+// Data Tables
+// ===========
+
+// Using the `code` bank so the data is included in `audio-driver.bin`
+in code {
+    // The bit used for global DSP registers (KON, KOFF, NON, EON, etc)
+    const ChannelVoiceBit : [u8; 8] = [1 << i for let i in 0..7];
+
+    // The offset into the Voice DSP registers
+    const ChannelVoiceOffset : [u8; 8] = [i * 0x10 for let i in 0..7];
 }
 
