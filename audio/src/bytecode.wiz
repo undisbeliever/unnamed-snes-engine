@@ -21,6 +21,8 @@ let SINGLE_ARGUMENT_INSTRUCTIONS = [
 
     set_channel_volume,
 
+    // parameter = number of 1/64 beats to pause
+    // NOTE: Does not send a keyoff event after.
     rest,
 ];
 
@@ -70,8 +72,16 @@ let INLINE_ARGUMENT_INSTRUCTIONS = [
     //      nnnn = note to play
     play_note,
 
+    // Does not send a KOFF after the note ends.
+    //
+    // The next `play_note*` command will not send a KON event.
+    //
+    // parameter: lnnnn
+    //      l    = next byte contains length of the note
+    //      nnnn = note to play
+    play_note_slur_next,
+
     // padding
-    null_instruction,
     null_instruction,
     null_instruction,
     null_instruction,

@@ -127,6 +127,10 @@ in zeropage {
         // Default note length (in 64ths)
         var defaultNoteLength : [u8 ; N_CHANNELS];
 
+        // if non-zero: The next play_note is a slur
+        // ::BUGFIX have to use a byte-flag for each channel as `test_and_set()` and `test_and_clear()` cause a segmentation fault in wiz::
+        var slurNextNote : [u8 ; N_CHANNELS];
+
         // If non-zero, the next event is a key-off event
         // If zero, the next event will process bytecode
         var nextEventIsKeyOff : [u8 ; N_CHANNELS];
@@ -522,6 +526,7 @@ func set_channel_volume(channelIndex : u8 in x, volume : u8 in a) : bool in carr
 func play_note(channelIndex : u8 in x, note : u8 in a) : bool in carry {
     zpTmp = a;
 
+    // Set note pitch
     a &= 0xf;
     y = a = a + channelSoA.noteOffset[x] + channelSoA.pitchTableOffset[x];
 
@@ -531,9 +536,63 @@ func play_note(channelIndex : u8 in x, note : u8 in a) : bool in carry {
     smp.dsp_addr++;
     smp.dsp_data = a = external_data.pitchTable_h[y];
 
-    // queue KON
-    // ::BUGFIX `test_and_set(a, keyOnShadow);` causes a wiz Segmentation fault::
-    keyOnShadow = a = keyOnShadow | ChannelVoiceBit[x];
+
+    // Only set `KON` if `slurNextNote` is false.
+    y = channelSoA.slurNextNote[x];
+    if zero {
+        // queue KON
+        // ::BUGFIX `test_and_set(a, keyOnShadow);` causes a wiz Segmentation fault::
+        keyOnShadow = a = keyOnShadow | ChannelVoiceBit[x];
+    }
+    else {
+        // No not slur the next note
+        channelSoA.slurNextNote[x] = a = 0;
+    }
+
+
+    carry = zpTmp $ 4;
+    if !carry {
+        a = channelSoA.defaultNoteLength[x];
+    }
+    else {
+        // Get note length from the next byte in the instructionPtr
+        y = 0;
+        a = instructionPtr[y];
+        instructionPtr++;
+    }
+
+    return _rest_with_keyoff__inline(x, a);
+}
+
+
+
+// KEEP: x
+func play_note_slur_next(channelIndex : u8 in x, note : u8 in a) : bool in carry {
+    zpTmp = a;
+
+    // Set note pitch
+    a &= 0xf;
+    y = a = a + channelSoA.noteOffset[x] + channelSoA.pitchTableOffset[x];
+
+    smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.PITCH_L as u8;
+    smp.dsp_data = a = external_data.pitchTable_l[y];
+
+    smp.dsp_addr++;
+    smp.dsp_data = a = external_data.pitchTable_h[y];
+
+
+    // Only set `KON` if `slurNextNote` is false.
+    y = channelSoA.slurNextNote[x];
+    if zero {
+        // queue KON
+        // ::BUGFIX `test_and_set(a, keyOnShadow);` causes a wiz Segmentation fault::
+        keyOnShadow = a = keyOnShadow | ChannelVoiceBit[x];
+
+        // Slur the next note
+        // A is non-zero
+        channelSoA.slurNextNote[x] = a;
+    }
+
 
     carry = zpTmp $ 4;
     if !carry {
@@ -556,6 +615,40 @@ func play_note(channelIndex : u8 in x, note : u8 in a) : bool in carry {
 // NOTE: Always returns true
 // KEEP: x
 func rest(channelIndex : u8 in x, length: u8 in a) : bool in carry {
+var _tmp : u8 in zpTmp;
+
+    // No need to zero `nextEventIsKeyOff` it is cleared by `process_bytecode__inline()`.
+
+    // Calculate number of ticks to sleep
+    // (Q16.8)nextEvent += (Q8.8)tempo * (Q8.0)note
+
+    _tmp = a;
+
+    y = channelSoA.tempo_f[x];
+    ya = __multiply(y, a);
+
+    channelSoA.nextEvent_f[x] = a = a + channelSoA.nextEvent_f[x];
+    channelSoA.nextEvent_l[x] = a = y +# channelSoA.nextEvent_l[x];
+    if carry {
+        channelSoA.nextEvent_h[x]++;
+    }
+
+    a = _tmp;
+    y = channelSoA.tempo_l[x];
+    ya = __multiply(y, a);
+
+    channelSoA.nextEvent_l[x] = a = a + channelSoA.nextEvent_l[x];
+    channelSoA.nextEvent_h[x] = a = y +# channelSoA.nextEvent_h[x];
+
+    // return true (do not execute the next bytecode and sleep)
+    return true;
+}
+
+
+
+// NOTE: Always returns true
+// KEEP: x
+inline func _rest_with_keyoff__inline(channelIndex : u8 in x, length: u8 in a) : bool in carry {
 var _tmp : u8 in zpTmp;
 
     _tmp = a;
@@ -640,12 +733,26 @@ in data {
     let _PLAY_NOTE = 1 << 5;
     let _PLAY_NOTE_LENGTH = _PLAY_NOTE | (0x10);
 
+    let _PLAY_NOTE_SLUR_NEXT = 2 << 5;
+    let _PLAY_NOTE_SLUR_NEXT_LENGTH = _PLAY_NOTE_SLUR_NEXT | (0x10);
+
     let __L2 = 64 / 2;
 
     const ExampleSongChannel : [u8] = [
         _REST, 192,
 
         _SET_INSTRUMENT, 2,
+
+        _PLAY_NOTE_SLUR_NEXT_LENGTH | 0, __L2,
+        _PLAY_NOTE_SLUR_NEXT        | 5,
+        _PLAY_NOTE_SLUR_NEXT        | 10,
+        _PLAY_NOTE_SLUR_NEXT_LENGTH | 5,  __L2,
+        _PLAY_NOTE_SLUR_NEXT        | 4,
+        _PLAY_NOTE_SLUR_NEXT_LENGTH | 9,
+        _PLAY_NOTE                  | 12,
+
+        _REST, 64,
+        _SET_INSTRUMENT, 0,
 
         _PLAY_NOTE | 0,
         _PLAY_NOTE_LENGTH | 8, __L2,
