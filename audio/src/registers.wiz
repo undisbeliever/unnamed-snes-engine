@@ -91,8 +91,8 @@ namespace smp {
 
 
     let CONTROL__ENABLE_TIMER_0 = 1 << 0;
-    let CONTROL__ENABLE_TIMER_2 = 1 << 1;
-    let CONTROL__ENABLE_TIMER_3 = 1 << 2;
+    let CONTROL__ENABLE_TIMER_1 = 1 << 1;
+    let CONTROL__ENABLE_TIMER_2 = 1 << 2;
     let CONTROL__RESET_PORTS_01 = 1 << 4;
     let CONTROL__RESET_PORTS_23 = 1 << 5;
     let CONTROL__ENABLE_IPL     = 1 << 7;

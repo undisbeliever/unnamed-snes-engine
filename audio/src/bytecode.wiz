@@ -1,0 +1,84 @@
+// Copyright (c) 2023, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+
+import "audio-driver";
+
+
+namespace bytecode {
+
+let DISABLE_CHANNEL_BYTECODE = N_SINGLE_ARGUMENT_INSTRUCTIONS;
+
+let INLINE_ARGUMENT_MASK = 0x1f;
+
+let N_SINGLE_ARGUMENT_INSTRUCTIONS = 3;
+let N_NO_PARAMETER_INSTRUCTIONS = 0;
+
+
+// These bytecodes do have parameters
+let SINGLE_ARGUMENT_INSTRUCTIONS = [
+    set_instrument,
+
+    set_channel_volume,
+
+    rest,
+];
+
+// These bytecodes do not have parameters
+let NO_PARAMETER_INSTRUCTIONS = [
+    disable_channel,
+
+    // padding
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+];
+
+
+// These bytecode combine instruction and parameter in a single byte
+// byte value = `bbbppppp`
+let INLINE_ARGUMENT_INSTRUCTIONS = [
+    null_instruction,
+
+    // parameter: lnnnn
+    //      l    = next byte contains length of the note
+    //      nnnn = note to play
+    play_note,
+
+    // padding
+    null_instruction,
+    null_instruction,
+    null_instruction,
+    null_instruction,
+    null_instruction,
+    null_instruction,
+];
+
+}
+
+

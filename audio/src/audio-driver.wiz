@@ -15,13 +15,17 @@ config {
 bank zeropage       @ 0x0000 : [vardata;     0x00f0];
 // addresses 0x00f0 - 0x00ff contain registers
 bank stack          @ 0x0100 : [vardata;     0x0100];
-bank code           @ 0x0200 : [varinitdata; 0x0200];
+bank code           @ 0x0200 : [constdata;   0x0300];
 
-let EXTERNAL_DATA_ADDR = 0x400;
+let EXTERNAL_DATA_ADDR = 0x500;
 
 
 // Data Structures
 // ===============
+
+let N_CHANNELS = 8;
+let N_MUSIC_CHANNELS = 6;
+let N_SFX_CHANNELS = N_CHANNELS = N_MUSIC_CHANNELS;
 
 let N_BRR_SAMPLES   = 64;
 let N_INSTRUMENTS   = 64;
@@ -29,6 +33,16 @@ let N_SOUND_EFFECTS = 128;
 
 
 let INSTRUMENT_MASK = N_INSTRUMENTS - 1;
+
+
+// Number of clock ticks after a KOFF event before the bytecode is processed.
+//
+// This delay MUST be > 64 8Khz timer ticks to ensure the Key-Off event complexly silences the audio.
+let KEY_OFF_DELAY = 72;
+
+
+let STARTING_OCTAVE = 3;
+let STARTING_DEFAULT_NOTE_LENGTH = 64 / 4;
 
 
 struct DirItem {
@@ -56,6 +70,16 @@ struct ExternalData {
     instruments    : InstrumentsSoA,
 };
 
+struct SongHeader {
+    // Instruction pointers for each channel
+    // If address is < 0x100 then the channel is disabled.
+    instPtrs : [*const u8 ; N_MUSIC_CHANNELS],
+
+    // Starting tempo.
+    // (Q8.8)
+    tempo   : u16,
+};
+
 extern const external_data @ EXTERNAL_DATA_ADDR : ExternalData;
 
 
@@ -70,24 +94,56 @@ in data {
 // Variables
 // =========
 
-let N_CHANNELS = 8;
 
 in zeropage {
+    // Temporary variables
+    var zpTmp : u8;
+    var zpTmpPtr : *u8;
+
+
+    // Incremented once every tick (1/8000 seconds)
+    var tickClock : u16;
+
+    // Shadow variables for KON and KOFF DSP registers
+    var keyOffShadow : u8;
+    var keyOnShadow : u8;
+
+
+    var instructionPtr : *const u8;
+
+
     namespace channelSoA {
-        var pitchOffset : [u8 ; N_CHANNELS];
+        // The time of the next event
+        // (Q16.8 fixed point)
+        var nextEvent_f : [u8 ; N_CHANNELS];
+        var nextEvent_l : [u8 ; N_CHANNELS];
+        var nextEvent_h : [u8 ; N_CHANNELS];
 
+        // Number of ticks (1/8000 seconds) per 1/64 beat.
+        // (Q8.8 fixed point)
+        var tempo_f : [u8 ; N_CHANNELS];
+        var tempo_l : [u8 ; N_CHANNELS];
+
+        // Default note length (in 64ths)
+        var defaultNoteLength : [u8 ; N_CHANNELS];
+
+        // If non-zero, the next event is a key-off event
+        // If zero, the next event will process bytecode
+        var nextEventIsKeyOff : [u8 ; N_CHANNELS];
+
+        // The address of the bytecode
+        var instructionPtr_l : [u8 ; N_CHANNELS];
+        var instructionPtr_h : [u8 ; N_CHANNELS];
+
+        // Offset between notes 0-16 and the notes to play
+        // Incremented by 12 when increasing octave
+        // Decremented by 12 when decreasing octave
+        var noteOffset : [u8 ; N_CHANNELS];
+
+        // Offset between the instrument's note and the pitch table.
+        // (NOTE: Adding `pitchTableOffset` to note to play is allowed to an can overflow)
+        var pitchTableOffset : [u8 ; N_CHANNELS];
     }
-
-    // Index into channelSoA
-    // Index into ChannelVoiceOffset
-    // Index into ChannelVoiceBit
-    // (byte index < N_CHANNELS)
-    var currentChannelIndex : u8;
-
-
-    // Used by the octave playing loop.
-    var __instrumentCounter : u8;
-    var __noteCounter : u8;
 }
 
 
@@ -108,8 +164,9 @@ inline func write_dsp(addr : GlobalDspAddr in a, data : u8 in y) {
 in code {
 
 // MUST be the first thing in the `code` bank (so the starting address is consistent across builds).
-#[fallthrough]
 func main() {
+var _ptr : *const u8 in zpTmpPtr;
+
     sp = x = 0xff;
 
     // Reset the DSP
@@ -141,72 +198,292 @@ func main() {
 
     // Unmute the audio (keep echo disabled)
     write_dsp(GlobalDspAddr.FLG,    dsp.FLG__ECHO_DISABLE);
-    write_dsp(GlobalDspAddr.KOFF,   0);
 
 
-    // Reset all channels
-    x = N_CHANNELS - 1;
+    // Clear zero-page variables
+    a = 0;
+    x = 0xf0;
     do {
-        set_channel_volume(x, 96);
-        set_instrument(x, 0);
+        x--;
+        (0 as *u8)[x] = a;
+    } while !zero;
+
+
+    // Disable SFX channels
+    a = <:&ChannelDisabledBytecode;
+    y = >:&ChannelDisabledBytecode;
+    inline for let i in N_MUSIC_CHANNELS..7 {
+        channelSoA.instructionPtr_l[i] = a;
+        channelSoA.instructionPtr_h[i] = y;
+    }
+
+
+    // Reset all music channels
+    a = <:&SongData;
+    y = >:&SongData;
+    _ptr = ya as *u8;
+
+    x = N_MUSIC_CHANNELS - 1;
+    do {
+        bytecode.set_channel_volume(x, 96);
+        bytecode.set_instrument(x, 0);
+
+        channelSoA.defaultNoteLength[x] = a = STARTING_DEFAULT_NOTE_LENGTH;
+        channelSoA.noteOffset[x] = a = STARTING_OCTAVE * 12;
+
+        y = offsetof(SongHeader, tempo);
+        channelSoA.tempo_f[x] = a = _ptr[y];
+        y++;
+        channelSoA.tempo_l[x] = a = _ptr[y];
+
+
+        // Load instructionPtr for each channel
+        // ASSUMES offsetof(SongHeader, instPtrs) == 0
+
+        // read high byte of `SongHeader.instPtrs[x]`
+        y = a = x << 1;
+        y++;
+        a = _ptr[y];
+        if zero {
+            // If the high byte of `instPtrs` is 0, the song is disabled.
+            // Set instructionPtr to `ChannelDisabledBytecode`.
+            channelSoA.instructionPtr_h[x] = a = >:&ChannelDisabledBytecode;
+            a = <:&ChannelDisabledBytecode;
+        }
+        else {
+            channelSoA.instructionPtr_h[x] = a;
+            y--;
+            a = _ptr[y];
+        }
+        channelSoA.instructionPtr_l[x] = a;
+
+        // Set nextEvent to 0x8080 to test `__rewind_tick_clock()`
+        a = 0x80;
+        channelSoA.nextEvent_l[x] = a;
+        channelSoA.nextEvent_h[x] = a;
 
         x--;
     } while !negative;
 
 
-    currentChannelIndex = a = 0;
+    // Set nextEvent to 0x8080 to test `__rewind_tick_clock()`
+    a = 0x80;
+    <:tickClock = a;
+    >:tickClock = a;
 
-    while true {
+
+    // Setup and enable the timer
+    smp.timer_0 = a = 1;
+    smp.control = a = smp.CONTROL__ENABLE_TIMER_0;
+    a = smp.counter_0;
+
+    return process_event_loop();
+}
+
+
+#[fallthrough]
+func process_event_loop() {
+    ^while true {
+        write_dsp(GlobalDspAddr.KOFF,   keyOffShadow);
+        write_dsp(GlobalDspAddr.KON,    keyOnShadow);
+
         a = 0;
+        keyOffShadow = a;
+        keyOnShadow = a;
+
+
+        x = N_CHANNELS - 1;
         do {
-            __instrumentCounter = a;
-            set_instrument(currentChannelIndex, a);
+            process_channel__inline(x);
 
-            a = 4 * 12;
-            do {
-                __noteCounter = a;
+            x--;
+        } while !negative;
 
-                play_note(currentChannelIndex, a);
 
-                delay();
+        // Wait until the timer counter has incremented
+        // ::TODO confirm `counter_0` with never overflow
+        do {
+            a = smp.counter_0;
+        } while zero;
 
-                // Required to prevent popping
-                key_off(currentChannelIndex);
-
-                a = __noteCounter;
-                a++;
-            } while a < 5 * 12;
-
-            delay();
-            delay();
-
-            a = __instrumentCounter;
-            a++;
-        } while a < 4;
+        <:tickClock = a = a + <:tickClock;
+        if carry {
+            (>:tickClock)++;
+            goto __rewind_tick_clock if negative;
+        }
     }
 }
 
 
-func delay() {
-    x = 0x80;
-    do {
-        y = 0;
-        do {
-            y--;
-        } while !zero;
 
+// To prevent the tick clock from overflowing it needs to be rewound regularly.
+//
+// This function will rewind the clock and all events by 0x7f00 ticks.
+//
+// MUST be called when `tickClock >= 0x8000`
+#[fallthrough]
+func __rewind_tick_clock() {
+    >:tickClock = a = >:tickClock - 0x7f;
+    x = N_CHANNELS - 1;
+    do {
+        channelSoA.nextEvent_h[x] = a = channelSoA.nextEvent_h[x] - 0x7f;
         x--;
+    } while !negative;
+
+    ^goto process_event_loop;
+}
+
+
+func delay() {
+    y = 0;
+    do {
+        y--;
     } while !zero;
 }
 
 
 // KEEP: X
-func set_instrument(channelIndex : u8 in x, instrumentId : u8 in a) {
+inline func process_channel__inline(channelIndex : u8 in x) {
+    a = channelSoA.nextEvent_l[x];
+    y = channelSoA.nextEvent_h[x];
+
+    if ya < tickClock {
+        // Check if a KEY_OFF is required
+        a = channelSoA.nextEventIsKeyOff[x];
+        if !zero {
+            // ::BUGFIX `test_and_set(a, keyOffShadow);` causes a wiz Segmentation fault::
+            keyOffShadow = a = keyOffShadow | ChannelVoiceBit[x];
+
+            // schedule a bytecode event
+            channelSoA.nextEventIsKeyOff[x] = a = 0;
+            increment_next_event__fixed_u8__inline(x, KEY_OFF_DELAY);
+        }
+        else {
+            process_bytecode__inline(x);
+        }
+    }
+}
+
+
+in zeropage {
+    // MUST ONLY be used by `process_bytecode__inline()`.
+    var __currentChannelIndex : u8;
+}
+
+// KEEP: X
+inline func process_bytecode__inline(channelIndex : u8 in x) {
+
+    __currentChannelIndex = x;
+
+    a = channelSoA.instructionPtr_l[x];
+    y = channelSoA.instructionPtr_h[x];
+    instructionPtr = ya as *const u8;
+
+    do {
+        y = 0;
+        a = instructionPtr[y];
+        instructionPtr++;
+
+        if a < sizeof(typeof(bytecode.ByteInstructions_l)) {
+            y = a;
+            // Set address of the instruction using self-modifying code
+            // (If I used the `JMP [!abs+X]` it would have clobbered `X` and cost be ~80 bytes to do a `x = _currentChannelIndex` on every instruction).
+            (&CallInstruction as *u8)[1] = a = bytecode.ByteInstructions_l[y];
+            (&CallInstruction as *u8)[2] = a = bytecode.ByteInstructions_h[y];
+
+            if y < bytecode.N_SINGLE_ARGUMENT_INSTRUCTIONS {
+                // Instruction has a parameter
+                y = 0;
+                a = instructionPtr[y];
+                instructionPtr++;
+            }
+        }
+        else {
+            x = a;
+
+            a &= 0b11100000;
+            swap_digits(a);
+            y = a;
+
+            // Y = instruction_index * 2
+
+            // Set address of the instruction using self-modifying code
+            (&CallInstruction as *u8)[1] = a = (&<:bytecode.InlineArgumentInstructions[0] as *const u8)[unaligned y];
+            (&CallInstruction as *u8)[2] = a = (&>:bytecode.InlineArgumentInstructions[0] as *const u8)[unaligned y];
+
+            a = x & bytecode.INLINE_ARGUMENT_MASK;
+            x = __currentChannelIndex;
+        }
+
+    CallInstruction:
+        carry = bytecode.null_instruction(x, a);
+        // carry set if there are more instructions to process
+    } while !carry;
+
+    x = __currentChannelIndex;
+
+    ya = instructionPtr as u16;
+    channelSoA.instructionPtr_l[x] = a;
+    channelSoA.instructionPtr_h[x] = y;
+}
+
+
+
+// KEEP: X
+inline func increment_next_event__fixed_u8__inline(channelIndex : u8 in x, let TICKS : u8) {
+    // Do not update fractional bits
+
+    channelSoA.nextEvent_l[x] = a = channelSoA.nextEvent_l[x] + TICKS;
+    if carry {
+        channelSoA.nextEvent_h[x]++;
+    }
+}
+
+
+
+// NOTE: BYTECODE INSTRUCTIONS MUST KEEP X
+namespace bytecode {
+
+const ByteInstructions_l : [ u8 ; 1 << 5 ] = [ <:&f for let f in SINGLE_ARGUMENT_INSTRUCTIONS ]
+                                           ~ [ <:&f for let f in NO_PARAMETER_INSTRUCTIONS ];
+
+const ByteInstructions_h : [ u8 ; 1 << 5 ] = [ >:&f for let f in SINGLE_ARGUMENT_INSTRUCTIONS ]
+                                           ~ [ >:&f for let f in NO_PARAMETER_INSTRUCTIONS ];
+
+const InlineArgumentInstructions : [ func(u8 in x, u8 in y) : bool in carry ; 1 << 3 ] = INLINE_ARGUMENT_INSTRUCTIONS;
+
+
+
+func null_instruction(channelIndex : u8 in x, note : u8 in a) : bool in carry {
+    return disable_channel(x);
+}
+
+
+
+// KEEP: X
+func disable_channel(channelIndex : u8 in x) : bool in carry {
+    // Set the nextEvent clock to the highest it can go
+    a = 0xff;
+    channelSoA.nextEvent_l[x] = a;
+    channelSoA.nextEvent_h[x] = a;
+
+    a = <:&ChannelDisabledBytecode;
+    y = >:&ChannelDisabledBytecode;
+    instructionPtr = ya as *const u8;
+
+    // return true (do not execute the next bytecode and sleep)
+    return true;
+}
+
+
+
+// KEEP: X
+func set_instrument(channelIndex : u8 in x, instrumentId : u8 in a) : bool in carry {
     // Using addr,y addressing mode for `channels`, 1 cycle faster then transferring y to x.
 
     y = a = a & INSTRUMENT_MASK;
 
-    channelSoA.pitchOffset[x] = a = external_data.instruments.pitchOffset[y];
+    channelSoA.pitchTableOffset[x] = a = external_data.instruments.pitchOffset[y];
 
     smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.SCRN as u8;
     smp.dsp_data = a = external_data.instruments.scrn[y];
@@ -219,11 +496,14 @@ func set_instrument(channelIndex : u8 in x, instrumentId : u8 in a) {
 
     smp.dsp_addr++;
     smp.dsp_data = a = external_data.instruments.gain[y];
+
+    return false;
 }
 
 
+
 // KEEP: X
-func set_channel_volume(channelIndex : u8 in x, volume : u8 in a) {
+func set_channel_volume(channelIndex : u8 in x, volume : u8 in a) : bool in carry {
     y = a;
 
     // ASSUMES VoiceDspAddr.VOL_L == 0
@@ -232,30 +512,18 @@ func set_channel_volume(channelIndex : u8 in x, volume : u8 in a) {
 
     smp.dsp_addr++;
     smp.dsp_data = y;
+
+    return false;
 }
 
-
-// KEEP: X
-func key_off(channelIndex : u8 in x) {
-    smp.dsp_addr = a = GlobalDspAddr.KOFF as u8;
-    smp.dsp_data = a = ChannelVoiceBit[x];
-
-    // This delay is required to prevent popping
-    a = 0;
-    do {
-        nop();
-        nop();
-        nop();
-        nop();
-        a--;
-    } while !zero;
-}
 
 
 // KEEP: x
-func play_note(channelIndex : u8 in x, note : u8 in a) {
+func play_note(channelIndex : u8 in x, note : u8 in a) : bool in carry {
+    zpTmp = a;
 
-    y = a = a + channelSoA.pitchOffset[x];
+    a &= 0xf;
+    y = a = a + channelSoA.noteOffset[x] + channelSoA.pitchTableOffset[x];
 
     smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.PITCH_L as u8;
     smp.dsp_data = a = external_data.pitchTable_l[y];
@@ -263,16 +531,80 @@ func play_note(channelIndex : u8 in x, note : u8 in a) {
     smp.dsp_addr++;
     smp.dsp_data = a = external_data.pitchTable_h[y];
 
-    // Must clear the KOFF register or else the notes will not play
-    smp.dsp_addr = a = GlobalDspAddr.KOFF as u8;
-    smp.dsp_data = a = 0;
+    // queue KON
+    // ::BUGFIX `test_and_set(a, keyOnShadow);` causes a wiz Segmentation fault::
+    keyOnShadow = a = keyOnShadow | ChannelVoiceBit[x];
 
-    // Send KON command
-    smp.dsp_addr = a = GlobalDspAddr.KON as u8;
-    smp.dsp_data = a = ChannelVoiceBit[x];
+    carry = zpTmp $ 4;
+    if !carry {
+        a = channelSoA.defaultNoteLength[x];
+
+        return rest(x, a);
+    }
+    else {
+        // Get note length from the next byte in the instructionPtr
+        y = 0;
+        a = instructionPtr[y];
+        instructionPtr++;
+
+        return rest(x, a);
+    }
+}
+
+
+
+// NOTE: Always returns true
+// KEEP: x
+func rest(channelIndex : u8 in x, length: u8 in a) : bool in carry {
+var _tmp : u8 in zpTmp;
+
+    _tmp = a;
+
+    channelSoA.nextEventIsKeyOff[x] = y = 1;
+
+    // Calculate number of ticks to sleep
+    // (Q16.8)nextEvent += (Q8.8)tempo * (Q8.0)note - KEY_OFF_DELAY
+
+    y = channelSoA.tempo_f[x];
+    ya = __multiply(y, a);
+
+    channelSoA.nextEvent_f[x] = a = a + channelSoA.nextEvent_f[x];
+    channelSoA.nextEvent_l[x] = a = y +# channelSoA.nextEvent_l[x];
+    if carry {
+        channelSoA.nextEvent_h[x]++;
+    }
+
+    a = _tmp;
+    y = channelSoA.tempo_l[x];
+    ya = __multiply(y, a);
+
+    // Subtract `KEY_OFF_DELAY`
+    a -= KEY_OFF_DELAY;
+    if !carry {
+        y--;
+    }
+
+    channelSoA.nextEvent_l[x] = a = a + channelSoA.nextEvent_l[x];
+    channelSoA.nextEvent_h[x] = a = y +# channelSoA.nextEvent_h[x];
+
+    // return true (do not execute the next bytecode and sleep)
+    return true;
+}
+
+
+
+// ::BUGFIX wiz cannot compile `ya = y * a`::
+// ::: wiz outputs error: left-hand side of type `u16` cannot be assigned `u8` expression ::
+//
+// KEEP: x
+inline func __multiply(v1 : u8 in y, v2 : u8 in a) : u16 in ya {
+    return y * a;
 }
 
 }
+
+}
+
 
 
 // Data Tables
@@ -285,5 +617,68 @@ in code {
 
     // The offset into the Voice DSP registers
     const ChannelVoiceOffset : [u8; 8] = [i * 0x10 for let i in 0..7];
+
+
+    // This is the bytecode used by a disabled channel.
+    const ChannelDisabledBytecode : [ u8; 1 ] = [ bytecode.DISABLE_CHANNEL_BYTECODE ];
 }
+
+
+in data {
+    let NULL = 0 as *u8;
+    let STARTING_BPM = 120;
+
+    const SongData = SongHeader{
+        tempo = (0x100 * 8000 * 60) / (STARTING_BPM * 64),
+
+        instPtrs = [ NULL, NULL, NULL, &ExampleSongChannel[0], NULL, NULL ],
+    };
+
+    let _REST = 2;
+
+    let _SET_INSTRUMENT = 0;
+    let _PLAY_NOTE = 1 << 5;
+    let _PLAY_NOTE_LENGTH = _PLAY_NOTE | (0x10);
+
+    let __L2 = 64 / 2;
+
+    const ExampleSongChannel : [u8] = [
+        _REST, 192,
+
+        _SET_INSTRUMENT, 2,
+
+        _PLAY_NOTE | 0,
+        _PLAY_NOTE_LENGTH | 8, __L2,
+        _PLAY_NOTE | 1,
+        _PLAY_NOTE_LENGTH | 8, __L2,
+        _PLAY_NOTE | 2,
+        _PLAY_NOTE_LENGTH | 8, __L2,
+        _PLAY_NOTE | 3,
+        _PLAY_NOTE_LENGTH | 8, __L2,
+        _PLAY_NOTE | 4,
+        _PLAY_NOTE_LENGTH | 8, __L2,
+        _PLAY_NOTE | 5,
+        _PLAY_NOTE_LENGTH | 8, __L2,
+
+        _SET_INSTRUMENT, 1,
+
+        _PLAY_NOTE | 5,
+        _PLAY_NOTE_LENGTH | 8, __L2,
+        _PLAY_NOTE | 4,
+        _PLAY_NOTE_LENGTH | 8, __L2,
+        _PLAY_NOTE | 3,
+        _PLAY_NOTE_LENGTH | 8, __L2,
+        _PLAY_NOTE | 2,
+        _PLAY_NOTE_LENGTH | 8, __L2,
+        _PLAY_NOTE | 1,
+        _PLAY_NOTE_LENGTH | 8, __L2,
+        _PLAY_NOTE | 0,
+        _PLAY_NOTE_LENGTH | 8, __L2,
+
+        bytecode.DISABLE_CHANNEL_BYTECODE,
+    ];
+}
+
+
+import "bytecode";
 
