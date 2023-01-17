@@ -15,9 +15,9 @@ config {
 bank zeropage       @ 0x0000 : [vardata;     0x00f0];
 // addresses 0x00f0 - 0x00ff contain registers
 bank stack          @ 0x0100 : [vardata;     0x0100];
-bank code           @ 0x0200 : [constdata;   0x0300];
+bank code           @ 0x0200 : [constdata;   0x0400];
 
-let EXTERNAL_DATA_ADDR = 0x500;
+let EXTERNAL_DATA_ADDR = 0x600;
 
 
 // Data Structures
@@ -109,7 +109,14 @@ in zeropage {
     var keyOnShadow : u8;
 
 
+    // Only valid inside bytecode instructions
     var instructionPtr : *const u8;
+
+    // Index into channelSoA for the current channel.
+    // Used to restore X index inside bytecode instructions.
+    // Only valid inside bytecode instructions
+    // MUST ONLY be set by `process_bytecode__inline()`.
+    var currentChannelIndex : u8;
 
 
     namespace channelSoA {
@@ -147,6 +154,21 @@ in zeropage {
         // Offset between the instrument's note and the pitch table.
         // (NOTE: Adding `pitchTableOffset` to note to play is allowed to an can overflow)
         var pitchTableOffset : [u8 ; N_CHANNELS];
+
+
+        // Address to return to in a `return_from_subroutine` bytecode
+        var returnInstPtr_l : [u8 ; N_CHANNELS];
+        var returnInstPtr_h : [u8 ; N_CHANNELS];
+
+
+        struct LoopState {
+            counter : [u8 ; N_CHANNELS],
+
+            // Instruction pointer at the start of the loop.
+            loopPoint_l : [u8 ; N_CHANNELS],
+            loopPoint_h : [u8 ; N_CHANNELS],
+        };
+        var loopState : [LoopState ; 2];
     }
 }
 
@@ -369,15 +391,11 @@ inline func process_channel__inline(channelIndex : u8 in x) {
 }
 
 
-in zeropage {
-    // MUST ONLY be used by `process_bytecode__inline()`.
-    var __currentChannelIndex : u8;
-}
 
 // KEEP: X
 inline func process_bytecode__inline(channelIndex : u8 in x) {
 
-    __currentChannelIndex = x;
+    currentChannelIndex = x;
 
     a = channelSoA.instructionPtr_l[x];
     y = channelSoA.instructionPtr_h[x];
@@ -416,7 +434,7 @@ inline func process_bytecode__inline(channelIndex : u8 in x) {
             (&CallInstruction as *u8)[2] = a = (&>:bytecode.InlineArgumentInstructions[0] as *const u8)[unaligned y];
 
             a = x & bytecode.INLINE_ARGUMENT_MASK;
-            x = __currentChannelIndex;
+            x = currentChannelIndex;
         }
 
     CallInstruction:
@@ -424,7 +442,7 @@ inline func process_bytecode__inline(channelIndex : u8 in x) {
         // carry set if there are more instructions to process
     } while !carry;
 
-    x = __currentChannelIndex;
+    x = currentChannelIndex;
 
     ya = instructionPtr as u16;
     channelSoA.instructionPtr_l[x] = a;
@@ -480,8 +498,109 @@ func disable_channel(channelIndex : u8 in x) : bool in carry {
 }
 
 
+// KEEP: X
+func jump(channelIndex : u8 in x, target_l : u8 in a) : bool in carry {
+    x = a;
+
+    // read high byte of the jump instruction parameter
+    y = 0;
+    a = instructionPtr[y];
+
+    <:instructionPtr = x;
+    >:instructionPtr = a;
+
+    x = currentChannelIndex;
+    return false;
+}
+
 
 // KEEP: X
+func call_subroutine(channelIndex : u8 in x, subroutine_l : u8 in a) : bool in carry {
+var _subroutineAddr : *const u8 in zpTmpPtr;
+
+    <:_subroutineAddr = a;
+
+    // read high byte of the subroutine
+    y = 0;
+    >:_subroutineAddr = a = instructionPtr[y];
+    instructionPtr++;
+
+    ya = instructionPtr as u16;
+    channelSoA.returnInstPtr_l[x] = a;
+    channelSoA.returnInstPtr_h[x] = y;
+
+    ya = _subroutineAddr as u16;
+    instructionPtr = ya as *const u8;
+
+    return false;
+}
+
+
+// KEEP: X
+func return_from_subroutine(channelIndex : u8 in x) : bool in carry {
+    a = channelSoA.returnInstPtr_l[x];
+    y = channelSoA.returnInstPtr_h[x];
+    instructionPtr = ya as *const u8;
+
+    return false;
+}
+
+
+// KEEP: X
+inline func __start_loop(channelIndex : u8 in x, let LOOP_ID : u8) : bool in carry {
+    ya = instructionPtr as u16;
+
+    channelSoA.loopState[LOOP_ID].loopPoint_l[x] = a;
+    channelSoA.loopState[LOOP_ID].loopPoint_h[x] = y;
+
+    channelSoA.loopState[LOOP_ID].counter[x] = a = 0;
+
+    return false;
+}
+
+
+// KEEP: X
+inline func __end_loop(channelIndex : u8 in x, loopCount : u8 in a, let LOOP_ID : u8) : bool in carry {
+    if a >= channelSoA.loopState[LOOP_ID].counter[x] {
+        channelSoA.loopState[LOOP_ID].counter[x]++;
+
+        a = channelSoA.loopState[LOOP_ID].loopPoint_l[x];
+        y = channelSoA.loopState[LOOP_ID].loopPoint_h[x];
+        instructionPtr = ya as *const u8;
+
+        carry = false;
+    }
+    // carry false if `a < loopState`
+    // return false
+    return carry;
+}
+
+
+// KEEP: X
+func start_loop_0(channelIndex : u8 in x) : bool in carry {
+    return __start_loop(x, 0);
+}
+
+// KEEP: X
+func start_loop_1(channelIndex : u8 in x) : bool in carry {
+    return __start_loop(x, 1);
+}
+
+
+// KEEP: X
+func end_loop_0(channelIndex : u8 in x, loopCount : u8 in a) : bool in carry {
+    return __end_loop(x, a, 0);
+}
+
+// KEEP: X
+func end_loop_1(channelIndex : u8 in x, loopCount : u8 in a) : bool in carry {
+    return __end_loop(x, a, 1);
+}
+
+
+
+// KEEP: X
+// MUST NOT USE `currentChannelIndex`
 func set_instrument(channelIndex : u8 in x, instrumentId : u8 in a) : bool in carry {
     // Using addr,y addressing mode for `channels`, 1 cycle faster then transferring y to x.
 
@@ -507,6 +626,7 @@ func set_instrument(channelIndex : u8 in x, instrumentId : u8 in a) : bool in ca
 
 
 // KEEP: X
+// MUST NOT USE `currentChannelIndex`
 func set_channel_volume(channelIndex : u8 in x, volume : u8 in a) : bool in carry {
     y = a;
 
@@ -728,6 +848,15 @@ in data {
     };
 
     let _REST = 2;
+    let _JUMP = _REST + 1;
+    let _CALL = _JUMP + 1;
+    let _END_LOOP_0 = _CALL + 1;
+    let _END_LOOP_1 = _END_LOOP_0 + 1;
+
+    let _DISABLE_CHANNEL = bytecode.N_SINGLE_ARGUMENT_INSTRUCTIONS;
+    let _RTS = _DISABLE_CHANNEL + 1;
+    let _START_LOOP_0 = _RTS + 1;
+    let _START_LOOP_1 = _START_LOOP_0 + 1;
 
     let _SET_INSTRUMENT = 0;
     let _PLAY_NOTE = 1 << 5;
@@ -737,52 +866,47 @@ in data {
     let _PLAY_NOTE_SLUR_NEXT_LENGTH = _PLAY_NOTE_SLUR_NEXT | (0x10);
 
     let __L2 = 64 / 2;
+    let __L8 = 64 / 8;
 
     const ExampleSongChannel : [u8] = [
-        _REST, 192,
+        _REST as u8, 64,
 
-        _SET_INSTRUMENT, 2,
-
-        _PLAY_NOTE_SLUR_NEXT_LENGTH | 0, __L2,
-        _PLAY_NOTE_SLUR_NEXT        | 5,
-        _PLAY_NOTE_SLUR_NEXT        | 10,
-        _PLAY_NOTE_SLUR_NEXT_LENGTH | 5,  __L2,
-        _PLAY_NOTE_SLUR_NEXT        | 4,
-        _PLAY_NOTE_SLUR_NEXT_LENGTH | 9,
-        _PLAY_NOTE                  | 12,
-
-        _REST, 64,
-        _SET_INSTRUMENT, 0,
-
-        _PLAY_NOTE | 0,
-        _PLAY_NOTE_LENGTH | 8, __L2,
-        _PLAY_NOTE | 1,
-        _PLAY_NOTE_LENGTH | 8, __L2,
-        _PLAY_NOTE | 2,
-        _PLAY_NOTE_LENGTH | 8, __L2,
-        _PLAY_NOTE | 3,
-        _PLAY_NOTE_LENGTH | 8, __L2,
-        _PLAY_NOTE | 4,
-        _PLAY_NOTE_LENGTH | 8, __L2,
-        _PLAY_NOTE | 5,
-        _PLAY_NOTE_LENGTH | 8, __L2,
+        _CALL, <:&ExampleSubroutine, >:&ExampleSubroutine,
 
         _SET_INSTRUMENT, 1,
 
-        _PLAY_NOTE | 5,
-        _PLAY_NOTE_LENGTH | 8, __L2,
-        _PLAY_NOTE | 4,
-        _PLAY_NOTE_LENGTH | 8, __L2,
-        _PLAY_NOTE | 3,
-        _PLAY_NOTE_LENGTH | 8, __L2,
-        _PLAY_NOTE | 2,
-        _PLAY_NOTE_LENGTH | 8, __L2,
-        _PLAY_NOTE | 1,
-        _PLAY_NOTE_LENGTH | 8, __L2,
-        _PLAY_NOTE | 0,
-        _PLAY_NOTE_LENGTH | 8, __L2,
+        _START_LOOP_0,
+            _START_LOOP_1,
+                _PLAY_NOTE | 5,
+            _END_LOOP_1, 4 - 2,
 
-        bytecode.DISABLE_CHANNEL_BYTECODE,
+            _REST, 16,
+        _END_LOOP_0, 2 - 2,
+
+        _REST as u8, 64,
+
+        _CALL, <:&ExampleSubroutine, >:&ExampleSubroutine,
+
+        _SET_INSTRUMENT, 1,
+
+        _PLAY_NOTE_LENGTH | 3, __L2,
+        _PLAY_NOTE_LENGTH | 1, __L2,
+
+        _JUMP, <:&ExampleSongChannel, >:&ExampleSongChannel,
+    ];
+
+    const ExampleSubroutine : [u8] = [
+        _SET_INSTRUMENT, 2,
+
+        _START_LOOP_0,
+            _PLAY_NOTE_SLUR_NEXT | 5,
+            _PLAY_NOTE_SLUR_NEXT | 10,
+        _END_LOOP_0, 5 - 2,
+
+        // Clear slur on next note flag
+        _PLAY_NOTE | 5,
+
+        _RTS,
     ];
 }
 

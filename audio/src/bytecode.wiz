@@ -11,8 +11,8 @@ let DISABLE_CHANNEL_BYTECODE = N_SINGLE_ARGUMENT_INSTRUCTIONS;
 
 let INLINE_ARGUMENT_MASK = 0x1f;
 
-let N_SINGLE_ARGUMENT_INSTRUCTIONS = 3;
-let N_NO_PARAMETER_INSTRUCTIONS = 0;
+let N_SINGLE_ARGUMENT_INSTRUCTIONS = sizeof(typeof(SINGLE_ARGUMENT_INSTRUCTIONS)) / sizeof(typeof(SINGLE_ARGUMENT_INSTRUCTIONS[0]));
+let N_NO_ARGUMENT_INSTRUCTIONS = sizeof(typeof(NO_ARGUMENT_INSTRUCTIONS)) / sizeof(typeof(NO_ARGUMENT_INSTRUCTIONS[0]));
 
 
 // These bytecodes do have parameters
@@ -24,20 +24,33 @@ let SINGLE_ARGUMENT_INSTRUCTIONS = [
     // parameter = number of 1/64 beats to pause
     // NOTE: Does not send a keyoff event after.
     rest,
+
+    // U16 WORD parameter = address to jump to
+    jump,
+
+    // U16 WORD parameter = subroutine address
+    //
+    // The `call` bytecode CANNOT be called inside a subroutine.
+    call_subroutine,
+
+    // parameter = number of times to loop - 2
+    end_loop_0,
+
+    // parameter = number of times to loop - 2
+    end_loop_1,
 ];
 
 // These bytecodes do not have parameters
 let NO_PARAMETER_INSTRUCTIONS = [
     disable_channel,
 
+    // Return from a call instruction
+    return_from_subroutine,
+
+    start_loop_0,
+    start_loop_1,
+
     // padding
-    disable_channel,
-    disable_channel,
-    disable_channel,
-    disable_channel,
-    disable_channel,
-    disable_channel,
-    disable_channel,
     disable_channel,
     disable_channel,
     disable_channel,
