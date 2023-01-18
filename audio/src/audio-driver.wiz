@@ -112,6 +112,10 @@ in zeropage {
     // Incremented once every tick (1/8000 seconds)
     var tickClock : u16;
 
+    // Maximum value of the timer counter0 register.
+    var maxTimerCounter : u8;
+
+
     // Shadow variables for KON and KOFF DSP registers
     var keyOffShadow : u8;
     var keyOnShadow : u8;
@@ -388,6 +392,10 @@ func process_event_loop() {
         do {
             a = smp.counter_0;
         } while zero;
+
+        if a >= maxTimerCounter {
+            maxTimerCounter = a;
+        }
 
         <:tickClock = a = a + <:tickClock;
         if carry {
