@@ -57,7 +57,7 @@ struct InstrumentsSoA {
     gain            : [u8 ; N_INSTRUMENTS],
 
     // offset between note c0 and `ExternalData.pitchTable[0]`
-    // (pitch_offset + pitch is allowed to overflow and underflow)
+    // (pitchOffset + note is allowed to overflow and underflow)
     pitchOffset    : [u8 ; N_INSTRUMENTS],
 };
 
@@ -142,18 +142,10 @@ in zeropage {
         // If zero, the next event will process bytecode
         var nextEventIsKeyOff : [u8 ; N_CHANNELS];
 
+
         // The address of the bytecode
         var instructionPtr_l : [u8 ; N_CHANNELS];
         var instructionPtr_h : [u8 ; N_CHANNELS];
-
-        // Offset between notes 0-16 and the notes to play
-        // Incremented by 12 when increasing octave
-        // Decremented by 12 when decreasing octave
-        var noteOffset : [u8 ; N_CHANNELS];
-
-        // Offset between the instrument's note and the pitch table.
-        // (NOTE: Adding `pitchTableOffset` to note to play is allowed to an can overflow)
-        var pitchTableOffset : [u8 ; N_CHANNELS];
 
 
         // Address to return to in a `return_from_subroutine` bytecode
@@ -169,6 +161,33 @@ in zeropage {
             loopPoint_h : [u8 ; N_CHANNELS],
         };
         var loopState : [LoopState ; 2];
+
+
+        // NOTE: Pitch table variable MUST NOT be modified directly.
+        // Use the `__set_pt_offset()` and `__add_to_pt_offset()` to edit the offset variables.
+
+        // Offset between the `u4` note to play and the pitch table.
+        //
+        // Equal to `instPitchOffset + octaveOffset + transposeOffset` (wrapping on overflow).
+        //
+        // NOTE: Adding `pitchTableOffset` to the note to play is allowed to an can overflow.
+        var pitchTableOffset : [u8 ; N_CHANNELS];
+
+        // Offset between the note to play and the pitch table.
+        //
+        // NOTE: Adding `instPitchOffset` to the note to play is allowed to an can overflow.
+        var instPitchOffset : [u8 ; N_CHANNELS];
+
+        // Offset (in semitones) between the note to play and the current octave.
+        //
+        // Equal to `octave * 12`
+        var octaveOffset : [u8 ; N_CHANNELS];
+
+        // Offset (in semitones) to add to the current note.
+        //
+        // NOTE: This is a `i8` variable.
+        // Using u8 here so I can use this variable with `__set_pt_offset()` and `__add_to_pt_offset().
+        var semitoneOffset : [u8 ; N_CHANNELS];
     }
 }
 
@@ -180,6 +199,31 @@ in zeropage {
 // KEEP: a, x, y
 inline func write_dsp(addr : GlobalDspAddr in a, data : u8 in y) {
     smp.dsp_addr_and_data = ya;
+}
+
+
+
+// Set a semitone offset variable and update the pitchTableOffset.
+//
+// KEEP: X
+inline func __set_pt_offset(channelIndex : u8 in x, st_offset : u8 in a, let SOA_VAR : [u8 ; N_CHANNELS]) {
+    y = a;
+
+    channelSoA.pitchTableOffset[x] = a = a + channelSoA.pitchTableOffset[x] - SOA_VAR[x];
+    SOA_VAR[x] = y;
+}
+
+
+
+// Add an `i8` semitone offset to an offset variable and the pitchTableOffset.
+//
+// KEEP: X
+inline func __add_to_pt_offset(channelIndex : u8 in x, st_offset : i8 in a, let SOA_VAR : [u8 ; N_CHANNELS]) {
+    y = a;
+
+    channelSoA.pitchTableOffset[x] = a = a + channelSoA.pitchTableOffset[x];
+
+    SOA_VAR[x] = a = y + SOA_VAR[x];
 }
 
 
@@ -251,11 +295,15 @@ var _ptr : *const u8 in zpTmpPtr;
 
     x = N_MUSIC_CHANNELS - 1;
     do {
+        // These variables MUST be set before set_instrument
+        a = STARTING_OCTAVE * 12;
+        channelSoA.octaveOffset[x] = a;
+        channelSoA.pitchTableOffset[x] = a;
+
         bytecode.set_channel_volume(x, 96);
         bytecode.set_instrument(x, 0);
 
         channelSoA.defaultNoteLength[x] = a = STARTING_DEFAULT_NOTE_LENGTH;
-        channelSoA.noteOffset[x] = a = STARTING_OCTAVE * 12;
 
         y = offsetof(SongHeader, tempo);
         channelSoA.tempo_f[x] = a = _ptr[y];
@@ -305,6 +353,7 @@ var _ptr : *const u8 in zpTmpPtr;
 
     return process_event_loop();
 }
+
 
 
 #[fallthrough]
@@ -606,8 +655,6 @@ func set_instrument(channelIndex : u8 in x, instrumentId : u8 in a) : bool in ca
 
     y = a = a & INSTRUMENT_MASK;
 
-    channelSoA.pitchTableOffset[x] = a = external_data.instruments.pitchOffset[y];
-
     smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.SCRN as u8;
     smp.dsp_data = a = external_data.instruments.scrn[y];
 
@@ -619,6 +666,53 @@ func set_instrument(channelIndex : u8 in x, instrumentId : u8 in a) : bool in ca
 
     smp.dsp_addr++;
     smp.dsp_data = a = external_data.instruments.gain[y];
+
+    a = external_data.instruments.pitchOffset[y];
+    __set_pt_offset(x, a, channelSoA.instPitchOffset);
+
+    return false;
+}
+
+
+
+// ASSUMES: parameter is 5 bits
+// KEEP: X
+func change_octave(channelIndex : u8 in x, parameter : u8 in a) : bool in carry {
+    y = a = a >>>= 1;
+    if carry {
+        // relative octave change
+
+        a = OctaveTable[y] as u8;
+        __add_to_pt_offset(x, a as i8, channelSoA.octaveOffset);
+
+        return false;
+    }
+    else {
+        // Set octave
+
+        a = OctaveTable[y] as u8;
+        __set_pt_offset(x, a, channelSoA.octaveOffset);
+
+        return false;
+    }
+}
+
+const OctaveTable : [i8 ; 16] = [i * 12 for let i in -6..9];
+
+
+
+// KEEP: X
+func set_semitone_offset(channelIndex : u8 in x, parameter : i8 in a) : bool in carry {
+    __set_pt_offset(x, a, channelSoA.semitoneOffset);
+
+    return false;
+}
+
+
+
+// KEEP: X
+func relative_semitone_offset(channelIndex : u8 in x, parameter : i8 in a) : bool in carry {
+    __add_to_pt_offset(x, a as i8, channelSoA.semitoneOffset);
 
     return false;
 }
@@ -648,7 +742,7 @@ func play_note(channelIndex : u8 in x, note : u8 in a) : bool in carry {
 
     // Set note pitch
     a &= 0xf;
-    y = a = a + channelSoA.noteOffset[x] + channelSoA.pitchTableOffset[x];
+    y = a = a + channelSoA.pitchTableOffset[x];
 
     smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.PITCH_L as u8;
     smp.dsp_data = a = external_data.pitchTable_l[y];
@@ -692,7 +786,7 @@ func play_note_slur_next(channelIndex : u8 in x, note : u8 in a) : bool in carry
 
     // Set note pitch
     a &= 0xf;
-    y = a = a + channelSoA.noteOffset[x] + channelSoA.pitchTableOffset[x];
+    y = a = a + channelSoA.pitchTableOffset[x];
 
     smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.PITCH_L as u8;
     smp.dsp_data = a = external_data.pitchTable_l[y];
@@ -853,58 +947,68 @@ in data {
     let _END_LOOP_0 = _CALL + 1;
     let _END_LOOP_1 = _END_LOOP_0 + 1;
 
+    let _SET_SEMITONE_OFFSET =  _END_LOOP_1 + 1;
+    let _RELATIVE_SEMITONE_OFFSET = _SET_SEMITONE_OFFSET + 1;
+
+
     let _DISABLE_CHANNEL = bytecode.N_SINGLE_ARGUMENT_INSTRUCTIONS;
     let _RTS = _DISABLE_CHANNEL + 1;
     let _START_LOOP_0 = _RTS + 1;
     let _START_LOOP_1 = _START_LOOP_0 + 1;
 
+
     let _SET_INSTRUMENT = 0;
+
     let _PLAY_NOTE = 1 << 5;
     let _PLAY_NOTE_LENGTH = _PLAY_NOTE | (0x10);
 
     let _PLAY_NOTE_SLUR_NEXT = 2 << 5;
     let _PLAY_NOTE_SLUR_NEXT_LENGTH = _PLAY_NOTE_SLUR_NEXT | (0x10);
 
+    let _CHANGE_OCTAVE = 3 << 5;
+
     let __L2 = 64 / 2;
     let __L8 = 64 / 8;
 
-    const ExampleSongChannel : [u8] = [
-        _REST as u8, 64,
 
-        _CALL, <:&ExampleSubroutine, >:&ExampleSubroutine,
+    const ExampleSongChannel : [u8] = [
+        _REST as u8, 192,
 
         _SET_INSTRUMENT, 1,
 
         _START_LOOP_0,
-            _START_LOOP_1,
-                _PLAY_NOTE | 5,
-            _END_LOOP_1, 4 - 2,
+            _CHANGE_OCTAVE | (((5+6) & 0xf) << 1),     // set octave to 5
+            _CALL, <:&ExampleSubroutine, >:&ExampleSubroutine,
 
-            _REST, 16,
-        _END_LOOP_0, 2 - 2,
+            _CHANGE_OCTAVE | (((-2+6) & 0xf) << 1) | 1, // lower by 2 octaves
+            _CALL, <:&ExampleSubroutine, >:&ExampleSubroutine,
 
-        _REST as u8, 64,
+            _CHANGE_OCTAVE | ((( 1+6) & 0xf) << 1) | 1, // increase by 1 octave
+            _CALL, <:&ExampleSubroutine, >:&ExampleSubroutine,
 
-        _CALL, <:&ExampleSubroutine, >:&ExampleSubroutine,
+            _REST as u8, 64,
 
-        _SET_INSTRUMENT, 1,
-
-        _PLAY_NOTE_LENGTH | 3, __L2,
-        _PLAY_NOTE_LENGTH | 1, __L2,
+            _SET_INSTRUMENT, 2,
+        _END_LOOP_0, 0,
 
         _JUMP, <:&ExampleSongChannel, >:&ExampleSongChannel,
     ];
 
+
     const ExampleSubroutine : [u8] = [
-        _SET_INSTRUMENT, 2,
+        _SET_SEMITONE_OFFSET as u8, 0 as u8,
+        _PLAY_NOTE | 2,
 
-        _START_LOOP_0,
-            _PLAY_NOTE_SLUR_NEXT | 5,
-            _PLAY_NOTE_SLUR_NEXT | 10,
-        _END_LOOP_0, 5 - 2,
+        _SET_SEMITONE_OFFSET, -3 as u8,
+        _PLAY_NOTE | 2,
 
-        // Clear slur on next note flag
-        _PLAY_NOTE | 5,
+        _RELATIVE_SEMITONE_OFFSET, 2,
+        _PLAY_NOTE | 2,
+
+        _RELATIVE_SEMITONE_OFFSET, -4 as u8,
+        _PLAY_NOTE | 2,
+
+        _REST as u8, 64,
 
         _RTS,
     ];

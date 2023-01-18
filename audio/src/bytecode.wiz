@@ -38,7 +38,15 @@ let SINGLE_ARGUMENT_INSTRUCTIONS = [
 
     // parameter = number of times to loop - 2
     end_loop_1,
+
+
+    // parameter = i8 semitone offset to use
+    set_semitone_offset,
+
+    // parameter = i8 semitones adjust the current semitone offset by
+    relative_semitone_offset,
 ];
+
 
 // These bytecodes do not have parameters
 let NO_PARAMETER_INSTRUCTIONS = [
@@ -50,9 +58,8 @@ let NO_PARAMETER_INSTRUCTIONS = [
     start_loop_0,
     start_loop_1,
 
+
     // padding
-    disable_channel,
-    disable_channel,
     disable_channel,
     disable_channel,
     disable_channel,
@@ -94,8 +101,22 @@ let INLINE_ARGUMENT_INSTRUCTIONS = [
     //      nnnn = note to play
     play_note_slur_next,
 
+
+    // Changes the current octave for the channel.
+    //
+    // parameter: oooor
+    //      r    = relative change flag.
+    //             If set: octave is incremented/decremented by `oooo`.
+    //             If clear: octave is set to `oooo`.
+    //
+    //      oooo = octave.
+    //             Biased Integer -6
+    //             Range is [-6..9] (inclusive).
+    //             MUST not be negative if `r` is clear.
+    change_octave,
+
+
     // padding
-    null_instruction,
     null_instruction,
     null_instruction,
     null_instruction,
