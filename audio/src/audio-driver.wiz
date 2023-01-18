@@ -23,6 +23,11 @@ let EXTERNAL_DATA_ADDR = 0x600;
 // Data Structures
 // ===============
 
+
+let TIMER_DIVIDER = 16;
+let TICKS_PER_SECOND = 8000 / TIMER_DIVIDER;
+
+
 let N_CHANNELS = 8;
 let N_MUSIC_CHANNELS = 6;
 let N_SFX_CHANNELS = N_CHANNELS = N_MUSIC_CHANNELS;
@@ -37,8 +42,11 @@ let INSTRUMENT_MASK = N_INSTRUMENTS - 1;
 
 // Number of clock ticks after a KOFF event before the bytecode is processed.
 //
-// This delay MUST be > 64 8Khz timer ticks to ensure the Key-Off event complexly silences the audio.
-let KEY_OFF_DELAY = 72;
+// This delay MUST be > 64 8Khz timer ticks to ensure the Key-Off event completely silences
+// the sample before the next note plays.
+//
+// ::TODO somehow confirm this value is large enough to ensure all KOFF events always occur 256 samples before KON events::
+let KEY_OFF_DELAY = (64 + 48) / TIMER_DIVIDER;
 
 
 let STARTING_OCTAVE = 3;
@@ -347,7 +355,7 @@ var _ptr : *const u8 in zpTmpPtr;
 
 
     // Setup and enable the timer
-    smp.timer_0 = a = 1;
+    smp.timer_0 = a = TIMER_DIVIDER;
     smp.control = a = smp.CONTROL__ENABLE_TIMER_0;
     a = smp.counter_0;
 
@@ -936,7 +944,7 @@ in data {
     let STARTING_BPM = 120;
 
     const SongData = SongHeader{
-        tempo = (0x100 * 8000 * 60) / (STARTING_BPM * 64),
+        tempo = (TICKS_PER_SECOND * 60 * 0x100) / (STARTING_BPM * 64),
 
         instPtrs = [ NULL, NULL, NULL, &ExampleSongChannel[0], NULL, NULL ],
     };
