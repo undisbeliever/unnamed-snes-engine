@@ -78,14 +78,33 @@ struct ExternalData {
     instruments    : InstrumentsSoA,
 };
 
+
+struct MusicChannelHeader {
+    // The starting offset of the channel bytecode (relative to the start of the song data).
+    //
+    // If `starting+SongData` overflows (ie, starting >= 0xff00), then the channel is disabled.
+    starting : u16,
+
+    // The loop point in the channel bytecode (relative to the start of the song data).
+    //
+    // If `loop+SongData` overflows (ie, loop >= 0xff00), then the channel will not loop.
+    loop: u16,
+};
+
 struct SongHeader {
-    // Instruction pointers for each channel
-    // If address is < 0x100 then the channel is disabled.
-    instPtrs : [*const u8 ; N_MUSIC_CHANNELS],
+    channels : [MusicChannelHeader ; N_MUSIC_CHANNELS],
 
     // Starting tempo.
     // (Q8.8)
     tempo   : u16,
+
+    // Number of subroutines
+    // NOTE: This variable has a maximum value of 128
+    nSubroutines : u8,
+
+    // Immediately after this header is an array, [u16 ; nSubroutines], containing the location of each subroutine
+    // (relative to the start of the song data).
+    // The audio-engine will convert the locations into addresses before starting the event-loop.
 };
 
 extern const external_data @ EXTERNAL_DATA_ADDR : ExternalData;
@@ -107,6 +126,9 @@ in zeropage {
     // Temporary variables
     var zpTmp : u8;
     var zpTmpPtr : *u8;
+
+    // The table of subroutine addresses
+    var subroutineTable : **const u8;
 
 
     // Incremented once every tick (1/8000 seconds)
@@ -155,9 +177,14 @@ in zeropage {
         var nextEventIsKeyOff : [u8 ; N_CHANNELS];
 
 
-        // The address of the bytecode
+        // The address of the next bytecode to execute
         var instructionPtr_l : [u8 ; N_CHANNELS];
         var instructionPtr_h : [u8 ; N_CHANNELS];
+
+        // Bytecode address to loop to when the channel encounters and `end` instruction.
+        // If `instructionPtrAfterEnd_h` is 0, the channel does not loop and will instead stop.
+        var instructionPtrAfterEnd_l : [u8 ; N_CHANNELS];
+        var instructionPtrAfterEnd_h : [u8 ; N_CHANNELS];
 
 
         // Address to return to in a `return_from_subroutine` bytecode
@@ -218,6 +245,8 @@ inline func write_dsp(addr : GlobalDspAddr in a, data : u8 in y) {
 // Set a semitone offset variable and update the pitchTableOffset.
 //
 // KEEP: X
+//
+// MUST NOT USE `zpTmp` or `zpTmpPtr`
 inline func __set_pt_offset(channelIndex : u8 in x, st_offset : u8 in a, let SOA_VAR : [u8 ; N_CHANNELS]) {
     y = a;
 
@@ -247,7 +276,9 @@ in code {
 
 // MUST be the first thing in the `code` bank (so the starting address is consistent across builds).
 func main() {
-var _ptr : *const u8 in zpTmpPtr;
+var _songPtr : *const u8 in zpTmpPtr;
+var _loopEnd : u8 in zpTmp;
+
 
     sp = x = 0xff;
 
@@ -300,11 +331,34 @@ var _ptr : *const u8 in zpTmpPtr;
     }
 
 
-    // Reset all music channels
+    // Retrieve the address of the song header
     a = <:&SongData;
     y = >:&SongData;
-    _ptr = ya as *u8;
+    _songPtr = ya as *u8;
 
+
+    // Calculate the subroutineTable address.
+    a = sizeof(SongHeader);
+    y = 0;
+    ya += _songPtr as u16;
+    subroutineTable = ya as **const u8;
+
+    // Add _songPtr to each element in the subroutine table, turning an offset into an address.
+    y = offsetof(SongHeader, nSubroutines);
+    a = _songPtr[y];
+    if !zero {
+        _loopEnd = a = a << 1;
+        y = 0;
+        do {
+            (subroutineTable as *u8)[y] = a = (subroutineTable as *u8)[y] + <:_songPtr;
+            y++;
+            (subroutineTable as *u8)[y] = a = (subroutineTable as *u8)[y] +# >:_songPtr;
+            y++;
+        } while y != _loopEnd;
+    }
+
+
+    // Reset all music channels
     x = N_MUSIC_CHANNELS - 1;
     do {
         // These variables MUST be set before set_instrument
@@ -318,30 +372,35 @@ var _ptr : *const u8 in zpTmpPtr;
         channelSoA.defaultNoteLength[x] = a = STARTING_DEFAULT_NOTE_LENGTH;
 
         y = offsetof(SongHeader, tempo);
-        channelSoA.tempo_f[x] = a = _ptr[y];
+        channelSoA.tempo_f[x] = a = _songPtr[y];
         y++;
-        channelSoA.tempo_l[x] = a = _ptr[y];
+        channelSoA.tempo_l[x] = a = _songPtr[y];
 
 
-        // Load instructionPtr for each channel
-        // ASSUMES offsetof(SongHeader, instPtrs) == 0
+        // ASSUMES offsetof(SongHeader, channels) == 0
+        // ASSUMES sizeof(MusicChannelHeader) == 4
+        y = a = x <<< 2;
 
-        // read high byte of `SongHeader.instPtrs[x]`
-        y = a = x << 1;
+        // Calculate instructionPtr (and setting it to `ChannelDisabledBytecode` if the addition overflows)
+        channelSoA.instructionPtr_l[x] = a = _songPtr[y] + <:_songPtr;
         y++;
-        a = _ptr[y];
-        if zero {
-            // If the high byte of `instPtrs` is 0, the song is disabled.
-            // Set instructionPtr to `ChannelDisabledBytecode`.
-            channelSoA.instructionPtr_h[x] = a = >:&ChannelDisabledBytecode;
-            a = <:&ChannelDisabledBytecode;
+        a = _songPtr[y] +# >:_songPtr;
+        if carry {
+            channelSoA.instructionPtr_l[x] = a = <:&ChannelDisabledBytecode;
+            a = >:&ChannelDisabledBytecode;
         }
-        else {
-            channelSoA.instructionPtr_h[x] = a;
-            y--;
-            a = _ptr[y];
+        channelSoA.instructionPtr_h[x] = a;
+        y++;
+
+        // Calculate endInstPtr (and set the high byte to 0 (no looping) if the addition overflows)
+        channelSoA.instructionPtrAfterEnd_l[x] = a = _songPtr[y] + <:_songPtr;
+        y++;
+        a = _songPtr[y] +# >:_songPtr;
+        if carry {
+            a = 0;
         }
-        channelSoA.instructionPtr_l[x] = a;
+        channelSoA.instructionPtrAfterEnd_h[x] = a;
+
 
         // Set nextEvent to 0x8080 to test `__rewind_tick_clock()`
         a = 0x80;
@@ -564,38 +623,34 @@ func disable_channel(channelIndex : u8 in x) : bool in carry {
 
 
 // KEEP: X
-func jump(channelIndex : u8 in x, target_l : u8 in a) : bool in carry {
-    x = a;
+func end(channelIndex : u8 in x) : bool in carry {
+    y = channelSoA.instructionPtrAfterEnd_h[x];
+    goto disable_channel if zero;
 
-    // read high byte of the jump instruction parameter
-    y = 0;
-    a = instructionPtr[y];
+    a = channelSoA.instructionPtrAfterEnd_l[x];
 
-    <:instructionPtr = x;
-    >:instructionPtr = a;
+    instructionPtr = ya as *const u8;
 
-    x = currentChannelIndex;
     return false;
 }
 
 
 // KEEP: X
-func call_subroutine(channelIndex : u8 in x, subroutine_l : u8 in a) : bool in carry {
-var _subroutineAddr : *const u8 in zpTmpPtr;
+func call_subroutine(channelIndex : u8 in x, subroutineId : u8 in a) : bool in carry {
+var _subroutineId : u8 in zpTmp;
 
-    <:_subroutineAddr = a;
+    _subroutineId = a;
 
-    // read high byte of the subroutine
-    y = 0;
-    >:_subroutineAddr = a = instructionPtr[y];
-    instructionPtr++;
-
+    // Save return address
     ya = instructionPtr as u16;
     channelSoA.returnInstPtr_l[x] = a;
     channelSoA.returnInstPtr_h[x] = y;
 
-    ya = _subroutineAddr as u16;
-    instructionPtr = ya as *const u8;
+    y = a = _subroutineId <<< 1;
+
+    <:instructionPtr = a = (subroutineTable as *u8)[y];
+    y++;
+    >:instructionPtr = a = (subroutineTable as *u8)[y];
 
     return false;
 }
@@ -666,6 +721,7 @@ func end_loop_1(channelIndex : u8 in x, loopCount : u8 in a) : bool in carry {
 
 // KEEP: X
 // MUST NOT USE `currentChannelIndex`
+// MUST NOT USE `zpTmp` or `zpTmpPtr`
 func set_instrument(channelIndex : u8 in x, instrumentId : u8 in a) : bool in carry {
     // Using addr,y addressing mode for `channels`, 1 cycle faster then transferring y to x.
 
@@ -737,6 +793,7 @@ func relative_semitone_offset(channelIndex : u8 in x, parameter : i8 in a) : boo
 
 // KEEP: X
 // MUST NOT USE `currentChannelIndex`
+// MUST NOT USE `zpTmp` or `zpTmpPtr`
 func set_channel_volume(channelIndex : u8 in x, volume : u8 in a) : bool in carry {
     y = a;
 
@@ -948,18 +1005,34 @@ in code {
 
 
 in data {
-    let NULL = 0 as *u8;
+    let UNUSED_CHANNEL = MusicChannelHeader{starting=0xffff, loop=0xffff};
     let STARTING_BPM = 120;
 
     const SongData = SongHeader{
-        tempo = (TICKS_PER_SECOND * 60 * 0x100) / (STARTING_BPM * 64),
+        channels = [
+            UNUSED_CHANNEL,
+            UNUSED_CHANNEL,
+            UNUSED_CHANNEL,
+            MusicChannelHeader{
+                starting = EXAMPLE_SONG_OFFSET,
+                loop = EXAMPLE_SONG_OFFSET,
+            },
+            UNUSED_CHANNEL,
+            UNUSED_CHANNEL,
+        ],
 
-        instPtrs = [ NULL, NULL, NULL, &ExampleSongChannel[0], NULL, NULL ],
+        tempo = (TICKS_PER_SECOND * 60 * 0x100) / (STARTING_BPM * 64),
+        nSubroutines = 1,
     };
 
+    const SongSubroutineTable : [ u16 ; 1] = [ &ExampleSubroutine as u16 - &SongData as u16 ];
+
+
+    let EXAMPLE_SONG_OFFSET = sizeof(SongHeader) + sizeof(typeof(SongSubroutineTable));
+
+
     let _REST = 2;
-    let _JUMP = _REST + 1;
-    let _CALL = _JUMP + 1;
+    let _CALL = _REST + 1;
     let _END_LOOP_0 = _CALL + 1;
     let _END_LOOP_1 = _END_LOOP_0 + 1;
 
@@ -968,7 +1041,8 @@ in data {
 
 
     let _DISABLE_CHANNEL = bytecode.N_SINGLE_ARGUMENT_INSTRUCTIONS;
-    let _RTS = _DISABLE_CHANNEL + 1;
+    let _END = _DISABLE_CHANNEL + 1;
+    let _RTS = _END + 1;
     let _START_LOOP_0 = _RTS + 1;
     let _START_LOOP_1 = _START_LOOP_0 + 1;
 
@@ -987,6 +1061,7 @@ in data {
     let __L8 = 64 / 8;
 
 
+    // MUST BE immediately after SongSubroutineTable
     const ExampleSongChannel : [u8] = [
         _REST as u8, 192,
 
@@ -994,20 +1069,20 @@ in data {
 
         _START_LOOP_0,
             _CHANGE_OCTAVE | (((5+6) & 0xf) << 1),     // set octave to 5
-            _CALL, <:&ExampleSubroutine, >:&ExampleSubroutine,
+            _CALL, 0,
 
             _CHANGE_OCTAVE | (((-2+6) & 0xf) << 1) | 1, // lower by 2 octaves
-            _CALL, <:&ExampleSubroutine, >:&ExampleSubroutine,
+            _CALL, 0,
 
             _CHANGE_OCTAVE | ((( 1+6) & 0xf) << 1) | 1, // increase by 1 octave
-            _CALL, <:&ExampleSubroutine, >:&ExampleSubroutine,
+            _CALL, 0,
 
             _REST as u8, 64,
 
             _SET_INSTRUMENT, 2,
         _END_LOOP_0, 0,
 
-        _JUMP, <:&ExampleSongChannel, >:&ExampleSongChannel,
+        _END,
     ];
 
 

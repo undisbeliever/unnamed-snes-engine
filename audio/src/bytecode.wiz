@@ -25,12 +25,10 @@ let SINGLE_ARGUMENT_INSTRUCTIONS = [
     // NOTE: Does not send a keyoff event after.
     rest,
 
-    // U16 WORD parameter = address to jump to
-    jump,
-
-    // U16 WORD parameter = subroutine address
+    // parameter = subroutine ID (MAX: 127)
     //
-    // The `call` bytecode CANNOT be called inside a subroutine.
+    // NOTE: Only the lower 7 bits of the subroutine id are used.
+    // NOTE: There is no bounds checking
     call_subroutine,
 
     // parameter = number of times to loop - 2
@@ -51,6 +49,15 @@ let SINGLE_ARGUMENT_INSTRUCTIONS = [
 // These bytecodes do not have parameters
 let NO_PARAMETER_INSTRUCTIONS = [
     disable_channel,
+
+    // End of channel bytecode.
+    //
+    // This instruction will either jump to the loop point or stop the channel
+    // (depending `MusicChannelHeader.loop`)
+    //
+    // This instruction is not recommended for sound effects.
+    // NOTE: `disable_channel` is slightly faster then `end`.
+    end,
 
     // Return from a call instruction
     return_from_subroutine,
