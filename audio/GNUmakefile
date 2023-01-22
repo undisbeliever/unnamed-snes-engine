@@ -32,8 +32,8 @@ $(BINARY): $(SOURCES) $(RESOURCES)
 	'$(WIZ)' -s wla -I src --system=spc700 src/audio-driver.wiz -o '$(BINARY)'
 
 
-gen/common_data.bin: samples/_samples.json $(AUDIO_SAMPLES) tools/compile_common_data.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/compile_common_data.py -o '$@' samples/_samples.json
+gen/common_data.bin: samples/_samples.json resources/mappings.json resources/sound_effects.txt $(AUDIO_SAMPLES) tools/compile_common_data.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/compile_common_data.py -o '$@' samples/_samples.json resources/mappings.json resources/sound_effects.txt
 
 
 

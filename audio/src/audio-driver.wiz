@@ -15,9 +15,9 @@ config {
 bank zeropage       @ 0x0000 : [vardata;     0x00f0];
 // addresses 0x00f0 - 0x00ff contain registers
 bank stack          @ 0x0100 : [vardata;     0x0100];
-bank code           @ 0x0200 : [constdata;   0x0400];
+bank code           @ 0x0200 : [constdata;   0x0500];
 
-let EXTERNAL_DATA_ADDR = 0x600;
+let EXTERNAL_DATA_ADDR = 0x700;
 
 
 // Data Structures
@@ -38,6 +38,7 @@ let N_SOUND_EFFECTS = 128;
 
 
 let INSTRUMENT_MASK = N_INSTRUMENTS - 1;
+let SOUND_EFFECT_MASK = N_SOUND_EFFECTS - 1;
 
 
 // Number of clock ticks after a KOFF event before the bytecode is processed.
@@ -51,6 +52,11 @@ let KEY_OFF_DELAY = (64 + 48) / TIMER_DIVIDER;
 
 let STARTING_OCTAVE = 3;
 let STARTING_DEFAULT_NOTE_LENGTH = 64 / 4;
+
+
+let SFX_BPM = 125;
+let SFX_TEMPO = (TICKS_PER_SECOND * 60 * 0x100) / (SFX_BPM * 48);
+let SFX_DEFAULT_NOTE_LENGTH = 96 / 4;
 
 
 struct DirItem {
@@ -76,6 +82,10 @@ struct ExternalData {
     pitchTable_h   : [u8; 256],
 
     instruments    : InstrumentsSoA,
+
+    // The address of the sound effect bytecode.
+    soundEffects_l : [u8; N_SOUND_EFFECTS],
+    soundEffects_h : [u8; N_SOUND_EFFECTS],
 };
 
 
@@ -154,6 +164,10 @@ in zeropage {
 
 
     namespace channelSoA {
+        // If non-zero, the channel is disabled.
+        // (Used to determine which channel to play a sound effect on)
+        var disabled : [u8 ; N_CHANNELS];
+
         // The time of the next event
         // (Q16.8 fixed point)
         var nextEvent_f : [u8 ; N_CHANNELS];
@@ -161,6 +175,9 @@ in zeropage {
         var nextEvent_h : [u8 ; N_CHANNELS];
 
         // Number of ticks (1/8000 seconds) per 1/64 beat.
+        //
+        // NOTE: This variable is only set once (at the start of the song).
+        //
         // (Q8.8 fixed point)
         var tempo_f : [u8 ; N_CHANNELS];
         var tempo_l : [u8 ; N_CHANNELS];
@@ -228,6 +245,10 @@ in zeropage {
         // Using u8 here so I can use this variable with `__set_pt_offset()` and `__add_to_pt_offset().
         var semitoneOffset : [u8 ; N_CHANNELS];
     }
+
+    // Used for testing sound effects
+    var _countdownToNextSfx : u16;
+    var _sfxToPlay : u8;
 }
 
 
@@ -411,6 +432,15 @@ var _loopEnd : u8 in zpTmp;
     } while !negative;
 
 
+    // Set SFX tempo
+    a = <:SFX_TEMPO;
+    y = >:SFX_TEMPO;
+    inline for let i in N_MUSIC_CHANNELS..7 {
+        channelSoA.tempo_f[i] = a;
+        channelSoA.tempo_l[i] = y;
+    }
+
+
     // Set nextEvent to 0x8080 to test `__rewind_tick_clock()`
     a = 0x80;
     <:tickClock = a;
@@ -461,6 +491,16 @@ func process_event_loop() {
             (>:tickClock)++;
             goto __rewind_tick_clock if negative;
         }
+
+
+        // Test sound effects.
+        _countdownToNextSfx--;
+        if negative {
+            play_sound_effect(_sfxToPlay & 3);
+            _sfxToPlay++;
+
+            >:_countdownToNextSfx = a = 2;
+        }
     }
 }
 
@@ -490,6 +530,51 @@ func delay() {
         y--;
     } while !zero;
 }
+
+
+func play_sound_effect(sfx_id : u8 in a) {
+    x = a = sfx_id & SOUND_EFFECT_MASK;
+
+    y = a = external_data.soundEffects_h[x];
+    if !zero {
+        a = external_data.soundEffects_l[x];
+
+        inline for let i in N_MUSIC_CHANNELS..7 {
+            x = channelSoA.disabled[i];
+            if !zero {
+                x = i;
+                return __play_sfx_on_channel(x, ya);
+            }
+        }
+    }
+}
+
+func __play_sfx_on_channel(channelIndex : u8 in x, sfxBytecode : u16 in ya) {
+    channelSoA.instructionPtr_l[x] = a;
+    channelSoA.instructionPtr_h[x] = y;
+
+    ya = tickClock;
+    channelSoA.nextEvent_l[x] = a;
+    channelSoA.nextEvent_h[x] = y;
+
+    a = 0;
+    channelSoA.disabled[x] = a;
+    channelSoA.nextEvent_f[x] = a;
+    channelSoA.instructionPtrAfterEnd_h[x] = a;     // don't loop SFX
+    channelSoA.slurNextNote[x] = a;
+    channelSoA.nextEventIsKeyOff[x] = a;
+    channelSoA.instPitchOffset[x] = a;
+    channelSoA.semitoneOffset[x] = a;
+
+    a = STARTING_OCTAVE * 12;
+    channelSoA.octaveOffset[x] = a;
+    channelSoA.pitchTableOffset[x] = a;
+
+    channelSoA.defaultNoteLength[x] = a = SFX_DEFAULT_NOTE_LENGTH;
+
+    ^return bytecode.set_channel_volume(x, 96);
+}
+
 
 
 // KEEP: X
@@ -612,6 +697,9 @@ func disable_channel(channelIndex : u8 in x) : bool in carry {
     a = 0xff;
     channelSoA.nextEvent_l[x] = a;
     channelSoA.nextEvent_h[x] = a;
+
+    // A is non-zero
+    channelSoA.disabled[x] = a;
 
     a = <:&ChannelDisabledBytecode;
     y = >:&ChannelDisabledBytecode;
@@ -1013,96 +1101,15 @@ in data {
             UNUSED_CHANNEL,
             UNUSED_CHANNEL,
             UNUSED_CHANNEL,
-            MusicChannelHeader{
-                starting = EXAMPLE_SONG_OFFSET,
-                loop = EXAMPLE_SONG_OFFSET,
-            },
+            UNUSED_CHANNEL,
             UNUSED_CHANNEL,
             UNUSED_CHANNEL,
         ],
 
         tempo = (TICKS_PER_SECOND * 60 * 0x100) / (STARTING_BPM * 64),
-        nSubroutines = 1,
+        nSubroutines = 0,
     };
-
-    const SongSubroutineTable : [ u16 ; 1] = [ &ExampleSubroutine as u16 - &SongData as u16 ];
-
-
-    let EXAMPLE_SONG_OFFSET = sizeof(SongHeader) + sizeof(typeof(SongSubroutineTable));
-
-
-    let _REST = 2;
-    let _CALL = _REST + 1;
-    let _END_LOOP_0 = _CALL + 1;
-    let _END_LOOP_1 = _END_LOOP_0 + 1;
-
-    let _SET_SEMITONE_OFFSET =  _END_LOOP_1 + 1;
-    let _RELATIVE_SEMITONE_OFFSET = _SET_SEMITONE_OFFSET + 1;
-
-
-    let _DISABLE_CHANNEL = bytecode.N_SINGLE_ARGUMENT_INSTRUCTIONS;
-    let _END = _DISABLE_CHANNEL + 1;
-    let _RTS = _END + 1;
-    let _START_LOOP_0 = _RTS + 1;
-    let _START_LOOP_1 = _START_LOOP_0 + 1;
-
-
-    let _SET_INSTRUMENT = 0;
-
-    let _PLAY_NOTE = 1 << 5;
-    let _PLAY_NOTE_LENGTH = _PLAY_NOTE | (0x10);
-
-    let _PLAY_NOTE_SLUR_NEXT = 2 << 5;
-    let _PLAY_NOTE_SLUR_NEXT_LENGTH = _PLAY_NOTE_SLUR_NEXT | (0x10);
-
-    let _CHANGE_OCTAVE = 3 << 5;
-
-    let __L2 = 64 / 2;
-    let __L8 = 64 / 8;
-
-
-    // MUST BE immediately after SongSubroutineTable
-    const ExampleSongChannel : [u8] = [
-        _REST as u8, 192,
-
-        _SET_INSTRUMENT, 1,
-
-        _START_LOOP_0,
-            _CHANGE_OCTAVE | (((5+6) & 0xf) << 1),     // set octave to 5
-            _CALL, 0,
-
-            _CHANGE_OCTAVE | (((-2+6) & 0xf) << 1) | 1, // lower by 2 octaves
-            _CALL, 0,
-
-            _CHANGE_OCTAVE | ((( 1+6) & 0xf) << 1) | 1, // increase by 1 octave
-            _CALL, 0,
-
-            _REST as u8, 64,
-
-            _SET_INSTRUMENT, 2,
-        _END_LOOP_0, 0,
-
-        _END,
-    ];
-
-
-    const ExampleSubroutine : [u8] = [
-        _SET_SEMITONE_OFFSET as u8, 0 as u8,
-        _PLAY_NOTE | 2,
-
-        _SET_SEMITONE_OFFSET, -3 as u8,
-        _PLAY_NOTE | 2,
-
-        _RELATIVE_SEMITONE_OFFSET, 2,
-        _PLAY_NOTE | 2,
-
-        _RELATIVE_SEMITONE_OFFSET, -4 as u8,
-        _PLAY_NOTE | 2,
-
-        _REST as u8, 64,
-
-        _RTS,
-    ];
+    const SongSubroutineTable : [ u16 ; 0] = [ ];
 }
 
 

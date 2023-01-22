@@ -6,6 +6,7 @@ import json
 import os
 import re
 
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Final, Optional, TypeAlias, Union
 
@@ -25,7 +26,7 @@ class JsonError(RuntimeError):
 NAME_REGEX: Final = re.compile(r'[a-zA-Z][a-zA-Z0-9_]*$')
 
 
-def _read_name(s: Any) -> Name:
+def parse_name(s: Any) -> Name:
     name = str(s)
     if NAME_REGEX.match(name):
         return name
@@ -53,6 +54,38 @@ def _read_optional_int(v: Union[str, int, float, None]) -> Optional[int]:
         return None
     else:
         return _read_int(v)
+
+
+#
+# mappings.json
+# =============
+#
+
+@dataclass
+class Mappings:
+    sound_effects: list[Name]
+
+
+def _read_mapping_list(json_input: dict[str, Any], key: str) -> list[Name]:
+    json_list = json_input.get(key)
+
+    if type(json_list) != list:
+        raise ValueError(f"JSON Error: {key}: Expected a list of names")
+
+    out = list()
+    for n in json_list:
+        out.append(parse_name(n))
+
+    return out
+
+
+def load_mapping_json(filename: Filename) -> Mappings:
+    with open(filename, 'r') as fp:
+        json_input = json.load(fp)
+
+    return Mappings(
+        _read_mapping_list(json_input, 'sound-effects')
+    )
 
 
 #
@@ -139,7 +172,7 @@ def _read_instruments(json_input: dict[str, list[dict[str, Any]]], filename: Fil
 
         try:
             inst = Instrument(
-                name=_read_name(ji['name']),
+                name=parse_name(ji['name']),
                 source=_read_filename(ji['source'], dirname),
                 looping=bool(ji['looping']),
                 freq=float(ji['freq']),

@@ -1,0 +1,38 @@
+
+
+== menu_cursor ==
+    set_instrument      square_500
+    set_channel_volume  20
+    change_octave       +1
+
+    play_note           d, 8
+
+    disable_channel
+
+
+
+== menu_select ==
+    set_instrument  sawtooth_333
+    change_octave   4
+
+    play_note       c+  16
+    play_note       b-  96
+
+    disable_channel
+
+
+
+== slur_loop_test ==
+    set_instrument      square_500
+    set_channel_volume  127
+
+    start_loop
+        play_note_slur_next   5, 12
+        play_note_slur_next  10, 12
+    end_loop    6
+
+    play_note   5
+
+    disable_channel
+
+

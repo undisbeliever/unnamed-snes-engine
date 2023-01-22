@@ -93,9 +93,8 @@ def _compile_brr_samples(instruments: list[Instrument]) -> BrrData:
         except Exception as e:
             errors.append(f"ERROR in Instrument {i} {inst.name}: {e}")
 
-    max_brr_data_size: Final = BRR_DATA_END_ADDRESS - BRR_DATA_ADDRESS
-    if len(brr_data) >= max_brr_data_size:
-        errors.append(f"Too many BRR samples.  ({len(brr_data)} bytes, max is {max_brr_data_size})")
+    if len(brr_data) >= MAX_COMMON_DATA_SIZE:
+        errors.append(f"Too many BRR samples.  ({len(brr_data)} bytes, max is {MAX_COMMON_DATA_SIZE}")
 
     # Pad `brr_directory`
     directory_padding = BRR_DIRECTORY_SIZE - len(brr_directory)
