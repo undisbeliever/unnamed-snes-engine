@@ -2,6 +2,7 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "memmap";
+import "audio";
 import "joypad";
 import "metasprites";
 import "metatiles";
@@ -131,6 +132,8 @@ func wait_frame() {
         nmiCounter = 0;
 
         joypad.update_state__inline();
+
+        audio.process_sfx_queue__inline();
     }
 
 

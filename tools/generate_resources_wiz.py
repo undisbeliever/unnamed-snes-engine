@@ -6,8 +6,9 @@
 import re
 import argparse
 from io import StringIO
+from typing import TextIO
 
-from _json_formats import RoomName, load_mappings_json, Mappings, MemoryMap
+from _json_formats import RoomName, load_mappings_json, load_audio_mappings_json, Name, Mappings, AudioMappings, MemoryMap
 from _common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET, USB2SNES_DATA_BANK_OFFSET, ResourceType
 
 
@@ -26,7 +27,17 @@ def resources_over_usb2snes_data_addr(memory_map : MemoryMap) -> int:
 
 
 
-def generate_wiz_code(mappings : Mappings) -> str:
+def write_enum(out: TextIO, name: Name, name_list: list[Name]) -> None:
+    out.write(f"enum { name } : u8 {{\n")
+
+    for n in name_list:
+        out.write(f"  { n },\n")
+
+    out.write('};\n\n')
+
+
+
+def generate_wiz_code(mappings : Mappings, audio_mappings: AudioMappings) -> str:
 
     with StringIO() as out:
         out.write('namespace resources {\n\n')
@@ -45,16 +56,12 @@ def generate_wiz_code(mappings : Mappings) -> str:
             out.write(f"{ l }, ")
         out.write('];\n\n')
 
-
         for rt in ResourceType:
-            out.write(f"enum { rt.name } : u8 {{\n")
+            write_enum(out, rt.name, getattr(mappings, rt.name))
 
-            for i in getattr(mappings, rt.name):
-                out.write(f"  { i },\n")
+        out.write('}\n\n')
 
-            out.write('};\n\n')
-
-        out.write('}')
+        write_enum(out, 'sound_effects', audio_mappings.sound_effects)
 
         return out.getvalue()
 
@@ -66,6 +73,8 @@ def parse_arguments() -> argparse.Namespace:
                         help='wiz output file')
     parser.add_argument('mappings_json_file', action='store',
                         help='mappings json file input')
+    parser.add_argument('audio_mappings_json', action='store',
+                        help='audio mappings json file input')
 
     args = parser.parse_args()
 
@@ -77,8 +86,9 @@ def main() -> None:
     args = parse_arguments()
 
     mappings = load_mappings_json(args.mappings_json_file)
+    audio_mappings = load_audio_mappings_json(args.audio_mappings_json)
 
-    out = generate_wiz_code(mappings)
+    out = generate_wiz_code(mappings, audio_mappings)
 
     with open(args.output, 'w') as fp:
         fp.write(out)

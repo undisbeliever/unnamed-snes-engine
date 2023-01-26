@@ -6,10 +6,12 @@ import "../common/reset";
 
 import "../../wiz/common/snes/snes";
 
+import "../audio";
 import "../gamemodes";
 import "../joypad";
 import "../resources";
 import "../wait-frame";
+import "gen/resources";
 
 
 namespace gamemodes {
@@ -50,6 +52,9 @@ func exec() {
 
         a = joypad.pressed_h;
     } while a & joypad.JOYH.START == 0;
+
+
+    audio.queue_sound_effect(sound_effects.menu_select);
 
 
     gamestate.new_game();

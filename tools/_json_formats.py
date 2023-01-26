@@ -702,6 +702,23 @@ def load_mappings_json(filename : Filename) -> Mappings:
 
 
 
+# audio_mappings.json
+# ===================
+
+
+class AudioMappings(NamedTuple):
+    sound_effects: list[Name]
+
+
+def load_audio_mappings_json(filename: Filename) -> AudioMappings:
+    jh = _load_json_file(filename, _Helper)
+
+    return AudioMappings(
+        sound_effects = jh.get_name_list('sound-effects'),
+    )
+
+
+
 # metasprites.json
 # ================
 

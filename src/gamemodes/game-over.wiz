@@ -5,6 +5,7 @@ import "../memmap";
 
 import "../../wiz/common/snes/snes";
 
+import "../audio";
 import "../gamemodes";
 import "../gamestate";
 import "../joypad";
@@ -12,6 +13,7 @@ import "../metasprites";
 import "../resources";
 import "../wait-frame";
 import "../common/reset";
+import "gen/resources";
 
 
 namespace gamemodes {
@@ -88,6 +90,8 @@ func exec() {
                 a = N_MENU_ITEMS - 1;
             }
             selectedItem = a as MenuItem;
+
+            audio.queue_sound_effect(sound_effects.menu_cursor);
         }
         else if a & joypad.JOYH.DOWN != 0 {
             a = selectedItem as u8;
@@ -96,8 +100,12 @@ func exec() {
                 a = 0;
             }
             selectedItem = a as MenuItem;
+
+            audio.queue_sound_effect(sound_effects.menu_cursor);
         }
         else if a & joypad.JOYH.START != 0 {
+            audio.queue_sound_effect(sound_effects.menu_select);
+
             a = selectedItem as u8;
             if a == MenuItem.TITLE_SCREEN as u8{
                 a = GameModes.TITLE_SCREEN as u8;

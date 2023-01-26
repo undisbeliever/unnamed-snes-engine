@@ -3,6 +3,7 @@
 
 import "memmap";
 import "resources";
+import "gen/resources";
 
 import "../wiz/common/snes/snes";
 
@@ -15,8 +16,34 @@ namespace audio {
 let AUDIO_DRIVER_ARAM_ADDR = 0x200;
 
 
+// MUST match `audio/src/audio-driver.wiz`
+namespace IO {
+    extern writeonly command_id @ &snes.apu.output0 : u8;
+    extern const command_id_ack @ &snes.apu.input0 : u8;
+
+    extern writeonly command @ &snes.apu.output1 : u8;
+}
+
+
+// MUST match `audio/src/audio-driver.wiz`
+enum IoCommand : u8 {
+    // commands 0-127: Play sound effect.
+};
+
+
 in rodata0 {
     const AudioDriver = embed "../audio/audio-driver.bin";
+}
+
+
+in zeropage {
+    // The sound effect to play next.
+    //
+    // NOTE: If sfxQueue > N_SOUND_EFFECTS.  No sound effect will be played.
+    var sfxQueue : u8;
+
+    // The `command_id` of the previous command send to the S-SMP audio driver.
+    var previousCommandId : u8;
 }
 
 
@@ -41,11 +68,63 @@ var _res : resources.ResourceEntry in resources.res;
     _res.size = yy = sizeof(typeof(AudioDriver));
 
     __initialise_ipl();
-    transfer_data_to_aram(_res, AUDIO_DRIVER_ARAM_ADDR);
+    _transfer_data_to_aram(_res, AUDIO_DRIVER_ARAM_ADDR);
 
-    // ::TODO transfer music data::
+    // ::TODO transfer common data::
 
     __execute_audio_driver();
+
+
+    // Reset the SFX queue
+    sfxQueue = a = 0xff;
+
+    // Start audio driver.
+    IO.command_id = 0;
+    previousCommandId = 0;
+}
+
+
+
+// Queue the next sound effect to play.
+//
+// NOTE: Only 1 sound effect can be played at a time
+// NOTE: Lower sound effect IDs take priority over higher sound effect IDs.
+//
+// DB access zero-page
+#[mem8, idx8]
+func queue_sound_effect(effect_id : sound_effects in a) {
+    if a < sfxQueue {
+        sfxQueue = a;
+    }
+}
+
+
+
+// Process sound effects
+//
+// MUST be called once per frame.
+//
+// DB = 0x80
+#[mem8, idx8]
+inline func process_sfx_queue__inline() {
+    // Assumes N_SOUND_EFFECTS <= 128
+    a = sfxQueue;
+    if !negative {
+        x = previousCommandId;
+        if x == IO.command_id_ack {
+            // The previous command executed successfully.
+            // Send a new command.
+
+            IO.command = a;
+
+            x++;
+            IO.command_id = x;
+            previousCommandId = x;
+
+            // Reset the SFX queue
+            sfxQueue = a = 0xff;
+        }
+    }
 }
 
 
@@ -72,7 +151,7 @@ func __initialise_ipl() {
 //
 // DB = 0x80
 #[mem8, idx16]
-func transfer_data_to_aram(_res : resources.ResourceEntry in resources.res, aramAddr : u16 in xx) {
+func _transfer_data_to_aram(_res : resources.ResourceEntry in resources.res, aramAddr : u16 in xx) {
 
     // ::TODO add a 'running IPL' check::
 

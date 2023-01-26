@@ -127,6 +127,21 @@ in data {
 }
 
 
+// MUST match `src/audio.wiz`
+namespace IO {
+    extern const command_id  @ &smp.io_port_in_0 : u8;
+    extern writeonly command_id_ack @ &smp.io_port_out_0 : u8;
+
+    extern const command @ &smp.io_port_in_1 : u8;
+}
+
+
+// MUST match `audio/src/audio-driver.wiz`
+enum IoCommand : u8 {
+    // commands 0-127: Play sound effect.
+};
+
+
 
 // Variables
 // =========
@@ -136,6 +151,11 @@ in zeropage {
     // Temporary variables
     var zpTmp : u8;
     var zpTmpPtr : *u8;
+
+
+    // The previous IO port command_id
+    var previousCommandId : u8;
+
 
     // The table of subroutine addresses
     var subroutineTable : **const u8;
@@ -447,6 +467,9 @@ var _loopEnd : u8 in zpTmp;
     >:tickClock = a;
 
 
+    init_io_ports__inline();
+
+
     // Setup and enable the timer
     smp.timer_0 = a = TIMER_DIVIDER;
     smp.control = a = smp.CONTROL__ENABLE_TIMER_0;
@@ -466,6 +489,9 @@ func process_event_loop() {
         a = 0;
         keyOffShadow = a;
         keyOnShadow = a;
+
+
+        process_io_ports__inline();
 
 
         x = N_CHANNELS - 1;
@@ -490,16 +516,6 @@ func process_event_loop() {
         if carry {
             (>:tickClock)++;
             goto __rewind_tick_clock if negative;
-        }
-
-
-        // Test sound effects.
-        _countdownToNextSfx--;
-        if negative {
-            play_sound_effect(_sfxToPlay & 3);
-            _sfxToPlay++;
-
-            >:_countdownToNextSfx = a = 2;
         }
     }
 }
@@ -532,9 +548,53 @@ func delay() {
 }
 
 
-func play_sound_effect(sfx_id : u8 in a) {
-    x = a = sfx_id & SOUND_EFFECT_MASK;
+// IO Ports
+// ========
 
+inline func init_io_ports__inline() {
+    // Wait until CPU ready
+    do {
+        a = IO.command_id;
+    } while !zero;
+
+    IO.command_id_ack = a;
+    previousCommandId = a;
+}
+
+
+inline func process_io_ports__inline() {
+    // Test if `IO.command_id` has changed.
+    // If S-CPU writes to `command_id` at the same time S-SMP reads `command_id`, `command_id` will contain invalid data.
+    // We do not care about the value of `command_id` at this point in time, we only care if it has changed.
+    x = IO.command_id;
+    if x != previousCommandId {
+        // There is a new command from the S-CPU
+
+        // Get command from S-CPU
+        a = IO.command;
+
+        // Acknowledge command
+        // Read `IO.command_id` a second time to ensure the correct value is read.
+        // This should be safe.  The S-CPU will not write to `IO.command_id` until it has been acknowledged.
+        // ::TODO stress test `command_id`::
+        x = IO.command_id;
+        IO.command_id_ack = x;
+        previousCommandId = x;
+
+        // Assumes N_SOUND_EFFECTS == 128
+        if negative {
+            // ::TODO process other commands::
+        }
+        else {
+            // Play sound effect command
+            play_sound_effect__inline(a);
+        }
+    }
+}
+
+
+// ASSUMES: sfx_id < N_SOUND_EFFECTS (128)
+inline func play_sound_effect__inline(sfx_id : u8 in x) {
     y = a = external_data.soundEffects_h[x];
     if !zero {
         a = external_data.soundEffects_l[x];
@@ -543,7 +603,8 @@ func play_sound_effect(sfx_id : u8 in a) {
             x = channelSoA.disabled[i];
             if !zero {
                 x = i;
-                return __play_sfx_on_channel(x, ya);
+                __play_sfx_on_channel(x, ya);
+                return;
             }
         }
     }
@@ -575,6 +636,10 @@ func __play_sfx_on_channel(channelIndex : u8 in x, sfxBytecode : u16 in ya) {
     ^return bytecode.set_channel_volume(x, 96);
 }
 
+
+
+// Process Channels
+// ================
 
 
 // KEEP: X
