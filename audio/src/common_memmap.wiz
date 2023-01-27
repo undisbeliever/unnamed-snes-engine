@@ -1,0 +1,40 @@
+// Common addresses, sizes and banks used by the loader and the audio driver.
+//
+// Copyright (c) 2023, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+
+let LOADER_ADDR = 0x160;
+let LOADER_SIZE =  0x80;
+
+let STACK_SIZE = 0x200 - LOADER_ADDR - LOADER_SIZE;
+let STACK_BOTTOM_ADDR = 0x200 - STACK_SIZE;
+
+let COMMON_DATA_ADDR = 0x700;
+
+let CODE_ADDR = 0x200;
+let CODE_SIZE = COMMON_DATA_ADDR - CODE_ADDR;
+
+let SONG_HEADER_SIZE = 27;
+
+
+bank zeropage        @ 0x0000 : [vardata;     0x00ed];
+bank loader_zeropage @ 0x00ed : [vardata;     0x0002];
+// addresses 0x00f0 - 0x00ff contains registers
+bank stack           @ STACK_BOTTOM_ADDR : [vardata; STACK_SIZE];
+
+
+in loader_zeropage {
+    // The address of the song data
+    var __loader_songPtr : *const u8;
+}
+
+// Provide read-only access to songPtr address and data in `audio-driver.wiz`
+extern const songPtr @ &__loader_songPtr : *const u8;
+
+
+inline func execute_loader() {
+    goto (LOADER_ADDR as func);
+}
+
+

@@ -1,0 +1,156 @@
+// Copyright (c) 2023, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+
+import "registers";
+import "common_memmap.wiz";
+
+config {
+    trim = true
+}
+
+bank loader_code     @ LOADER_ADDR : [varinitdata; LOADER_SIZE];
+
+in loader_zeropage {
+    // Allow the loader to read/write song address and data
+    var _songPtr : *u8 in __loader_songPtr;
+}
+
+
+enum LoaderDataType : u8 {
+    // These values cannot be 0 or negative.
+    CODE        = 'C',
+    COMMON_DATA = 'D',
+    SONG_DATA   = 'S',
+};
+
+
+in loader_code {
+
+// MUST be the first thing in the loader_code bank
+#[fallthrough]
+func start_loader() {
+    sp = x = 0xff;
+    direct_page = false;
+
+    // Clear IO ports
+    smp.control = a = smp.CONTROL__RESET_PORTS_01 | smp.CONTROL__RESET_PORTS_23;
+    smp.control = a = 0;
+
+    // Send 'ready' signal
+    a = 'R';
+    y = 'D';
+    smp.io_port_out_23 = ya;
+
+    // Wait for S-CPU to respond to the ready signal
+    do {
+    } while ya != smp.io_port_in_23;
+
+    // retrieve LoaderDataType from port 0
+    x = smp.io_port_in_0;
+
+    push(x);
+
+        // Get the address to store the data
+        // MUST NOT USE X
+        a = 0;
+        if x == LoaderDataType.CODE as u8 {
+            y = >:CODE_ADDR;
+        }
+        else if x == LoaderDataType.COMMON_DATA as u8 {
+            y = >:COMMON_DATA_ADDR;
+        }
+        else {
+            // Assumes `_songPtr` is even
+            ya = _songPtr as u16;
+        }
+
+        // Write high byte of the address to the two `MOV !abs+Y, A` instructions.
+        (&STA_1 as *u8)[2] = y;
+        (&STA_2 as *u8)[2] = y;
+        y = a;
+
+        // Acknowledge LoaderDataType
+        // And override the `RD` ready signal.
+        smp.io_port_out_2 = a = 0;
+
+        x = 'D';
+
+        // Have to use a manual loop so the above code has access to the `STA_1` and `STA_2` labels.
+        Loop:
+            // Y = low byte of data address
+            // X = last value written to IO port 3
+
+            // Wait until S-CPU has written the data to the IO ports
+            do {
+            } while x == smp.io_port_in_3;
+
+            // Check if this data is correct, and get the byte to send back to the S-CPU
+            x = smp.io_port_in_3;
+            goto EndLoop if negative;
+
+
+            // Read data from the IO ports
+            a = smp.io_port_in_0;
+        STA_1:
+            (0xFF00 as *u8)[y] = a;
+
+            a = smp.io_port_in_1;
+
+
+            // Acknowledge data (S-CPU will start loading new data)
+            smp.io_port_out_3 = x;
+
+
+            // This code is executed while the S-CPU loads the next data into ports 0 & 1
+            y++;
+        STA_2:
+            (0xFF00 as *u8)[y] = a;
+            y++;
+
+            goto Loop if !zero;
+                (&STA_1 as *u8)[2]++;
+                (&STA_2 as *u8)[2]++;
+                goto Loop;
+EndLoop:
+
+    // Y = low byte of data address
+
+    // Acknowledge end of data
+    // (x is negative)
+    smp.io_port_out_3 = x;
+
+    x = pop();
+
+    goto start_loader if x == LoaderDataType.CODE as u8;
+
+    if x == LoaderDataType.COMMON_DATA as u8 {
+        // Save current data address in `songPtr`
+        a = y;
+        y = (&STA_1 as *u8)[2];
+
+        _songPtr = ya as *u8;
+
+
+        // Build a dummy song header
+        y = SONG_HEADER_SIZE - 1;
+
+        // Set SongHeader.nSubroutines to 0
+        _songPtr[y] = a = 0;
+        y--;
+
+        // Disable all song channels.
+        a = 0xff;
+        do {
+            _songPtr[y] = a;
+        } while --y != 0;
+
+        // Do not worry about resetting byte 0 of the header,
+        // only the high-bytes of the song channel offsets need to be 0xff to disable (silence) the channel.
+    }
+
+    goto (CODE_ADDR as func);
+}
+
+}
+

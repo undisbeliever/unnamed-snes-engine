@@ -3,21 +3,13 @@
 
 
 import "registers";
-
-
-// Memory Map
-// ==========
+import "common_memmap";
 
 config {
     trim = true
 }
 
-bank zeropage       @ 0x0000 : [vardata;     0x00f0];
-// addresses 0x00f0 - 0x00ff contain registers
-bank stack          @ 0x0100 : [vardata;     0x0100];
-bank code           @ 0x0200 : [constdata;   0x0500];
-
-let EXTERNAL_DATA_ADDR = 0x700;
+bank code           @ CODE_ADDR : [constdata;   CODE_SIZE];
 
 
 // Data Structures
@@ -92,12 +84,12 @@ struct ExternalData {
 struct MusicChannelHeader {
     // The starting offset of the channel bytecode (relative to the start of the song data).
     //
-    // If `starting+SongData` overflows (ie, starting >= 0xff00), then the channel is disabled.
+    // If `starting+songPtr` overflows (ie, starting >= 0xff00), then the channel is disabled.
     starting : u16,
 
     // The loop point in the channel bytecode (relative to the start of the song data).
     //
-    // If `loop+SongData` overflows (ie, loop >= 0xff00), then the channel will not loop.
+    // If `loop+songPtr` overflows (ie, loop >= 0xff00), then the channel will not loop.
     loop: u16,
 };
 
@@ -109,7 +101,8 @@ struct SongHeader {
     tempo   : u16,
 
     // Number of subroutines
-    // NOTE: This variable has a maximum value of 128
+    // NOTE: This variable has a maximum value of 128.
+    // (This variable must be the last field in the SongHeader).
     nSubroutines : u8,
 
     // Immediately after this header is an array, [u16 ; nSubroutines], containing the location of each subroutine
@@ -117,18 +110,16 @@ struct SongHeader {
     // The audio-engine will convert the locations into addresses before starting the event-loop.
 };
 
-extern const external_data @ EXTERNAL_DATA_ADDR : ExternalData;
+extern const external_data @ COMMON_DATA_ADDR : ExternalData;
 
-
-bank data @ EXTERNAL_DATA_ADDR : [constdata; 0x8000];
-
-in data {
-    const __external_data = embed "../gen/common_data.bin";
-}
 
 
 // MUST match `src/audio.wiz`
 namespace IO {
+    // The audio-driver MUST NOT use IO port 3 (without rewriting the loader).
+    //
+    // Port 3 is used by the loader to signal to the S-CPU that the loader is running.
+
     extern const command_id  @ &smp.io_port_in_0 : u8;
     extern writeonly command_id_ack @ &smp.io_port_out_0 : u8;
 
@@ -150,7 +141,6 @@ enum IoCommand : u8 {
 in zeropage {
     // Temporary variables
     var zpTmp : u8;
-    var zpTmpPtr : *u8;
 
 
     // The previous IO port command_id
@@ -287,7 +277,7 @@ inline func write_dsp(addr : GlobalDspAddr in a, data : u8 in y) {
 //
 // KEEP: X
 //
-// MUST NOT USE `zpTmp` or `zpTmpPtr`
+// MUST NOT USE `zpTmp`
 inline func __set_pt_offset(channelIndex : u8 in x, st_offset : u8 in a, let SOA_VAR : [u8 ; N_CHANNELS]) {
     y = a;
 
@@ -317,7 +307,6 @@ in code {
 
 // MUST be the first thing in the `code` bank (so the starting address is consistent across builds).
 func main() {
-var _songPtr : *const u8 in zpTmpPtr;
 var _loopEnd : u8 in zpTmp;
 
 
@@ -354,9 +343,10 @@ var _loopEnd : u8 in zpTmp;
     write_dsp(GlobalDspAddr.FLG,    dsp.FLG__ECHO_DISABLE);
 
 
-    // Clear zero-page variables
+    // Clear all zero-page variables before `songPtr`.
+    // Assumes `songPtr` is AFTER `zeropage` bank.
     a = 0;
-    x = 0xf0;
+    x = &songPtr as u8;
     do {
         x--;
         (0 as *u8)[x] = a;
@@ -372,28 +362,22 @@ var _loopEnd : u8 in zpTmp;
     }
 
 
-    // Retrieve the address of the song header
-    a = <:&SongData;
-    y = >:&SongData;
-    _songPtr = ya as *u8;
-
-
     // Calculate the subroutineTable address.
     a = sizeof(SongHeader);
     y = 0;
-    ya += _songPtr as u16;
+    ya += songPtr as u16;
     subroutineTable = ya as **const u8;
 
-    // Add _songPtr to each element in the subroutine table, turning an offset into an address.
+    // Add songPtr to each element in the subroutine table, turning an offset into an address.
     y = offsetof(SongHeader, nSubroutines);
-    a = _songPtr[y];
+    a = songPtr[y];
     if !zero {
         _loopEnd = a = a << 1;
         y = 0;
         do {
-            (subroutineTable as *u8)[y] = a = (subroutineTable as *u8)[y] + <:_songPtr;
+            (subroutineTable as *u8)[y] = a = (subroutineTable as *u8)[y] + <:songPtr;
             y++;
-            (subroutineTable as *u8)[y] = a = (subroutineTable as *u8)[y] +# >:_songPtr;
+            (subroutineTable as *u8)[y] = a = (subroutineTable as *u8)[y] +# >:songPtr;
             y++;
         } while y != _loopEnd;
     }
@@ -413,9 +397,9 @@ var _loopEnd : u8 in zpTmp;
         channelSoA.defaultNoteLength[x] = a = STARTING_DEFAULT_NOTE_LENGTH;
 
         y = offsetof(SongHeader, tempo);
-        channelSoA.tempo_f[x] = a = _songPtr[y];
+        channelSoA.tempo_f[x] = a = songPtr[y];
         y++;
-        channelSoA.tempo_l[x] = a = _songPtr[y];
+        channelSoA.tempo_l[x] = a = songPtr[y];
 
 
         // ASSUMES offsetof(SongHeader, channels) == 0
@@ -423,9 +407,9 @@ var _loopEnd : u8 in zpTmp;
         y = a = x <<< 2;
 
         // Calculate instructionPtr (and setting it to `ChannelDisabledBytecode` if the addition overflows)
-        channelSoA.instructionPtr_l[x] = a = _songPtr[y] + <:_songPtr;
+        channelSoA.instructionPtr_l[x] = a = songPtr[y] + <:songPtr;
         y++;
-        a = _songPtr[y] +# >:_songPtr;
+        a = songPtr[y] +# >:songPtr;
         if carry {
             channelSoA.instructionPtr_l[x] = a = <:&ChannelDisabledBytecode;
             a = >:&ChannelDisabledBytecode;
@@ -434,9 +418,9 @@ var _loopEnd : u8 in zpTmp;
         y++;
 
         // Calculate endInstPtr (and set the high byte to 0 (no looping) if the addition overflows)
-        channelSoA.instructionPtrAfterEnd_l[x] = a = _songPtr[y] + <:_songPtr;
+        channelSoA.instructionPtrAfterEnd_l[x] = a = songPtr[y] + <:songPtr;
         y++;
-        a = _songPtr[y] +# >:_songPtr;
+        a = songPtr[y] +# >:songPtr;
         if carry {
             a = 0;
         }
@@ -874,7 +858,7 @@ func end_loop_1(channelIndex : u8 in x, loopCount : u8 in a) : bool in carry {
 
 // KEEP: X
 // MUST NOT USE `currentChannelIndex`
-// MUST NOT USE `zpTmp` or `zpTmpPtr`
+// MUST NOT USE `zpTmp`
 func set_instrument(channelIndex : u8 in x, instrumentId : u8 in a) : bool in carry {
     // Using addr,y addressing mode for `channels`, 1 cycle faster then transferring y to x.
 
@@ -946,7 +930,7 @@ func relative_semitone_offset(channelIndex : u8 in x, parameter : i8 in a) : boo
 
 // KEEP: X
 // MUST NOT USE `currentChannelIndex`
-// MUST NOT USE `zpTmp` or `zpTmpPtr`
+// MUST NOT USE `zpTmp`
 func set_channel_volume(channelIndex : u8 in x, volume : u8 in a) : bool in carry {
     y = a;
 
@@ -1155,28 +1139,6 @@ in code {
     // This is the bytecode used by a disabled channel.
     const ChannelDisabledBytecode : [ u8; 1 ] = [ bytecode.DISABLE_CHANNEL_BYTECODE ];
 }
-
-
-in data {
-    let UNUSED_CHANNEL = MusicChannelHeader{starting=0xffff, loop=0xffff};
-    let STARTING_BPM = 120;
-
-    const SongData = SongHeader{
-        channels = [
-            UNUSED_CHANNEL,
-            UNUSED_CHANNEL,
-            UNUSED_CHANNEL,
-            UNUSED_CHANNEL,
-            UNUSED_CHANNEL,
-            UNUSED_CHANNEL,
-        ],
-
-        tempo = (TICKS_PER_SECOND * 60 * 0x100) / (STARTING_BPM * 64),
-        nSubroutines = 0,
-    };
-    const SongSubroutineTable : [ u16 ; 0] = [ ];
-}
-
 
 import "bytecode";
 

@@ -1,5 +1,6 @@
 
 BINARY         := audio-driver.bin
+LOADER_BIN     := loader.bin
 
 WIZ            := ../wiz/bin/wiz
 
@@ -26,7 +27,10 @@ COMMON_PYTHON_SCRIPTS = $(wildcard tools/_*.py) tools/wav2brr.py
 
 
 .PHONY: all
-all: $(BINARY)
+all: $(BINARY) $(LOADER_BIN)
+
+$(LOADER_BIN): src/loader.wiz src/common_memmap.wiz
+	'$(WIZ)' -s wla -I src --system=spc700 src/loader.wiz -o '$@'
 
 $(BINARY): $(SOURCES) $(RESOURCES)
 	'$(WIZ)' -s wla -I src --system=spc700 src/audio-driver.wiz -o '$(BINARY)'

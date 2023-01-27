@@ -11,9 +11,10 @@ import "../wiz/common/snes/snes";
 namespace audio {
 
 
-// Address to store the AudioDriver (in Audio-RAM)
-// Address (in Audio-RAM) to execute after loading the AudioDriver.
-let AUDIO_DRIVER_ARAM_ADDR = 0x200;
+// Address to store the loader (in Audio-RAM).
+// Address (in Audio-RAM) to execute after loading the Loader.
+// MUST match LOADER_ADDR in `audio/src/common_memmap.wiz`
+let LOADER_ARAM_ADDR = 0x160;
 
 
 // MUST match `audio/src/audio-driver.wiz`
@@ -24,6 +25,14 @@ namespace IO {
     extern writeonly command @ &snes.apu.output1 : u8;
 }
 
+// MUST match `audio/src/loader.wiz`
+enum LoaderDataType : u8 {
+    // These values cannot be 0 or negative.
+    CODE        = 'C',
+    COMMON_DATA = 'D',
+    SONG_DATA   = 'S',
+};
+
 
 // MUST match `audio/src/audio-driver.wiz`
 enum IoCommand : u8 {
@@ -32,7 +41,13 @@ enum IoCommand : u8 {
 
 
 in rodata0 {
+    const __Loader = embed "../audio/loader.bin";
+
+    let Loader = far &__Loader as far * const u8;
+    let LOADER_SIZE = sizeof(typeof(__Loader));
+
     const AudioDriver = embed "../audio/audio-driver.bin";
+    const CommonData = embed "../audio/gen/common_data.bin";
 }
 
 
@@ -61,20 +76,29 @@ var _res : resources.ResourceEntry in resources.res;
 
     // ::TODO add a first-call check::
 
+    __transfer_loader_via_ipl__inline();
 
-    // ::TODO add audio driver and music data to resources::
+
     *(&_res.farPtr as *u16) = xx = &AudioDriver as u16;
     #:_res.farPtr = a = #:far &AudioDriver;
     _res.size = yy = sizeof(typeof(AudioDriver));
 
-    __initialise_ipl();
-    _transfer_data_to_aram(_res, AUDIO_DRIVER_ARAM_ADDR);
-
-    // ::TODO transfer common data::
-
-    __execute_audio_driver();
+    _transfer_data_to_loader(_res, LoaderDataType.CODE);
 
 
+    // ::TODO move common data and song data to resources::
+    *(&_res.farPtr as *u16) = xx = &CommonData as u16;
+    #:_res.farPtr = a = #:far &CommonData;
+    _res.size = yy = sizeof(typeof(CommonData));
+
+    _transfer_data_to_loader(_res, LoaderDataType.COMMON_DATA);
+}
+
+
+
+// DB access low-ram
+#[mem8]
+inline func _reset_sfx_queue__inline() {
     // Reset the SFX queue
     sfxQueue = a = 0xff;
 
@@ -129,13 +153,84 @@ inline func process_sfx_queue__inline() {
 
 
 
+// Transfer data to the audio loader
+//
+// NOTE: This function may read one byte past the end of `_res`.
+//
+// DB = 0x80
+#[mem8, idx16]
+func _transfer_data_to_loader(_res : resources.ResourceEntry in resources.res, type : LoaderDataType in a) {
+
+    // Wait until loader is ready
+    xx = ('R' as u16) | ('D' as u16 << 8);
+    do {
+    } while xx != snes.apu.input32;
+
+
+    // Send the ready signal and the LoaderDataType.
+    snes.apu.output0 = a;
+    snes.apu.output2 = a = 'R';
+    snes.apu.output3 = a = 'D';
+
+
+    // Calculate the number of words to transfer
+    // ASSUMES _res.size >= 2.
+    mem16();
+    #[mem16] {
+        aa = _res.size;
+        aa++;
+        xx = aa = aa >>> 1;
+    }
+    mem8();
+
+
+    // Wait for acknowledgement from the LoaderDataType
+    do {
+        a = snes.apu.input2;
+    } while !zero;
+
+    yy = 0;
+    do {
+        snes.apu.output0 = a = _res.farPtr[yy];
+        yy++;
+        snes.apu.output1 = a = _res.farPtr[yy];
+
+        // Tell S-SMP the data is ready
+        // `snes.apu.output3` cannot be negative.  A negative value on port-3 means end-of-data.
+        // Also cannot be 'D'.
+        a = y & 0xf;
+        snes.apu.output3 = a;
+
+        yy++;
+
+        do {
+        } while a != snes.apu.input3;
+
+        xx--;
+    } while !zero;
+
+
+    // End of data transfer
+    snes.apu.output3 = a = 0xff;
+
+    // Must wait for the end of the input as `_reset_sfx_queue__inline()` writes to IO port 0.
+    do {
+    } while a != snes.apu.input3;
+
+    _reset_sfx_queue__inline();
+}
+
+
+
 // REQUIRES: S-SMP reset and no data has been written to it yet
 //
 // This function MUST only be called once.
 //
 // DB = 0x80
 #[mem8, idx16]
-func __initialise_ipl() {
+inline func __transfer_loader_via_ipl__inline() {
+    // ::TODO add a 'running IPL' check::
+
     // Initialize the transfer
     yy = 0xbbaa;
     snes.apu.output10 = yy;
@@ -143,33 +238,9 @@ func __initialise_ipl() {
     // Wait for a response from the IPL
     do {
     } while yy != snes.apu.input10;
-}
 
-
-
-// REQUIRES: S-SMP is running the IPL and `__initialise_ipl()` has been called.
-//
-// DB = 0x80
-#[mem8, idx16]
-func _transfer_data_to_aram(_res : resources.ResourceEntry in resources.res, aramAddr : u16 in xx) {
-
-    // ::TODO add a 'running IPL' check::
-
-
-    // A transfer data command occurs when `APUIO0` is incremented by more than 2 and non-zero.
-    // However the first transfer command requires an `APUIO0` of 0xcc.
-    //
-    // Since the IPL sets `APUIO0` to 0xaa, we can increment `APUIO0` by 0x22 and use the same
-    // code on the first and subsequent data transfers.
-    //
-    // Source: SNESdev wiki: https://snes.nesdev.org/wiki/Booting_the_SPC700
-
-    a = snes.apu.input0;
-    a += 0x22;
-    if zero {
-        a++;
-    }
-
+    xx = LOADER_ARAM_ADDR;
+    a = 0xcc;
     snes.apu.output32 = xx;     // destination ARAM address
     snes.apu.output1 = a;       // non-zero = write data to address
     snes.apu.output0 = a;       // New data command (non-zero and APUIO0 + more than 2, or 0xcc on the first transfer)
@@ -181,43 +252,28 @@ func _transfer_data_to_aram(_res : resources.ResourceEntry in resources.res, ara
 
 
     // Transfer the data
-    yy = 0;
-    do {
-        // Send the next byte to the IPL
-        snes.apu.output1 = a = _res.farPtr[unaligned yy];
-
-        // Increase output0 by 1 (starting at 0)
-        // Tell the IPL the next data is ready
-        snes.apu.output0 = a = y;
-
-        // Increment yy here, while the IPL is busy
-        yy++;
-
-        // Wait for a response from the IPL
+    idx8();
+    #[idx8] {
+        x = 0;
         do {
-        } while a != snes.apu.input0;
+            // Send the next byte to the IPL
+            snes.apu.output1 = a = Loader[x];
 
-    } while yy < _res.size;
-}
+            // Tell the IPL the next data is ready
+            snes.apu.output0 = x;
 
+            // Wait for a response from the IPL
+            do {
+            } while x != snes.apu.input0;
 
-
-// REQUIRES: S-SMP is running the IPL and the driver has been transferred to the A-RAM
-//
-// DB = 0x80
-#[mem8, idx16]
-func __execute_audio_driver() {
-
-    a = snes.apu.input0;
-    a++;
-    a++;
-    if zero {
-        a++;
+            x++;
+        } while x < LOADER_SIZE;
     }
+    idx16();
 
-    snes.apu.output32 = xx = AUDIO_DRIVER_ARAM_ADDR;    // A-RAM address
-    snes.apu.output1 = 0;                               // zero = execute program at A-RAM address
-    snes.apu.output0 = a;                               // New data command (non-zero and APUIO0 + more than 2, or 0xcc on the first transfer)
+    snes.apu.output32 = xx = LOADER_ARAM_ADDR;  // A-RAM address
+    snes.apu.output1 = 0;                       // zero = execute program at A-RAM address
+    snes.apu.output0 = a = LOADER_SIZE + 2;     // New data command (must be at least +2 the previous snes.apu.output0 write)
 }
 
 }

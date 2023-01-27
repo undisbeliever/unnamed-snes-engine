@@ -72,10 +72,14 @@ namespace smp {
     extern const        io_port_in_2        @ 0xf6 : u8;
     extern const        io_port_in_3        @ 0xf7 : u8;
 
+    extern const        io_port_in_23       @ 0xf6 : u16;
+
     extern writeonly    io_port_out_0       @ 0xf4 : u8;
     extern writeonly    io_port_out_1       @ 0xf5 : u8;
     extern writeonly    io_port_out_2       @ 0xf6 : u8;
     extern writeonly    io_port_out_3       @ 0xf7 : u8;
+
+    extern writeonly    io_port_out_23      @ 0xf6 : u16;
 
 
     extern writeonly    timer_0             @ 0xfa : u8;
