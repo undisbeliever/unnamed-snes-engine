@@ -1,0 +1,17 @@
+
+Monospace 8x16px font and border tiles.
+
+I started with the 8x8 pixel font from my untech-engine unit tests (that I made ages ago) and:
+ * Vertically scaled them to 11 pixels tall with Aseprite.
+ * Manually shrunk most of the characters from 7 to 6 pixels wide.
+ * Centered the tiles.
+ * Increased the width of most of the strokes to 2 pixels.
+ * Cleaned up the corners.
+ * Cleaned up the tails of the lower case letters.
+ * Redrew the 4, 9 and 0 characters.
+ * Cleaned up half of the symbols.
+ * Redrew the other half the symbols.
+ * Added a cursor symbol.
+ * Rearranged the order of the characters to match ASCII.
+
+

@@ -369,6 +369,8 @@ func reset_tile_properties(tileIndex : u8 in x) {
 // DB = 0x80
 #[mem16, idx8]
 inline func process_draw_tile_buffer__vblank() {
+    // MUST NOT modify zpTmp variables.
+
     x = drawTileBufferIndex;
     if !zero {
         snes.ppu.vram_control = y = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
@@ -1412,6 +1414,8 @@ in code {
 // DB = 0x80
 #[mem8, idx16]
 func transfer_buffer__vblank() {
+    // MUST NOT modify zpTmp variables.
+
     a = buffer_vram_control;
     if !zero {
         snes.ppu.vram_control = a;

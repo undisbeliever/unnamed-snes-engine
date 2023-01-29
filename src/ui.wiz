@@ -23,10 +23,6 @@ let KEYS_TILE_X = HEALTH_BAR_TILE_X + 1;
 let KEYS_TILE_Y = HEALTH_BAR_TILE_Y + 1;
 
 
-let X_BG_OFFSET = -4;
-let Y_BG_OFFSET = -4;
-
-
 let HB_ANIMATION_TIMER = 3;
 
 
@@ -110,7 +106,7 @@ inline func init() {
 
 
 
-// Setup the PPU, load tiles into VRAM, clear tilemap
+// Setup the PPU, load UI tiles into VRAM.
 //
 // REQUIRES: Force-Blank
 // Uses DMA channel 0
@@ -122,9 +118,7 @@ inline func setup_ppu__forceblank() {
     // Transfer UI tiles VRAM
     resources.load_tiles_resource_into_vram(resources.tiles.ui, VRAM_BG3_TILES_WADDR);
 
-    // Clear BG3 tilemap (with order bit set high)
-    dma.set_tilemap__forceblank(VRAM_BG3_MAP_WADDR, 0x2000);
-
+    // BG3 tilemap cleared by the Textbox subsystem
 
     // Set palette and order bits for Key UI
     {
@@ -139,15 +133,9 @@ inline func setup_ppu__forceblank() {
         } while !zero;
     }
 
+    // BG3 scroll registers reset by the Textbox subsystem
 
-    snes.ppu.bg3_scroll_x = a = <:X_BG_OFFSET;
-    snes.ppu.bg3_scroll_x = a = >:X_BG_OFFSET;
-    // Set Y scroll to -1;
-    snes.ppu.bg3_scroll_y = a = <:(Y_BG_OFFSET - 1);
-    snes.ppu.bg3_scroll_y = a = >:(Y_BG_OFFSET - 1);
-
-
-    // Write UI back to VRAM after it has been erased by `dma.set_tilemap__forceblank`
+    // Write UI back to VRAM after it has been erased by the Textbox subsystem
     healthBarBufferFlag = 0;
     keyBufferFlag = 0;
 }
@@ -162,6 +150,7 @@ inline func setup_ppu__forceblank() {
 // DB = 0x80
 #[mem8, idx16]
 inline func transfer_buffer__vblank() {
+    // MUST NOT modify zpTmp variables.
 
     a = healthBarBufferFlag;
     if zero {

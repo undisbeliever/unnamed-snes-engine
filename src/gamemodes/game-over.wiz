@@ -9,8 +9,8 @@ import "../audio";
 import "../gamemodes";
 import "../gamestate";
 import "../joypad";
-import "../metasprites";
 import "../resources";
+import "../textbox";
 import "../wait-frame";
 import "../common/reset";
 import "gen/resources";
@@ -36,10 +36,11 @@ enum MenuItem : u8 {
 
 let N_MENU_ITEMS = 4;
 
-
-in wram7e {
-    // The currently selected menu item
-    var selectedItem : MenuItem;
+in rodata0 {
+    const Text = "\x03 Continue\n"
+               ~ "\x04 Restart Room\n"
+               ~ "\x05 Quit\n"
+               ~ "\x06 Quit and show credits\0";
 }
 
 
@@ -58,8 +59,6 @@ func exec() {
 
     idx16();
     #[idx16] {
-        metasprites.reset_buffers();
-
         push16(0x7e80);
         data_bank = pop8();
     // DB = 0x80
@@ -68,90 +67,42 @@ func exec() {
 
         data_bank = pop8();
     // DB = 0x7e
+
+        textbox.print_textbox(#:far &Text, &Text as u16);
+
+        wait_multiple_frames_and_fadein();
+
+        a = textbox.print_textbox_and_wait__start(a = #:far &Text, xx = &Text as u16);
     }
     mem8_idx8();
 
-
-    selectedItem = MenuItem.CONTINUE;
-
-    update_cursor();
-
-    wait_multiple_frames_and_fadein();
-
-
-    while true {
-        wait_frame();
-
-        a = joypad.pressed_h;
-        if a & joypad.JOYH.UP != 0 {
-            a = selectedItem as u8;
-            a--;
-            if negative {
-                a = N_MENU_ITEMS - 1;
-            }
-            selectedItem = a as MenuItem;
-
-            audio.queue_sound_effect(sound_effects.menu_cursor);
-        }
-        else if a & joypad.JOYH.DOWN != 0 {
-            a = selectedItem as u8;
-            a++;
-            if a >= N_MENU_ITEMS {
-                a = 0;
-            }
-            selectedItem = a as MenuItem;
-
-            audio.queue_sound_effect(sound_effects.menu_cursor);
-        }
-        else if a & joypad.JOYH.START != 0 {
-            audio.queue_sound_effect(sound_effects.menu_select);
-
-            a = selectedItem as u8;
-            if a == MenuItem.TITLE_SCREEN as u8{
-                a = GameModes.TITLE_SCREEN as u8;
-            }
-            else if a == MenuItem.RESTART_ROOM as u8 {
-                // Restart gamestate (which will load the gamestate backup if it exists)
-                gamestate.init();
-
-                // Increment health (if it is too low)
-                a = gamestate.data.playerState.health;
-                if a < MIN_HEALTH_ON_RESTART_ROOM {
-                    gamestate.data.playerState.health = a = MIN_HEALTH_ON_RESTART_ROOM;
-                }
-
-                a = GameModes.START_GAMELOOP as u8;
-            }
-            else if a == MenuItem.SHOW_CREDITS as u8 {
-                a = GameModes.CREDITS as u8;
-            }
-            else {
-                gamestate.continue_game();
-                a = GameModes.START_GAMELOOP as u8;
-            }
-
-            // A = new gamemode
-            gameMode = a as GameModes;
-            return;
-        }
-
-        update_cursor();
+    if a == MenuItem.TITLE_SCREEN as u8{
+        a = GameModes.TITLE_SCREEN as u8;
     }
-}
+    else if a == MenuItem.RESTART_ROOM as u8 {
+        // Restart gamestate (which will load the gamestate backup if it exists)
+        gamestate.init();
 
+        // Increment health (if it is too low)
+        a = gamestate.data.playerState.health;
+        if a < MIN_HEALTH_ON_RESTART_ROOM {
+            gamestate.data.playerState.health = a = MIN_HEALTH_ON_RESTART_ROOM;
+        }
 
+        a = GameModes.START_GAMELOOP as u8;
+    }
+    else if a == MenuItem.SHOW_CREDITS as u8 {
+        a = GameModes.CREDITS as u8;
+    }
+    else {
+        gamestate.continue_game();
+        a = GameModes.START_GAMELOOP as u8;
+    }
 
-// Update the menu cursor position
-//
-// DB = 0x80
-#[mem8, idx8]
-func update_cursor() {
-    metasprites.buffer[0].xPos = a = CURSOR_X_POS;
-    metasprites.buffer[0].yPos = a = (selectedItem as u8 << 4) + CURSOR_Y_POS;
-    metasprites.buffer[0].char = 0;
-    metasprites.buffer[0].attr = 0;
+    // A = new gamemode
+    gameMode = a as GameModes;
 
-    metasprites.hiTableBuffer[0] = 0;
+    ^return audio.queue_sound_effect(sound_effects.menu_select);
 }
 
 
@@ -164,6 +115,7 @@ inline func setup_ppu() {
     // ::TODO create some kind of system for setting PPU registers::
 
     reset_registers();
+    textbox.setup_ppu__forceblank();
 
     // ::TODO move elsewhere::
     mem16();
@@ -177,21 +129,32 @@ inline func setup_ppu() {
     snes.ppu.obj_control = a = (VRAM_OBJ_WADDR / 8192) | (snes.ppu.OBJ_CONTROL_8x8_16x16 << 4);
     snes.ppu.bg1_tilemap = a = (VRAM_BG1_MAP_WADDR >> snes.ppu.BG_TILEMAP_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT) | snes.ppu.BG_TILEMAP_MIRROR_X;
     snes.ppu.bg12_tileset = a = (VRAM_BG1_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG1_SHIFT);
-    snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_BG1 | snes.ppu.SCREEN_ENABLE_OBJ;
+    snes.ppu.bg3_tilemap = a = (VRAM_BG3_MAP_WADDR >> snes.ppu.BG_TILEMAP_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT);
+    snes.ppu.bg34_tileset = a = (VRAM_BG3_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG1_SHIFT);
+    snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_BG1 | snes.ppu.SCREEN_ENABLE_BG3;
 
     resources.load_bg_image_resource_into_vram(resources.bg_images.game_over, VRAM_BG1_MAP_WADDR, VRAM_BG1_TILES_WADDR);
 
-    resources.load_tiles_resource_into_vram(resources.tiles.menu_sprites, VRAM_OBJ_WADDR);
+    // Manually load textbox palette
+    // ::TODO add palettes to the resources subsystem::
+    snes.ppu.cgram_address = a = 64;
 
-    // Set sprite palette
-    // ::TODO add menu sprites palette into the resources subsystem::
-    snes.ppu.cgram_address = a = 129;
+    a = 5 * 2;
+    do {
+        snes.ppu.cgram_write_data = 0;
+        a--;
+    } while !zero;
+
+    snes.ppu.cgram_write_data = a = 16;
+    snes.ppu.cgram_write_data = 0;
+
+    snes.ppu.cgram_write_data = 0;
+    snes.ppu.cgram_write_data = 0;
 
     a = 0xff;
     snes.ppu.cgram_write_data = a;
     snes.ppu.cgram_write_data = a;
 }
-
 
 }
 

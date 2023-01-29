@@ -11,6 +11,7 @@ import "gamestate";
 import "metasprites";
 import "metatiles";
 import "resources";
+import "textbox";
 import "ui";
 import "wait-frame";
 import "common/reset";
@@ -422,6 +423,7 @@ inline func __clear_room_memory() {
 //  * PPU
 //  * MetaTiles
 //  * MetaSprite
+//  * Textbox
 //  * UI
 //
 // NOTE: This function DOES NOT draw the MetaTiles to screen.
@@ -470,6 +472,7 @@ inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
             // ::TODO get spritesheet_id from somewhere::
             metasprites.load_ms_spritesheet_ppu_data__forceblank(1);
 
+            textbox.setup_ppu__forceblank();
             ui.setup_ppu__forceblank();
         }
         idx8();

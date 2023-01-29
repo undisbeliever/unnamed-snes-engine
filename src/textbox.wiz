@@ -1,0 +1,622 @@
+// Copyright (c) 2023, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "memmap";
+import "../wiz/common/snes/snes";
+import "common/dma";
+
+import "audio";
+import "joypad";
+import "resources";
+import "wait-frame";
+import "gen/resources";
+
+// For `empty_byte`
+import "common/reset";
+
+
+namespace textbox {
+
+// Taken from UI.wiz
+// Shifts BG3 half a tile
+let X_BG_OFFSET = -4;
+let Y_BG_OFFSET = -4;
+
+
+// NOTE: This offset is used to calculate the VRAM word address.
+// It does not affect the start of the line within the buffer.
+let TEXTBOX_BORDER_X = 2;
+
+
+// MUST be an odd value
+let TEXTBOX_WIDTH = 25;
+let TEXTBOX_WIDTH_BYTES = TEXTBOX_WIDTH * 2;
+
+let MAX_TEXTBOX_HEIGHT = 5;
+let MIN_TEXTBOX_HEIGHT = 1;
+
+let BUFFER_WIDTH = 32;
+let BUFFER_WIDTH_BYTES = BUFFER_WIDTH * 2;
+let BUFFER_HEIGHT = (MAX_TEXTBOX_HEIGHT * 2) + 2;
+
+
+let DEFAULT_HEIGHT = 4;
+let DEFAULT_YPOS = 15;
+
+
+namespace Font {
+    let TILE_OFFSET = 16;
+
+    // Offset between the top half of a character and the bottom half of a character.
+    let BOTTOM_TILE_OFFSET = 98;
+
+
+    let BORDER_CORNER     = TILE_OFFSET + 0;
+    let BORDER_HORIZONTAL = TILE_OFFSET + 1;
+    let BORDER_VERTICAL   = TILE_OFFSET + BOTTOM_TILE_OFFSET + 0;
+    let BORDER_EMPTY      = TILE_OFFSET + BOTTOM_TILE_OFFSET + 1;
+
+    let SPACE_TILE = TILE_OFFSET + 2;
+    let RIGHT_ARROW_TILE = TILE_OFFSET + 97;
+
+    let FIRST_PRINTABLE_ASCII_CHAR = ' ';
+    let ASCII_OFFSET = ' ' - SPACE_TILE;
+
+
+    let MAIN_PALETTE = 1;
+    let ALT_PALETTE = 2;
+
+
+    // Tilemap charattr words for the border and padding.
+    namespace CharAttr {
+        let __ATTR = (Font.MAIN_PALETTE << 10) | 0x2000;  // High priority
+        let __ATTR_HFLIP = __ATTR | 0x4000;
+        let __ATTR_VFLIP = __ATTR | 0x8000;
+        let __ATTR_HVFLIP = __ATTR_VFLIP | __ATTR_HFLIP;
+
+        let BORDER_TOP_LEFT = Font.BORDER_CORNER | __ATTR;
+        let BORDER_TOP = Font.BORDER_HORIZONTAL | __ATTR;
+        let BORDER_TOP_RIGHT = Font.BORDER_CORNER | __ATTR_HFLIP;
+
+        let BORDER_LEFT = Font.BORDER_VERTICAL | __ATTR;
+        let BORDER_RIGHT = Font.BORDER_VERTICAL | __ATTR_HFLIP;
+
+        let PADDING = Font.SPACE_TILE | __ATTR;
+
+        let BORDER_BOTTOM_LEFT = Font.BORDER_CORNER | __ATTR_VFLIP;
+        let BORDER_BOTTOM = Font.BORDER_HORIZONTAL | __ATTR_VFLIP;
+        let BORDER_BOTTOM_RIGHT = Font.BORDER_CORNER | __ATTR_HVFLIP;
+    }
+}
+
+
+// Special string characters/tokens.
+namespace SpecialChars {
+    // String End (end of textbox)
+    let END = 0;
+
+    // Change text palette to MAIN_PALETTE
+    let MAIN_PALETTE = 1;
+
+    // Change text palette to ALT_PALETTE
+    // ::TODO add codes to change the alt-color::
+    let ALT_PALETTE = 2;
+
+    // Print a '▶' cursor if `selectedMenuItem` == n, otherwise print a ' '
+    let MENU_CURSOR_0 = 3;
+    let MENU_CURSOR_1 = 4;
+    let MENU_CURSOR_2 = 5;
+    let MENU_CURSOR_3 = 6;
+    let MENU_CURSOR_4 = 7;
+    let MENU_CURSOR_5 = 8;
+
+    let _LAST_MENU_CURSOR = 8;
+
+    let NEW_LINE = 10;
+
+    // Changes the menu cursor selection to left/right
+    let LEFT_RIGHT_SELECTION = 11;
+
+    // ::TODO add special characters for two-column selection::
+}
+
+
+// The action to preform on the next VBlank.
+enum VBlankAction : u8 {
+    NOTHING = 0,
+    COPY_TEXTBOX = 1,
+    ERASE_TEXTBOX = 0x80,
+}
+
+
+in zeropage {
+    // The selected menu item
+    var selectedMenuItem : u8;
+}
+
+
+in lowram {
+    var nextVBlankAction : VBlankAction;
+
+    // The VRAM word address to store the buffer.
+    var bufferVramWaddr : u16;
+
+    // The number of bytes to transfer when uploading the buffer.
+    var bufferSizeInBytes : u16;
+
+    // Used to determine if the textbox has finished drawing.
+    // Points to the start of the bottom-half of the last line of text.
+    var bufferIndexAtEndOfText : u16;
+}
+
+
+in wram7e {
+    var buffer : [u16 ; BUFFER_WIDTH * BUFFER_HEIGHT];
+}
+
+
+// Temporary variables used by this subsystem.
+//
+// NOTE: This subsystem is not allowed to call functions that modify temporary variables.
+in zeropage {
+    var _string : far *const u8 in zpTmp_farPtr;
+
+    var _attrByte : u8 in zpTmp_byte_0;
+    var _lastOption : u8 in zpTmp_byte_1;
+    var _dpadMask_h : u8 in zpTmp_byte_2;
+
+    var _endOfLineIndex : u16 in zpTmp_word_0;
+    var _confirmButton : u16 in zpTmp_word_1;
+}
+
+in code {
+
+
+// Setup the PPU, load tiles into VRAM, clear tilemap
+//
+// MUST be initialised before the UI subsystem as it overrides BG3 tilemap.
+//
+// REQUIRES: Force-Blank
+// Uses DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+func setup_ppu__forceblank() {
+
+    // Clear the first `Font.TILE_OFFSET` tiles
+    dma.clear_vram__forceblank(VRAM_BG3_TILES_WADDR, 8 * Font.TILE_OFFSET);
+
+
+    // Transfer UI tiles VRAM
+    resources.load_tiles_resource_into_vram(resources.tiles.text, VRAM_BG3_TILES_WADDR + 8 * Font.TILE_OFFSET);
+
+    // Clear BG3 tilemap (with order bit set high)
+    dma.set_tilemap__forceblank(VRAM_BG3_MAP_WADDR, 0x2000);
+
+
+    // Reset BG3 scroll
+    snes.ppu.bg3_scroll_x = a = <:X_BG_OFFSET;
+    snes.ppu.bg3_scroll_x = a = >:X_BG_OFFSET;
+    // Set Y scroll to -1;
+    snes.ppu.bg3_scroll_y = a = <:(Y_BG_OFFSET - 1);
+    snes.ppu.bg3_scroll_y = a = >:(Y_BG_OFFSET - 1);
+
+
+    // Do not transfer the buffer to VRAM on the next VBlank
+    nextVBlankAction = VBlankAction.NOTHING;
+
+    // Only need to reset this variable
+    // It is checked at the start of `print_textbox` and 
+    bufferIndexAtEndOfText = xx = 0;
+
+    selectedMenuItem = 0;
+}
+
+
+
+// Transfer the textbox buffer to VRAM if required.
+//
+// REQUIRES: V-Blank
+// Uses DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func transfer_buffer__vblank() {
+    // MUST NOT modify zpTmp variables.
+
+    // assumes VBlankAction.ERASE_TEXTBOX == 0x80
+    a = nextVBlankAction as u8;
+    if !zero {
+        if negative {
+            // Erase textbox
+            snes.dma0.control = a = snes.dma.CONTROL_MODE_AB | snes.dma.CONTROL_MDMA_NO_INCREMENT;
+
+            xx = &empty_byte as u16;
+            a = #:far &empty_byte;
+        }
+        else {
+            // Copy textbox
+            snes.dma0.control = a = snes.dma.CONTROL_MODE_AB;
+
+            xx = &buffer as u16;
+            a = #:far &buffer;
+        }
+
+        snes.dma0.src_address_hl = xx;
+        snes.dma0.src_address_bank = a;
+
+        snes.dma0.mdma_size_hl = xx = bufferSizeInBytes;
+
+        snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
+
+        snes.ppu.vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
+        snes.ppu.vram_address_hl = xx = bufferVramWaddr;
+
+        snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+
+        nextVBlankAction = VBlankAction.NOTHING;
+    }
+}
+
+
+
+#[mem8, idx8]
+#[fallthrough]
+func setup_default_textbox() {
+    a = DEFAULT_HEIGHT;
+    y = DEFAULT_YPOS;
+
+// Fallthrough
+}
+
+// Setup the textbox height and location, draw the top and bottom borders of the textbox.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func setup_textbox(height : u8 in a, yPos : u8 in y) {
+    if a < MIN_TEXTBOX_HEIGHT {
+        a = MIN_TEXTBOX_HEIGHT;
+    }
+    else if a >= MAX_TEXTBOX_HEIGHT + 1 {
+        a = MAX_TEXTBOX_HEIGHT;
+    }
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        aa = aa & 0xff;
+        swap_bytes(aa); // << 8
+        aa >>>= 1;      // << 8 >> 1 == << 7
+
+        // aa = height * BUFFER_WIDTH
+        bufferIndexAtEndOfText = aa;
+        bufferSizeInBytes = aa = aa + BUFFER_WIDTH_BYTES * 2; // + top and bottom border rows
+
+        aa = yy & 31;
+        swap_bytes(aa); // << 8
+        aa >>>= 3;      // << 8 >> 2 == << 5
+        bufferVramWaddr = aa = aa | (VRAM_BG3_MAP_WADDR + TEXTBOX_BORDER_X);
+
+
+        // Copy the top row to `buffer`
+        // Parameter order is destination, source.
+        load_dec_repeat(#: far &buffer, yy = &buffer as u16,
+                        #: far &TopRow, xx = &TopRow as u16,
+                        aa = sizeof(typeof(TopRow)) - 1);
+        // DB = 0x7e
+
+        // Copy the bottom row to `buffer`.
+        // Parameter order is destination, source.
+        yy = aa = bufferSizeInBytes + (&buffer as u16 - BUFFER_WIDTH_BYTES);
+        load_dec_repeat(#: far &buffer, yy,
+                        #: far &BottomRow, xx = &BottomRow as u16,
+                        aa = sizeof(typeof(BottomRow)) - 1);
+        // DB = 0x7e
+    }
+    mem8_idx8();
+
+    // Do not transfer the buffer to VRAM until the textbox has been fully drawn.
+    nextVBlankAction = VBlankAction.NOTHING;
+}
+
+
+
+// Erase the textbox.
+//
+// NOTE: There MUST be a `WaitFrame` call before the next `setup_textbox()` or `print_textbox()` call.
+//
+// DB = 0x7e
+#[mem8, idx16]
+func erase_textbox() {
+    xx = bufferIndexAtEndOfText;
+    if !zero && xx < sizeof(typeof(buffer)) - BUFFER_WIDTH_BYTES * 2 + 1 { // (+1 `if xx >`)
+        // textbox exists.
+
+        a = VBlankAction.ERASE_TEXTBOX as u8;
+        nextVBlankAction = a as VBlankAction;
+    }
+}
+
+
+
+// Print the textbox (while also drawing the left/right borders and BG tiles).
+//
+// Also sets `_lastOption` to the `selectedMenuItem` index of the last item.
+// May also modify `_dpadMask_h`.
+//
+// ASSUMES: `buffer` was zeroed out by the Reset Handler and this function is the only one that
+//          modifies the buffer.
+//
+// WARNING: Spaghetti code
+//
+// DB = 0x7e
+#[mem8, idx16]
+#[fallthrough]
+func print_textbox(bankbyte : u8 in a, addr : u16 in xx) {
+    #:_string = a;
+    *(&_string as *u16) = xx;
+
+// Fallthrough
+}
+
+#[mem8, idx16]
+func print_textbox__zpTmp(_string : far *const u8 in _string) {
+
+    // -----------------------
+    // WARNING: Spaghetti code
+    // -----------------------
+
+    // MUST NOT CALL any external functions
+
+    _attrByte = a = Font.MAIN_PALETTE << 2;
+
+    _lastOption = 0;
+
+
+    // Setup the buffer if required.
+    // (Ensures an invalid `bufferIndexAtEndOfText` will not overflow the buffer)
+    // (Also allows the caller of omit the `setup_textbox()` call)
+    xx = bufferIndexAtEndOfText;
+    if zero || xx >= sizeof(typeof(buffer)) - BUFFER_WIDTH_BYTES * 2 + 1 { // (+1 `if xx >`)
+        mem8_idx8();
+        #[mem8, idx8] {
+            setup_default_textbox();
+        }
+    }
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        _endOfLineIndex = xx = BUFFER_WIDTH_BYTES + 2 + TEXTBOX_WIDTH_BYTES; // +2 for the border tiles
+        xx = BUFFER_WIDTH_BYTES;
+
+        yy = 0;
+        // Loop until all textbox lines are completed
+        // (even if the string has ended)
+        ^while true {
+            // Draw the left border character
+            aa = Font.CharAttr.BORDER_LEFT;
+            buffer[unaligned xx] = aa;
+            (&buffer[BUFFER_WIDTH])[unaligned xx] = aa;
+            xx++;
+            xx++;
+
+            mem8();
+            #[mem8] {
+                // Print one line
+                do {
+                    // xx = index into buffer
+                    // yy = string index
+
+                    a = _string[yy];
+                    goto NewLine if zero;   // Fill the line with padding tiles if the string is ended.
+
+                    yy++;
+
+                    if a < Font.FIRST_PRINTABLE_ASCII_CHAR {
+                        goto NewLine if a == SpecialChars.NEW_LINE;
+
+                        if a == SpecialChars.MAIN_PALETTE {
+                            _attrByte = a = Font.MAIN_PALETTE << 2;
+                            continue;
+                        }
+                        else if a == SpecialChars.ALT_PALETTE {
+                            _attrByte = a = Font.ALT_PALETTE << 2;
+                            continue;
+                        }
+                        else if a == SpecialChars.LEFT_RIGHT_SELECTION {
+                            __set_left_right_selection__inline();
+                            continue;
+                        }
+                        // ASSUMES all codes < `SpecialChars.MENU_CURSOR_0 have` already been processed
+                        else if a < SpecialChars._LAST_MENU_CURSOR {
+                            a -= SpecialChars.MENU_CURSOR_0;
+
+                            if a >= _lastOption {
+                                _lastOption = a;
+                            }
+
+                            if a == selectedMenuItem {
+                                a = Font.RIGHT_ARROW_TILE;
+                            }
+                            else {
+                                a = Font.SPACE_TILE;
+                            }
+                            // no continue - print this character
+                        }
+                        else {
+                            // Invalid control code
+                            continue;
+                        }
+                    }
+                    else {
+                        // ::TODO remove ASCII translation, build my own character encoding::
+                        a = a - Font.ASCII_OFFSET;
+                    }
+
+                    // A = tile to print.
+
+                    (&<:buffer[0])[unaligned xx] = a;
+                    (&<:buffer[BUFFER_WIDTH])[unaligned xx] = a = a + Font.BOTTOM_TILE_OFFSET;
+
+                    a = _attrByte;
+                    (&>:buffer[0])[unaligned xx] = a;
+                    (&>:buffer[BUFFER_WIDTH])[unaligned xx] = a;
+
+                    xx++;
+                    xx++;
+                } while xx < _endOfLineIndex;
+            }
+            mem16();
+            // The line is over, do not draw padding.
+            goto DrawRightBorder;
+
+
+        // .A8
+        NewLine:
+            // The line is incomplete, fill the rest of the line with padding tiles.
+            mem16();
+
+            aa = Font.CharAttr.PADDING;
+            do {
+                (&buffer[0])[unaligned xx] = aa;
+                (&buffer[BUFFER_WIDTH])[unaligned xx] = aa;
+                xx++;
+                xx++;
+            } while xx < _endOfLineIndex;
+
+
+        DrawRightBorder:
+            xx = _endOfLineIndex;
+            aa = Font.CharAttr.BORDER_RIGHT;
+            buffer[unaligned xx] = aa;
+            (&buffer[BUFFER_WIDTH])[unaligned xx] = aa;
+
+            aa = xx + BUFFER_WIDTH_BYTES * 2;
+            break if aa >= bufferIndexAtEndOfText;
+
+            _endOfLineIndex = aa;
+            xx = aa = aa - TEXTBOX_WIDTH_BYTES - 2;
+        }
+    }
+    mem8();
+
+    a = VBlankAction.COPY_TEXTBOX as u8;
+    nextVBlankAction = a as VBlankAction;
+}
+
+
+#[mem8, idx16]
+inline func __set_up_down_selection__inline() {
+    _dpadMask_h = a = joypad.JOYH.UP | joypad.JOYH.DOWN;
+}
+
+#[mem8, idx16]
+inline func __set_left_right_selection__inline() {
+    _dpadMask_h = a = joypad.JOYH.LEFT | joypad.JOYH.RIGHT;
+}
+
+
+
+// Print a textbox and wait for the player to press start.
+// If the text has a menu, allow player to select options with the d-pad.
+//
+// Returns: `selectedMenuItem`.
+//
+// DB = 0x7e
+#[mem8, idx16]
+func print_textbox_and_wait__start(bankbyte : u8 in a, addr : u16 in xx) : u8 in a {
+    return print_textbox_and_wait(a, xx, joypad.JOY.START);
+}
+
+
+
+// Print a textbox and wait for the player to press A.
+// If the text has a menu, allow player to select options with the d-pad.
+//
+// Returns: `selectedMenuItem`.
+//
+// DB = 0x7e
+#[mem8, idx16]
+func print_textbox_and_wait__a(bankbyte : u8 in a, addr : u16 in xx) : u8 in a {
+    return print_textbox_and_wait(a, xx, joypad.JOY.A);
+}
+
+
+
+// Print a textbox and wait for the player to press a `confirmButton`.
+// If the text has a menu, allow player to select options with the d-pad.
+//
+// Returns: `selectedMenuItem`.
+//
+// DB = 0x7e
+#[mem8, idx16]
+func print_textbox_and_wait(bankbyte : u8 in a, addr : u16 in xx, confirmButton : u16 in yy) : u8 in a {
+
+    // MUST NOT CALL any external functions that modify zpTmp variables
+
+    #:_string = a;
+    *(&_string as *u16) = xx;
+
+    _confirmButton = yy;
+
+    __set_up_down_selection__inline();
+    selectedMenuItem = 0;
+
+    while true {
+        print_textbox__zpTmp(_string);
+
+        a = joypad.pressed_l;
+        break if a & <:_confirmButton != 0;
+
+        a = joypad.pressed_h;
+        break if a & >:_confirmButton != 0;
+
+        a = _lastOption;
+        if !zero {
+            a = joypad.pressed_h;
+            if a & _dpadMask_h != 0 {
+                if a & (joypad.JOYH.UP | joypad.JOYH.LEFT) != 0 {
+                    a = selectedMenuItem;
+                    a--;
+                    if negative {
+                        a = _lastOption;
+                    }
+                }
+                else {
+                    a = selectedMenuItem;
+                    if a >= _lastOption {
+                        a = -1 as u8;
+                    }
+                    a++;
+                }
+                selectedMenuItem = a;
+
+                // Safe - does not modify zpTmp variables.
+                audio.queue_sound_effect(sound_effects.menu_cursor);
+            }
+        }
+
+        wait_frame();
+    }
+
+    return selectedMenuItem;
+}
+
+}
+
+
+in rodata0 {
+    const TopRow : [ u16 ; BUFFER_WIDTH] =
+        [ Font.CharAttr.BORDER_TOP_LEFT ; 1 ]
+        ~ [ Font.CharAttr.BORDER_TOP ; TEXTBOX_WIDTH ]
+        ~ [ Font.CharAttr.BORDER_TOP_RIGHT ; 1 ]
+        ~ [ 0 ; BUFFER_WIDTH - TEXTBOX_WIDTH - 2 ];
+
+    const BottomRow : [ u16 ; BUFFER_WIDTH ] =
+        [ Font.CharAttr.BORDER_BOTTOM_LEFT ; 1 ]
+        ~ [ Font.CharAttr.BORDER_BOTTOM ; TEXTBOX_WIDTH ]
+        ~ [ Font.CharAttr.BORDER_BOTTOM_RIGHT ; 1 ]
+        ~ [ 0 ; BUFFER_WIDTH - TEXTBOX_WIDTH - 2 ];
+}
+
+}
+

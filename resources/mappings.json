@@ -15,8 +15,8 @@
  ],
  "tiles": [
    "ui",
-   "metasprite_shadows",
-   "menu_sprites"
+   "text",
+   "metasprite_shadows"
  ],
  "bg_images": [
    "title_screen",

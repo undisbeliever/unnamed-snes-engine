@@ -4,15 +4,13 @@
       "format": "2bpp",
       "source": "tilesets/ui-2bpp-tiles.png"
     },
-
+    "text": {
+      "format": "2bpp",
+      "source": "tilesets/text-2bpp-tiles.png"
+    },
     "metasprite_shadows": {
       "format": "4bpp",
       "source": "metasprites/shadows-4bpp-tiles.png"
-    },
-
-    "menu_sprites": {
-      "format": "4bpp",
-      "source": "tilesets/menu-sprites.png"
     }
   },
   "bg_images": {

@@ -349,6 +349,7 @@ var _secondRowVramWaddr : u16 in zpTmp_word_0;
 // DB = 0x80
 #[mem8, idx16]
 inline func update_oam__vblank() {
+    // MUST NOT modify zpTmp variables.
 
     // ::ANNOY snes.ppu.oam_address_hl address is wrong (should be 0x2102)
     *(&snes.ppu.oam_address_l as *u16) = xx = 0;
