@@ -44,6 +44,9 @@ let DEFAULT_HEIGHT = 4;
 let DEFAULT_YPOS = 15;
 
 
+let MAX_UINT16_CHARS = 5;
+
+
 namespace Font {
     let TILE_OFFSET = 16;
 
@@ -91,6 +94,11 @@ namespace Font {
 
 
 // Special string characters/tokens.
+//
+// NOTE: These tokens are processed every time the textbox is printed.
+//       As apposed to DecodeTokens, which are processed when `decodedString` is built.
+//
+// NOTE: The largest value in this section SHOULD BE < the first printable character.
 namespace SpecialChars {
     // String End (end of textbox)
     let END = 0;
@@ -118,6 +126,25 @@ namespace SpecialChars {
     let LEFT_RIGHT_SELECTION = 11;
 
     // ::TODO add special characters for two-column selection::
+}
+
+
+// These special characters are used when decoding ROM data into `decodedString`.
+//
+// NOTE: All tokens must be >= _FIRST_CHAR.
+namespace DecodeTokens {
+    let _FIRST_CHAR = 0xc0;
+
+    let SET_U16_PADDING_1 = 0xc0;
+    let SET_U16_PADDING_2 = 0xc1;
+    let SET_U16_PADDING_3 = 0xc2;
+    let SET_U16_PADDING_4 = 0xc3;
+    let SET_U16_PADDING_5 = 0xc4;
+
+    // ::TODO add special chars for DTE (Dual Tile Encoding) and names and strings::
+
+    let PRINT_FIRST_U16 = 0xff;
+    let PRINT_SECOND_U16 = 0xfe;
 }
 
 
@@ -151,23 +178,54 @@ in lowram {
 
 
 in wram7e {
+    // The tilemap buffer.
     var buffer : [u16 ; BUFFER_WIDTH * BUFFER_HEIGHT];
+
+    // The decoded string to print inside the textbox.
+    // This buffer is large enough for 10 lines of text.
+    // (no need to align the variable, it is read with a 16 bit index and written with an 8 bit index)
+    var decodedString : [u8 ; 256];
+
+    // Buffer for converting a u16 to a string.
+    // MUST BE > `MAX_UINT16_CHARS + 2`
+    var u16Buffer : [u8 ; 8];
+
+
+    // The values to print when the string decoder encounters a `PRINT_FIRST_U16` or `PRINT_SECOND_U16` token.
+    var firstU16parameter : u16;
+    var secondU16parameter : u16;
 }
+
 
 
 // Temporary variables used by this subsystem.
 //
-// NOTE: This subsystem is not allowed to call functions that modify temporary variables.
+// NOTE: This subsystem is not allowed to call external functions that modify zpTmp variables.
 in zeropage {
+    // A far-pointer to the hold the string to decode.
+    // Used by `decode_string()`
     var _string : far *const u8 in zpTmp_farPtr;
 
+    // The high byte of the tilemap word when printing characters.
+    // Used by `print_decoded_textbox()`
     var _attrByte : u8 in zpTmp_byte_0;
+
+    // State variables by `print_decoded_textbox()` and `print_textbox_and_wait()`
     var _lastOption : u8 in zpTmp_byte_1;
     var _dpadMask_h : u8 in zpTmp_byte_2;
 
+    // Equal to the minimum number of digits to print - 1.
+    // Used by `decode_string()`
+    var _integerPadding : u8 in zpTmp_byte_3;
+
+    // The index (within buffer) at the end of the current line.
+    // Used by `print_decoded_textbox()`
     var _endOfLineIndex : u16 in zpTmp_word_0;
+
+    // Used by `print_textbox_and_wait()`
     var _confirmButton : u16 in zpTmp_word_1;
 }
+
 
 in code {
 
@@ -205,8 +263,10 @@ func setup_ppu__forceblank() {
     // Do not transfer the buffer to VRAM on the next VBlank
     nextVBlankAction = VBlankAction.NOTHING;
 
-    // Only need to reset this variable
-    // It is checked at the start of `print_textbox` and 
+    // There is no need to reset the other buffer size variables.
+    //
+    // `bufferIndexAtEndOfText` is checked at the start of `print_decoded_textbox()` to
+    // determine if `setup_textbox()` has been called.
     bufferIndexAtEndOfText = xx = 0;
 
     selectedMenuItem = 0;
@@ -338,28 +398,171 @@ func erase_textbox() {
 
 
 
-// Print the textbox (while also drawing the left/right borders and BG tiles).
+// Decode the string into `decodedString`
 //
-// Also sets `_lastOption` to the `selectedMenuItem` index of the last item.
-// May also modify `_dpadMask_h`.
+// DB = 0x7e
+#[mem8, idx16]
+func decode_string(bankbyte : u8 in a, addr : u16 in xx) : [u8; 256] in decodedString {
+    #:_string = a;
+    *(&_string as *u16) = xx;
+
+    // Using an 8 bit index to store the buffer
+    // There is no way a single textbox is over 256 bytes in size, this is safe.
+    mem8_idx8();
+    #[mem8, idx8] {
+        _integerPadding = 0;
+
+        x = y = 0;
+        while true {
+            // y = index into _string
+            // x = index into decodedString
+
+            a = _string[y];
+            break if zero;
+            y++;
+
+            if a < DecodeTokens._FIRST_CHAR {
+                decodedString[x] = a;
+                x++;
+                continue;
+            }
+
+            // Assumes PRINT_FIRST_U16 == 0xfe and PRINT_SECOND_U16 == 0xff
+            if a >= 0xfe {
+                // OK to use here, does not modify flags
+                push8(y);
+                    x = __decode_string__u16__inline(x, zero);
+                y = pop8();
+                continue;
+            }
+
+            if a < DecodeTokens.SET_U16_PADDING_5 + 1 {
+                // Assumes DecodeTokens.SET_U16_PADDING_1 == DecodeTokens._FIRST_CHAR
+                _integerPadding = a = a - DecodeTokens.SET_U16_PADDING_1;
+                continue;
+            }
+        }
+    }
+    idx16();
+
+    return decodedString;
+}
+
+
+
+// Convert one of the two u16 parameters into a string (with padding) and append it to `decodedString`.
 //
-// ASSUMES: `buffer` was zeroed out by the Reset Handler and this function is the only one that
-//          modifies the buffer.
+// Uses: `_integerPadding` to determine the number of padding characters to print.
 //
-// WARNING: Spaghetti code
+// Return: the new end of `decodedString`.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func __decode_string__u16__inline(decodedStringPos : u8 in x, isSecondParameter : bool in zero) : u8 in x {
+
+    // OK to use here, does not manipulate flags
+    push8(x);
+
+    mem16();
+    #[mem16] {
+        // Get the U16 value
+        // Assumes only 2 PRINT_*_U16 symbols
+        // Assumes comparison is done against the second u16 parameter
+        if !zero {
+            aa = firstU16parameter;
+        } else {
+            aa = secondU16parameter;
+        }
+
+        // Divisor
+        x = 10;
+
+        // Index into `u16Buffer`.
+        // The +1 inside the loop will set to 0 on the first pass of the loop.
+        y = -1 as u8;
+
+        // Set DP so we can access the division registers
+        push16(&snes.divider.left_hl as u16 & 0xff00);
+        direct_page = pop16();
+        {
+        // DP = 0x4200
+        // MUST NOT USE zeropage variables
+            do {
+                *((&snes.divider.left_hl as u16 & 0xff) as *u16) = aa;
+                *((&snes.divider.right as u16 & 0xff) as *u8) = x;
+
+                // Must wait 16 cycles before reading result.
+
+                swap_bytes(aa);                                                 // 3
+                nop();                                                          // 2
+                nop();                                                          // 2
+
+                y++;                                                            // 2
+                aa = '0' as u16;                                                // 3
+                carry = false;                                                  // 2
+                aa +#= *((&snes.divider.mod_result_hl as u16 & 0xff) as *u16);  // +2 instruction fetch
+
+                (&u16Buffer as *u16)[unaligned y] = aa;
+
+                aa = *((&snes.divider.div_result_hl as u16 & 0xff) as *u16);
+            } while !zero;
+        }
+        direct_page = aa = 0;
+    // DP = 0
+    }
+    mem8();
+
+    x = pop8();
+
+    // Y = last value written to `u16Buffer` (number of chars in u16Buffer MINUS one)
+
+    if y < _integerPadding {
+        push8(y);
+        a = '0';
+        do {
+            decodedString[x] = a;
+            x++;
+            y++;
+        } while y < _integerPadding && y < MAX_UINT16_CHARS;
+        y = pop8();
+    }
+
+    do {
+        decodedString[x] = a = u16Buffer[y];
+        x++;
+        y--;
+    } while !negative;
+
+    return x;
+}
+
+
+
+// Decode and then print the textbox.
 //
 // DB = 0x7e
 #[mem8, idx16]
 #[fallthrough]
 func print_textbox(bankbyte : u8 in a, addr : u16 in xx) {
-    #:_string = a;
-    *(&_string as *u16) = xx;
+    decodedString = decode_string(a, xx);
 
 // Fallthrough
 }
 
+
+// Print the textbox (while also drawing the left/right borders and BG tiles).
+//
+// Also sets `_lastOption` to the `selectedMenuItem` index of the last item.
+// May also modify `_dpadMask_h`.
+//
+// ASSUMES: `buffer` was zeroed out by the Reset Handler and the buffer is only modified by
+//          this function and `setup_textbox()`.
+//
+// WARNING: Spaghetti code
+//
+// DB = 0x7e
 #[mem8, idx16]
-func print_textbox__zpTmp(_string : far *const u8 in _string) {
+func print_decoded_textbox(_decodedString : [u8 ; 256] in decodedString) {
 
     // -----------------------
     // WARNING: Spaghetti code
@@ -404,9 +607,9 @@ func print_textbox__zpTmp(_string : far *const u8 in _string) {
                 // Print one line
                 do {
                     // xx = index into buffer
-                    // yy = string index
+                    // yy = index into decodedString
 
-                    a = _string[yy];
+                    a = decodedString[yy];
                     goto NewLine if zero;   // Fill the line with padding tiles if the string is ended.
 
                     yy++;
@@ -553,16 +756,15 @@ func print_textbox_and_wait(bankbyte : u8 in a, addr : u16 in xx, confirmButton 
 
     // MUST NOT CALL any external functions that modify zpTmp variables
 
-    #:_string = a;
-    *(&_string as *u16) = xx;
-
     _confirmButton = yy;
+
+    decodedString = decode_string(a, xx);
 
     __set_up_down_selection__inline();
     selectedMenuItem = 0;
 
     while true {
-        print_textbox__zpTmp(_string);
+        print_decoded_textbox(decodedString);
 
         a = joypad.pressed_l;
         break if a & <:_confirmButton != 0;
