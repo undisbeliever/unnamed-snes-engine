@@ -8,6 +8,7 @@ import "gameloop";
 import "gamemodes/title-screen";
 import "gamemodes/game-over";
 import "gamemodes/credits";
+import "gamemodes/sound-test";
 import "room-transitions";
 
 
@@ -19,6 +20,8 @@ enum GameModes : u8 {
     GAME_OVER,
 
     CREDITS,
+
+    SOUND_TEST,
 
 
     // Fadeout the screen, initialise the player and gameloop, and start the game.
@@ -64,6 +67,7 @@ const gamemode_function_table : [func()] = [
     gamemodes.title_screen.exec,
     gamemodes.game_over.exec,
     gamemodes.credits.exec,
+    gamemodes.sound_test.exec,
     room_transitions.start_gameloop,
     room_transitions.load_room__fadein,
     room_transitions.fadeout,

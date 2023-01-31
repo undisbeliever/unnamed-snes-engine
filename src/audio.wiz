@@ -54,7 +54,7 @@ in rodata0 {
 in zeropage {
     // The sound effect to play next.
     //
-    // NOTE: If sfxQueue > N_SOUND_EFFECTS.  No sound effect will be played.
+    // NOTE: If sfxQueue > MAX_N_SOUND_EFFECTS.  No sound effect will be played.
     var sfxQueue : u8;
 
     // The `command_id` of the previous command send to the S-SMP audio driver.
@@ -133,7 +133,7 @@ func queue_sound_effect(effect_id : sound_effects in a) {
 // DB = 0x80
 #[mem8, idx8]
 inline func process_sfx_queue__inline() {
-    // Assumes N_SOUND_EFFECTS <= 128
+    // Assumes MAX_N_SOUND_EFFECTS == 128
     a = sfxQueue;
     if !negative {
         x = previousCommandId;

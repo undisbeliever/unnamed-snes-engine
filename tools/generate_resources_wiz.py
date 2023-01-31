@@ -62,6 +62,7 @@ def generate_wiz_code(mappings : Mappings, audio_mappings: AudioMappings) -> str
         out.write('}\n\n')
 
         write_enum(out, 'sound_effects', audio_mappings.sound_effects)
+        out.write(f"let N_SOUND_EFFECTS = { len(audio_mappings.sound_effects) };\n\n")
 
         return out.getvalue()
 

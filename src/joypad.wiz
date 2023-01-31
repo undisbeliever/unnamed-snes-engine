@@ -51,6 +51,7 @@ namespace JOYH {
     let Y       = 0x40;
     let B       = 0x80;
 
+    let LEFT_RIGHT = LEFT | RIGHT;
 
     let DPAD    = UP | DOWN | LEFT | RIGHT;
 }

@@ -1,0 +1,196 @@
+// Copyright (c) 2023, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+import "../common/reset";
+
+import "../../wiz/common/snes/snes";
+
+import "../audio";
+import "../gamemodes";
+import "../joypad";
+import "../resources";
+import "../textbox";
+import "../wait-frame";
+import "../common/reset";
+import "gen/resources";
+
+
+namespace gamemodes {
+namespace sound_test {
+
+
+in code {
+
+enum Options : u8 {
+    PLAY_SFX,
+    PLAY_SONG,
+    QUIT,
+};
+let N_OPTIONS = 3;
+
+in rodata0 {
+    const Text = "Sound Text\n"
+               ~ "  \x03 Play SFX:     \xc2\xff\n"
+               ~ "  \x04 Play Song:    n/a\n"
+               ~ "\n"
+               ~ "  \x05 Quit\n";
+}
+
+
+
+// Sound test screen
+//
+// DB = 0x7e
+#[mem8, idx8]
+func exec() {
+
+    wait_multiple_frames_and_fadeout();
+
+    idx16();
+    #[idx16] {
+        push16(0x7e80);
+        data_bank = pop8();
+    // DB = 0x80
+
+        setup_ppu__inline();
+
+        data_bank = pop8();
+    // DB = 0x7e
+
+    }
+    mem8_idx8();
+
+    textbox.setup_textbox(5, 12);
+
+    wait_frame_and_change_brightness(15);
+
+    process__inline();
+
+
+    a = GameModes.TITLE_SCREEN as u8;
+    gameMode = a as GameModes;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+inline func process__inline() {
+var _menuOption : u8 in textbox.selectedMenuItem;
+var _sfxId @ &textbox.firstU16parameter : u8;
+
+let JOYH_CONFIRM = joypad.JOYH.B | joypad.JOYH.Y | joypad.JOYH.START;
+
+    _menuOption = 0;
+    _sfxId = 0;
+
+    while true {
+        // ::TODO check if common data has changed and reload it::
+
+        x = _menuOption;
+
+        a = joypad.pressed_h;
+        if a & JOYH_CONFIRM != 0 {
+            if x == Options.PLAY_SFX as u8 {
+                audio.queue_sound_effect(_sfxId as sound_effects);
+            }
+            else if x == Options.PLAY_SONG as u8 {
+                // ::TODO implement::
+            }
+            else {
+                break;
+            }
+        }
+        else {
+            if a & joypad.JOYH.DOWN != 0 {
+                x++;
+                if x >= N_OPTIONS {
+                    x = 0;
+                }
+            }
+            else if a & joypad.JOYH.UP != 0 {
+                x--;
+                if negative {
+                    x = N_OPTIONS - 1;
+                }
+            }
+            else if a & joypad.JOYH.LEFT_RIGHT != 0 {
+                if a & joypad.JOYH.RIGHT != 0 {
+                    a = 1;
+                }
+                else {
+                    a = -1 as u8;
+                }
+
+                if x == Options.PLAY_SFX as u8 {
+                    a += _sfxId;
+                    if a == -1 as u8 {
+                        a = N_SOUND_EFFECTS - 1;
+                    }
+                    if a >= N_SOUND_EFFECTS {
+                        a = 0;
+                    }
+                    _sfxId = a;
+                }
+            }
+
+            _menuOption = x;
+        }
+
+        idx16();
+        #[idx16] {
+            textbox.print_textbox(#:far &Text, &Text as u16);
+        }
+        mem8_idx8();
+
+        wait_frame();
+    }
+}
+
+
+
+// DB = 0x80
+#[mem8, idx16]
+inline func setup_ppu__inline() {
+    // ::TODO create some kind of system for setting PPU registers::
+
+    reset_registers();
+    textbox.setup_ppu__forceblank();
+
+    snes.ppu.bg_mode = a = 0;
+    snes.ppu.bg3_tilemap = a = (VRAM_BG3_MAP_WADDR >> snes.ppu.BG_TILEMAP_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT);
+    snes.ppu.bg34_tileset = a = (VRAM_BG3_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG1_SHIFT);
+    snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_BG3;
+
+    resources.load_bg_image_resource_into_vram(resources.bg_images.game_over, VRAM_BG1_MAP_WADDR, VRAM_BG1_TILES_WADDR);
+
+    // Manually load textbox palette
+    // ::TODO add palettes to the resources subsystem::
+    snes.ppu.cgram_address = a = 64;
+
+    a = 32 * 2;
+    do {
+        snes.ppu.cgram_write_data = 0;
+        a--;
+    } while !zero;
+
+    snes.ppu.cgram_address = a = 69;
+    snes.ppu.cgram_write_data = 0;
+    snes.ppu.cgram_write_data = a = 16 << 2;
+
+    snes.ppu.cgram_address = a = 71;
+    a = 0xff;
+    snes.ppu.cgram_write_data = a;
+    snes.ppu.cgram_write_data = a;
+
+    snes.ppu.cgram_address = a = 75;
+    snes.ppu.cgram_write_data = a = 8;
+    snes.ppu.cgram_write_data = a = 31 << 2 | 1;
+}
+
+}
+
+}
+}
+
