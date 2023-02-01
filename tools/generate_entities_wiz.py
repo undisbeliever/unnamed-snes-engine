@@ -6,11 +6,10 @@
 import argparse
 from io import StringIO
 
-from _json_formats import load_entities_json, load_ms_export_order_json, \
-                          EntitiesJson, MsExportOrder
+from _json_formats import load_entities_json, load_ms_export_order_json, EntitiesJson, MsExportOrder
 
 
-def generate_wiz_code(entities_input : EntitiesJson, ms_export_orders : MsExportOrder) -> str:
+def generate_wiz_code(entities_input: EntitiesJson, ms_export_orders: MsExportOrder) -> str:
 
     entity_functions = entities_input.entity_functions.values()
     entities = entities_input.entities.values()
@@ -24,7 +23,6 @@ def generate_wiz_code(entities_input : EntitiesJson, ms_export_orders : MsExport
         for e in entities:
             out.write(f"  { e.name },\n")
         out.write("};\n\n")
-
 
         for ef in entity_functions:
             out.write(f"namespace { ef.name } {{\n")
@@ -41,39 +39,32 @@ def generate_wiz_code(entities_input : EntitiesJson, ms_export_orders : MsExport
 
             p = ef.parameter
             if p:
-                if p.type == 'enum':
+                if p.type == "enum":
                     assert p.values and len(p.values) > 0
 
-                    out.write('enum init_parameter : u8 {\n')
+                    out.write("enum init_parameter : u8 {\n")
                     for v in p.values:
                         out.write(f"  { v },\n")
-                    out.write('};\n')
+                    out.write("};\n")
                 else:
                     ValueError(f"Unknown entity_function parameter type: { p.type }")
 
             out.write("}\n\n")
 
-
         out.write("}\n\n")
-
 
         return out.getvalue()
 
 
-
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument('-o', '--output', required=True,
-                        help='wiz output file')
-    parser.add_argument('entities_json_file', action='store',
-                        help='entities  JSON  file input')
-    parser.add_argument('ms_export_order_json_file', action='store',
-                        help='metasprite export order  JSON  file input')
+    parser.add_argument("-o", "--output", required=True, help="wiz output file")
+    parser.add_argument("entities_json_file", action="store", help="entities  JSON  file input")
+    parser.add_argument("ms_export_order_json_file", action="store", help="metasprite export order  JSON  file input")
 
     args = parser.parse_args()
 
-    return args;
-
+    return args
 
 
 def main() -> None:
@@ -84,12 +75,9 @@ def main() -> None:
 
     out = generate_wiz_code(entities, ms_export_orders)
 
-    with open(args.output, 'w') as fp:
+    with open(args.output, "w") as fp:
         fp.write(out)
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
-

@@ -10,9 +10,10 @@ from _bytecode import BcMappings, Bytecode
 from _json_formats import parse_name, Filename, Name, Mappings
 
 
-END_INSTRUCTION: Final = 'disable_channel'
+END_INSTRUCTION: Final = "disable_channel"
 
-SOUND_EFFECT_SEPARATOR_REGEX = re.compile(r'^==+ *([a-zA-Z][a-zA-Z0-9_]*) *==+')
+SOUND_EFFECT_SEPARATOR_REGEX = re.compile(r"^==+ *([a-zA-Z][a-zA-Z0-9_]*) *==+")
+
 
 def compile_sound_effects_file(lines: Sequence[str], filename: str, bcMappings: BcMappings) -> dict[Name, bytes]:
     sound_effects: dict[Name, bytes] = dict()
@@ -20,7 +21,7 @@ def compile_sound_effects_file(lines: Sequence[str], filename: str, bcMappings: 
     current_sfx: Optional[Name] = None
     current_bc: Optional[Bytecode] = None
 
-    prev_line = ''
+    prev_line = ""
 
     errors = list()
 
@@ -31,7 +32,7 @@ def compile_sound_effects_file(lines: Sequence[str], filename: str, bcMappings: 
             errors.append(f"{filename}:{line_no+1}: {message}")
 
     for line_no, line in enumerate(lines):
-        line, _sep, _comment = line.partition(';')
+        line, _sep, _comment = line.partition(";")
         line = line.strip()
         if line:
             try:
@@ -47,7 +48,7 @@ def compile_sound_effects_file(lines: Sequence[str], filename: str, bcMappings: 
                     if current_bc:
                         current_bc.parse_line(line)
                     else:
-                        add_error('Cannot assign bytecode instruction to sound effect')
+                        add_error("Cannot assign bytecode instruction to sound effect")
             except Exception as e:
                 add_error(str(e))
 
@@ -57,7 +58,7 @@ def compile_sound_effects_file(lines: Sequence[str], filename: str, bcMappings: 
         add_error(f"The sound effect must end with a `{END_INSTRUCTION}` instruction")
 
     if errors:
-        raise RuntimeError(f"{len(errors)} errors compiling sound effects\n    " + '\n    '.join(errors))
+        raise RuntimeError(f"{len(errors)} errors compiling sound effects\n    " + "\n    ".join(errors))
 
     return sound_effects
 
@@ -84,15 +85,14 @@ def build_sfx_header_and_data(sfx: dict[Name, bytes], mappings: Mappings, starti
     if missing_sfx:
         raise RuntimeError(f"Missing {len(missing_sfx)} sound effects: {', '.join(missing_sfx)}")
 
-    if current_addr >= 0xffff:
+    if current_addr >= 0xFFFF:
         raise RuntimeError(f"Cannot fit sound effect data in Audio-RAM")
 
     padding = bytes(N_SOUND_EFFECTS - len(addresses))
 
-    header = bytes(a & 0xff for a in addresses)
+    header = bytes(a & 0xFF for a in addresses)
     header += padding
     header += bytes(a >> 8 for a in addresses)
     header += padding
 
     return header, data
-

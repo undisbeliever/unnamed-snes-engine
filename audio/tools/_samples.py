@@ -19,6 +19,7 @@ from typing import Final, NamedTuple, Optional, TypeAlias, Union
 # BRR Samples
 # ===========
 
+
 class BrrData(NamedTuple):
     instrument_scrn_table: bytes
     brr_directory: bytes
@@ -73,9 +74,9 @@ def _compile_brr_samples(instruments: list[Instrument]) -> BrrData:
             loop_offset = (loop_point // 16) * BYTES_PER_BRR_BLOCK
 
             if loop_offset >= brr_size:
-                raise ValueError('Loop point must be < number of samples in the wave file')
+                raise ValueError("Loop point must be < number of samples in the wave file")
 
-            dir_item = struct.pack('<2H', brr_addr, brr_addr + loop_offset)
+            dir_item = struct.pack("<2H", brr_addr, brr_addr + loop_offset)
 
             assert len(dir_item) == BYTES_PER_SAMPLE_DIRECTORY_ITEM
             brr_directory.extend(dir_item)
@@ -99,21 +100,19 @@ def _compile_brr_samples(instruments: list[Instrument]) -> BrrData:
     # Pad `brr_directory`
     directory_padding = BRR_DIRECTORY_SIZE - len(brr_directory)
     if directory_padding < 0:
-        errors.append(f"Too many items in the sample directory. (The directory is {len(brr_directory)} bytes, max is {N_BRR_SAMPLES_IN_DIRECTORY})")
+        errors.append(
+            f"Too many items in the sample directory. (The directory is {len(brr_directory)} bytes, max is {N_BRR_SAMPLES_IN_DIRECTORY})"
+        )
     elif directory_padding > 0:
         brr_directory += bytes(directory_padding)
 
     if errors:
-        error_string = '\n    '.join(errors)
+        error_string = "\n    ".join(errors)
         raise ValueError(f"{len(errors)} errors compiling brr samples:\n    {error_string}")
 
     assert len(brr_directory) == BRR_DIRECTORY_SIZE
 
-    return BrrData(
-            instrument_scrn_table=instrument_scrn_table,
-            brr_directory=brr_directory,
-            brr_data=brr_data
-    )
+    return BrrData(instrument_scrn_table=instrument_scrn_table, brr_directory=brr_directory, brr_data=brr_data)
 
 
 # Pitch Table
@@ -174,15 +173,14 @@ def _build_microsemitone_map(instruments: list[Instrument]) -> OrderedDict[int, 
         if max_octave_offset > 2:
             errors.append("Instrument {i} {inst.name}: last_octave is too high")
 
-        sp.append(InstrumentPitch(
-            instrument_id=i,
-            octaves_above_c0=octave,
-            min_octave_offset=min_octave_offset,
-            max_octave_offset=max_octave_offset
-        ))
+        sp.append(
+            InstrumentPitch(
+                instrument_id=i, octaves_above_c0=octave, min_octave_offset=min_octave_offset, max_octave_offset=max_octave_offset
+            )
+        )
 
     if errors:
-        error_string = '\n    '.join(errors)
+        error_string = "\n    ".join(errors)
         raise ValueError(f"{len(errors)} errors building the pitch table:\n    {error_string}")
 
     return mst_map
@@ -227,8 +225,8 @@ def _build_instrument_pitch_table(mst_map: OrderedDict[int, list[InstrumentPitch
     assert all(o is not None for o in instrument_pt_offsets)
 
     return PitchTable(
-            table_data=pitch_table,
-            instrument_offsets=instrument_pt_offsets,  # type: ignore
+        table_data=pitch_table,
+        instrument_offsets=instrument_pt_offsets,  # type: ignore
     )
 
 
@@ -246,7 +244,7 @@ def _pitch_table_data(pt: PitchTable) -> bytes:
     out = bytearray()
 
     # lo byte
-    out += bytes(i & 0xff for i in pt.table_data)
+    out += bytes(i & 0xFF for i in pt.table_data)
     out += padding
 
     # hi byte
@@ -261,40 +259,42 @@ def _pitch_table_data(pt: PitchTable) -> bytes:
 # Instruments
 # ===========
 
+
 def validate_instrument_input(instruments: list[Instrument]) -> None:
     errors: list[str] = list()
 
     if len(instruments) <= 0:
-        raise ValueError('Expected at least one instrument')
+        raise ValueError("Expected at least one instrument")
 
     if len(instruments) > N_INSTRUMENTS:
         raise ValueError(f"Too many instruments (max: {N_INSTRUMENTS})")
 
     for i, inst in enumerate(instruments):
+
         def test_value(var_name: str, v: Union[int, float], min_value: int, max_value: int) -> None:
             if v < min_value or v > max_value:
                 errors.append(f"Instrument {i} {inst.name}: {var_name} out of bounds (got: {v}, min: {min_value}, max: {max_value}")
 
-        test_value('freq',          inst.freq,                  100,                32000)
+        test_value("freq", inst.freq, 100, 32000)
         # loop-point tested when building sample directory
-        test_value('first_octave',  inst.first_octave,          MIN_OCTAVE,         MAX_OCTAVE)
-        test_value('last_octave',   inst.last_octave,           inst.first_octave,  MAX_OCTAVE)
-        test_value('ADSR attack',   inst.adsr.attack,           0,                  0b01111)
-        test_value('ADSR decay',    inst.adsr.decay,            0,                  0b00111)
-        test_value('ADSR sustain',  inst.adsr.sustain_level,    0,                  0b00111)
-        test_value('ADSR release',  inst.adsr.sustain_rate,     0,                  0b11111)
-        test_value('gain',          inst.gain,                  0,                  0xff)
+        test_value("first_octave", inst.first_octave, MIN_OCTAVE, MAX_OCTAVE)
+        test_value("last_octave", inst.last_octave, inst.first_octave, MAX_OCTAVE)
+        test_value("ADSR attack", inst.adsr.attack, 0, 0b01111)
+        test_value("ADSR decay", inst.adsr.decay, 0, 0b00111)
+        test_value("ADSR sustain", inst.adsr.sustain_level, 0, 0b00111)
+        test_value("ADSR release", inst.adsr.sustain_rate, 0, 0b11111)
+        test_value("gain", inst.gain, 0, 0xFF)
 
     if errors:
-        error_string = '\n    '.join(errors)
+        error_string = "\n    ".join(errors)
         raise ValueError(f"{len(errors)} errors in instruments:\n    {error_string}")
 
 
 def _mask_pitch_offset(i: int) -> int:
     if i >= 0:
-        return i & 0xff
+        return i & 0xFF
     else:
-        o = (-i) & 0xff
+        o = (-i) & 0xFF
         if o == 0:
             return 0
         return 0x100 - o
@@ -359,5 +359,3 @@ def build_sample_and_instrument_data(samplesInput: SamplesJson) -> SampleAndInst
     assert len(header) == SAMPLE_AND_INSTRUMENT_HEADER_SIZE
 
     return SampleAndInstrumentData(header, samples.brr_data)
-
-

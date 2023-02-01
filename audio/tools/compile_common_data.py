@@ -38,17 +38,13 @@ def build_common_data(samples_input: SamplesJson, mappings: Mappings, sfx_file: 
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument('-o', '--output', required=True,
-                        help='binary file output')
+    parser.add_argument("-o", "--output", required=True, help="binary file output")
 
-    parser.add_argument('samples_json', action='store',
-                        help='samples json file')
+    parser.add_argument("samples_json", action="store", help="samples json file")
 
-    parser.add_argument('mapping_json', action='store',
-                        help='mapping json file')
+    parser.add_argument("mapping_json", action="store", help="mapping json file")
 
-    parser.add_argument('sound_effects', action='store',
-                        help='sound effects source file')
+    parser.add_argument("sound_effects", action="store", help="sound effects source file")
 
     args = parser.parse_args()
 
@@ -62,17 +58,17 @@ def main() -> None:
         samples_input = load_samples_json(args.samples_json)
         mapping_json = load_mapping_json(args.mapping_json)
 
-        with open(args.sound_effects, 'r') as fp:
+        with open(args.sound_effects, "r") as fp:
             sfx_file = list(fp)
 
         data = build_common_data(samples_input, mapping_json, sfx_file, args.sound_effects)
 
-        with open(args.output, 'wb') as fp:
+        with open(args.output, "wb") as fp:
             fp.write(data)
 
     except Exception as e:
         sys.exit(f"ERROR: { e }")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

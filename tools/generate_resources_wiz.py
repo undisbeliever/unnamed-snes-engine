@@ -12,8 +12,8 @@ from _json_formats import RoomName, load_mappings_json, load_audio_mappings_json
 from _common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET, USB2SNES_DATA_BANK_OFFSET, ResourceType
 
 
-def room_id_for_name(room_name : RoomName) -> int:
-    m = re.match(r'(\d+)-(\d+)-.+$', room_name)
+def room_id_for_name(room_name: RoomName) -> int:
+    m = re.match(r"(\d+)-(\d+)-.+$", room_name)
 
     if not m:
         raise ValueError("Invalid room name")
@@ -21,10 +21,8 @@ def room_id_for_name(room_name : RoomName) -> int:
     return int(m.group(1), 10) + 16 * int(m.group(2), 10)
 
 
-
-def resources_over_usb2snes_data_addr(memory_map : MemoryMap) -> int:
+def resources_over_usb2snes_data_addr(memory_map: MemoryMap) -> int:
     return ((memory_map.first_resource_bank + USB2SNES_DATA_BANK_OFFSET) << 16) | memory_map.mode.bank_start
-
 
 
 def write_enum(out: TextIO, name: Name, name_list: list[Name]) -> None:
@@ -33,14 +31,13 @@ def write_enum(out: TextIO, name: Name, name_list: list[Name]) -> None:
     for n in name_list:
         out.write(f"  { n },\n")
 
-    out.write('};\n\n')
+    out.write("};\n\n")
 
 
-
-def generate_wiz_code(mappings : Mappings, audio_mappings: AudioMappings) -> str:
+def generate_wiz_code(mappings: Mappings, audio_mappings: AudioMappings) -> str:
 
     with StringIO() as out:
-        out.write('namespace resources {\n\n')
+        out.write("namespace resources {\n\n")
 
         out.write(f"let MS_FS_DATA_BANK = { mappings.memory_map.first_resource_bank + MS_FS_DATA_BANK_OFFSET };\n")
         out.write(f"let ROOM_DATA_BANK = { mappings.memory_map.first_resource_bank + ROOM_DATA_BANK_OFFSET };\n\n")
@@ -50,37 +47,32 @@ def generate_wiz_code(mappings : Mappings, audio_mappings: AudioMappings) -> str
         out.write(f"let _USB2SNES_DATA_ADDR = { resources_over_usb2snes_data_addr(mappings.memory_map) };\n")
         out.write(f"let _BANK_SIZE = { mappings.memory_map.mode.bank_size };\n\n")
 
-        out.write('let n_resources_per_type = [')
+        out.write("let n_resources_per_type = [")
         for rt in ResourceType:
             l = len(getattr(mappings, rt.name))
             out.write(f"{ l }, ")
-        out.write('];\n\n')
+        out.write("];\n\n")
 
         for rt in ResourceType:
             write_enum(out, rt.name, getattr(mappings, rt.name))
 
-        out.write('}\n\n')
+        out.write("}\n\n")
 
-        write_enum(out, 'sound_effects', audio_mappings.sound_effects)
+        write_enum(out, "sound_effects", audio_mappings.sound_effects)
         out.write(f"let N_SOUND_EFFECTS = { len(audio_mappings.sound_effects) };\n\n")
 
         return out.getvalue()
 
 
-
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument('-o', '--output', required=True,
-                        help='wiz output file')
-    parser.add_argument('mappings_json_file', action='store',
-                        help='mappings json file input')
-    parser.add_argument('audio_mappings_json', action='store',
-                        help='audio mappings json file input')
+    parser.add_argument("-o", "--output", required=True, help="wiz output file")
+    parser.add_argument("mappings_json_file", action="store", help="mappings json file input")
+    parser.add_argument("audio_mappings_json", action="store", help="audio mappings json file input")
 
     args = parser.parse_args()
 
-    return args;
-
+    return args
 
 
 def main() -> None:
@@ -91,12 +83,9 @@ def main() -> None:
 
     out = generate_wiz_code(mappings, audio_mappings)
 
-    with open(args.output, 'w') as fp:
+    with open(args.output, "w") as fp:
         fp.write(out)
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
-

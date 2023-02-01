@@ -6,7 +6,7 @@
 import json
 import sys
 import os.path
-import PIL.Image # type: ignore
+import PIL.Image  # type: ignore
 import argparse
 from io import StringIO
 
@@ -14,72 +14,95 @@ from typing import overload, Callable, Final, Iterable, Literal, NamedTuple, Opt
 
 from _common import RomData, MemoryMapMode, MultilineError, print_error
 
-from _snes import extract_small_tile, extract_large_tile, split_large_tile, \
-            hflip_tile, vflip_tile, hflip_large_tile, vflip_large_tile, \
-            create_palettes_map, get_palette_id, convert_palette_image, \
-            convert_snes_tileset, is_small_tile_not_transparent, \
-            SnesColor, SmallTileData, LargeTileData, PaletteMap
+from _snes import (
+    extract_small_tile,
+    extract_large_tile,
+    split_large_tile,
+    hflip_tile,
+    vflip_tile,
+    hflip_large_tile,
+    vflip_large_tile,
+    create_palettes_map,
+    get_palette_id,
+    convert_palette_image,
+    convert_snes_tileset,
+    is_small_tile_not_transparent,
+    SnesColor,
+    SmallTileData,
+    LargeTileData,
+    PaletteMap,
+)
 
-from _json_formats import load_ms_export_order_json, load_metasprites_json, \
-                          Name, ScopedName, Filename, MsExportOrder, MsPattern, \
-                          Aabb, TileHitbox, MsAnimation, MsLayout, MsFrameset, MsSpritesheet, \
-                          MsLayoutOverride, AabbOverride
+from _json_formats import (
+    load_ms_export_order_json,
+    load_metasprites_json,
+    Name,
+    ScopedName,
+    Filename,
+    MsExportOrder,
+    MsPattern,
+    Aabb,
+    TileHitbox,
+    MsAnimation,
+    MsLayout,
+    MsFrameset,
+    MsSpritesheet,
+    MsLayoutOverride,
+    AabbOverride,
+)
 
 
 TILE_DATA_BPP = 4
 
 # MUST match `ShadowSize` enum in `src/metasprites.wiz`
-SHADOW_SIZES : dict[str, int] = {
-    'NONE':   0,
-    'SMALL':  1,
-    'MEDIUM': 2,
-    'LARGE':  3,
+SHADOW_SIZES: dict[str, int] = {
+    "NONE": 0,
+    "SMALL": 1,
+    "MEDIUM": 2,
+    "LARGE": 3,
 }
 
 
 class TileError(NamedTuple):
-    x         : int
-    y         : int
-    tile_size : Literal[8, 16]
+    x: int
+    y: int
+    tile_size: Literal[8, 16]
 
 
 class AnimationError(MultilineError):
-    def __init__(self, name : Name, message : str):
-        self.name    : Final = name
-        self.message : Final = message
+    def __init__(self, name: Name, message: str):
+        self.name: Final = name
+        self.message: Final = message
 
-
-    def print_indented(self, fp : TextIO) -> None:
+    def print_indented(self, fp: TextIO) -> None:
         fp.write(f"    Animation { self.name }: { self.message }\n")
 
 
 class FrameError(MultilineError):
-    def __init__(self, frame_name : Name, message : str, tiles : Optional[list[TileError]] = None):
-        self.frame_name : Final = frame_name
-        self.message    : Final = message
-        self.tiles      : Final = tiles
+    def __init__(self, frame_name: Name, message: str, tiles: Optional[list[TileError]] = None):
+        self.frame_name: Final = frame_name
+        self.message: Final = message
+        self.tiles: Final = tiles
 
-
-    def print_indented(self, fp : TextIO) -> None:
+    def print_indented(self, fp: TextIO) -> None:
         if not self.tiles:
             fp.write(f"    Frame { self.frame_name }: { self.message }\n")
         if self.tiles:
             fp.write(f"    Frame { self.frame_name }: { self.message }:")
             for t in self.tiles:
                 fp.write(f" ({t.x:>3},{t.y:>4})x{t.tile_size:<2}")
-            fp.write('\n')
+            fp.write("\n")
 
 
 class FramesetError(MultilineError):
-    def __init__(self, fs_name : Name, errors : Union[str, list[Union[str, FrameError, AnimationError]]]):
+    def __init__(self, fs_name: Name, errors: Union[str, list[Union[str, FrameError, AnimationError]]]):
         if not isinstance(errors, list):
-            errors = [ errors ]
+            errors = [errors]
 
-        self.fs_name : Final = fs_name
-        self.errors  : Final = errors
+        self.fs_name: Final = fs_name
+        self.errors: Final = errors
 
-
-    def print_indented(self, fp : TextIO) -> None:
+    def print_indented(self, fp: TextIO) -> None:
         fp.write(f"  Frameset { self.fs_name }: { len(self.errors) } errors\n")
         for e in self.errors:
             if isinstance(e, str):
@@ -89,41 +112,39 @@ class FramesetError(MultilineError):
 
 
 class SpritesheetError(MultilineError):
-    def __init__(self, errors : list[FramesetError]):
-        self.errors : Final = errors
+    def __init__(self, errors: list[FramesetError]):
+        self.errors: Final = errors
 
-    def print_indented(self, fp : TextIO) -> None:
+    def print_indented(self, fp: TextIO) -> None:
         fp.write(f"{ len(self.errors) } invalid framesets:\n")
         for e in self.errors:
             e.print_indented(fp)
 
 
 class FrameLocation(NamedTuple):
-    is_clone        : bool
-    flip            : Optional[str]
-    frame_x         : int
-    frame_y         : int
-    pattern         : MsPattern
-    x_offset        : Optional[int]
-    y_offset        : Optional[int]
-    hitbox          : Optional[Aabb]
-    hurtbox         : Optional[Aabb]
-
+    is_clone: bool
+    flip: Optional[str]
+    frame_x: int
+    frame_y: int
+    pattern: MsPattern
+    x_offset: Optional[int]
+    y_offset: Optional[int]
+    hitbox: Optional[Aabb]
+    hurtbox: Optional[Aabb]
 
 
 # MsFramesetFormat and MsFsData intermediate
 class MsFsEntry(NamedTuple):
-    fullname            : ScopedName
-    ms_export_order     : Name
-    header              : bytes
-    pattern             : Name
-    frames              : list[bytes]
-    animations          : list[bytes]
-
+    fullname: ScopedName
+    ms_export_order: Name
+    header: bytes
+    pattern: Name
+    frames: list[bytes]
+    animations: list[bytes]
 
 
 class Tileset:
-    def __init__(self, starting_tile_id : int, end_tile_id : int):
+    def __init__(self, starting_tile_id: int, end_tile_id: int):
         assert starting_tile_id < 512
         assert end_tile_id <= 512
         assert starting_tile_id < end_tile_id
@@ -134,30 +155,29 @@ class Tileset:
         assert end_tile_id & 0x01 == 0, "end_tile is not on an even row"
         assert end_tile_id & 0x10 == 0, "end_tile is not on an even column"
 
-        self.starting_tile_id   : Final = starting_tile_id
-        self.end_tile_id        : Final = end_tile_id
+        self.starting_tile_id: Final = starting_tile_id
+        self.end_tile_id: Final = end_tile_id
 
         # Offset between a tile pos and a SNES OAM tile_id
-        self.tile_id_offset     : Final = starting_tile_id & ~0x1f
+        self.tile_id_offset: Final = starting_tile_id & ~0x1F
 
         # This list is always incremented 2-rows at a time.
         # This greatly simplifies the `add_small_tile()` code
-        self.tiles              : list[Optional[LargeTileData]] = [ None ] * 0x20
+        self.tiles: list[Optional[LargeTileData]] = [None] * 0x20
 
-        self.large_tile_pos     : int = starting_tile_id & 0x1f
+        self.large_tile_pos: int = starting_tile_id & 0x1F
 
-        self.small_tile_pos     : int = 4
-        self.small_tile_offset  : int = 0
+        self.small_tile_pos: int = 4
+        self.small_tile_offset: int = 0
 
-        self.small_tiles_map    : dict[SmallTileData, tuple[int, bool, bool]] = dict()
-        self.large_tiles_map    : dict[LargeTileData, tuple[int, bool, bool]] = dict()
+        self.small_tiles_map: dict[SmallTileData, tuple[int, bool, bool]] = dict()
+        self.large_tiles_map: dict[LargeTileData, tuple[int, bool, bool]] = dict()
 
-        self.first_large_tile_pos : Final = self.large_tile_pos
-
+        self.first_large_tile_pos: Final = self.large_tile_pos
 
     def get_tiles(self) -> list[LargeTileData]:
         if self.large_tile_pos == self.first_large_tile_pos:
-            raise ValueError('No tiles in tileset')
+            raise ValueError("No tiles in tileset")
 
         large_tile_id = self.large_tile_pos + self.tile_id_offset
         if large_tile_id > self.end_tile_id:
@@ -171,28 +191,26 @@ class Tileset:
         n_tiles = end_tile + 1
 
         # Skip tiles before `self.starting_tile_id`
-        flt : Final = self.first_large_tile_pos
+        flt: Final = self.first_large_tile_pos
         if flt > 0:
-            tiles = self.tiles[flt:0x10] + self.tiles[flt+0x10:n_tiles]
+            tiles = self.tiles[flt:0x10] + self.tiles[flt + 0x10 : n_tiles]
         else:
             tiles = self.tiles
 
         # Replace unused tiles with blank data
         blank_tile = bytearray(64)
-        return [ blank_tile if t is None else t for t in tiles ]
-
+        return [blank_tile if t is None else t for t in tiles]
 
     def _allocate_large_tile(self) -> int:
         tile_pos = self.large_tile_pos
 
         self.large_tile_pos += 2
-        if self.large_tile_pos & 0x0f == 0:
+        if self.large_tile_pos & 0x0F == 0:
             self.large_tile_pos += 0x10
 
-            self.tiles += [ None ] * 0x20
+            self.tiles += [None] * 0x20
 
         return tile_pos
-
 
     def _allocate_small_tile(self) -> int:
         if self.small_tile_pos >= 4:
@@ -204,10 +222,9 @@ class Tileset:
 
         return tile_pos
 
-    _SMALL_TILE_OFFSETS = [ 0x00, 0x01, 0x10, 0x11 ]
+    _SMALL_TILE_OFFSETS = [0x00, 0x01, 0x10, 0x11]
 
-
-    def add_small_tile(self, tile_data : SmallTileData) -> int:
+    def add_small_tile(self, tile_data: SmallTileData) -> int:
         assert len(tile_data) == 64
 
         tile_pos = self._allocate_small_tile()
@@ -216,8 +233,7 @@ class Tileset:
 
         return tile_pos + self.tile_id_offset
 
-
-    def add_large_tile(self, small_tiles : tuple[SmallTileData, SmallTileData, SmallTileData, SmallTileData]) -> int:
+    def add_large_tile(self, small_tiles: tuple[SmallTileData, SmallTileData, SmallTileData, SmallTileData]) -> int:
         assert all(len(st) == 64 for st in small_tiles)
 
         tile_pos = self._allocate_large_tile()
@@ -229,8 +245,7 @@ class Tileset:
 
         return tile_pos + self.tile_id_offset
 
-
-    def add_or_get_small_tile(self, tile_data : SmallTileData) -> tuple[int, bool, bool]:
+    def add_or_get_small_tile(self, tile_data: SmallTileData) -> tuple[int, bool, bool]:
         assert len(tile_data) == 64
 
         match = self.small_tiles_map.get(tile_data)
@@ -250,8 +265,7 @@ class Tileset:
 
         return match
 
-
-    def add_or_get_large_tile(self, tile_data : LargeTileData) -> tuple[int, bool, bool]:
+    def add_or_get_large_tile(self, tile_data: LargeTileData) -> tuple[int, bool, bool]:
         match = self.large_tiles_map.get(tile_data)
         if match is None:
             small_tiles = split_large_tile(tile_data)
@@ -284,16 +298,16 @@ class Tileset:
         return match
 
 
-
-def i8_cast(i : int) -> int:
+def i8_cast(i: int) -> int:
     if i < 0:
         return 0x100 + i
-    return i;
+    return i
 
 
 NO_AABB_VALUE = 0x80
 
-def add_i8aabb(data : bytearray, box : Optional[Aabb], fs : MsFrameset) -> None:
+
+def add_i8aabb(data: bytearray, box: Optional[Aabb], fs: MsFrameset) -> None:
     if box is not None:
         if box.x < 0 or box.y < 0 or box.width <= 0 or box.height <= 0:
             raise ValueError(f"AABB box is invalid: { box }")
@@ -317,18 +331,19 @@ def add_i8aabb(data : bytearray, box : Optional[Aabb], fs : MsFrameset) -> None:
     data.extend((x1, x2, y1, y2))
 
 
-
-def extract_frame(fl : FrameLocation, frame_name : Name, image : PIL.Image.Image, palettes_map : list[PaletteMap], tileset : Tileset, fs : MsFrameset) -> bytes:
+def extract_frame(
+    fl: FrameLocation, frame_name: Name, image: PIL.Image.Image, palettes_map: list[PaletteMap], tileset: Tileset, fs: MsFrameset
+) -> bytes:
     assert fl.x_offset is not None and fl.y_offset is not None
 
-    pattern : Final = fl.pattern
-    assert(pattern)
+    pattern: Final = fl.pattern
+    assert pattern
 
-    image_x : Final = fl.frame_x + fl.x_offset
-    image_y : Final = fl.frame_y + fl.y_offset
+    image_x: Final = fl.frame_x + fl.x_offset
+    image_y: Final = fl.frame_y + fl.y_offset
 
-    x_offset : Final = fs.x_origin - fl.x_offset
-    y_offset : Final = fs.y_origin - fl.y_offset
+    x_offset: Final = fs.x_origin - fl.x_offset
+    y_offset: Final = fs.y_origin - fl.y_offset
 
     if x_offset < 0 or x_offset >= fs.frame_width or y_offset < 0 or y_offset >= fs.frame_height:
         raise FrameError(frame_name, f"offset is outside frame: { x_offset }, { y_offset }")
@@ -377,49 +392,50 @@ def extract_frame(fl : FrameLocation, frame_name : Name, image : PIL.Image.Image
         assert tile_id < 512
         assert palette_id is not None
 
-        data.append(tile_id & 0xff)
-        data.append((tile_id >> 8)
-                    | ((palette_id & 7) << 1)
-                    | ((fs.order & 3) << 4)
-                    | (bool(hflip) << 6)
-                    | (bool(vflip) << 7)
-        )
+        data.append(tile_id & 0xFF)
+        data.append((tile_id >> 8) | ((palette_id & 7) << 1) | ((fs.order & 3) << 4) | (bool(hflip) << 6) | (bool(vflip) << 7))
 
     if objects_outside_frame:
-        raise FrameError(frame_name, 'Objects outside frame', objects_outside_frame)
+        raise FrameError(frame_name, "Objects outside frame", objects_outside_frame)
 
     if tiles_with_no_palettes:
-        raise FrameError(frame_name, 'Cannot find palette for object tiles', tiles_with_no_palettes)
+        raise FrameError(frame_name, "Cannot find palette for object tiles", tiles_with_no_palettes)
 
     return data
 
 
+def build_frame_data(
+    frame_locations: dict[Name, FrameLocation],
+    fs: MsFrameset,
+    image: PIL.Image.Image,
+    tiles: Tileset,
+    palettes_map: list[PaletteMap],
+    transparent_color: SnesColor,
+) -> tuple[dict[Name, bytes], set[Name]]:
+    errors: list[Union[str, FrameError, AnimationError]] = list()
 
-def build_frame_data(frame_locations : dict[Name, FrameLocation], fs : MsFrameset, image : PIL.Image.Image, tiles : Tileset, palettes_map : list[PaletteMap], transparent_color : SnesColor) -> tuple[dict[Name, bytes], set[Name]]:
-    errors : list[Union[str, FrameError, AnimationError]] = list()
+    image_hflip: Optional[PIL.Image.Image] = None
+    image_vflip: Optional[PIL.Image.Image] = None
+    image_hvflip: Optional[PIL.Image.Image] = None
 
-    image_hflip : Optional[PIL.Image.Image] = None
-    image_vflip : Optional[PIL.Image.Image] = None
-    image_hvflip : Optional[PIL.Image.Image] = None
-
-    frames      : dict[Name, bytes] = dict()
-    patterns_used : set[Name] = set()
+    frames: dict[Name, bytes] = dict()
+    patterns_used: set[Name] = set()
 
     for frame_name, fl in frame_locations.items():
         frame_image = None
         if not fl.flip:
             frame_image = image
-        elif fl.flip == 'hflip':
+        elif fl.flip == "hflip":
             if image_hflip is None:
                 image_hflip = image.transpose(PIL.Image.Transpose.FLIP_LEFT_RIGHT)
             frame_image = image_hflip
 
-        elif fl.flip == 'vflip':
+        elif fl.flip == "vflip":
             if image_vflip is None:
                 image_vflip = image.transpose(PIL.Image.Transpose.FLIP_TOP_BOTTOM)
             frame_image = image_vflip
 
-        elif fl.flip == 'hvflip':
+        elif fl.flip == "hvflip":
             if image_hvflip is None:
                 image_hvflip = image.transpose(PIL.Image.Transpose.ROTATE_180)
             frame_image = image_hvflip
@@ -443,24 +459,22 @@ def build_frame_data(frame_locations : dict[Name, FrameLocation], fs : MsFramese
     return frames, patterns_used
 
 
-
-def flip_optional_aabb(aabb : Optional[Aabb], flip : Optional[str], fs : MsFrameset) -> Optional[Aabb]:
+def flip_optional_aabb(aabb: Optional[Aabb], flip: Optional[str], fs: MsFrameset) -> Optional[Aabb]:
     if not aabb or not flip:
         return None
 
     x = aabb.x
     y = aabb.y
 
-    if flip == 'hflip' or flip == 'hvflip':
+    if flip == "hflip" or flip == "hvflip":
         x = 2 * fs.x_origin - aabb.x - aabb.width
-    if flip == 'vflip' or flip == 'hvflip':
+    if flip == "vflip" or flip == "hvflip":
         y = 2 * fs.y_origin - aabb.y - aabb.height
 
     return Aabb(x, y, aabb.width, aabb.height)
 
 
-
-def clone_frame_location(fl : FrameLocation, flip : Optional[str], fs : MsFrameset, image_width : int, image_height : int) -> FrameLocation:
+def clone_frame_location(fl: FrameLocation, flip: Optional[str], fs: MsFrameset, image_width: int, image_height: int) -> FrameLocation:
     if not flip:
         return fl
 
@@ -469,30 +483,36 @@ def clone_frame_location(fl : FrameLocation, flip : Optional[str], fs : MsFrames
     frame_x = fl.frame_x
     frame_y = fl.frame_y
 
-    if flip == 'hflip' or flip == 'hvflip':
+    if flip == "hflip" or flip == "hvflip":
         frame_x = image_width - frame_x - fs.frame_width
-    if flip == 'vflip' or flip == 'hvflip':
+    if flip == "vflip" or flip == "hvflip":
         frame_y = image_height - frame_y - fs.frame_height
 
     # ::TODO test if pattern is symmetrical::
     # ::TODO update x_offset/y_offset::
     return FrameLocation(
-            is_clone = True,
-            flip = flip,
-            frame_x = frame_x,
-            frame_y = frame_y,
-            pattern = fl.pattern,
-            x_offset = fl.x_offset,
-            y_offset = fl.y_offset,
-            hitbox = flip_optional_aabb(fl.hitbox, flip, fs),
-            hurtbox = flip_optional_aabb(fl.hurtbox, flip, fs),
+        is_clone=True,
+        flip=flip,
+        frame_x=frame_x,
+        frame_y=frame_y,
+        pattern=fl.pattern,
+        x_offset=fl.x_offset,
+        y_offset=fl.y_offset,
+        hitbox=flip_optional_aabb(fl.hitbox, flip, fs),
+        hurtbox=flip_optional_aabb(fl.hurtbox, flip, fs),
     )
 
 
-T = TypeVar('T', Aabb, MsLayout)
+T = TypeVar("T", Aabb, MsLayout)
 
-def build_override_table(olist : Union[list[AabbOverride], list[MsLayoutOverride]], default_value : Optional[T], fs : MsFrameset, errors : list[Union[str, FrameError, AnimationError]]) -> list[Optional[T]]:
-    out = [ default_value ] * len(fs.frames)
+
+def build_override_table(
+    olist: Union[list[AabbOverride], list[MsLayoutOverride]],
+    default_value: Optional[T],
+    fs: MsFrameset,
+    errors: list[Union[str, FrameError, AnimationError]],
+) -> list[Optional[T]]:
+    out = [default_value] * len(fs.frames)
 
     for o in olist:
         if o.end:
@@ -515,8 +535,10 @@ def build_override_table(olist : Union[list[AabbOverride], list[MsLayoutOverride
 
 # Using `image_width` and `image_height` instead of an `PIL.Image.Image` argument so I
 # can call this function with either a PIL image and a `tk.PhotoImage` image.
-def extract_frame_locations(fs : MsFrameset, ms_export_orders : MsExportOrder, image_width : int, image_height : int) -> dict[Name, FrameLocation]:
-    errors : list[Union[str, FrameError, AnimationError]] = list()
+def extract_frame_locations(
+    fs: MsFrameset, ms_export_orders: MsExportOrder, image_width: int, image_height: int
+) -> dict[Name, FrameLocation]:
+    errors: list[Union[str, FrameError, AnimationError]] = list()
 
     frame_locations = dict[Name, FrameLocation]()
 
@@ -527,7 +549,7 @@ def extract_frame_locations(fs : MsFrameset, ms_export_orders : MsExportOrder, i
         errors.append(f"Frame size is too large: { fs.frame_width } x { fs.frame_height }")
 
     if image_width % fs.frame_width != 0 or image_height % fs.frame_height != 0:
-        errors.append('Source image is not a multiple of frame size')
+        errors.append("Source image is not a multiple of frame size")
 
     if fs.x_origin < 0 or fs.x_origin >= fs.frame_width or fs.y_origin < 0 or fs.y_origin >= fs.frame_height:
         errors.append(f"Origin is outside frame: { fs.x_origin }, { fs.y_origin }")
@@ -539,7 +561,7 @@ def extract_frame_locations(fs : MsFrameset, ms_export_orders : MsExportOrder, i
     if errors:
         raise FramesetError(fs.name, errors)
 
-    frames_per_row : Final = image_width // fs.frame_width
+    frames_per_row: Final = image_width // fs.frame_width
 
     for frame_number, frame_name in enumerate(fs.frames):
         if frame_name in frame_locations:
@@ -553,21 +575,20 @@ def extract_frame_locations(fs : MsFrameset, ms_export_orders : MsExportOrder, i
             pattern = ms_export_orders.patterns.get(layout.pattern)
             if pattern is not None:
                 frame_locations[frame_name] = FrameLocation(
-                        is_clone = False,
-                        flip = None,
-                        frame_x = frame_x,
-                        frame_y = frame_y,
-                        pattern = pattern,
-                        x_offset = layout.x_offset,
-                        y_offset = layout.y_offset,
-                        hitbox = hitboxes[frame_number],
-                        hurtbox = hurtboxes[frame_number],
+                    is_clone=False,
+                    flip=None,
+                    frame_x=frame_x,
+                    frame_y=frame_y,
+                    pattern=pattern,
+                    x_offset=layout.x_offset,
+                    y_offset=layout.y_offset,
+                    hitbox=hitboxes[frame_number],
+                    hurtbox=hurtboxes[frame_number],
                 )
             else:
                 errors.append(f"Unknown pattern for { frame_name }: { layout.pattern }")
         else:
             errors.append(f"Missing layout for frame: { frame_name }")
-
 
     #
     # Process cloned frames
@@ -589,63 +610,62 @@ def extract_frame_locations(fs : MsFrameset, ms_export_orders : MsExportOrder, i
     return frame_locations
 
 
-def animation_delay__distance(d : Union[float, int]) -> int:
+def animation_delay__distance(d: Union[float, int]) -> int:
     if d < 0.0 or d >= 16.0:
         raise ValueError(f"Invalid animation frame delay (must be between 0 and 16): { d }")
     return round(d * 16)
 
 
-ANIMATION_DELAY_FUNCTIONS : dict[str, Callable[[Union[float, int]], int]] = {
-    'none':         lambda d : 0,
-    'frame':        lambda d : int(d),
-    'distance_x':   animation_delay__distance,
-    'distance_y':   animation_delay__distance,
-    'distance_xy':  animation_delay__distance,
+ANIMATION_DELAY_FUNCTIONS: dict[str, Callable[[Union[float, int]], int]] = {
+    "none": lambda d: 0,
+    "frame": lambda d: int(d),
+    "distance_x": animation_delay__distance,
+    "distance_y": animation_delay__distance,
+    "distance_xy": animation_delay__distance,
 }
 
 # NOTE: If you modify this map, also modify the `AnimationProcessFunctions` in `metasprites.wiz`
-LOOPING_ANIMATION_DELAY_IDS : Final[dict[str, int]] = {
-    'none':        0,
-    'frame':       2,
-    'distance_x':  4,
-    'distance_y':  6,
-    'distance_xy': 8,
+LOOPING_ANIMATION_DELAY_IDS: Final[dict[str, int]] = {
+    "none": 0,
+    "frame": 2,
+    "distance_x": 4,
+    "distance_y": 6,
+    "distance_xy": 8,
 }
 
 # NOTE: If you modify this map, also modify the `AnimationProcessFunctions` in `metasprites.wiz`
-NON_LOOPING_ANIMATION_DELAY_IDS : Final[dict[str, int]] = {
-    'none':         0,
-    'frame':       24,
-    'distance_x':  26,
-    'distance_y':  28,
-    'distance_xy': 30,
+NON_LOOPING_ANIMATION_DELAY_IDS: Final[dict[str, int]] = {
+    "none": 0,
+    "frame": 24,
+    "distance_x": 26,
+    "distance_y": 28,
+    "distance_xy": 30,
 }
 
 
-END_OF_ANIMATION_BYTE = 0xff
+END_OF_ANIMATION_BYTE = 0xFF
 
-MAX_FRAME_ID = 0xfc
+MAX_FRAME_ID = 0xFC
 MAX_N_FRAMES = MAX_FRAME_ID + 1
 
-MAX_N_ANIMATIONS = 0xff
+MAX_N_ANIMATIONS = 0xFF
 
 
-def build_animation_data(ani : MsAnimation, get_frame_id : Callable[[Name], int]) -> bytes:
-    if ani.delay_type == 'none' and len(ani.frames) != 1:
-        raise ValueError('A \'none\' delay type can only contain a single animation frame')
+def build_animation_data(ani: MsAnimation, get_frame_id: Callable[[Name], int]) -> bytes:
+    if ani.delay_type == "none" and len(ani.frames) != 1:
+        raise ValueError("A 'none' delay type can only contain a single animation frame")
 
     ani_delay_converter = ANIMATION_DELAY_FUNCTIONS[ani.delay_type]
 
     if ani.loop:
         if len(ani.frames) == 1:
             # Do not process looping animations that have a single frame
-            process_function = LOOPING_ANIMATION_DELAY_IDS['none']
+            process_function = LOOPING_ANIMATION_DELAY_IDS["none"]
         else:
             process_function = LOOPING_ANIMATION_DELAY_IDS[ani.delay_type]
     else:
         # Non-Looping animations can be used as timers.  Do not test for 1-frame animations.
         process_function = NON_LOOPING_ANIMATION_DELAY_IDS[ani.delay_type]
-
 
     ani_data = bytearray()
     ani_data.append(process_function)
@@ -668,20 +688,26 @@ def build_animation_data(ani : MsAnimation, get_frame_id : Callable[[Name], int]
     return ani_data
 
 
-
-def build_frameset(fs : MsFrameset, ms_export_orders : MsExportOrder, ms_dir : Filename, tiles : Tileset, palettes_map : list[PaletteMap], transparent_color : SnesColor, spritesheet_name : Name) -> MsFsEntry:
-    errors : list[Union[str,FrameError,AnimationError]] = list()
+def build_frameset(
+    fs: MsFrameset,
+    ms_export_orders: MsExportOrder,
+    ms_dir: Filename,
+    tiles: Tileset,
+    palettes_map: list[PaletteMap],
+    transparent_color: SnesColor,
+    spritesheet_name: Name,
+) -> MsFsEntry:
+    errors: list[Union[str, FrameError, AnimationError]] = list()
 
     image = load_image(ms_dir, fs.source)
 
     frame_locations = extract_frame_locations(fs, ms_export_orders, image.width, image.height)
 
     frames, patterns_used = build_frame_data(frame_locations, fs, image, tiles, palettes_map, transparent_color)
-    animations  : dict[Name, bytes] = dict()
+    animations: dict[Name, bytes] = dict()
 
-    exported_frames    : list[bytes]     = list()
-    exported_frame_ids : dict[Name, int] = dict()
-
+    exported_frames: list[bytes] = list()
+    exported_frame_ids: dict[Name, int] = dict()
 
     ms_export_orders.shadow_sizes[fs.shadow_size]
     shadow_size = fs.shadow_size
@@ -697,14 +723,13 @@ def build_frameset(fs : MsFrameset, ms_export_orders : MsExportOrder, ms_dir : F
     if errors:
         raise FramesetError(fs.name, errors)
 
-
     # Confirm all frames have been processed
     assert len(frames) == len(fs.frames) + len(fs.clones)
 
     for ani in fs.animations.values():
         assert ani.name not in animations
 
-        def get_frame_id(frame_name : Name) -> int:
+        def get_frame_id(frame_name: Name) -> int:
             if frame_name in exported_frame_ids:
                 return exported_frame_ids[frame_name]
             else:
@@ -728,17 +753,15 @@ def build_frameset(fs : MsFrameset, ms_export_orders : MsExportOrder, ms_dir : F
     if errors:
         raise FramesetError(fs.name, errors)
 
-
     if len(exported_frames) > MAX_N_FRAMES:
         errors.append(f"Too many frames ({ len(exported_frames) }, max: { MAX_N_FRAMES })")
 
     if len(animations) > MAX_N_ANIMATIONS:
         errors.append(f"Too many animations ({ len(exported_frames) }, max: { MAX_N_ANIMATIONS})")
 
-
     assert export_order
 
-    eo_animations : list[bytes] = list()
+    eo_animations: list[bytes] = list()
     for ea_name in export_order.animations:
         a = animations.get(ea_name)
         if a:
@@ -749,12 +772,10 @@ def build_frameset(fs : MsFrameset, ms_export_orders : MsExportOrder, ms_dir : F
     if errors:
         raise FramesetError(fs.name, errors)
 
-
     if len(patterns_used) == 1:
         pattern_name = next(iter(patterns_used))
     else:
         pattern_name = "dynamic_pattern"
-
 
     unused_frames = frames.keys() - exported_frame_ids.keys()
     if unused_frames:
@@ -766,11 +787,11 @@ def build_frameset(fs : MsFrameset, ms_export_orders : MsExportOrder, ms_dir : F
         # ::TODO do something about this (not thread safe)::
         print(f"WARNING: Unused MetaSprite animations in { fs.name }: { unused_animations }")
 
-
     assert not errors
 
-    return build_msfs_entry(spritesheet_name, fs.name, fs.ms_export_order, shadow_size, tile_hitbox, pattern_name, exported_frames, eo_animations)
-
+    return build_msfs_entry(
+        spritesheet_name, fs.name, fs.ms_export_order, shadow_size, tile_hitbox, pattern_name, exported_frames, eo_animations
+    )
 
 
 #
@@ -779,8 +800,16 @@ def build_frameset(fs : MsFrameset, ms_export_orders : MsExportOrder, ms_dir : F
 #
 
 
-
-def build_msfs_entry(spritesheet_name : Name, fs_name : Name, ms_export_order : Name, shadow_size : Name, tile_hitbox : TileHitbox, pattern : Name, frames : list[bytes], animations : list[bytes]) -> MsFsEntry:
+def build_msfs_entry(
+    spritesheet_name: Name,
+    fs_name: Name,
+    ms_export_order: Name,
+    shadow_size: Name,
+    tile_hitbox: TileHitbox,
+    pattern: Name,
+    frames: list[bytes],
+    animations: list[bytes],
+) -> MsFsEntry:
 
     header = bytearray().zfill(3)
 
@@ -789,51 +818,52 @@ def build_msfs_entry(spritesheet_name : Name, fs_name : Name, ms_export_order : 
     header[2] = tile_hitbox[1]
 
     return MsFsEntry(
-            fullname = f"{ spritesheet_name }.{ fs_name }",
-            ms_export_order = ms_export_order,
-            header = header,
-            pattern = pattern,
-            frames = frames,
-            animations = animations
+        fullname=f"{ spritesheet_name }.{ fs_name }",
+        ms_export_order=ms_export_order,
+        header=header,
+        pattern=pattern,
+        frames=frames,
+        animations=animations,
     )
 
 
-
-def msfs_entries_to_text(msfs_entries : list[MsFsEntry]) -> str:
+def msfs_entries_to_text(msfs_entries: list[MsFsEntry]) -> str:
     with StringIO() as out:
         for entry in msfs_entries:
-            frames = ','.join([ f.hex() for f in entry.frames ])
-            animations = ','.join([ a.hex() for a in entry.animations ])
+            frames = ",".join([f.hex() for f in entry.frames])
+            animations = ",".join([a.hex() for a in entry.animations])
 
             out.write(f"{entry.fullname} {entry.ms_export_order} {entry.header.hex()} {entry.pattern} {frames} {animations}\n")
 
         return out.getvalue()
 
 
-
-def text_to_msfs_entries(line_iterator : Iterable[str]) -> list[MsFsEntry]:
+def text_to_msfs_entries(line_iterator: Iterable[str]) -> list[MsFsEntry]:
     out = list()
 
     for line in line_iterator:
-        sep = line.split(' ')
+        sep = line.split(" ")
 
         if len(sep) != 6:
             raise ValueError("Invalid MsFsEntry text format")
 
-        out.append(MsFsEntry(
-                fullname = sep[0],
-                ms_export_order = sep[1],
-                header = bytes.fromhex(sep[2]),
-                pattern = sep[3],
-                frames = [ bytes.fromhex(i) for i in sep[4].split(',') ],
-                animations = [ bytes.fromhex(i) for i in sep[5].split(',') ]
-        ))
+        out.append(
+            MsFsEntry(
+                fullname=sep[0],
+                ms_export_order=sep[1],
+                header=bytes.fromhex(sep[2]),
+                pattern=sep[3],
+                frames=[bytes.fromhex(i) for i in sep[4].split(",")],
+                animations=[bytes.fromhex(i) for i in sep[5].split(",")],
+            )
+        )
 
     return out
 
 
-
-def build_ms_fs_data(spritesheets : list[list[MsFsEntry]], symbols : dict[str, int], mapmode : MemoryMapMode) -> tuple[RomData, dict[ScopedName, tuple[int, Name]]]:
+def build_ms_fs_data(
+    spritesheets: list[list[MsFsEntry]], symbols: dict[str, int], mapmode: MemoryMapMode
+) -> tuple[RomData, dict[ScopedName, tuple[int, Name]]]:
     # Return: tuple(rom_data, dict fs_fullname -> tuple(addr, export_order))
 
     MS_FRAMESET_FORMAT_SIZE = 9
@@ -842,7 +872,7 @@ def build_ms_fs_data(spritesheets : list[list[MsFsEntry]], symbols : dict[str, i
 
     fs_map = dict()
 
-    n_framesets = sum([ len(i) for i in spritesheets ])
+    n_framesets = sum([len(i) for i in spritesheets])
     assert n_framesets > 0
 
     fs_table, fs_table_addr = rom_data.allocate(n_framesets * MS_FRAMESET_FORMAT_SIZE)
@@ -855,18 +885,17 @@ def build_ms_fs_data(spritesheets : list[list[MsFsEntry]], symbols : dict[str, i
             frame_table_addr = rom_data.insert_data_addr_table(fs.frames)
             animation_table_addr = rom_data.insert_data_addr_table(fs.animations)
 
-            drawing_function = symbols[f"metasprites.drawing_functions.{ fs.pattern }"] & 0xffff
+            drawing_function = symbols[f"metasprites.drawing_functions.{ fs.pattern }"] & 0xFFFF
 
+            fs_table[fs_pos : fs_pos + 3] = fs.header
 
-            fs_table[fs_pos : fs_pos+3] = fs.header
-
-            fs_table[fs_pos + 3] = drawing_function & 0xff
+            fs_table[fs_pos + 3] = drawing_function & 0xFF
             fs_table[fs_pos + 4] = drawing_function >> 8
 
-            fs_table[fs_pos + 5] = frame_table_addr & 0xff
+            fs_table[fs_pos + 5] = frame_table_addr & 0xFF
             fs_table[fs_pos + 6] = frame_table_addr >> 8
 
-            fs_table[fs_pos + 7] = animation_table_addr & 0xff
+            fs_table[fs_pos + 7] = animation_table_addr & 0xFF
             fs_table[fs_pos + 8] = animation_table_addr >> 8
 
             fs_pos += MS_FRAMESET_FORMAT_SIZE
@@ -875,14 +904,11 @@ def build_ms_fs_data(spritesheets : list[list[MsFsEntry]], symbols : dict[str, i
 
     assert fs_pos == n_framesets * MS_FRAMESET_FORMAT_SIZE
 
-
     # Ensure player data is the first item
-    if fs_map['common.Player'][0] != mapmode.bank_start:
+    if fs_map["common.Player"][0] != mapmode.bank_start:
         raise RuntimeError("The first MetaSprite FrameSet MUST be the player")
 
-
     return rom_data, fs_map
-
 
 
 #
@@ -891,11 +917,11 @@ def build_ms_fs_data(spritesheets : list[list[MsFsEntry]], symbols : dict[str, i
 #
 
 
-def load_palette(ms_dir : Filename, palette_filename : Filename) -> tuple[list[PaletteMap], bytes]:
+def load_palette(ms_dir: Filename, palette_filename: Filename) -> tuple[list[PaletteMap], bytes]:
     image = load_image(ms_dir, palette_filename)
 
     if image.width != 16 or image.height != 8:
-        raise ValueError('Palette Image MUST BE 16x8 px in size')
+        raise ValueError("Palette Image MUST BE 16x8 px in size")
 
     palettes_map = create_palettes_map(image, TILE_DATA_BPP)
     palette_data = convert_palette_image(image)
@@ -903,24 +929,21 @@ def load_palette(ms_dir : Filename, palette_filename : Filename) -> tuple[list[P
     return palettes_map, palette_data
 
 
-
-def get_transparent_color(palette_data : bytes) -> SnesColor:
+def get_transparent_color(palette_data: bytes) -> SnesColor:
     # Hack to reconstruct the first color from palette_data bytes
     return palette_data[0] | (palette_data[1] << 8)
 
 
-
-def load_image(ms_dir : Filename, filename : Filename) -> PIL.Image.Image:
+def load_image(ms_dir: Filename, filename: Filename) -> PIL.Image.Image:
     image_filename = os.path.join(ms_dir, filename)
 
     with PIL.Image.open(image_filename) as image:
         image.load()
 
-    if image.mode == 'RGB':
+    if image.mode == "RGB":
         return image
     else:
-        return image.convert('RGB')
-
+        return image.convert("RGB")
 
 
 #
@@ -928,15 +951,13 @@ def load_image(ms_dir : Filename, filename : Filename) -> PIL.Image.Image:
 #
 
 
-
-def generate_ppu_data(ms_input : MsSpritesheet, tileset : list[SmallTileData], palette_data : bytes) -> bytes:
+def generate_ppu_data(ms_input: MsSpritesheet, tileset: list[SmallTileData], palette_data: bytes) -> bytes:
     tile_data = convert_snes_tileset(tileset, TILE_DATA_BPP)
-
 
     data = bytearray()
 
     # first_tile
-    data.append(ms_input.first_tile & 0xff)
+    data.append(ms_input.first_tile & 0xFF)
     data.append(ms_input.first_tile >> 8)
 
     # palette_data
@@ -948,8 +969,7 @@ def generate_ppu_data(ms_input : MsSpritesheet, tileset : list[SmallTileData], p
     return data
 
 
-
-def convert_spritesheet(ms_input : MsSpritesheet, ms_export_orders : MsExportOrder, ms_dir : Filename) -> tuple[bytes, list[MsFsEntry]]:
+def convert_spritesheet(ms_input: MsSpritesheet, ms_export_orders: MsExportOrder, ms_dir: Filename) -> tuple[bytes, list[MsFsEntry]]:
     # Returns tuple (binary_data, msfs_entries)
 
     palettes_map, palette_data = load_palette(ms_dir, ms_input.palette)
@@ -958,13 +978,11 @@ def convert_spritesheet(ms_input : MsSpritesheet, ms_export_orders : MsExportOrd
     tileset = Tileset(ms_input.first_tile, ms_input.end_tile)
 
     msfs_entries = list()
-    errors : list[FramesetError] = list()
+    errors: list[FramesetError] = list()
 
     for fs in ms_input.framesets.values():
         try:
-            msfs_entries.append(
-                    build_frameset(fs, ms_export_orders, ms_dir, tileset, palettes_map, transparent_color, ms_input.name)
-            )
+            msfs_entries.append(build_frameset(fs, ms_export_orders, ms_dir, tileset, palettes_map, transparent_color, ms_input.name))
         except FramesetError as e:
             errors.append(e)
         except Exception as e:
@@ -980,7 +998,6 @@ def convert_spritesheet(ms_input : MsSpritesheet, ms_export_orders : MsExportOrd
     return bin_data, msfs_entries
 
 
-
 #
 # =========================
 #
@@ -988,19 +1005,14 @@ def convert_spritesheet(ms_input : MsSpritesheet, ms_export_orders : MsExportOrd
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--bin-output', required=True,
-                        help='binary (PPU) data output file')
-    parser.add_argument('--msfs-output', required=True,
-                        help='msfs text output file')
-    parser.add_argument('json_filename', action='store',
-                        help='Sprite map JSON file')
-    parser.add_argument('ms_export_order_json_file', action='store',
-                        help='metasprite export order map JSON file')
+    parser.add_argument("--bin-output", required=True, help="binary (PPU) data output file")
+    parser.add_argument("--msfs-output", required=True, help="msfs text output file")
+    parser.add_argument("json_filename", action="store", help="Sprite map JSON file")
+    parser.add_argument("ms_export_order_json_file", action="store", help="metasprite export order map JSON file")
 
     args = parser.parse_args()
 
-    return args;
-
+    return args
 
 
 def main() -> None:
@@ -1016,19 +1028,16 @@ def main() -> None:
 
         msfs_text = msfs_entries_to_text(msfs_entries)
 
-
-        with open(args.bin_output, 'wb') as fp:
+        with open(args.bin_output, "wb") as fp:
             fp.write(bin_data)
 
-        with open(args.msfs_output, 'w') as fp:
+        with open(args.msfs_output, "w") as fp:
             fp.write(msfs_text)
 
     except Exception as e:
-        print_error('ERROR', e)
+        print_error("ERROR", e)
         sys.exit("Error compiling MetaSprite spritesheet")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
-

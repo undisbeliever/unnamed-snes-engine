@@ -5,7 +5,7 @@
 
 import sys
 import os.path
-import PIL.Image # type: ignore
+import PIL.Image  # type: ignore
 import argparse
 import xml.etree.ElementTree
 from typing import Final, NamedTuple, Optional, TextIO
@@ -22,32 +22,30 @@ TILE_DATA_BPP = 4
 DEFAULT_PRIORITY = 0
 
 
-TILE_PROPERTY_SOLID_MASK                : Final = 0b10000000
-TILE_PROPERTY_PROJECTILE_SOLID_MASK     : Final = 0b01000000
-TILE_PROPERTY_INTERACTIVE_TILES_MASK    : Final = 0b00111111
+TILE_PROPERTY_SOLID_MASK: Final = 0b10000000
+TILE_PROPERTY_PROJECTILE_SOLID_MASK: Final = 0b01000000
+TILE_PROPERTY_INTERACTIVE_TILES_MASK: Final = 0b00111111
 
 
 class TileProperty(NamedTuple):
-    solid            : bool
-    projectile_solid : bool
-    type             : Optional[str]
-    priority         : int           # integer bitfield (4 bits wide), one priority bit for each 8px tile
+    solid: bool
+    projectile_solid: bool
+    type: Optional[str]
+    priority: int  # integer bitfield (4 bits wide), one priority bit for each 8px tile
 
 
 class TsxFile(NamedTuple):
-    name                : str
-    image_filename      : Filename
-    palette_filename    : Filename
-    tile_properties     : list[TileProperty]
-
+    name: str
+    image_filename: Filename
+    palette_filename: Filename
+    tile_properties: list[TileProperty]
 
 
 class TsxFileError(SimpleMultilineError):
     pass
 
 
-
-def create_metatile_map(tilemap : TileMap, tile_properties : list[TileProperty]) -> bytes:
+def create_metatile_map(tilemap: TileMap, tile_properties: list[TileProperty]) -> bytes:
     data = bytearray()
 
     if tilemap.width != 32 and tilemap.height != 32:
@@ -62,49 +60,50 @@ def create_metatile_map(tilemap : TileMap, tile_properties : list[TileProperty])
         for y in range(yoffset, 32, 2):
             for x in range(xoffset, 32, 2):
                 tm = tilemap.get_tile(x, y)
-                data.append(tm.tile_id & 0xff)
+                data.append(tm.tile_id & 0xFF)
 
         for y in range(yoffset, 32, 2):
             for x in range(xoffset, 32, 2):
                 tile_id = (y // 2) * 16 + (x // 2)
-                priority = tile_properties[tile_id].priority & priotity_bit;
+                priority = tile_properties[tile_id].priority & priotity_bit
 
                 tm = tilemap.get_tile(x, y)
                 # This should never happen
-                assert tm.tile_id <= 0x3ff
+                assert tm.tile_id <= 0x3FF
                 assert tm.palette_id <= 7
-                data.append((tm.tile_id >> 8) | (tm.palette_id << 2) | (bool(priority) << 5)
-                            | (bool(tm.hflip) << 6) | (bool(tm.vflip) << 7))
+                data.append(
+                    (tm.tile_id >> 8) | (tm.palette_id << 2) | (bool(priority) << 5) | (bool(tm.hflip) << 6) | (bool(tm.vflip) << 7)
+                )
 
     return data
 
 
-
-def check_objectgroup_tag(tag : xml.etree.ElementTree.Element) -> bool:
+def check_objectgroup_tag(tag: xml.etree.ElementTree.Element) -> bool:
     if len(tag) != 1:
         return False
 
     childTag = tag[0]
 
-    if childTag.tag != 'object':
+    if childTag.tag != "object":
         return False
 
-    return (childTag.tag == 'object'
-        and childTag.attrib.get('x') == '0'
-        and childTag.attrib.get('y') == '0'
-        and childTag.attrib.get('width') == '16'
-        and childTag.attrib.get('height') == '16')
+    return (
+        childTag.tag == "object"
+        and childTag.attrib.get("x") == "0"
+        and childTag.attrib.get("y") == "0"
+        and childTag.attrib.get("width") == "16"
+        and childTag.attrib.get("height") == "16"
+    )
 
 
-
-def read_tile_priority_value(value : Optional[str]) -> int:
+def read_tile_priority_value(value: Optional[str]) -> int:
     if not isinstance(value, str):
-        raise ValueError('Unknown priority value type, expected string')
+        raise ValueError("Unknown priority value type, expected string")
 
-    if value == '0':
+    if value == "0":
         return 0
-    if value == '1':
-        return 0xf
+    if value == "1":
+        return 0xF
 
     if len(value) != 4:
         raise ValueError(f"Unknown priority value: { value }")
@@ -112,52 +111,50 @@ def read_tile_priority_value(value : Optional[str]) -> int:
     return int(value, 2)
 
 
-
-def read_tile_tag(tile_tag : xml.etree.ElementTree.Element, error_list : list[str]) -> tuple[int, TileProperty]:
-    """ Returns (tile_id, TileProperty) """
+def read_tile_tag(tile_tag: xml.etree.ElementTree.Element, error_list: list[str]) -> tuple[int, TileProperty]:
+    """Returns (tile_id, TileProperty)"""
 
     try:
-        tile_id = int(tile_tag.attrib['id'])
+        tile_id = int(tile_tag.attrib["id"])
         if tile_id < 0 or tile_id > 255:
             error_list.append(f"Invalid <tile> id: { tile_id }")
     except KeyError:
-        error_list.append('<tile> tag with missing id')
+        error_list.append("<tile> tag with missing id")
         tile_id = -1
     except ValueError:
         error_list.append(f"Invalid <tile> id: { tile_tag.attrib.get('id') }")
         tile_id = -1
 
+    tile_solid: bool = False
+    projectile_solid: Optional[bool] = None
+    tile_priority: int = 0
 
-    tile_solid       : bool = False
-    projectile_solid : Optional[bool] = None
-    tile_priority    : int = 0
-
-    tile_type = tile_tag.attrib.get('class', tile_tag.attrib.get('type')) # Tiled 1.9 renamed 'type' attribute to 'class'
+    tile_type = tile_tag.attrib.get("class", tile_tag.attrib.get("type"))  # Tiled 1.9 renamed 'type' attribute to 'class'
 
     for tag in tile_tag:
-        if tag.tag == 'objectgroup':
+        if tag.tag == "objectgroup":
             if not check_objectgroup_tag(tag):
                 error_list.append(f"Tile {tile_id}: Tile collision MUST cover the whole tile in a single rectangle")
             tile_solid = True
 
-        elif tag.tag == 'properties':
+        elif tag.tag == "properties":
             for ptag in tag:
-                if ptag.tag == 'property':
-                    p_name = ptag.attrib.get('name')
-                    p_value = ptag.attrib.get('value')
+                if ptag.tag == "property":
+                    p_name = ptag.attrib.get("name")
+                    p_value = ptag.attrib.get("value")
 
-                    if p_name == 'priority':
+                    if p_name == "priority":
                         try:
                             tile_priority = read_tile_priority_value(p_value)
                         except ValueError as e:
                             error_list.append(f"Tile {tile_id}: { e }")
 
-                    elif p_name == 'not_projectile_solid':
+                    elif p_name == "not_projectile_solid":
                         # ::TODO find a better name for this property::
 
-                        if p_value == 'true':
+                        if p_value == "true":
                             projectile_solid = False
-                        elif p_value == 'false':
+                        elif p_value == "false":
                             # If the override is false, projectile_solid will the same value as tile_solid
                             projectile_solid = None
                         else:
@@ -170,97 +167,91 @@ def read_tile_tag(tile_tag : xml.etree.ElementTree.Element, error_list : list[st
     return tile_id, TileProperty(solid=tile_solid, projectile_solid=projectile_solid, type=tile_type, priority=tile_priority)
 
 
-
-def read_tsx_file(tsx_filename : Filename) -> TsxFile:
-    with open(tsx_filename, 'r') as tsx_fp:
+def read_tsx_file(tsx_filename: Filename) -> TsxFile:
+    with open(tsx_filename, "r") as tsx_fp:
         tsx_et = xml.etree.ElementTree.parse(tsx_fp)
 
-    error_list : list[str] = list()
+    error_list: list[str] = list()
 
-    image_filename : Optional[Filename] = None
-    palette_filename : Optional[Filename] = None
+    image_filename: Optional[Filename] = None
+    palette_filename: Optional[Filename] = None
 
-    read_tiles : set[int] = set()
-    tile_properties = [ TileProperty(solid=False, projectile_solid=False, type=None, priority=DEFAULT_PRIORITY) ] * N_TILES
-
+    read_tiles: set[int] = set()
+    tile_properties = [TileProperty(solid=False, projectile_solid=False, type=None, priority=DEFAULT_PRIORITY)] * N_TILES
 
     root_tag = tsx_et.getroot()
-    if root_tag.tag != 'tileset':
-        raise TsxFileError(f"Error reading { tsx_filename }", ['Expected a <tileset> tag'])
+    if root_tag.tag != "tileset":
+        raise TsxFileError(f"Error reading { tsx_filename }", ["Expected a <tileset> tag"])
 
-
-    name = root_tag.get('name')
+    name = root_tag.get("name")
     if not name:
-        error_list.append('Missing tileset name')
+        error_list.append("Missing tileset name")
 
     if name:
-        if name + '.tsx' != os.path.basename(tsx_filename):
-            error_list.append('')
-
+        if name + ".tsx" != os.path.basename(tsx_filename):
+            error_list.append("")
 
     for tag in root_tag:
-        if tag.tag == 'image':
+        if tag.tag == "image":
             if image_filename:
-                error_list.append('Only one <image> tag is allowed')
-            image_filename = tag.attrib.get('source')
+                error_list.append("Only one <image> tag is allowed")
+            image_filename = tag.attrib.get("source")
             if not image_filename:
-                error_list.append('<image> tag is missing attribute: source')
+                error_list.append("<image> tag is missing attribute: source")
 
-        if tag.tag == 'properties':
+        if tag.tag == "properties":
             for ptag in tag:
-                if ptag.tag == 'property':
-                    pname = ptag.attrib.get('name')
-                    if pname == 'palette':
-                        palette_filename = ptag.attrib.get('value')
+                if ptag.tag == "property":
+                    pname = ptag.attrib.get("name")
+                    if pname == "palette":
+                        palette_filename = ptag.attrib.get("value")
                         if not palette_filename:
-                            error_list.append('palette property is missing a value')
+                            error_list.append("palette property is missing a value")
                     else:
                         error_list.append(f"Unknown property: { pname }")
 
-        if tag.tag == 'tile':
+        if tag.tag == "tile":
             tile_id, t = read_tile_tag(tag, error_list)
 
             if tile_id not in read_tiles:
                 read_tiles.add(tile_id)
-                tile_properties[tile_id] = t;
+                tile_properties[tile_id] = t
             else:
                 error_list.append(f"Duplicate <tile> id: { tile_id }")
 
-
     if not image_filename:
-        error_list.append('Missing image filename')
+        error_list.append("Missing image filename")
 
     if not palette_filename:
-        error_list.append('Missing palette filename')
+        error_list.append("Missing palette filename")
 
     if name:
         if image_filename:
-            if not image_filename.startswith(name + '-'):
+            if not image_filename.startswith(name + "-"):
                 error_list.append(f"Invalid image filename (expected `{ name }-*`): { image_filename }")
 
         if palette_filename:
-            if not palette_filename.startswith(name + '-'):
+            if not palette_filename.startswith(name + "-"):
                 error_list.append(f"Invalid palette filename (expected `{ name }-*`): { palette_filename }")
-
 
     if error_list:
         raise TsxFileError(f"Error reading { tsx_filename }", error_list)
-
 
     assert name and image_filename and palette_filename
 
     dirname = os.path.dirname(tsx_filename)
 
     return TsxFile(
-            name = name,
-            image_filename = os.path.join(dirname, image_filename),
-            palette_filename = os.path.join(dirname, palette_filename),
-            tile_properties = tile_properties,
+        name=name,
+        image_filename=os.path.join(dirname, image_filename),
+        palette_filename=os.path.join(dirname, palette_filename),
+        tile_properties=tile_properties,
     )
 
 
-
-def create_properties_array(tile_properties : list[TileProperty], interactive_tile_functions : list[str], error_list : list[str]) -> bytes:
+def create_properties_array(
+    tile_properties: list[TileProperty], interactive_tile_functions: list[str], error_list: list[str]
+) -> bytes:
     data = bytearray(256)
 
     for i, tile in enumerate(tile_properties):
@@ -284,8 +275,7 @@ def create_properties_array(tile_properties : list[TileProperty], interactive_ti
     return data
 
 
-
-def create_tileset_data(palette_data : bytes, tile_data : bytes, metatile_map : bytes, properties : bytes) -> bytes:
+def create_tileset_data(palette_data: bytes, tile_data: bytes, metatile_map: bytes, properties: bytes) -> bytes:
     data = bytearray()
 
     # 2048 bytes = metatile map
@@ -308,19 +298,18 @@ def create_tileset_data(palette_data : bytes, tile_data : bytes, metatile_map : 
     return data
 
 
-
-def convert_mt_tileset(tsx_filename : Filename, mappings : Mappings) -> bytes:
+def convert_mt_tileset(tsx_filename: Filename, mappings: Mappings) -> bytes:
 
     tsx_file = read_tsx_file(tsx_filename)
 
     with PIL.Image.open(tsx_file.palette_filename) as palette_image:
         with PIL.Image.open(tsx_file.image_filename) as image:
             if image.width != 256 or image.height != 256:
-                raise ImageError(tsx_file.image_filename, 'Tileset Image MUST BE 256x256 px in size')
+                raise ImageError(tsx_file.image_filename, "Tileset Image MUST BE 256x256 px in size")
 
             tilemap, tile_data, palette_data = image_to_snes(image, palette_image, TILE_DATA_BPP)
 
-    error_list : list[str] = list()
+    error_list: list[str] = list()
 
     metatile_map = create_metatile_map(tilemap, tsx_file.tile_properties)
     properties = create_properties_array(tsx_file.tile_properties, mappings.interactive_tile_functions, error_list)
@@ -331,20 +320,15 @@ def convert_mt_tileset(tsx_filename : Filename, mappings : Mappings) -> bytes:
     return create_tileset_data(palette_data, tile_data, metatile_map, properties)
 
 
-
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument('-o', '--output', required=True,
-                        help='tileset output file')
-    parser.add_argument('mappings_json_file', action='store',
-                        help='mappings.json file')
-    parser.add_argument('tsx_filename', action='store',
-                        help='Tiled tsx file')
+    parser.add_argument("-o", "--output", required=True, help="tileset output file")
+    parser.add_argument("mappings_json_file", action="store", help="mappings.json file")
+    parser.add_argument("tsx_filename", action="store", help="Tiled tsx file")
 
     args = parser.parse_args()
 
-    return args;
-
+    return args
 
 
 def main() -> None:
@@ -355,14 +339,13 @@ def main() -> None:
 
         tileset_data = convert_mt_tileset(args.tsx_filename, mappings)
 
-        with open(args.output, 'wb') as fp:
+        with open(args.output, "wb") as fp:
             fp.write(tileset_data)
 
     except Exception as e:
-        print_error('ERROR', e)
+        print_error("ERROR", e)
         sys.exit("Error compiling MetaTile tileset")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-

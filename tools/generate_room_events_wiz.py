@@ -13,32 +13,32 @@ from _json_formats import load_mappings_json, Mappings, Name, RoomEvent
 
 # Mapping of parameter types to wiz types
 PARAM_TYPES = {
-    'u8':                   'u8',
-    'u8pos':                'U8Position',
-    'gamestate_flag':       'u8',
-    'locked_door':          'u8',
-    'open_door':            'u8',
-    'optional_open_door':   'u8'
+    "u8": "u8",
+    "u8pos": "U8Position",
+    "gamestate_flag": "u8",
+    "locked_door": "u8",
+    "open_door": "u8",
+    "optional_open_door": "u8",
 }
 
 # Size of each parameter type in bytes
 PARAM_SIZE = {
-    'u8':                   1,
-    'u8pos':                2,
-    'gamestate_flag':       1,
-    'locked_door':          1,
-    'open_door':            1,
-    'optional_open_door':   1,
+    "u8": 1,
+    "u8pos": 2,
+    "gamestate_flag": 1,
+    "locked_door": 1,
+    "open_door": 1,
+    "optional_open_door": 1,
 }
 
 
-
-def generate_wiz_code(room_events : OrderedDict[Name, RoomEvent]) -> str:
+def generate_wiz_code(room_events: OrderedDict[Name, RoomEvent]) -> str:
 
     n_functions = len(room_events)
 
     with StringIO() as out:
-        out.write("""
+        out.write(
+            """
 import "src/memmap";
 import "src/room";
 
@@ -50,7 +50,8 @@ struct U8Position {
 };
 
 in wram7e_roomstate {
-""")
+"""
+        )
 
         for e in room_events.values():
             if e.parameters:
@@ -60,43 +61,39 @@ in wram7e_roomstate {
 
                 for p in e.parameters:
                     if i != 0:
-                        out.write('\n')
+                        out.write("\n")
 
                     ptype = PARAM_TYPES.get(p.type)
                     if not ptype:
                         raise ValueError(f"Unknown room event parameter type: {p.type}")
 
                     if p.comment:
-                        p_comment = p.comment.replace('\n', '\n  // ')
+                        p_comment = p.comment.replace("\n", "\n  // ")
                         out.write(f"  // { p_comment }\n")
                     out.write(f"  // ({ p.type })\n")
                     out.write(f"  var parameter__{ p.name } @ &room.roomEventParameters[{ i }] : { ptype };\n")
 
                     i += PARAM_SIZE[p.type]
 
-                out.write('}\n\n')
+                out.write("}\n\n")
 
                 if i > 4:
                     raise ValueError(f"Room Event has too many parameters: {e.name}")
 
-        out.write('}\n')
-        out.write('}\n')
+        out.write("}\n")
+        out.write("}\n")
 
         return out.getvalue()
 
 
-
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument('-o', '--output', required=True,
-                        help='wiz output file')
-    parser.add_argument('mappings_json_file', action='store',
-                        help='mappings.json file')
+    parser.add_argument("-o", "--output", required=True, help="wiz output file")
+    parser.add_argument("mappings_json_file", action="store", help="mappings.json file")
 
     args = parser.parse_args()
 
-    return args;
-
+    return args
 
 
 def main() -> None:
@@ -106,12 +103,9 @@ def main() -> None:
 
     out = generate_wiz_code(mappings.room_events)
 
-    with open(args.output, 'w') as fp:
+    with open(args.output, "w") as fp:
         fp.write(out)
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
-

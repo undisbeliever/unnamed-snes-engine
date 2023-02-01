@@ -11,7 +11,8 @@ from _json_formats import load_entities_json, EntitiesJson
 
 # NOTE: I cannot put this data in `gen/entities.wiz` as it causes a circular dependency
 
-def generate_wiz_code(entities_json : EntitiesJson) -> str:
+
+def generate_wiz_code(entities_json: EntitiesJson) -> str:
 
     death_functions = entities_json.death_functions
     if not death_functions:
@@ -20,11 +21,12 @@ def generate_wiz_code(entities_json : EntitiesJson) -> str:
     if len(death_functions) >= 256 / 2:
         raise ValueError("Too many death functions")
 
-    if death_functions[0] != 'none':
+    if death_functions[0] != "none":
         raise ValueError("The first death functions must be `none`")
 
     with StringIO() as out:
-        out.write("""
+        out.write(
+            """
 import "../src/memmap";
 import "../src/entities/_death_functions";
 
@@ -34,35 +36,34 @@ in code {
 
 // Death function returns true if the entity is still active
 const DeathFunctionsTable : [func(entityId : u8 in y) : bool in carry] = [
-""")
+"""
+        )
         for df in death_functions:
             out.write(f"    entities.death_functions.{df},\n")
 
-        out.write('];\n\n')
+        out.write("];\n\n")
 
         out.write(f"let N_DEATH_FUNCTIONS = { len(death_functions) };\n")
 
-        out.write("""
+        out.write(
+            """
 }
 
 }
-""")
+"""
+        )
 
         return out.getvalue()
 
 
-
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument('-o', '--output', required=True,
-                        help='wiz output file')
-    parser.add_argument('entities_json_file', action='store',
-                        help='entities.json file')
+    parser.add_argument("-o", "--output", required=True, help="wiz output file")
+    parser.add_argument("entities_json_file", action="store", help="entities.json file")
 
     args = parser.parse_args()
 
-    return args;
-
+    return args
 
 
 def main() -> None:
@@ -72,11 +73,9 @@ def main() -> None:
 
     out = generate_wiz_code(entities)
 
-    with open(args.output, 'w') as fp:
+    with open(args.output, "w") as fp:
         fp.write(out)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
-

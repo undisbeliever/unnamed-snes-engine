@@ -27,38 +27,39 @@ def bound(i: int, minimum: int, maximum: int) -> int:
 
 
 def clamp_s4(i: int) -> int:
-    """ Clamp i to a 4 bit signed integer. """
+    """Clamp i to a 4 bit signed integer."""
     return bound(i, -8, 7)
 
 
 # Contains 16 int16 sample
 SampleBlock: TypeAlias = Sequence[int]
 
+
 class WaveFile(NamedTuple):
     samplerate: int
-    blocks:     list[SampleBlock]
+    blocks: list[SampleBlock]
 
 
 def load_wav_file(filename: str) -> WaveFile:
-    with wave.open(filename, 'rb') as wf:
+    with wave.open(filename, "rb") as wf:
         if wf.getnchannels() != 1 or wf.getsampwidth() != 2:
-            raise ValueError('Expected a 16bit mono wave file')
+            raise ValueError("Expected a 16bit mono wave file")
 
         samplerate = wf.getframerate()
 
         n_frames = wf.getnframes()
         if n_frames > 16 * 1024:
-            raise ValueError('wav file is too large')
+            raise ValueError("wav file is too large")
 
         data = wf.readframes(n_frames)
 
         if len(data) == 0:
-            raise ValueError(f'wav file has no samples')
+            raise ValueError(f"wav file has no samples")
 
         if len(data) % (SAMPLES_PER_BLOCK * 2) != 0:
-            raise ValueError(f'wav file must be a multiple of {SAMPLES_PER_BLOCK} in size')
+            raise ValueError(f"wav file must be a multiple of {SAMPLES_PER_BLOCK} in size")
 
-        samples: list[SampleBlock] = list(struct.iter_unpack('<16h', data))
+        samples: list[SampleBlock] = list(struct.iter_unpack("<16h", data))
 
         return WaveFile(samplerate, samples)
 
@@ -70,8 +71,9 @@ class BrrBlock(NamedTuple):
     decoded_samples: SampleBlock
 
 
-def __encode(samples: SampleBlock, shift: int, prev1: int, prev2: int,
-             filter_id: int, offset_calc: Callable[[int, int], int]) -> BrrBlock:
+def __encode(
+    samples: SampleBlock, shift: int, prev1: int, prev2: int, filter_id: int, offset_calc: Callable[[int, int], int]
+) -> BrrBlock:
 
     assert len(samples) == SAMPLES_PER_BLOCK
     assert 0 <= shift <= MAX_SHIFT
@@ -96,23 +98,19 @@ def __encode(samples: SampleBlock, shift: int, prev1: int, prev2: int,
 
 
 def encode__filter0(samples: SampleBlock, shift: int) -> BrrBlock:
-    return __encode(samples, shift, 0, 0,
-                    0, lambda p1, p2: 0)
+    return __encode(samples, shift, 0, 0, 0, lambda p1, p2: 0)
 
 
 def encode__filter1(samples: SampleBlock, shift: int, prev_sample: int) -> BrrBlock:
-    return __encode(samples, shift, prev_sample, 0,
-                    1, lambda p1, p2: p1 * 15 // 16)
+    return __encode(samples, shift, prev_sample, 0, 1, lambda p1, p2: p1 * 15 // 16)
 
 
 def encode__filter2(samples: SampleBlock, shift: int, prev1: int, prev2: int) -> BrrBlock:
-    return __encode(samples, shift, prev1, prev2,
-                    2, lambda p1, p2: (p1 * 61 // 32) - (p2 * 15 // 16))
+    return __encode(samples, shift, prev1, prev2, 2, lambda p1, p2: (p1 * 61 // 32) - (p2 * 15 // 16))
 
 
 def encode__filter3(samples: SampleBlock, shift: int, prev1: int, prev2: int) -> BrrBlock:
-    return __encode(samples, shift, prev1, prev2,
-                    3, lambda p1, p2: (p1 * 115 // 64) - (p2 * 13 // 16))
+    return __encode(samples, shift, prev1, prev2, 3, lambda p1, p2: (p1 * 115 // 64) - (p2 * 13 // 16))
 
 
 def calc_error(to_test: BrrBlock, target_samples: SampleBlock) -> int:
@@ -148,7 +146,7 @@ def encode_brr(wave_file: WaveFile, loop_flag: bool) -> bytes:
 
         out.append(header)
         for i in range(0, SAMPLES_PER_BLOCK, 2):
-            out.append(((best.nibbles[i] & 0xf) << 4) | (best.nibbles[i+1] & 0xf))
+            out.append(((best.nibbles[i] & 0xF) << 4) | (best.nibbles[i + 1] & 0xF))
 
         prev_sample_1: int = best.decoded_samples[-1]
         prev_sample_2: int = best.decoded_samples[-2]
@@ -158,17 +156,13 @@ def encode_brr(wave_file: WaveFile, loop_flag: bool) -> bytes:
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument('-o', '--output', required=True,
-                        help='brr file output')
+    parser.add_argument("-o", "--output", required=True, help="brr file output")
 
     g = parser.add_mutually_exclusive_group(required=True)
-    g.add_argument('-l', '--loop', action='store_true',
-                   help='Set the loop flag')
-    g.add_argument('-n', '--no-loop', action='store_true',
-                   help='Do not set the loop flag')
+    g.add_argument("-l", "--loop", action="store_true", help="Set the loop flag")
+    g.add_argument("-n", "--no-loop", action="store_true", help="Do not set the loop flag")
 
-    parser.add_argument('wav_file', action='store',
-                        help='wav file input')
+    parser.add_argument("wav_file", action="store", help="wav file input")
 
     args = parser.parse_args()
 
@@ -182,14 +176,12 @@ def main() -> None:
         wave_file = load_wav_file(args.wav_file)
         brr_data = encode_brr(wave_file, args.loop)
 
-        with open(args.output, 'wb') as fp:
+        with open(args.output, "wb") as fp:
             fp.write(brr_data)
 
     except Exception as e:
         sys.exit(f"ERROR: { e }")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
-

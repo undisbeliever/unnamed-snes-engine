@@ -23,7 +23,7 @@ class JsonError(RuntimeError):
             super().__init__(f"JSON ERROR {filename}: {pos}: {message}")
 
 
-NAME_REGEX: Final = re.compile(r'[a-zA-Z][a-zA-Z0-9_]*$')
+NAME_REGEX: Final = re.compile(r"[a-zA-Z][a-zA-Z0-9_]*$")
 
 
 def parse_name(s: Any) -> Name:
@@ -61,6 +61,7 @@ def _read_optional_int(v: Union[str, int, float, None]) -> Optional[int]:
 # =============
 #
 
+
 @dataclass
 class Mappings:
     sound_effects: list[Name]
@@ -80,12 +81,10 @@ def _read_mapping_list(json_input: dict[str, Any], key: str) -> list[Name]:
 
 
 def load_mapping_json(filename: Filename) -> Mappings:
-    with open(filename, 'r') as fp:
+    with open(filename, "r") as fp:
         json_input = json.load(fp)
 
-    return Mappings(
-        _read_mapping_list(json_input, 'sound-effects')
-    )
+    return Mappings(_read_mapping_list(json_input, "sound-effects"))
 
 
 #
@@ -128,7 +127,7 @@ class SamplesJson:
 
 def _read_adsr(s: str) -> Adsr:
     if type(s) != str:
-        raise ValueError('Expected a string containing 4 values (and optionally prepended with D or E)')
+        raise ValueError("Expected a string containing 4 values (and optionally prepended with D or E)")
 
     values = s.strip().upper().split()
 
@@ -136,51 +135,45 @@ def _read_adsr(s: str) -> Adsr:
 
     if len(values) == 5:
         e = values.pop(0)
-        if e == 'D':
+        if e == "D":
             enabled = True
-        elif e == 'E':
+        elif e == "E":
             enabled = True
         else:
             raise ValueError(f"ADSR: Unknown value: {e}")
 
     try:
-        return Adsr(
-                enabled,
-                int(values[0], 0),
-                int(values[1], 0),
-                int(values[2], 0),
-                int(values[3], 0)
-        )
+        return Adsr(enabled, int(values[0], 0), int(values[1], 0), int(values[2], 0), int(values[3], 0))
     except ValueError as e:
         raise ValueError(f"ADSR: {e}")
 
 
 def _read_instruments(json_input: dict[str, list[dict[str, Any]]], filename: Filename) -> list[Instrument]:
-    JSON_KEY: Final = 'instruments'
+    JSON_KEY: Final = "instruments"
 
     dirname: Final = os.path.dirname(filename)
 
     j_instruments = json_input.get(JSON_KEY)
     if type(j_instruments) != list:
-        raise JsonError(filename, JSON_KEY, 'Missing instruments')
+        raise JsonError(filename, JSON_KEY, "Missing instruments")
 
     out: list[Instrument] = list()
 
     for i, ji in enumerate(j_instruments):
         if type(ji) != dict:
-            raise JsonError(filename, JSON_KEY, 'Expected a dictionary')
+            raise JsonError(filename, JSON_KEY, "Expected a dictionary")
 
         try:
             inst = Instrument(
-                name=parse_name(ji['name']),
-                source=_read_filename(ji['source'], dirname),
-                looping=bool(ji['looping']),
-                freq=float(ji['freq']),
-                loop_point=_read_optional_int(ji.get('loop_point')),
-                first_octave=_read_int(ji['first_octave']),
-                last_octave=_read_int(ji['last_octave']),
-                adsr=_read_adsr(ji['adsr']),
-                gain=_read_int(ji['gain']),
+                name=parse_name(ji["name"]),
+                source=_read_filename(ji["source"], dirname),
+                looping=bool(ji["looping"]),
+                freq=float(ji["freq"]),
+                loop_point=_read_optional_int(ji.get("loop_point")),
+                first_octave=_read_int(ji["first_octave"]),
+                last_octave=_read_int(ji["last_octave"]),
+                adsr=_read_adsr(ji["adsr"]),
+                gain=_read_int(ji["gain"]),
             )
             out.append(inst)
 
@@ -193,11 +186,7 @@ def _read_instruments(json_input: dict[str, list[dict[str, Any]]], filename: Fil
 
 
 def load_samples_json(filename: Filename) -> SamplesJson:
-    with open(filename, 'r') as fp:
+    with open(filename, "r") as fp:
         json_input = json.load(fp)
 
-    return SamplesJson(
-            instruments=_read_instruments(json_input, filename)
-    )
-
-
+    return SamplesJson(instruments=_read_instruments(json_input, filename))
