@@ -42,8 +42,8 @@ import asyncio
 import posixpath
 import websockets.client
 
-import watchdog.events  # type: ignore
-import watchdog.observers  # type: ignore
+import watchdog.events
+import watchdog.observers
 
 from typing import cast, Any, Callable, Final, NamedTuple, Optional, Union
 
@@ -495,9 +495,9 @@ def start_filesystem_watcher(data_store: DataStore, compiler: Compiler) -> tuple
 
     handler = FsEventHandler(data_store, compiler)
 
-    observer = watchdog.observers.Observer()
-    observer.schedule(handler, path=".", recursive=True)
-    observer.start()
+    observer = watchdog.observers.Observer()  # type: ignore[no-untyped-call]
+    observer.schedule(handler, path=".", recursive=True)  # type: ignore[no-untyped-call]
+    observer.start()  # type: ignore[no-untyped-call]
 
     return observer, handler.stop_token
 
@@ -1069,7 +1069,7 @@ def resources_over_usb2snes(sfc_file_relpath: Filename, websocket_address: str, 
             )
         )
 
-        fs_watcher.stop()
+        fs_watcher.stop()  # type: ignore[no-untyped-call]
         fs_watcher.join()
 
     except Exception as e:
