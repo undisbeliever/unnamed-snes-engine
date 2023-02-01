@@ -3,27 +3,15 @@ BINARY := game.sfc
 
 INTERMEDIATE_BINARY := gen/game-no-resources.sfc
 
+RESOURCES_DIR := resources
+
 
 .DELETE_ON_ERROR:
 .SUFFIXES:
 MAKEFLAGS += --no-builtin-rules
 
 
-
 SOURCES	  := $(wildcard src/*.wiz src/*/*.wiz)
-
-
-RESOURCES_DOT_BIN_SOURCES := $(wildcard resources/*/*8bpp-tiles.png)
-
-RESOURCES  := gen/other-resources.bin
-
-ROOMS_DIR  := resources/rooms
-ROOMS_SRC  := $(wildcard $(ROOMS_DIR)/*.tmx)
-RESOURCES  += gen/rooms.bin
-
-
-METATILE_TILESETS = dungeon
-RESOURCES  += $(patsubst %,gen/metatiles/%.bin, $(METATILE_TILESETS))
 
 GEN_SOURCES  := gen/resources.wiz
 GEN_SOURCES  += gen/interactive-tiles.wiz
@@ -35,18 +23,11 @@ GEN_SOURCES  += gen/ms-drawing-functions.wiz
 GEN_SOURCES  += gen/arctan-table.wiz
 GEN_SOURCES  += gen/cosine-tables.wiz
 
-
-METASPRITE_SPRITESETS = common dungeon
-RESOURCES  += $(patsubst %,gen/metasprites/%.bin, $(METASPRITE_SPRITESETS))
-RESOURCES  += $(patsubst %,gen/metasprites/%.txt, $(METASPRITE_SPRITESETS))
-
-
-OTHER_RESOURCES_SRC := $(wildcard resources/tilesets/*.png)
-OTHER_RESOURCES_SRC += $(wildcard resources/images/*.png)
-OTHER_RESOURCES_SRC += resources/metasprites/shadows-4bpp-tiles.png
+RESOURCES_SRC := $(wildcard $(RESOURCES_DIR)/*.json $(RESOURCES_DIR)/* $(RESOURCES_DIR)/*/* $(RESOURCES_DIR)/*/*/*)
 
 
 COMMON_PYTHON_SCRIPTS = tools/_json_formats.py tools/_snes.py tools/_ansi_color.py tools/_common.py
+ALL_PYTHON_SCRIPTS := $(wildcard tools/*.py)
 
 # Python interpreter
 # (-bb issues errors on bytes/string comparisons)
@@ -57,8 +38,8 @@ PYTHON3  := python3 -bb
 all: $(BINARY)
 
 
-$(BINARY): $(INTERMEDIATE_BINARY) tools/insert_resources.py tools/convert_metasprite.py tools/convert_other_resources.py tools/_entity_data.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/insert_resources.py -o $(BINARY) resources/mappings.json resources/entities.json gen/other-resources.bin $(INTERMEDIATE_BINARY:.sfc=.sym) $(INTERMEDIATE_BINARY)
+$(BINARY): $(INTERMEDIATE_BINARY) tools/insert_resources.py $(ALL_PYTHON_SCRIPTS) $(RESOURCES_SRC)
+	$(PYTHON3) tools/insert_resources.py -o '$(BINARY)' '$(RESOURCES_DIR)' '$(INTERMEDIATE_BINARY:.sfc=.sym)' '$(INTERMEDIATE_BINARY)'
 	cp $(INTERMEDIATE_BINARY:.sfc=.sym) $(BINARY:.sfc=.sym)
 
 
@@ -92,11 +73,6 @@ audio audio/audio-driver.bin:
 $(INTERMEDIATE_BINARY): audio/audio-driver.bin
 
 
-
-gen/metatiles/%.bin: resources/metatiles/%-tiles.png resources/metatiles/%-palette.png resources/metatiles/%.tsx resources/mappings.json tools/convert_mt_tileset.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/convert_mt_tileset.py -o '$@' 'resources/mappings.json' 'resources/metatiles/$*.tsx'
-
-
 gen/interactive-tiles.wiz: resources/mappings.json tools/generate_interactive_tiles_wiz.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate_interactive_tiles_wiz.py -o '$@' 'resources/mappings.json'
 
@@ -105,13 +81,6 @@ gen/room-events-function-tables.wiz: resources/mappings.json tools/generate_room
 
 gen/room-events.wiz: resources/mappings.json tools/generate_room_events_wiz.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate_room_events_wiz.py -o '$@' 'resources/mappings.json'
-
-gen/other-resources.bin: $(OTHER_RESOURCES_SRC) resources/other-resources.json resources/mappings.json tools/convert_other_resources.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/convert_other_resources.py -o '$@' 'resources/mappings.json' 'resources/other-resources.json'
-
-gen/rooms.bin: $(ROOMS_DIR) resources/mappings.json resources/entities.json tools/convert_rooms.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/convert_rooms.py -o '$@' 'resources/mappings.json' 'resources/entities.json' '$(ROOMS_DIR)'
-
 
 gen/resources.wiz: resources/mappings.json audio/resources/mappings.json tools/generate_resources_wiz.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate_resources_wiz.py -o '$@' 'resources/mappings.json' 'audio/resources/mappings.json'
@@ -131,30 +100,11 @@ gen/arctan-table.wiz: tools/generate_arctan_table.py $(COMMON_PYTHON_SCRIPTS)
 gen/cosine-tables.wiz: tools/generate_cosine_tables.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate_cosine_tables.py -o '$@'
 
-gen/metasprites/%.wiz gen/metasprites/%.txt: resources/metasprites/%/_metasprites.json resources/ms-export-order.json tools/convert_metasprite.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/convert_metasprite.py --bin-output 'gen/metasprites/$*.bin' --msfs-output 'gen/metasprites/$*.txt' 'resources/metasprites/$*/_metasprites.json' 'resources/ms-export-order.json'
 
-
-define __update_metasprite_dependencies
-gen/metasprites/$(firstword $1).wiz gen/metasprites/$(firstword $1).bin: $2
-endef
-
-$(foreach d, $(METASPRITE_SPRITESETS), $(eval $(call __update_metasprite_dependencies, $d, $(wildcard resources/metasprites/$d/*.png))))
-
-
-
-.PHONY: resources
-resources: $(RESOURCES)
-$(BINARY): $(RESOURCES)
-
-
-
-DIRS := $(sort $(dir $(RESOURCES) $(GEN_SOURCES)))
-
-$(RESOURCES): $(DIRS)
-$(GEN_SOURCES): $(DIRS)
-$(DIRS):
-	mkdir -p '$@'
+$(GEN_SOURCES): gen/
+$(INTERMEDIATE_BINARY): gen/
+gen/:
+	mkdir 'gen/'
 
 
 .PHONY: clean
@@ -162,7 +112,6 @@ clean:
 	$(MAKE) -C audio clean
 	$(RM) $(BINARY) $(INTERMEDIATE_BINARY)
 	$(RM) $(GEN_SOURCES)
-	$(RM) $(RESOURCES)
 
 
 .PHONY: clean-wiz

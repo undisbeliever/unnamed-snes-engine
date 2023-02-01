@@ -6,7 +6,6 @@
 import sys
 import os.path
 import PIL.Image  # type: ignore
-import argparse
 import xml.etree.ElementTree
 from typing import Final, NamedTuple, Optional, TextIO
 
@@ -318,34 +317,3 @@ def convert_mt_tileset(tsx_filename: Filename, mappings: Mappings) -> bytes:
         raise TsxFileError(f"Error compiling { tsx_filename }", error_list)
 
     return create_tileset_data(palette_data, tile_data, metatile_map, properties)
-
-
-def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-o", "--output", required=True, help="tileset output file")
-    parser.add_argument("mappings_json_file", action="store", help="mappings.json file")
-    parser.add_argument("tsx_filename", action="store", help="Tiled tsx file")
-
-    args = parser.parse_args()
-
-    return args
-
-
-def main() -> None:
-    try:
-        args = parse_arguments()
-
-        mappings = load_mappings_json(args.mappings_json_file)
-
-        tileset_data = convert_mt_tileset(args.tsx_filename, mappings)
-
-        with open(args.output, "wb") as fp:
-            fp.write(tileset_data)
-
-    except Exception as e:
-        print_error("ERROR", e)
-        sys.exit("Error compiling MetaTile tileset")
-
-
-if __name__ == "__main__":
-    main()

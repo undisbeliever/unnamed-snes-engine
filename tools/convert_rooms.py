@@ -9,7 +9,6 @@ import sys
 import gzip
 import base64
 import struct
-import argparse
 import xml.etree.ElementTree
 import posixpath
 from collections import OrderedDict
@@ -580,76 +579,3 @@ def extract_room_id(basename: str) -> int:
         raise RuntimeError("Invalid room filename")
 
     return int(m.group(1), 10) + 16 * int(m.group(2), 10)
-
-
-def compile_rooms(rooms_directory: str, entities: EntitiesJson, mapping: Mappings) -> Optional[bytes]:
-    valid = True
-
-    tmx_files = get_list_of_tmx_files(rooms_directory)
-
-    # First 256 words: index of each room in the binary
-    # If a value is 0xffff, then there is no room that location
-    out = bytearray([0xFF, 0xFF]) * 256
-
-    room_id_set = set()
-
-    room_addr = mapping.memory_map.mode.bank_start
-
-    for basename in tmx_files:
-        try:
-            room_data = compile_room(os.path.join(rooms_directory, basename), entities, mapping)
-
-            room_id = extract_room_id(basename)
-
-            if room_id in room_id_set:
-                raise RuntimeError(f"Two rooms have the same location: { room_id }")
-            room_id_set.add(room_id)
-
-            out[room_id * 2 + 0] = room_addr & 0xFF
-            out[room_id * 2 + 1] = room_addr >> 8
-            out += room_data
-
-            room_addr += len(room_data)
-
-        except Exception as ex:
-            print_error(f"ERROR compiling { basename }", ex)
-            valid = False
-
-    if room_addr > 0x10000:
-        raise RuntimeError("Output too large.  Maximum rooms binary is 64KiB.")
-
-    if not valid:
-        return None
-
-    return out
-
-
-def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-o", "--output", required=True, help="output file")
-    parser.add_argument("mapping_filename", action="store", help="mapping json file input")
-    parser.add_argument("entities_json_file", action="store", help="entities JSON file input")
-    parser.add_argument("rooms_directory", action="store", help="rooms directory (containing tmx files)")
-
-    args = parser.parse_args()
-
-    return args
-
-
-def main() -> None:
-    args = parse_arguments()
-
-    entities = load_entities_json(args.entities_json_file)
-    mapping = load_mappings_json(args.mapping_filename)
-
-    rooms_bin = compile_rooms(args.rooms_directory, entities, mapping)
-
-    if not rooms_bin:
-        sys.exit("Error compiling rooms")
-
-    with open(args.output, "wb") as fp:
-        fp.write(rooms_bin)
-
-
-if __name__ == "__main__":
-    main()

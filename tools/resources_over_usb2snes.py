@@ -49,31 +49,16 @@ from typing import cast, Any, Callable, Final, NamedTuple, Optional, Union
 
 from _ansi_color import AnsiColors
 
-from convert_mt_tileset import convert_mt_tileset
-from convert_metasprite import convert_spritesheet, MsFsEntry, build_ms_fs_data
-from convert_rooms import get_list_of_tmx_files, extract_room_id, compile_room
-from convert_other_resources import convert_tiles, convert_bg_image
-from insert_resources import read_binary_file, read_symbols_file, validate_sfc_file, ROM_HEADER_V3_ADDR
+from insert_resources import read_binary_file, validate_sfc_file, ROM_HEADER_V3_ADDR
 
-from _json_formats import (
-    load_mappings_json,
-    load_entities_json,
-    load_ms_export_order_json,
-    load_other_resources_json,
-    load_metasprites_json,
-    Name,
-    Filename,
-    JsonError,
-    MemoryMap,
-    Mappings,
-    EntitiesJson,
-    MsExportOrder,
-    OtherResources,
-)
+from _resources_compiler import DataStore, Compilers, FixedInput, ResourceData, ResourceError, MetaSpriteResourceData
+from _resources_compiler import load_fixed_inputs, compile_all_resources, compile_msfs_and_entity_data
+
+from _json_formats import Name, Filename, MemoryMap
 
 from _common import MultilineError, ResourceType, MS_FS_DATA_BANK_OFFSET, USB2SNES_DATA_BANK_OFFSET, USE_RESOURCES_OVER_USB2SNES_LABEL
 
-from _entity_data import create_entity_rom_data, ENTITY_ROM_DATA_LABEL, ENTITY_ROM_DATA_BYTES_PER_ENTITY
+from _entity_data import ENTITY_ROM_DATA_LABEL, ENTITY_ROM_DATA_BYTES_PER_ENTITY
 
 from _common import print_error as __print_error
 
@@ -143,6 +128,10 @@ def log_error(s: str, e: Optional[Exception] = None) -> None:
         __print_error(s, e, sys.stdout)
 
 
+def log_resource_error(re: ResourceError) -> None:
+    log_error(f"ERROR: { re.resource_type }[{ re.resource_id}] { re.resource_name }", re.error)
+
+
 def log_fs_watcher(s: str) -> None:
     __log(s, AnsiColors.BRIGHT_BLUE)
 
@@ -163,211 +152,6 @@ def log_success(s: str) -> None:
     __log(s, AnsiColors.GREEN)
 
 
-# =====================
-# Resource Data Storage
-# =====================
-
-
-@unique
-class DataType(IntEnum):
-    MT_TILESET = ResourceType.mt_tilesets
-    MS_SPRITESHEET = ResourceType.ms_spritesheets
-    TILE = ResourceType.tiles
-    BG_IMAGE = ResourceType.bg_images
-    ROOM = SpecialRequestType.rooms
-
-
-class CompilerOutput(NamedTuple):
-    data_type: DataType
-    resource_id: int
-    name: Name
-
-    data: Optional[bytes] = None
-    msfs_entries: Optional[list[MsFsEntry]] = None
-    error: Optional[Exception] = None
-
-
-class MsFsAndEntityOutput(NamedTuple):
-    msfs_data: Optional[bytes] = None
-    entity_rom_data: Optional[bytes] = None
-    error: Optional[Exception] = None
-
-
-class DataStoreKey(NamedTuple):
-    data_type: DataType
-    resource_id: int
-
-
-# Thread Safety: This class MUST ONLY be accessed via method calls.
-# Thread Safety: All methods in this class must acquire the `_lock` before accessing fields.
-class DataStore:
-    def __init__(self, mappings: Mappings):
-        self._lock: Final[threading.Lock] = threading.Lock()
-
-        with self._lock:
-            self._resources: dict[DataStoreKey, CompilerOutput] = dict()
-
-            self._msfs_lists: list[Optional[list[MsFsEntry]]] = [None] * len(mappings.ms_spritesheets)
-
-            self._msfs_and_entity_data: Optional[MsFsAndEntityOutput] = None
-            self._msfs_and_entity_data_valid: bool = False
-
-            # Not incremented when room data changes
-            self._not_room_counter: int = 0
-
-    def insert_data(self, c: CompilerOutput) -> None:
-        with self._lock:
-            key = DataStoreKey(c.data_type, c.resource_id)
-            self._resources[key] = c
-
-            if c.data_type != DataType.ROOM:
-                self._not_room_counter += 1
-
-            if c.data_type == DataType.MS_SPRITESHEET:
-                self._msfs_lists[c.resource_id] = c.msfs_entries
-                self._msfa_and_entity_rom_data = None
-                self._msfs_and_entity_data_valid = False
-
-    def insert_msfs_and_entity_data(self, me: MsFsAndEntityOutput) -> None:
-        with self._lock:
-            self._msfs_and_entity_data = me
-            self._not_room_counter += 1
-
-    def get_not_room_counter(self) -> int:
-        with self._lock:
-            return self._not_room_counter
-
-    def get_msfs_lists(self) -> list[Optional[list[MsFsEntry]]]:
-        with self._lock:
-            return self._msfs_lists
-
-    def is_msfs_and_entity_data_valid(self) -> bool:
-        with self._lock:
-            return self._msfs_and_entity_data_valid
-
-    def mark_msfs_and_entity_data_valid(self) -> None:
-        with self._lock:
-            self._msfs_and_entity_data_valid = True
-
-    def get_msfs_and_entity_data(self) -> Optional[MsFsAndEntityOutput]:
-        with self._lock:
-            return self._msfs_and_entity_data
-
-    def get_resource_data(self, r_type: Union[ResourceType, SpecialRequestType], r_id: int) -> Optional[CompilerOutput]:
-        with self._lock:
-            key = DataStoreKey(DataType(r_type.value), r_id)
-            return self._resources.get(key)
-
-
-# ==================
-# Resource Compilers
-# ==================
-
-
-# ASSUMES: current working directory is the resources directory
-class Compiler:
-    # ::TODO do something about these hard coded filenames::
-
-    def __init__(self, sym_filename: Filename) -> None:
-        # Fixed input
-        self.mappings: Final[Mappings] = load_mappings_json("mappings.json")
-        self.entities: Final[EntitiesJson] = load_entities_json("entities.json")
-        self.other_resources: Final[OtherResources] = load_other_resources_json("other-resources.json")
-        self.ms_export_orders: Final[MsExportOrder] = load_ms_export_order_json("ms-export-order.json")
-        self.symbols: Final[dict[str, int]] = read_symbols_file(sym_filename)
-
-    def compile_mt_tileset(self, rid: int) -> CompilerOutput:
-        name = self.mappings.mt_tilesets[rid]
-
-        try:
-            tsx_filename = f"metatiles/{ name }.tsx"
-
-            data = convert_mt_tileset(tsx_filename, self.mappings)
-
-            return CompilerOutput(DataType.MT_TILESET, rid, name, data=data)
-
-        except Exception as e:
-            return CompilerOutput(DataType.MT_TILESET, rid, name, error=e)
-
-    def compile_ms_spritesheet(self, rid: int) -> CompilerOutput:
-        name = self.mappings.ms_spritesheets[rid]
-
-        try:
-            json_filename = f"metasprites/{ name }/_metasprites.json"
-
-            ms_input = load_metasprites_json(json_filename)
-            ms_dir = os.path.dirname(json_filename)
-
-            data, msfs_entries = convert_spritesheet(ms_input, self.ms_export_orders, ms_dir)
-
-            return CompilerOutput(DataType.MS_SPRITESHEET, rid, name, data=data, msfs_entries=msfs_entries)
-
-        except Exception as e:
-            return CompilerOutput(DataType.MS_SPRITESHEET, rid, name, error=e)
-
-    def compile_tiles(self, rid: int) -> CompilerOutput:
-        name = self.mappings.tiles[rid]
-
-        try:
-            t = self.other_resources.tiles[name]
-
-            data = convert_tiles(t)
-
-            return CompilerOutput(DataType.TILE, rid, name, data=data)
-
-        except Exception as e:
-            return CompilerOutput(DataType.TILE, rid, name, error=e)
-
-    def compile_bg_image(self, rid: int) -> CompilerOutput:
-        name = self.mappings.bg_images[rid]
-
-        try:
-            bgi = self.other_resources.bg_images[name]
-
-            data = convert_bg_image(bgi)
-
-            return CompilerOutput(DataType.BG_IMAGE, rid, name, data=data)
-
-        except Exception as e:
-            return CompilerOutput(DataType.BG_IMAGE, rid, name, error=e)
-
-    def compile_room(self, basename: Filename) -> CompilerOutput:
-        room_id = -1
-        name = os.path.splitext(basename)[0]
-
-        try:
-            room_id = extract_room_id(basename)
-
-            filename = os.path.join("rooms", basename)
-
-            data = compile_room(filename, self.entities, self.mappings)
-
-            return CompilerOutput(DataType.ROOM, room_id, name, data=data)
-
-        except Exception as e:
-            return CompilerOutput(DataType.ROOM, room_id, name, error=e)
-
-    def compile_msfs_and_entity_data(self, optional_msfs_lists: list[Optional[list[MsFsEntry]]]) -> MsFsAndEntityOutput:
-
-        if any(l is None for l in optional_msfs_lists):
-            return MsFsAndEntityOutput(error=ValueError("Cannot compile MsFs data.  There is an error in a MS Spritesheet."))
-
-        msfs_lists = cast(list[list[MsFsEntry]], optional_msfs_lists)
-
-        try:
-            rom_data, ms_map = build_ms_fs_data(msfs_lists, self.symbols, self.mappings.memory_map.mode)
-            ms_fs_data = bytes(rom_data.data())
-        except Exception as e:
-            return MsFsAndEntityOutput(error=e)
-
-        try:
-            entity_rom_data = create_entity_rom_data(self.entities, self.symbols, ms_map)
-        except Exception as e:
-            return MsFsAndEntityOutput(error=e)
-
-        return MsFsAndEntityOutput(ms_fs_data, entity_rom_data)
-
-
 # ASSUMES: current working directory is the resources directory
 class FsEventHandler(watchdog.events.FileSystemEventHandler):
     FILES_THAT_CANNOT_CHANGE: Final[tuple[str, ...]] = (
@@ -377,14 +161,11 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
         "ms-export-order.json",
     )
 
-    MT_TILESET_REGEX: Final = re.compile(r"^metatiles/(\w+)(\.tsx|-.+)$")
-    MS_SPRITESHEET_REGEX: Final = re.compile(r"^metasprites/(\w+)/")
-
-    def __init__(self, data_store: DataStore, compiler: Compiler):
+    def __init__(self, data_store: DataStore, compilers: Compilers):
         super().__init__()
 
         self.data_store: Final = data_store
-        self.compiler: Final = compiler
+        self.compilers: Final = compilers
 
         # Set by `FsEventHandler` if a FILES_THAT_CANNOT_CHANGE is modified
         self.stop_token: Final = threading.Event()
@@ -414,45 +195,19 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
             self.stop_token.set()
             return
 
-        compiler: Final = self.compiler
-        mappings: Final = compiler.mappings
-
         if ext == ".aseprite":
             self.process_aseprite_file_changed(filename)
             return
 
-        elif ext == ".tmx":
-            self.process_room(filename)
-            return
-
-        elif m := self.MT_TILESET_REGEX.match(filename):
-            self.process_resource("mt_tileset", compiler.compile_mt_tileset, mappings.mt_tilesets, m.group(1))
-            return
-
-        elif m := self.MS_SPRITESHEET_REGEX.match(filename):
-            self.process_resource("ms_spritesheet", compiler.compile_ms_spritesheet, mappings.ms_spritesheets, m.group(1))
-            self.process_msfs_and_entity_data()
-            return
-
-        elif (tile_name := self._search_through_tiles(filename)) is not None:
-            self.process_resource("tile", compiler.compile_tiles, mappings.tiles, tile_name)
-            return
-
-        elif (bgi_name := self._search_through_bg_images(filename)) is not None:
-            self.process_resource("bg_image", compiler.compile_bg_image, mappings.bg_images, bgi_name)
-            return
-
-    def _search_through_tiles(self, filename: Filename) -> Optional[str]:
-        for name, t in self.compiler.other_resources.tiles.items():
-            if filename == t.source:
-                return name
-        return None
-
-    def _search_through_bg_images(self, filename: Filename) -> Optional[str]:
-        for name, bgi in self.compiler.other_resources.bg_images.items():
-            if filename == bgi.source or filename == bgi.palette:
-                return name
-        return None
+        rdata = self.compilers.file_changed(filename)
+        if rdata:
+            self.data_store.insert_data(rdata)
+            if isinstance(rdata, MetaSpriteResourceData):
+                self.process_msfs_and_entity_data()
+            if isinstance(rdata, ResourceError):
+                log_resource_error(rdata)
+            else:
+                log_fs_watcher(f"    Compiled { rdata.resource_type }[{ rdata.resource_id }]: { rdata.resource_name }")
 
     def process_aseprite_file_changed(self, filename: str) -> None:
         # ASSUMES: current directory is the resources directory
@@ -460,76 +215,24 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
         log_fs_watcher(f"    make { png_filename }")
         subprocess.call(("make", png_filename))
 
-    def process_resource(self, rtype: str, func: Callable[[int], CompilerOutput], name_list: list[Name], name: str) -> None:
-        try:
-            i = name_list.index(name)
-        except ValueError:
-            log_error(f"    Cannot find resource id for {rtype}: { name }")
-            return
-
-        log_fs_watcher(f"    Compiling { rtype }: { name }")
-        co = func(i)
-        if co.error:
-            log_error(f"    ERROR: { rtype } { name }", co.error)
-        self.data_store.insert_data(co)
-
-    def process_room(self, filename: str) -> None:
-        basename = os.path.basename(filename)
-
-        log_fs_watcher(f"    Compiling room: { basename }")
-        co = self.compiler.compile_room(basename)
-        if co.error:
-            log_error(f"    ERROR: room { basename }", co.error)
-        self.data_store.insert_data(co)
-
     def process_msfs_and_entity_data(self) -> None:
         log_fs_watcher(f"    Compiling MsFs and Entity Data")
-        me_data = self.compiler.compile_msfs_and_entity_data(self.data_store.get_msfs_lists())
+        me_data = compile_msfs_and_entity_data(self.compilers.fixed_input, self.data_store.get_msfs_lists())
         if me_data.error:
             log_error(f"    ERROR: MsFs and entity_rom_data", me_data.error)
         self.data_store.insert_msfs_and_entity_data(me_data)
 
 
 # ASSUMES: current working directory is the resources directory
-def start_filesystem_watcher(data_store: DataStore, compiler: Compiler) -> tuple[watchdog.observers.Observer, threading.Event]:
+def start_filesystem_watcher(data_store: DataStore, compilers: Compilers) -> tuple[watchdog.observers.Observer, threading.Event]:
 
-    handler = FsEventHandler(data_store, compiler)
+    handler = FsEventHandler(data_store, compilers)
 
     observer = watchdog.observers.Observer()  # type: ignore[no-untyped-call]
     observer.schedule(handler, path=".", recursive=True)  # type: ignore[no-untyped-call]
     observer.start()  # type: ignore[no-untyped-call]
 
     return observer, handler.stop_token
-
-
-# ASSUMES: current working directory is the resources directory
-def compile_all_resources(data_store: DataStore, compiler: Compiler, n_processes: Optional[int]) -> None:
-    # Uses multiprocessing to speed up the compiling
-
-    mappings = compiler.mappings
-
-    room_filenames = get_list_of_tmx_files("rooms")
-
-    with multiprocessing.Pool(processes=n_processes) as mp:
-        co_lists = (
-            mp.imap_unordered(compiler.compile_mt_tileset, range(len(mappings.mt_tilesets))),
-            mp.imap_unordered(compiler.compile_ms_spritesheet, range(len(mappings.ms_spritesheets))),
-            mp.imap_unordered(compiler.compile_tiles, range(len(mappings.tiles))),
-            mp.imap_unordered(compiler.compile_bg_image, range(len(mappings.bg_images))),
-            mp.imap_unordered(compiler.compile_room, room_filenames),
-        )
-
-        for co_l in co_lists:
-            for co in co_l:
-                data_store.insert_data(co)
-
-                if co.error:
-                    log_error(f"ERROR: { co.data_type.name.lower() } { co.name }", co.error)
-
-    msfs_and_entity_data = compiler.compile_msfs_and_entity_data(data_store.get_msfs_lists())
-    data_store.insert_msfs_and_entity_data(msfs_and_entity_data)
-    if msfs_and_entity_data.error:
-        log_error("ERROR: MsFs and entity_rom_data", msfs_and_entity_data.error)
 
 
 # ==================
@@ -730,15 +433,11 @@ class ResourcesOverUsb2Snes:
     # If a request is one of these types, then update msfs_and_entity_data before transferring request data.
     REQUEST_TYPE_USES_MSFS_OR_ENTITY_DATA: Final = (SpecialRequestType.rooms.value, ResourceType.ms_spritesheets.value)
 
-    def __init__(
-        self,
-        usb2snes: Usb2Snes,
-        stop_token: threading.Event,
-        data_store: DataStore,
-        memory_map: MemoryMap,
-        n_entities: int,
-        symbols: dict[str, int],
-    ) -> None:
+    def __init__(self, usb2snes: Usb2Snes, stop_token: threading.Event, data_store: DataStore, fixed_input: FixedInput) -> None:
+        symbols = fixed_input.symbols
+        memory_map = fixed_input.mappings.memory_map
+        n_entities = len(fixed_input.entities.entities)
+
         address_to_rom_offset: Final = memory_map.mode.address_to_rom_offset
 
         self.usb2snes: Final[Usb2Snes] = usb2snes
@@ -868,45 +567,66 @@ class ResourcesOverUsb2Snes:
         log_request(f"Request 0x{request.request_id:02x}: { request.request_type.name }[{ request.resource_id }]")
 
         try:
+            if request.request_type == SpecialRequestType.rooms:
+                status, data = await self.get_room(request.resource_id)
+            else:
+                status, data = await self.get_resource(ResourceType(request.request_type), request.resource_id)
+
             if request.request_type in self.REQUEST_TYPE_USES_MSFS_OR_ENTITY_DATA:
                 if not self.data_store.is_msfs_and_entity_data_valid():
                     await self.transmit_msfs_and_entity_data()
 
-            co = self.data_store.get_resource_data(request.request_type, request.resource_id)
-
-            if co is None or (not co.data):
-                if co:
-                    log_error(f"    ERROR: { request.request_type.name }[{ request.resource_id }]", co.error)
-
-                # Do not wait if request_type is room and resource does not exist.
-                if co is not None or request.request_type != SpecialRequestType.rooms:
-                    log_notice(f"    Waiting until resource data is ready...")
-                    while co is None or (not co.data):
-                        # Exit early if stop_token set
-                        if self.stop_token.is_set():
-                            log_notice("    Stop waiting")
-                            break
-                        co = self.data_store.get_resource_data(request.request_type, request.resource_id)
-                        await asyncio.sleep(WAITING_FOR_RESOURCE_DELAY)
-
-            status = ResponseStatus.ERROR
-
-            if co is None:
-                status = ResponseStatus.NOT_FOUND
-            else:
-                status = ResponseStatus.OK
-
-                if co.data_type == DataType.ROOM:
-                    nrc = self.data_store.get_not_room_counter()
-                    if nrc != self.not_room_counter:
-                        self.not_room_counter = nrc
-                        status = ResponseStatus.OK_RESOURCES_CHANGED
-
-            await self.write_response(request.request_id, status, co.data if co else None)
+            await self.write_response(request.request_id, status, data)
 
         except Exception as e:
             await self.write_response(request.request_id, ResponseStatus.ERROR, None)
             raise
+
+    async def get_room(self, room_id: int) -> tuple[ResponseStatus, Optional[bytes]]:
+        co = self.data_store.get_room_data(room_id)
+
+        if isinstance(co, ResourceError):
+            log_resource_error(co)
+            log_notice(f"    Waiting until resource data is ready...")
+            while isinstance(co, ResourceError):
+                # Exit early if stop_token set
+                if self.stop_token.is_set():
+                    log_notice("    Stop waiting")
+                    return ResponseStatus.ERROR, None
+                co = self.data_store.get_room_data(room_id)
+                await asyncio.sleep(WAITING_FOR_RESOURCE_DELAY)
+
+        if isinstance(co, ResourceData):
+            status = ResponseStatus.OK
+
+            nrc = self.data_store.get_not_room_counter()
+            if nrc != self.not_room_counter:
+                self.not_room_counter = nrc
+                status = ResponseStatus.OK_RESOURCES_CHANGED
+
+            return status, co.data
+        else:
+            # Room does not exist
+            return ResponseStatus.NOT_FOUND, None
+
+    async def get_resource(self, resource_type: ResourceType, resource_id: int) -> tuple[ResponseStatus, Optional[bytes]]:
+        co = self.data_store.get_resource_data(resource_type, resource_id)
+
+        if not isinstance(co, ResourceData):
+            if isinstance(co, ResourceError):
+                log_resource_error(co)
+
+            log_notice(f"    Waiting until resource data is ready...")
+
+            while not isinstance(co, ResourceData):
+                # Exit early if stop_token set
+                if self.stop_token.is_set():
+                    log_notice("    Stop waiting")
+                    return ResponseStatus.ERROR, None
+                co = self.data_store.get_resource_data(resource_type, resource_id)
+                await asyncio.sleep(WAITING_FOR_RESOURCE_DELAY)
+
+        return ResponseStatus.OK, co.data
 
     # NOTE: This method will sleep until the resource data is valid
     async def transmit_msfs_and_entity_data(self) -> None:
@@ -1005,9 +725,7 @@ async def create_and_process_websocket(
     sfc_file_basename: Filename,
     sfc_file_data: bytes,
     data_store: DataStore,
-    memory_map: MemoryMap,
-    n_entities: int,
-    symbols: dict[str, int],
+    fixed_input: FixedInput,
 ) -> None:
 
     async with websockets.client.connect(address) as socket:
@@ -1019,7 +737,7 @@ async def create_and_process_websocket(
 
         log_success(f"Connected to { usb2snes.device_name() }")
 
-        rou2s = ResourcesOverUsb2Snes(usb2snes, stop_token, data_store, memory_map, n_entities, symbols)
+        rou2s = ResourcesOverUsb2Snes(usb2snes, stop_token, data_store, fixed_input)
 
         # This sleep statement is required.
         # On my system there needs to be a 1/2 second delay between a usb2snes "Boot" command and a "GetAddress" command.
@@ -1029,7 +747,7 @@ async def create_and_process_websocket(
 
         await rou2s.validate_correct_rom(sfc_file_basename)
 
-        if await rou2s.test_game_matches_sfc_file(sfc_file_data, memory_map) == False:
+        if await rou2s.test_game_matches_sfc_file(sfc_file_data, fixed_input.mappings.memory_map) == False:
             log_notice(f"Running game does not match { sfc_file_basename }")
             await rou2s.reset_and_update_rom(sfc_file_data)
         else:
@@ -1044,29 +762,19 @@ def resources_over_usb2snes(sfc_file_relpath: Filename, websocket_address: str, 
     sfc_file_basename = os.path.basename(sfc_file_relpath)
 
     try:
-        compiler = Compiler(sym_file_relpath)
+        fixed_input = load_fixed_inputs(sym_file_relpath)
 
         sfc_file_data = read_binary_file(sfc_file_relpath, 512 * 1024)
-        validate_sfc_file(sfc_file_data, compiler.symbols, compiler.mappings)
-
-        data_store = DataStore(compiler.mappings)
+        validate_sfc_file(sfc_file_data, fixed_input.symbols, fixed_input.mappings)
 
         # ::TODO compile resources while creating usb2snes connection::
-        compile_all_resources(data_store, compiler, n_processes)
+        compilers = Compilers(fixed_input)
+        data_store = compile_all_resources(compilers, n_processes, log_resource_error)
 
-        fs_watcher, stop_token = start_filesystem_watcher(data_store, compiler)
+        fs_watcher, stop_token = start_filesystem_watcher(data_store, compilers)
 
         asyncio.run(
-            create_and_process_websocket(
-                websocket_address,
-                stop_token,
-                sfc_file_basename,
-                sfc_file_data,
-                data_store,
-                compiler.mappings.memory_map,
-                len(compiler.entities.entities),
-                compiler.symbols,
-            )
+            create_and_process_websocket(websocket_address, stop_token, sfc_file_basename, sfc_file_data, data_store, fixed_input)
         )
 
         fs_watcher.stop()  # type: ignore[no-untyped-call]
@@ -1084,9 +792,7 @@ def resources_over_usb2snes(sfc_file_relpath: Filename, websocket_address: str, 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("-a", "--address", required=False, default="ws://localhost:8080", help="Websocket address")
-    parser.add_argument(
-        "-j", "--processes", required=False, type=int, default=None, help="Number of processors to use (default = all)"
-    )
+    parser.add_argument("-j", "--processes", required=False, type=int, default=None, help="Number of processors to use (default=all)")
     parser.add_argument("resources_directory", action="store", help="resources directory")
     parser.add_argument("sfc_file", action="store", help="sfc file (without resources)")
 

@@ -7,8 +7,6 @@ import json
 import sys
 import os.path
 import PIL.Image  # type: ignore
-import argparse
-from io import StringIO
 
 from typing import overload, Callable, Final, Iterable, Literal, NamedTuple, Optional, TextIO, TypeVar, Union
 
@@ -827,40 +825,6 @@ def build_msfs_entry(
     )
 
 
-def msfs_entries_to_text(msfs_entries: list[MsFsEntry]) -> str:
-    with StringIO() as out:
-        for entry in msfs_entries:
-            frames = ",".join([f.hex() for f in entry.frames])
-            animations = ",".join([a.hex() for a in entry.animations])
-
-            out.write(f"{entry.fullname} {entry.ms_export_order} {entry.header.hex()} {entry.pattern} {frames} {animations}\n")
-
-        return out.getvalue()
-
-
-def text_to_msfs_entries(line_iterator: Iterable[str]) -> list[MsFsEntry]:
-    out = list()
-
-    for line in line_iterator:
-        sep = line.split(" ")
-
-        if len(sep) != 6:
-            raise ValueError("Invalid MsFsEntry text format")
-
-        out.append(
-            MsFsEntry(
-                fullname=sep[0],
-                ms_export_order=sep[1],
-                header=bytes.fromhex(sep[2]),
-                pattern=sep[3],
-                frames=[bytes.fromhex(i) for i in sep[4].split(",")],
-                animations=[bytes.fromhex(i) for i in sep[5].split(",")],
-            )
-        )
-
-    return out
-
-
 def build_ms_fs_data(
     spritesheets: list[list[MsFsEntry]], symbols: dict[str, int], mapmode: MemoryMapMode
 ) -> tuple[RomData, dict[ScopedName, tuple[int, Name]]]:
@@ -996,48 +960,3 @@ def convert_spritesheet(ms_input: MsSpritesheet, ms_export_orders: MsExportOrder
     assert not errors
 
     return bin_data, msfs_entries
-
-
-#
-# =========================
-#
-
-
-def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--bin-output", required=True, help="binary (PPU) data output file")
-    parser.add_argument("--msfs-output", required=True, help="msfs text output file")
-    parser.add_argument("json_filename", action="store", help="Sprite map JSON file")
-    parser.add_argument("ms_export_order_json_file", action="store", help="metasprite export order map JSON file")
-
-    args = parser.parse_args()
-
-    return args
-
-
-def main() -> None:
-    try:
-        args = parse_arguments()
-
-        ms_dir = os.path.dirname(args.json_filename)
-
-        ms_input = load_metasprites_json(args.json_filename)
-        ms_export_orders = load_ms_export_order_json(args.ms_export_order_json_file)
-
-        bin_data, msfs_entries = convert_spritesheet(ms_input, ms_export_orders, ms_dir)
-
-        msfs_text = msfs_entries_to_text(msfs_entries)
-
-        with open(args.bin_output, "wb") as fp:
-            fp.write(bin_data)
-
-        with open(args.msfs_output, "w") as fp:
-            fp.write(msfs_text)
-
-    except Exception as e:
-        print_error("ERROR", e)
-        sys.exit("Error compiling MetaSprite spritesheet")
-
-
-if __name__ == "__main__":
-    main()

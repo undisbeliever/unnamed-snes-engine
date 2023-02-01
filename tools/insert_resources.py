@@ -4,24 +4,17 @@
 
 
 import re
+import sys
 import os.path
 import argparse
 
-from typing import Callable, Final
-
-from _json_formats import load_mappings_json, load_entities_json, Name, Filename, MemoryMap, Mappings, EntitiesJson
+from typing import Callable, Final, NamedTuple, Optional
 
 from _common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET, ResourceType, USE_RESOURCES_OVER_USB2SNES_LABEL
-
-from _entity_data import (
-    ENTITY_ROM_DATA_LABEL,
-    validate_entity_rom_data_symbols,
-    expected_blank_entity_rom_data,
-    create_entity_rom_data,
-)
-from convert_metasprite import text_to_msfs_entries, build_ms_fs_data
-from convert_other_resources import load_other_resources_data_from_file, ResourceEntry, OtherResourcesData
-
+from _common import print_error
+from _json_formats import Name, Filename, Mappings, MemoryMap
+from _entity_data import ENTITY_ROM_DATA_LABEL, validate_entity_rom_data_symbols, expected_blank_entity_rom_data
+from _resources_compiler import DataStore, Compilers, FixedInput, ResourceData, ResourceError, load_fixed_inputs, compile_all_resources
 
 Address = int
 RomOffset = int
@@ -35,27 +28,6 @@ def read_binary_file(path: Filename, max_size: int) -> bytes:
             raise RuntimeError(f"File is too large: maximum file size is { max_size }: { path }")
 
         return out
-
-
-def read_symbols_file(symbol_filename: Filename) -> dict[str, int]:
-    regex = re.compile(r"([0-9A-F]{2}):([0-9A-F]{4}) (.+)")
-
-    out = dict()
-
-    with open(symbol_filename, "r") as fp:
-        for line in fp:
-            line = line.strip()
-
-            if line == "[labels]":
-                continue
-
-            m = regex.match(line)
-            if not m:
-                raise ValueError("Cannot read symbol file: invalid line")
-            addr = (int(m.group(1), 16) << 16) | (int(m.group(2), 16))
-            out[m.group(3)] = addr
-
-    return out
 
 
 def get_largest_rom_address(symbols: dict[str, int]) -> int:
@@ -214,19 +186,19 @@ class ResourceInserter:
 
         return resource_table_addr, expected_n_resources
 
-    def _insert_binary_resources(self, resource_type: ResourceType, n_resources: int, func: Callable[[int], bytes]) -> None:
+    def insert_resources(self, resource_type: ResourceType, resource_data: list[bytes]) -> None:
         table_addr, expected_n_resources = self.resource_table_for_type(resource_type)
 
-        if n_resources != expected_n_resources:
+        if len(resource_data) != expected_n_resources:
             raise RuntimeError(f"NResourcesPerTypeTable mismatch in sfc_file: { resource_type }")
 
         table_pos = self.address_to_rom_offset(table_addr)
 
-        for i in range(n_resources):
-            data = func(i)
+        for data in resource_data:
+            size = len(data)
+            assert size > 0 and size < 0xFFFF
 
             addr = self.insert_blob(data)
-            size = len(data)
 
             assert self.view[table_pos : table_pos + 5] == self.BLANK_RESOURCE_ENTRY
 
@@ -239,96 +211,52 @@ class ResourceInserter:
 
             table_pos += 5
 
-    def insert_binary_file_resources(self, resource_type: ResourceType, resource_names: list[Name], fmt: str) -> None:
-        self._insert_binary_resources(
-            resource_type, len(resource_names), lambda i: read_binary_file(fmt.format(resource_names[i]), self.bank_size)
-        )
+    def insert_room_data(self, bank_offset: int, rooms: list[Optional[bytes]]) -> None:
+        assert len(rooms) == 256
+        ROOM_TABLE_SIZE: Final = 0x100 * 2
 
-    def insert_other_resources(self, other_resources: OtherResourcesData, mapping: Mappings) -> None:
-        for resource_type_name in other_resources._fields:
-            mapping_names: list[Name] = getattr(mapping, resource_type_name)
-            resource_entries: list[ResourceEntry] = getattr(other_resources, resource_type_name)
-            resource_type = ResourceType[resource_type_name]
+        room_table = bytearray([0xFF]) * ROOM_TABLE_SIZE
+        room_data_blob = bytearray()
 
-            if len(mapping_names) != len(resource_entries):
-                raise RuntimeError(f"OtherResourcesData file does not match mappings.json: { resource_type }")
+        room_addr = self.bank_start + len(room_data_blob)
 
-            for i in range(len(resource_entries)):
-                if mapping_names[i] != resource_entries[i].name:
-                    raise RuntimeError(
-                        f"OtherResourcesData file does not match mappings.json: { resource_type }: { mapping_names[i] }, { resource_entries[i] }"
-                    )
-
-            self._insert_binary_resources(resource_type, len(mapping_names), lambda i: resource_entries[i].data)
-
-    def insert_room_data(self, bank_offset: int, room_bin: bytes) -> None:
-        ROOM_TABLE_SIZE = 0x100 * 2
-
-        room_view = memoryview(room_bin)
-
-        room_table = room_view[0:ROOM_TABLE_SIZE]
-        room_data_blob = room_view[ROOM_TABLE_SIZE:]
+        for room_id, room_data in enumerate(rooms):
+            if room_data:
+                room_table[room_id * 2 + 0] = room_addr & 0xFF
+                room_table[room_id * 2 + 1] = room_addr >> 8
+                room_data_blob += room_data
+                room_addr += len(room_data)
 
         room_table_offset = self.label_offset("resources.__RoomsTable")
-
         self.view[room_table_offset : room_table_offset + ROOM_TABLE_SIZE] = room_table
 
         self.insert_blob_into_start_of_bank(bank_offset, room_data_blob)
 
 
-def insert_metasprite_data(ri: ResourceInserter, mappings: Mappings) -> dict[str, tuple[int, Name]]:
-    spritesheets = list()
-
-    for ss_name in mappings.ms_spritesheets:
-        with open(f"gen/metasprites/{ ss_name }.txt", "r") as fp:
-            spritesheets.append(text_to_msfs_entries(fp))
-
-    ms_fs_data, metasprite_map = build_ms_fs_data(spritesheets, ri.symbols, mappings.memory_map.mode)
-
-    ri.insert_blob_into_start_of_bank(MS_FS_DATA_BANK_OFFSET, ms_fs_data.data())
-
-    return metasprite_map
-
-
-def insert_entity_rom_data(
-    ri: ResourceInserter, entities_input: EntitiesJson, symbols: dict[str, int], metasprite_map: dict[str, tuple[int, Name]]
-) -> None:
-    n_entities = len(entities_input.entities)
-
-    validate_entity_rom_data_symbols(symbols, n_entities)
-    ri.confirm_initial_data_is_correct(ENTITY_ROM_DATA_LABEL, expected_blank_entity_rom_data(symbols, n_entities))
-
-    entity_rom_data = create_entity_rom_data(entities_input, symbols, metasprite_map)
-
-    ri.insert_blob_at_label(ENTITY_ROM_DATA_LABEL, entity_rom_data)
-
-
-def insert_resources(
-    sfc_view: memoryview,
-    symbols: dict[str, Address],
-    mappings: Mappings,
-    entities: EntitiesJson,
-    other_resources_data: OtherResourcesData,
-) -> None:
+def insert_resources(sfc_view: memoryview, fixed_input: FixedInput, data_store: DataStore) -> None:
     # sfc_view is a memoryview of a bytearray containing the SFC file
 
     # ::TODO confirm sfc_view is the correct file::
 
-    ri = ResourceInserter(sfc_view, symbols, mappings)
+    n_entities: Final = len(fixed_input.entities.entities)
+    validate_entity_rom_data_symbols(fixed_input.symbols, n_entities)
 
-    metasprite_map = insert_metasprite_data(ri, mappings)
+    ri = ResourceInserter(sfc_view, fixed_input.symbols, fixed_input.mappings)
+    ri.confirm_initial_data_is_correct(ENTITY_ROM_DATA_LABEL, expected_blank_entity_rom_data(fixed_input.symbols, n_entities))
 
-    insert_entity_rom_data(ri, entities, symbols, metasprite_map)
+    ri.insert_room_data(ROOM_DATA_BANK_OFFSET, data_store.get_data_for_all_rooms())
 
-    ri.insert_room_data(ROOM_DATA_BANK_OFFSET, read_binary_file("gen/rooms.bin", ri.bank_size))
+    msfs_entity_data = data_store.get_msfs_and_entity_data()
+    assert msfs_entity_data and msfs_entity_data.msfs_data and msfs_entity_data.entity_rom_data
 
-    ri.insert_binary_file_resources(ResourceType.mt_tilesets, mappings.mt_tilesets, "gen/metatiles/{}.bin")
+    ri.insert_blob_into_start_of_bank(MS_FS_DATA_BANK_OFFSET, msfs_entity_data.msfs_data)
+    ri.insert_blob_at_label(ENTITY_ROM_DATA_LABEL, msfs_entity_data.entity_rom_data)
 
-    ri.insert_binary_file_resources(ResourceType.ms_spritesheets, mappings.ms_spritesheets, "gen/metasprites/{}.bin")
+    for r_type in ResourceType:
+        ri.insert_resources(r_type, data_store.get_all_data_for_type(r_type))
 
-    ri.insert_other_resources(other_resources_data, mappings)
-
-    if USE_RESOURCES_OVER_USB2SNES_LABEL in symbols:
+    # Disable resources-over-usb2snes
+    if USE_RESOURCES_OVER_USB2SNES_LABEL in fixed_input.symbols:
         ri.insert_blob_at_label(USE_RESOURCES_OVER_USB2SNES_LABEL, bytes(1))
 
 
@@ -365,12 +293,41 @@ def update_checksum(sfc_view: memoryview, memory_map: MemoryMap) -> None:
     sfc_view[cs_header_offset + 3] = checksum >> 8
 
 
+class CompiledData(NamedTuple):
+    fixed_input: FixedInput
+    data_store: DataStore
+
+
+def compile_data(resources_directory: Filename, symbols_file: Filename, n_processes: Optional[int]) -> Optional[CompiledData]:
+    valid = True
+
+    def print_resource_error(re: ResourceError) -> None:
+        nonlocal valid
+        valid = False
+        print_error(f"ERROR: { re.resource_type }[{ re.resource_id}] { re.resource_name }", re.error)
+
+    cwd: Final = os.getcwd()
+    symbols_file_relpath = os.path.relpath(symbols_file, resources_directory)
+
+    os.chdir(resources_directory)
+
+    fixed_input = load_fixed_inputs(symbols_file_relpath)
+    compilers = Compilers(fixed_input)
+    data_store = compile_all_resources(compilers, n_processes, print_resource_error)
+
+    os.chdir(cwd)
+
+    if valid:
+        return CompiledData(fixed_input, data_store)
+    else:
+        return None
+
+
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("-o", "--output", required=True, help="sfc output file")
-    parser.add_argument("mappings_json_file", help="mappings json file input")
-    parser.add_argument("entities_json_file", help="entities  JSON  file input")
-    parser.add_argument("other_resources_bin_file", help="other resources data binary file")
+    parser.add_argument("-j", "--processes", required=False, type=int, default=None, help="Number of processors to use (default=all)")
+    parser.add_argument("resources_directory", help="resources directory")
     parser.add_argument("symbols_file", help="symbols input file")
     parser.add_argument("sfc_input", help="sfc input file (unmodified)")
 
@@ -382,17 +339,16 @@ def parse_arguments() -> argparse.Namespace:
 def main() -> None:
     args = parse_arguments()
 
-    mappings = load_mappings_json(args.mappings_json_file)
-    entities = load_entities_json(args.entities_json_file)
-    symbols = read_symbols_file(args.symbols_file)
-    other_resources_data = load_other_resources_data_from_file(args.other_resources_bin_file)
+    co = compile_data(args.resources_directory, args.symbols_file, args.processes)
+    if co is None:
+        sys.exit("Error compiling resources")
 
     sfc_data = bytearray(read_binary_file(args.sfc_input, 4 * 1024 * 1024))
     sfc_memoryview = memoryview(sfc_data)
 
-    insert_resources(sfc_memoryview, symbols, mappings, entities, other_resources_data)
+    insert_resources(sfc_memoryview, co.fixed_input, co.data_store)
 
-    update_checksum(sfc_memoryview, mappings.memory_map)
+    update_checksum(sfc_memoryview, co.fixed_input.mappings.memory_map)
 
     with open(args.output, "wb") as fp:
         fp.write(sfc_data)
