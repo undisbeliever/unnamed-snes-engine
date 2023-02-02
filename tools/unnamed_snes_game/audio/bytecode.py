@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from collections import OrderedDict
 from typing import Any, Callable, Final, Optional
 
-from _driver_constants import KEY_OFF_DELAY
-from _json_formats import SamplesJson, Name, Instrument, NAME_REGEX
+from .driver_constants import KEY_OFF_DELAY
+from .json_formats import SamplesJson, Name, Instrument, NAME_REGEX
 
 
 # Opcode values MUST MATCH `src/bytecode.wiz`

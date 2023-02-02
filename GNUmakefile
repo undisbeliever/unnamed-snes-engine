@@ -81,8 +81,8 @@ gen/room-events-function-tables.wiz: resources/mappings.json tools/generate_room
 gen/room-events.wiz: resources/mappings.json tools/generate_room_events_wiz.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate_room_events_wiz.py -o '$@' 'resources/mappings.json'
 
-gen/resources.wiz: resources/mappings.json audio/resources/mappings.json tools/generate_resources_wiz.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/generate_resources_wiz.py -o '$@' 'resources/mappings.json' 'audio/resources/mappings.json'
+gen/resources.wiz: resources/mappings.json tools/generate_resources_wiz.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/generate_resources_wiz.py -o '$@' 'resources/mappings.json'
 
 gen/ms-drawing-functions.wiz: resources/ms-export-order.json tools/generate_ms_drawing_functions.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate_ms_drawing_functions.py -o '$@' 'resources/ms-export-order.json'

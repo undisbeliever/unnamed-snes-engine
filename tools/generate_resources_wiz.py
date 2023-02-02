@@ -42,7 +42,7 @@ def write_enum(out: TextIO, name: Name, name_list: list[Name]) -> None:
     out.write("};\n\n")
 
 
-def generate_wiz_code(mappings: Mappings, audio_mappings: AudioMappings) -> str:
+def generate_wiz_code(mappings: Mappings) -> str:
 
     with StringIO() as out:
         out.write("namespace resources {\n\n")
@@ -66,8 +66,8 @@ def generate_wiz_code(mappings: Mappings, audio_mappings: AudioMappings) -> str:
 
         out.write("}\n\n")
 
-        write_enum(out, "sound_effects", audio_mappings.sound_effects)
-        out.write(f"let N_SOUND_EFFECTS = { len(audio_mappings.sound_effects) };\n\n")
+        write_enum(out, "sound_effects", mappings.sound_effects)
+        out.write(f"let N_SOUND_EFFECTS = { len(mappings.sound_effects) };\n\n")
 
         return out.getvalue()
 
@@ -76,7 +76,6 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("-o", "--output", required=True, help="wiz output file")
     parser.add_argument("mappings_json_file", action="store", help="mappings json file input")
-    parser.add_argument("audio_mappings_json", action="store", help="audio mappings json file input")
 
     args = parser.parse_args()
 
@@ -87,9 +86,8 @@ def main() -> None:
     args = parse_arguments()
 
     mappings = load_mappings_json(args.mappings_json_file)
-    audio_mappings = load_audio_mappings_json(args.audio_mappings_json)
 
-    out = generate_wiz_code(mappings, audio_mappings)
+    out = generate_wiz_code(mappings)
 
     with open(args.output, "w") as fp:
         fp.write(out)

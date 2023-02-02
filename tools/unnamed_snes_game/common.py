@@ -29,6 +29,7 @@ class ResourceType(IntEnum):
     ms_spritesheets = 1
     tiles = 2
     bg_images = 3
+    songs = 4
 
 
 def lorom_address_to_rom_offset(addr: int) -> int:

@@ -47,7 +47,6 @@ in rodata0 {
     let LOADER_SIZE = sizeof(typeof(__Loader));
 
     const AudioDriver = embed "../audio/audio-driver.bin";
-    const CommonData = embed "../audio/gen/common_data.bin";
 }
 
 
@@ -86,11 +85,7 @@ var _res : resources.ResourceEntry in resources.res;
     _transfer_data_to_loader(_res, LoaderDataType.CODE);
 
 
-    // ::TODO move common data and song data to resources::
-    *(&_res.farPtr as *u16) = xx = &CommonData as u16;
-    #:_res.farPtr = a = #:far &CommonData;
-    _res.size = yy = sizeof(typeof(CommonData));
-
+    _res = resources.load_songs_resource(resources.songs.__null__common_data__);
     _transfer_data_to_loader(_res, LoaderDataType.COMMON_DATA);
 }
 

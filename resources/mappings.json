@@ -26,6 +26,15 @@
    "licenses_bg2"
  ],
 
+ "songs": [
+   "__null__common_data__"
+ ],
+ "sound_effects": [
+   "menu_cursor",
+   "menu_select",
+   "slur_loop_test"
+ ],
+
  "interactive_tile_functions": [
    "player_tile_collision_test",
    "doorway",

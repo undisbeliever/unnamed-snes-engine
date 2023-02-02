@@ -4,10 +4,10 @@
 import re
 from typing import Final, Optional, Sequence
 
-from _driver_constants import N_SOUND_EFFECTS, TICKS_PER_SECOND, SFX_BPM, KEY_OFF_DELAY, Addr
-from _bytecode import BcMappings, Bytecode
-
-from _json_formats import parse_name, Filename, Name, Mappings
+from .driver_constants import N_SOUND_EFFECTS, TICKS_PER_SECOND, SFX_BPM, KEY_OFF_DELAY, Addr
+from .bytecode import BcMappings, Bytecode
+from .json_formats import parse_name
+from ..json_formats import Filename, Name, Mappings
 
 
 END_INSTRUCTION: Final = "disable_channel"

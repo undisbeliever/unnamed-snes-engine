@@ -2,7 +2,7 @@
   "instruments": [
     {
       "name": "sine_220",
-      "source": "sine-220.wav",
+      "source": "samples/sine-220.wav",
       "freq": 220,
       "looping": true,
       "first_octave": 1,
@@ -12,7 +12,7 @@
     },
     {
       "name": "square_500",
-      "source": "square-500.wav",
+      "source": "samples/square-500.wav",
       "freq": 500,
       "looping": true,
       "first_octave": 2,
@@ -22,7 +22,7 @@
     },
     {
       "name": "sawtooth_333",
-      "source": "sawtooth-333.wav",
+      "source": "samples/sawtooth-333.wav",
       "freq": 333.33333333333,
       "looping": true,
       "first_octave": 2,
@@ -32,7 +32,7 @@
     },
     {
       "name": "triangle_440",
-      "source": "triangle-440.wav",
+      "source": "samples/triangle-440.wav",
       "freq": 440,
       "looping": true,
       "first_octave": 2,

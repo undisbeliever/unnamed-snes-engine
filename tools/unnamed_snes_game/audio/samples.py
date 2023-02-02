@@ -5,14 +5,12 @@ import math
 import struct
 from collections import OrderedDict
 
-from wav2brr import load_wav_file, encode_brr, SAMPLES_PER_BLOCK, BYTES_PER_BRR_BLOCK
-
-from _driver_constants import *
-
-from _json_formats import SamplesJson, Instrument, Filename, Name
-
 from dataclasses import dataclass
 from typing import Final, NamedTuple, Optional, TypeAlias, Union
+
+from .wav2brr import load_wav_file, encode_brr, SAMPLES_PER_BLOCK, BYTES_PER_BRR_BLOCK
+from .driver_constants import *
+from .json_formats import SamplesJson, Instrument, Filename, Name
 
 
 #

@@ -19,10 +19,13 @@ from .mt_tileset import convert_mt_tileset
 from .metasprite import convert_spritesheet, MsFsEntry, build_ms_fs_data
 from .rooms import get_list_of_tmx_files, extract_room_id, compile_room
 from .other_resources import convert_tiles, convert_bg_image
+from .audio.common_audio_data import build_common_data as build_common_audio_data
+from .audio.common_audio_data import load_sfx_file
 
 from .json_formats import load_mappings_json, load_entities_json, load_ms_export_order_json, load_other_resources_json
 from .json_formats import load_metasprites_json, Name, ScopedName, Filename, JsonError, MemoryMap, Mappings, EntitiesJson
 from .json_formats import MsExportOrder, OtherResources, TilesInput, BackgroundImageInput
+from .audio.json_formats import load_samples_json, SamplesJson
 
 
 #
@@ -157,6 +160,7 @@ class FixedInput(NamedTuple):
     entities: EntitiesJson
     other_resources: OtherResources
     ms_export_order: MsExportOrder
+    samples_input: SamplesJson
     symbols: dict[ScopedName, int]
 
 
@@ -188,6 +192,7 @@ def load_fixed_inputs(sym_filename: Filename) -> FixedInput:
         entities=load_entities_json("entities.json"),
         other_resources=load_other_resources_json("other-resources.json"),
         ms_export_order=load_ms_export_order_json("ms-export-order.json"),
+        samples_input=load_samples_json("audio/samples.json"),
         symbols=read_symbols_file(sym_filename),
     )
 
@@ -318,6 +323,30 @@ class BgImageCompiler(SimpleResourceCompiler):
         return convert_bg_image(bi)
 
 
+class SongCompiler(SimpleResourceCompiler):
+    COMMON_DATA_NAME: Final = "__null__common_data__"
+    SFX_FILE: Final = "audio/sound_effects.txt"
+
+    def __init__(self, fixed_input: FixedInput) -> None:
+        super().__init__(ResourceType.songs, fixed_input.mappings.songs)
+        self.samples_input: Final = fixed_input.samples_input
+        self.mappings: Final = fixed_input.mappings
+        if self.name_list[0] != self.COMMON_DATA_NAME:
+            raise RuntimeError(f"The first entry in the songs resources MUST BE `{self.COMMON_DATA_NAME}`")
+
+    def test_filename_is_resource(self, filename: Filename) -> Optional[int]:
+        if filename == self.SFX_FILE:
+            return 0
+        return None
+
+    def _compile(self, r_name: Name) -> bytes:
+        if r_name == self.COMMON_DATA_NAME:
+            sfx_file = load_sfx_file(self.SFX_FILE)
+            return build_common_audio_data(self.samples_input, self.mappings, sfx_file, self.SFX_FILE)
+        else:
+            raise NotImplementedError("Songs is not yet implemented")
+
+
 class RoomCompiler:
     def __init__(self, fixed_input: FixedInput) -> None:
         self.mappings: Final = fixed_input.mappings
@@ -345,8 +374,11 @@ class Compilers:
             MsSpritesheetCompiler(fixed_input),
             TileCompiler(fixed_input),
             BgImageCompiler(fixed_input),
+            SongCompiler(fixed_input),
         ]
         self.room_compiler = RoomCompiler(fixed_input)
+
+        assert len(self.resource_compilers) == len(ResourceType)
 
     def file_changed(self, filename: Filename) -> Optional[BaseResourceData]:
         if filename.endswith(".tmx"):

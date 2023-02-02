@@ -584,6 +584,8 @@ class Mappings(NamedTuple):
     ms_spritesheets: list[Name]
     tiles: list[Name]
     bg_images: list[Name]
+    songs: list[Name]
+    sound_effects: list[Name]
     interactive_tile_functions: list[Name]
     gamestate_flags: list[Name]
     room_events: OrderedDict[Name, RoomEvent]
@@ -646,6 +648,8 @@ def load_mappings_json(filename: Filename) -> Mappings:
         ms_spritesheets=jh.get_name_list("ms_spritesheets"),
         tiles=jh.get_name_list("tiles"),
         bg_images=jh.get_name_list("bg_images"),
+        songs=jh.get_name_list("songs"),
+        sound_effects=jh.get_name_list("sound_effects"),
         interactive_tile_functions=jh.get_name_list("interactive_tile_functions"),
         gamestate_flags=jh.get_name_list("gamestate_flags"),
         room_events=room_events,

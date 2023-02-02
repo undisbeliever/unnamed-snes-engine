@@ -57,37 +57,6 @@ def _read_optional_int(v: Union[str, int, float, None]) -> Optional[int]:
 
 
 #
-# mappings.json
-# =============
-#
-
-
-@dataclass
-class Mappings:
-    sound_effects: list[Name]
-
-
-def _read_mapping_list(json_input: dict[str, Any], key: str) -> list[Name]:
-    json_list = json_input.get(key)
-
-    if type(json_list) != list:
-        raise ValueError(f"JSON Error: {key}: Expected a list of names")
-
-    out = list()
-    for n in json_list:
-        out.append(parse_name(n))
-
-    return out
-
-
-def load_mapping_json(filename: Filename) -> Mappings:
-    with open(filename, "r") as fp:
-        json_input = json.load(fp)
-
-    return Mappings(_read_mapping_list(json_input, "sound-effects"))
-
-
-#
 # samples.json
 # ============
 #
