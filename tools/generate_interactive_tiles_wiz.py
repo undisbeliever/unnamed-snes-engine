@@ -7,7 +7,7 @@ import argparse
 from io import StringIO
 from typing import Final
 
-from _json_formats import load_mappings_json, Mappings
+from unnamed_snes_game.json_formats import load_mappings_json, Mappings
 
 
 MAX_INTERACTIVE_FUNCTIONS: Final = 1 << 6

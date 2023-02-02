@@ -3,11 +3,10 @@
 
 import sys
 from enum import IntEnum, Enum, unique
-
-from _ansi_color import NoAnsiColors, AnsiColors
-
 from typing import Callable, Final, Optional, TextIO, Union
 from abc import abstractmethod
+
+from .ansi_color import NoAnsiColors, AnsiColors
 
 
 # Offset between the first_resource_bank and the named data banks

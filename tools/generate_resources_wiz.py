@@ -8,8 +8,16 @@ import argparse
 from io import StringIO
 from typing import TextIO
 
-from _json_formats import RoomName, load_mappings_json, load_audio_mappings_json, Name, Mappings, AudioMappings, MemoryMap
-from _common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET, USB2SNES_DATA_BANK_OFFSET, ResourceType
+from unnamed_snes_game.json_formats import (
+    RoomName,
+    load_mappings_json,
+    load_audio_mappings_json,
+    Name,
+    Mappings,
+    AudioMappings,
+    MemoryMap,
+)
+from unnamed_snes_game.common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET, USB2SNES_DATA_BANK_OFFSET, ResourceType
 
 
 def room_id_for_name(room_name: RoomName) -> int:

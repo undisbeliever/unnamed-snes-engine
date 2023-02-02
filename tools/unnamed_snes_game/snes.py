@@ -3,13 +3,11 @@
 
 
 import itertools
-
 import PIL.Image  # type: ignore
-
 from typing import Generator, Final, Iterable, Literal, NamedTuple, Optional, Sequence, TextIO, Union
 
-from _json_formats import Filename
-from _common import MultilineError, FileError
+from .json_formats import Filename
+from .common import MultilineError, FileError
 
 
 SnesColor = int

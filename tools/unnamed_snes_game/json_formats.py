@@ -5,12 +5,10 @@
 import re
 import json
 import os.path
-
 from collections import OrderedDict
-
-from _common import MemoryMapMode, FileError
-
 from typing import Any, Callable, Final, Generator, Literal, NamedTuple, NoReturn, Optional, Type, TypeVar, Union
+
+from .common import MemoryMapMode, FileError
 
 
 Name = str

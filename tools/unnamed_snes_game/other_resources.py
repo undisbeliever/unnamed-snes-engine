@@ -5,13 +5,12 @@
 
 import PIL.Image  # type: ignore
 import sys
-
 from collections import OrderedDict
 from typing import Any, Callable, Final, Iterable, NamedTuple, Optional
 
-from _common import print_error
+from .common import print_error
 
-from _snes import (
+from .snes import (
     extract_tiles_from_paletted_image,
     convert_mode7_tileset,
     convert_snes_tileset,
@@ -20,7 +19,7 @@ from _snes import (
     SmallTileData,
 )
 
-from _json_formats import (
+from .json_formats import (
     load_mappings_json,
     load_other_resources_json,
     Name,

@@ -9,18 +9,16 @@ import os.path
 import argparse
 import traceback
 from collections import OrderedDict
+from typing import Any, Final, Generic, Literal, Optional, TypeVar, Union
 
 import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.messagebox
 
-from typing import Any, Final, Generic, Literal, Optional, TypeVar, Union
+from . import gui as gui
 
-from convert_metasprite import extract_frame_locations
-
-import _gui as gui
-
-from _json_formats import (
+from ..metasprite import extract_frame_locations
+from ..json_formats import (
     load_ms_export_order_json,
     load_metasprite_frameset_from_dict,
     Name,

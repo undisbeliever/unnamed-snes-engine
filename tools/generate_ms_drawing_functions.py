@@ -8,7 +8,7 @@ from io import StringIO
 
 from collections import OrderedDict
 
-from _json_formats import load_ms_export_order_json, Name, MsPattern
+from unnamed_snes_game.json_formats import load_ms_export_order_json, Name, MsPattern
 
 
 def generate_pattern_code(out: StringIO, pattern: MsPattern) -> None:

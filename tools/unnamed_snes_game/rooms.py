@@ -12,11 +12,10 @@ import struct
 import xml.etree.ElementTree
 import posixpath
 from collections import OrderedDict
-
-from _json_formats import load_entities_json, load_mappings_json, Filename, Mappings, EntitiesJson, Entity, RoomEvent, Name
-from _common import MultilineError, SimpleMultilineError, print_error
-
 from typing import Final, NamedTuple, Optional, Union
+
+from .json_formats import load_entities_json, load_mappings_json, Filename, Mappings, EntitiesJson, Entity, RoomEvent, Name
+from .common import MultilineError, SimpleMultilineError, print_error
 
 
 MAP_WIDTH = 16

@@ -9,9 +9,9 @@ import PIL.Image  # type: ignore
 import xml.etree.ElementTree
 from typing import Final, NamedTuple, Optional, TextIO
 
-from _json_formats import load_mappings_json, Filename, Mappings
-from _snes import image_to_snes, TileMap, ImageError, InvalidTilesError
-from _common import SimpleMultilineError, print_error
+from .json_formats import load_mappings_json, Filename, Mappings
+from .snes import image_to_snes, TileMap, ImageError, InvalidTilesError
+from .common import SimpleMultilineError, print_error
 
 
 N_TILES = 256

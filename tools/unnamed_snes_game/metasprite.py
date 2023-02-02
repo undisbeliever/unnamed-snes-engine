@@ -10,9 +10,8 @@ import PIL.Image  # type: ignore
 
 from typing import overload, Callable, Final, Iterable, Literal, NamedTuple, Optional, TextIO, TypeVar, Union
 
-from _common import RomData, MemoryMapMode, MultilineError, print_error
-
-from _snes import (
+from .common import RomData, MemoryMapMode, MultilineError, print_error
+from .snes import (
     extract_small_tile,
     extract_large_tile,
     split_large_tile,
@@ -31,7 +30,7 @@ from _snes import (
     PaletteMap,
 )
 
-from _json_formats import (
+from .json_formats import (
     load_ms_export_order_json,
     load_metasprites_json,
     Name,

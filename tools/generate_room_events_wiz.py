@@ -8,7 +8,7 @@ from io import StringIO
 
 from collections import OrderedDict
 
-from _json_formats import load_mappings_json, Mappings, Name, RoomEvent
+from unnamed_snes_game.json_formats import load_mappings_json, Mappings, Name, RoomEvent
 
 
 # Mapping of parameter types to wiz types

@@ -6,25 +6,23 @@
 import re
 import sys
 import os.path
-import argparse
 import threading
 import subprocess
 import multiprocessing
 from abc import abstractmethod, ABCMeta
 from dataclasses import dataclass
-
 from typing import cast, Any, Callable, ClassVar, Final, NamedTuple, Optional, Union
 
-from _common import ResourceType
-from _entity_data import create_entity_rom_data
-from convert_mt_tileset import convert_mt_tileset
-from convert_metasprite import convert_spritesheet, MsFsEntry, build_ms_fs_data
-from convert_rooms import get_list_of_tmx_files, extract_room_id, compile_room
-from convert_other_resources import convert_tiles, convert_bg_image
+from .common import ResourceType
+from .entity_data import create_entity_rom_data
+from .mt_tileset import convert_mt_tileset
+from .metasprite import convert_spritesheet, MsFsEntry, build_ms_fs_data
+from .rooms import get_list_of_tmx_files, extract_room_id, compile_room
+from .other_resources import convert_tiles, convert_bg_image
 
-from _json_formats import load_mappings_json, load_entities_json, load_ms_export_order_json, load_other_resources_json
-from _json_formats import load_metasprites_json, Name, ScopedName, Filename, JsonError, MemoryMap, Mappings, EntitiesJson
-from _json_formats import MsExportOrder, OtherResources, TilesInput, BackgroundImageInput
+from .json_formats import load_mappings_json, load_entities_json, load_ms_export_order_json, load_other_resources_json
+from .json_formats import load_metasprites_json, Name, ScopedName, Filename, JsonError, MemoryMap, Mappings, EntitiesJson
+from .json_formats import MsExportOrder, OtherResources, TilesInput, BackgroundImageInput
 
 
 #

@@ -6,7 +6,7 @@
 import argparse
 from io import StringIO
 
-from _json_formats import load_entities_json, EntitiesJson
+from unnamed_snes_game.json_formats import load_entities_json, EntitiesJson
 
 
 # NOTE: I cannot put this data in `gen/entities.wiz` as it causes a circular dependency

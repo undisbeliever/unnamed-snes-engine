@@ -6,7 +6,7 @@ import itertools
 from collections import OrderedDict
 from typing import Final
 
-from _json_formats import Name, ScopedName, EntitiesJson
+from .json_formats import Name, ScopedName, EntitiesJson
 
 
 ENTITY_ROM_DATA_SOA_LABELS = (

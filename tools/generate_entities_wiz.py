@@ -6,7 +6,7 @@
 import argparse
 from io import StringIO
 
-from _json_formats import load_entities_json, load_ms_export_order_json, EntitiesJson, MsExportOrder
+from unnamed_snes_game.json_formats import load_entities_json, load_ms_export_order_json, EntitiesJson, MsExportOrder
 
 
 def generate_wiz_code(entities_input: EntitiesJson, ms_export_orders: MsExportOrder) -> str:

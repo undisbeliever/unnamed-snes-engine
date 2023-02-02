@@ -26,8 +26,7 @@ GEN_SOURCES  += gen/cosine-tables.wiz
 RESOURCES_SRC := $(wildcard $(RESOURCES_DIR)/*.json $(RESOURCES_DIR)/* $(RESOURCES_DIR)/*/* $(RESOURCES_DIR)/*/*/*)
 
 
-COMMON_PYTHON_SCRIPTS = tools/_json_formats.py tools/_snes.py tools/_ansi_color.py tools/_common.py
-ALL_PYTHON_SCRIPTS := $(wildcard tools/*.py)
+COMMON_PYTHON_SCRIPTS = $(wildcard tools/unnamed_snes_game/*.py tools/unnamed_snes_game/*/*.py)
 
 # Python interpreter
 # (-bb issues errors on bytes/string comparisons)
@@ -38,7 +37,7 @@ PYTHON3  := python3 -bb
 all: $(BINARY)
 
 
-$(BINARY): $(INTERMEDIATE_BINARY) tools/insert_resources.py $(ALL_PYTHON_SCRIPTS) $(RESOURCES_SRC)
+$(BINARY): $(INTERMEDIATE_BINARY) tools/insert_resources.py $(COMMON_PYTHON_SCRIPTS) $(RESOURCES_SRC)
 	$(PYTHON3) tools/insert_resources.py -o '$(BINARY)' '$(RESOURCES_DIR)' '$(INTERMEDIATE_BINARY:.sfc=.sym)' '$(INTERMEDIATE_BINARY)'
 	cp $(INTERMEDIATE_BINARY:.sfc=.sym) $(BINARY:.sfc=.sym)
 
