@@ -14,8 +14,8 @@ Build Requirements
  * GNU Make
  * Python 3
  * [Python Pillow Imaging Library](https://pillow.readthedocs.io/en/stable/)
- * [python-websockets](https://websockets.readthedocs.io/en/stable/)
- * [python-watchdog](https://python-watchdog.readthedocs.io/en/stable/)
+ * [python websocket-client](https://websocket-client.readthedocs.io/en/latest/index.html)
+ * [python watchdog](https://python-watchdog.readthedocs.io/en/stable/)
 
 
 

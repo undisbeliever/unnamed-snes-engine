@@ -29,18 +29,19 @@
 
 import re
 import sys
+import time
+import json
 import os.path
-import argparse
-import threading
-import subprocess
 import secrets
+import argparse
+import posixpath
+import threading
+import contextlib
+import subprocess
 import multiprocessing
 from enum import IntEnum, unique
 
-import json
-import asyncio
-import posixpath
-import websockets.client
+import websocket  # type: ignore[import]
 
 import watchdog.events
 import watchdog.observers
@@ -108,6 +109,7 @@ print_error: Final = None
 
 
 __log_lock: Final = threading.Lock()
+
 
 # Thread safe printing
 def __log(s: str, c: str) -> None:
@@ -283,24 +285,23 @@ class Usb2Snes:
     USB2SNES_WRAM_OFFSET: Final[int] = 0xF50000
     USB2SNES_SRAM_OFFSET: Final[int] = 0xE00000
 
-    def __init__(self, socket: websockets.client.WebSocketClientProtocol) -> None:
-        self._socket: Final[websockets.client.WebSocketClientProtocol] = socket
+    def __init__(self, socket: websocket.WebSocket) -> None:
+        self._socket: Final = socket
         self._device: Optional[str] = None
 
     def device_name(self) -> Optional[str]:
         return self._device
 
     def _assert_attached(self) -> None:
-        if self._socket is None or not self._socket.open or self._socket.closed:
+        if self._socket is None or self._socket.status is None:
             raise RuntimeError("Socket is closed")
 
         if self._device is None:
             raise RuntimeError("Not attached to device")
 
-    async def _request(self, opcode: str, *operands: str) -> None:
+    def _request(self, opcode: str, *operands: str) -> None:
         self._assert_attached()
-
-        await self._socket.send(
+        self._socket.send(
             json.dumps(
                 {
                     "Opcode": opcode,
@@ -311,11 +312,11 @@ class Usb2Snes:
             )
         )
 
-    async def _request_not_attached(self, opcode: str, *operands: str) -> None:
-        if self._socket is None or not self._socket.open or self._socket.closed:
+    def _request_not_attached(self, opcode: str, *operands: str) -> None:
+        if self._socket is None or self._socket.status is None:
             raise RuntimeError("Socket is closed")
 
-        await self._socket.send(
+        self._socket.send(
             json.dumps(
                 {
                     "Opcode": opcode,
@@ -326,8 +327,8 @@ class Usb2Snes:
             )
         )
 
-    async def _response(self) -> list[str]:
-        r = json.loads(await self._socket.recv())
+    def _response(self) -> list[str]:
+        r = json.loads(self._socket.recv())
         r = r["Results"]
 
         if not isinstance(r, list):
@@ -338,17 +339,17 @@ class Usb2Snes:
 
         return r
 
-    async def _request_response(self, opcode: str, *operands: str) -> list[str]:
-        await self._request(opcode, *operands)
-        return await self._response()
+    def _request_response(self, opcode: str, *operands: str) -> list[str]:
+        self._request(opcode, *operands)
+        return self._response()
 
-    async def find_and_attach_device(self) -> bool:
+    def find_and_attach_device(self) -> bool:
         """
         Look through the DeviceList and connect to the first SD2SNES reported.
         """
 
-        await self._request_not_attached("DeviceList")
-        device_list = await self._response()
+        self._request_not_attached("DeviceList")
+        device_list = self._response()
 
         device = None
         for d in device_list:
@@ -359,35 +360,35 @@ class Usb2Snes:
         if device is None:
             return False
 
-        await self._request_not_attached("Attach", device)
+        self._request_not_attached("Attach", device)
 
         self._device = device
 
         return True
 
-    async def get_playing_filename(self) -> str:
-        r = await self._request_response("Info")
+    def get_playing_filename(self) -> str:
+        r = self._request_response("Info")
         return r[2]
 
-    async def get_playing_basename(self) -> str:
-        return posixpath.basename(await self.get_playing_filename())
+    def get_playing_basename(self) -> str:
+        return posixpath.basename(self.get_playing_filename())
 
-    async def send_reset_command(self) -> None:
+    def send_reset_command(self) -> None:
         # Reset command does not return a response
-        await self._request("Reset")
+        self._request("Reset")
 
-    async def read_offset(self, offset: int, size: int) -> bytes:
+    def read_offset(self, offset: int, size: int) -> bytes:
         if size < 0:
             raise ValueError("Invalid size")
 
-        await self._request("GetAddress", hex(offset), hex(size))
+        self._request("GetAddress", hex(offset), hex(size))
 
         out = bytes()
 
         # This loop is required.
         # On my system, Work-RAM addresses are sent in 128 byte blocks.
         while len(out) < size:
-            o = await self._socket.recv()
+            o = self._socket.recv()
             if not isinstance(o, bytes):
                 raise RuntimeError(f"Unknown response from QUsb2Snes, expected bytes got { type(out) }")
             out += o
@@ -397,7 +398,7 @@ class Usb2Snes:
 
         return out
 
-    async def write_to_offset(self, offset: int, data: bytes) -> None:
+    def write_to_offset(self, offset: int, data: bytes) -> None:
         if not isinstance(data, bytes) and not isinstance(data, bytearray):
             raise ValueError(f"Expected bytes data, got { type(data) }")
 
@@ -409,21 +410,21 @@ class Usb2Snes:
         if size == 0:
             return
 
-        await self._request("PutAddress", hex(offset), hex(size))
+        self._request("PutAddress", hex(offset), hex(size))
 
         for chunk_start in range(0, size, self.BLOCK_SIZE):
             chunk_end = min(chunk_start + self.BLOCK_SIZE, size)
 
-            await self._socket.send(data[chunk_start:chunk_end])
+            self._socket.send_binary(data[chunk_start:chunk_end])
 
-    async def read_wram_addr(self, addr: int, size: int) -> bytes:
+    def read_wram_addr(self, addr: int, size: int) -> bytes:
         wram_bank = addr >> 16
 
         if wram_bank == 0x7E or wram_bank == 0x7F:
-            return await self.read_offset((addr & 0x01FFFF) | self.USB2SNES_WRAM_OFFSET, size)
+            return self.read_offset((addr & 0x01FFFF) | self.USB2SNES_WRAM_OFFSET, size)
         elif wram_bank & 0x7F < 0x40:
             if addr & 0xFFFF >= 0x2000:
-                return await self.read_offset((addr & 0x1FFF) | self.USB2SNES_WRAM_OFFSET, size)
+                return self.read_offset((addr & 0x1FFF) | self.USB2SNES_WRAM_OFFSET, size)
 
         raise ValueError(f"addr is not a Work-RAM address")
 
@@ -493,26 +494,26 @@ class ResourcesOverUsb2Snes:
 
         self.not_room_counter: int = data_store.get_not_room_counter()
 
-    async def is_correct_rom_running(self, sfc_file_basename: Filename) -> bool:
-        playing_basename: Final[str] = await self.usb2snes.get_playing_basename()
+    def is_correct_rom_running(self, sfc_file_basename: Filename) -> bool:
+        playing_basename: Final[str] = self.usb2snes.get_playing_basename()
         if playing_basename != sfc_file_basename:
             log_error(f"{ self.usb2snes.device_name() } is not running { sfc_file_basename } (currently playing { playing_basename })")
             return False
 
-        urou2s_data = await self.usb2snes.read_offset(self.urou2s_offset, 1)
+        urou2s_data = self.usb2snes.read_offset(self.urou2s_offset, 1)
         if urou2s_data != b"\xff":
             log_error(f"{ self.usb2snes.device_name() } is not running the build without resources")
             return False
 
         return True
 
-    async def test_game_matches_sfc_file(self, sfc_file_data: bytes, memory_map: MemoryMap) -> bool:
+    def test_game_matches_sfc_file(self, sfc_file_data: bytes, memory_map: MemoryMap) -> bool:
         # Assumes `sfc_file_data` passes `validate_sfc_file()` tests
 
         n_bytes_to_test: Final = (memory_map.first_resource_bank & 0x3F) * memory_map.mode.bank_size
         assert len(sfc_file_data) >= n_bytes_to_test
 
-        usb2snes_data = bytearray(await self.usb2snes.read_offset(0, n_bytes_to_test))
+        usb2snes_data = bytearray(self.usb2snes.read_offset(0, n_bytes_to_test))
 
         # Ignore any changes to the `Response` byte
         p1 = self.response_offset
@@ -528,7 +529,7 @@ class ResourcesOverUsb2Snes:
 
         return usb2snes_data == sfc_file_data[:n_bytes_to_test]
 
-    async def reset_and_update_rom(self, rom_data: bytes) -> None:
+    def reset_and_update_rom(self, rom_data: bytes) -> None:
         # NOTE: This does not modify the file on the SD-card.
 
         # ASSUMES: rom_data passes `validate_sfc_file()` tests
@@ -537,47 +538,47 @@ class ResourcesOverUsb2Snes:
             raise ValueError("rom_data is too large")
 
         # Set rom update requested byte
-        await self.usb2snes.write_to_offset(self.rom_update_required_offset, bytes([0xFF]))
+        self.usb2snes.write_to_offset(self.rom_update_required_offset, bytes([0xFF]))
 
         log_notice("Reset")
-        await self.usb2snes.send_reset_command()
+        self.usb2snes.send_reset_command()
 
         # Wait until the game is executing the rom-update-required spinloop (which resides in Work-RAM)
         log_notice("Waiting for RomUpdateRequiredSpinloop...")
-        await self.__update_rom_spinloop_test_and_wait(0x42)
-        await self.__update_rom_spinloop_test_and_wait(0x42 ^ 0xFF)
-        await self.__update_rom_spinloop_test_and_wait(secrets.randbelow(256))
-        await self.__update_rom_spinloop_test_and_wait(secrets.randbelow(256))
-        await self.__update_rom_spinloop_test_and_wait(secrets.randbelow(256))
-        await self.__update_rom_spinloop_test_and_wait(secrets.randbelow(256))
+        self.__update_rom_spinloop_test_and_wait(0x42)
+        self.__update_rom_spinloop_test_and_wait(0x42 ^ 0xFF)
+        self.__update_rom_spinloop_test_and_wait(secrets.randbelow(256))
+        self.__update_rom_spinloop_test_and_wait(secrets.randbelow(256))
+        self.__update_rom_spinloop_test_and_wait(secrets.randbelow(256))
+        self.__update_rom_spinloop_test_and_wait(secrets.randbelow(256))
 
         # Confirmed game is executing Work-RAM code and the ROM can be safely modified.
 
         log_notice(f"Updating game...")
-        await self.usb2snes.write_to_offset(0, rom_data)
+        self.usb2snes.write_to_offset(0, rom_data)
 
         log_notice("Reset")
-        await self.usb2snes.send_reset_command()
+        self.usb2snes.send_reset_command()
 
-    async def __update_rom_spinloop_test_and_wait(self, b: int) -> None:
+    def __update_rom_spinloop_test_and_wait(self, b: int) -> None:
         """
         Set ROM_UPDATE_REQUIRED_ADDR to `b` and wait until the all bytes in zeropage is `b`.
 
         Used to confirm the SNES is executing the `RomUpdateRequiredSpinloop`.
         """
 
-        await self.usb2snes.write_to_offset(self.rom_update_required_offset, bytes([b]))
+        self.usb2snes.write_to_offset(self.rom_update_required_offset, bytes([b]))
 
         expected_zeropage: Final = bytes([b]) * 256
 
         zeropage: Optional[bytes] = None
 
         while zeropage != expected_zeropage:
-            await asyncio.sleep(UPDATE_ROM_SPINLOOP_SLEEP_DELAY)
-            zeropage = await self.usb2snes.read_wram_addr(0x7E0000, 256)
+            time.sleep(UPDATE_ROM_SPINLOOP_SLEEP_DELAY)
+            zeropage = self.usb2snes.read_wram_addr(0x7E0000, 256)
 
-    async def read_request(self) -> Request:
-        rb = await self.usb2snes.read_wram_addr(self.request_addr, 3)
+    def read_request(self) -> Request:
+        rb = self.usb2snes.read_wram_addr(self.request_addr, 3)
 
         r_type_id = rb[1]
 
@@ -590,7 +591,7 @@ class ResourcesOverUsb2Snes:
         return Request(rb[0], rt, rb[2])
 
     # NOTE: This method will sleep until the resource data is valid
-    async def process_request(self, request: Request) -> None:
+    def process_request(self, request: Request) -> None:
         assert request.request_type != SpecialRequestType.init
 
         if request.request_id == 0:
@@ -600,21 +601,21 @@ class ResourcesOverUsb2Snes:
 
         try:
             if request.request_type == SpecialRequestType.rooms:
-                status, data = await self.get_room(request.resource_id)
+                status, data = self.get_room(request.resource_id)
             else:
-                status, data = await self.get_resource(ResourceType(request.request_type), request.resource_id)
+                status, data = self.get_resource(ResourceType(request.request_type), request.resource_id)
 
             if request.request_type in self.REQUEST_TYPE_USES_MSFS_OR_ENTITY_DATA:
                 if not self.data_store.is_msfs_and_entity_data_valid():
-                    await self.transmit_msfs_and_entity_data()
+                    self.transmit_msfs_and_entity_data()
 
-            await self.write_response(request.request_id, status, data)
+            self.write_response(request.request_id, status, data)
 
         except Exception as e:
-            await self.write_response(request.request_id, ResponseStatus.ERROR, None)
+            self.write_response(request.request_id, ResponseStatus.ERROR, None)
             raise
 
-    async def get_room(self, room_id: int) -> tuple[ResponseStatus, Optional[bytes]]:
+    def get_room(self, room_id: int) -> tuple[ResponseStatus, Optional[bytes]]:
         co = self.data_store.get_room_data(room_id)
 
         if isinstance(co, ResourceError):
@@ -626,7 +627,7 @@ class ResourcesOverUsb2Snes:
                     log_notice("    Stop waiting")
                     return ResponseStatus.ERROR, None
                 co = self.data_store.get_room_data(room_id)
-                await asyncio.sleep(WAITING_FOR_RESOURCE_DELAY)
+                time.sleep(WAITING_FOR_RESOURCE_DELAY)
 
         if isinstance(co, ResourceData):
             status = ResponseStatus.OK
@@ -641,7 +642,7 @@ class ResourcesOverUsb2Snes:
             # Room does not exist
             return ResponseStatus.NOT_FOUND, None
 
-    async def get_resource(self, resource_type: ResourceType, resource_id: int) -> tuple[ResponseStatus, Optional[bytes]]:
+    def get_resource(self, resource_type: ResourceType, resource_id: int) -> tuple[ResponseStatus, Optional[bytes]]:
         co = self.data_store.get_resource_data(resource_type, resource_id)
 
         if not isinstance(co, ResourceData):
@@ -656,12 +657,12 @@ class ResourcesOverUsb2Snes:
                     log_notice("    Stop waiting")
                     return ResponseStatus.ERROR, None
                 co = self.data_store.get_resource_data(resource_type, resource_id)
-                await asyncio.sleep(WAITING_FOR_RESOURCE_DELAY)
+                time.sleep(WAITING_FOR_RESOURCE_DELAY)
 
         return ResponseStatus.OK, co.data
 
     # NOTE: This method will sleep until the resource data is valid
-    async def transmit_msfs_and_entity_data(self) -> None:
+    def transmit_msfs_and_entity_data(self) -> None:
         me = self.data_store.get_msfs_and_entity_data()
 
         if me is None or (not me.msfs_data) or (not me.entity_rom_data):
@@ -680,19 +681,19 @@ class ResourcesOverUsb2Snes:
                     log_notice("    Stop waiting")
                     return
                 me = self.data_store.get_msfs_and_entity_data()
-                await asyncio.sleep(WAITING_FOR_RESOURCE_DELAY)
+                time.sleep(WAITING_FOR_RESOURCE_DELAY)
 
         assert len(me.entity_rom_data) == self.expected_entity_rom_data_size
 
         log_response(f"    MsFsData { len(me.msfs_data) } bytes")
-        await self.usb2snes.write_to_offset(self.msfs_data_offset, me.msfs_data)
+        self.usb2snes.write_to_offset(self.msfs_data_offset, me.msfs_data)
 
         log_response(f"    entity_rom_data { len(me.entity_rom_data) } bytes")
-        await self.usb2snes.write_to_offset(self.entity_rom_data_offset, me.entity_rom_data)
+        self.usb2snes.write_to_offset(self.entity_rom_data_offset, me.entity_rom_data)
 
         self.data_store.mark_msfs_and_entity_data_valid()
 
-    async def write_response(self, response_id: int, status: ResponseStatus, data: Optional[bytes]) -> None:
+    def write_response(self, response_id: int, status: ResponseStatus, data: Optional[bytes]) -> None:
         data_size = len(data) if data else 0
         if data_size > self.max_data_size:
             raise ValueError(f"data is too large: { data_size }")
@@ -700,7 +701,7 @@ class ResourcesOverUsb2Snes:
         log_response(f"    { status.name } { data_size } bytes")
 
         if data is not None:
-            await self.usb2snes.write_to_offset(self.response_data_offset, data)
+            self.usb2snes.write_to_offset(self.response_data_offset, data)
 
         r = bytearray(RESPONSE_SIZE)
         r[0] = data_size & 0xFF
@@ -708,56 +709,60 @@ class ResourcesOverUsb2Snes:
         r[2] = status.value
         r[3] = response_id
 
-        await self.usb2snes.write_to_offset(self.response_offset, r)
+        self.usb2snes.write_to_offset(self.response_offset, r)
 
-    async def process_init_request(self) -> None:
+    def process_init_request(self) -> None:
         try:
-            while await self.read_request() != INIT_REQUEST:
+            while self.read_request() != INIT_REQUEST:
                 log_notice("Waiting for correctly formatted init request")
-                await asyncio.sleep(NORMAL_REQUEST_SLEEP_DELAY)
+                time.sleep(NORMAL_REQUEST_SLEEP_DELAY)
 
             log_request("Init")
 
-            await self.transmit_msfs_and_entity_data()
+            self.transmit_msfs_and_entity_data()
 
-            await self.write_response(INIT_REQUEST.request_id, ResponseStatus.INIT_OK, None)
+            self.write_response(INIT_REQUEST.request_id, ResponseStatus.INIT_OK, None)
 
         except Exception as e:
-            await self.write_response(INIT_REQUEST.request_id, ResponseStatus.ERROR, None)
+            self.write_response(INIT_REQUEST.request_id, ResponseStatus.ERROR, None)
             raise
 
-    async def run_until_stop_token_set(self) -> None:
+    def run_until_stop_token_set(self) -> None:
         burst_read_counter: int = 0
         current_request_id: int = 0
 
+        sleep_time: float = BURST_SLEEP_DELAY
+
         while not self.stop_token.is_set():
-            request = await self.read_request()
+            request = self.read_request()
 
             if request.request_type == SpecialRequestType.init:
                 # `SpecialRequestType.init` is a special case.
                 # The game has been reset, current_request_id is invalid
-                await self.process_init_request()
+                self.process_init_request()
                 current_request_id = INIT_REQUEST.request_id
 
             elif request.request_id != current_request_id:
-                await self.process_request(request)
+                self.process_request(request)
                 current_request_id = request.request_id
                 burst_read_counter = BURST_COUNT
 
             if burst_read_counter > 0:
                 burst_read_counter -= 1
-                await asyncio.sleep(BURST_SLEEP_DELAY)
+                time.sleep(BURST_SLEEP_DELAY)
             else:
-                await asyncio.sleep(NORMAL_REQUEST_SLEEP_DELAY)
+                time.sleep(NORMAL_REQUEST_SLEEP_DELAY)
 
 
-async def create_and_process_websocket(address: str, sfc_file_relpath: Filename, fs_handler: FsEventHandler) -> None:
+def create_and_process_websocket(address: str, sfc_file_relpath: Filename, fs_handler: FsEventHandler) -> None:
     sfc_file_basename = os.path.basename(sfc_file_relpath)
 
-    async with websockets.client.connect(address) as socket:
-        usb2snes = Usb2Snes(socket)
+    with contextlib.closing(websocket.WebSocket()) as ws:
+        ws.connect(address, origin="http://localhost")
 
-        connected: bool = await usb2snes.find_and_attach_device()
+        usb2snes = Usb2Snes(ws)
+
+        connected: bool = usb2snes.find_and_attach_device()
         if not connected:
             raise RuntimeError("Could not connect to usb2snes device.")
 
@@ -767,7 +772,7 @@ async def create_and_process_websocket(address: str, sfc_file_relpath: Filename,
         # On my system there needs to be a 1/2 second delay between a usb2snes "Boot" command and a "GetAddress" command.
         #
         # ::TODO find a way to eliminate this::
-        await asyncio.sleep(0.5)
+        time.sleep(0.5)
 
         while True:
             fs_handler.reset_token.clear()
@@ -786,23 +791,22 @@ async def create_and_process_websocket(address: str, sfc_file_relpath: Filename,
             if sfc_file_valid:
                 rou2s = ResourcesOverUsb2Snes(usb2snes, fs_handler.stop_token, fs_handler.data_store, shared_input)
 
-                while not await rou2s.is_correct_rom_running(sfc_file_basename):
-                    await asyncio.sleep(INCORRECT_ROM_SLEEP_DELAY)
+                while not rou2s.is_correct_rom_running(sfc_file_basename):
+                    time.sleep(INCORRECT_ROM_SLEEP_DELAY)
 
-                if await rou2s.test_game_matches_sfc_file(sfc_file_data, shared_input.mappings.memory_map) is False:
+                if rou2s.test_game_matches_sfc_file(sfc_file_data, shared_input.mappings.memory_map) is False:
                     log_notice(f"Running game does not match { sfc_file_basename }")
-                    await rou2s.reset_and_update_rom(sfc_file_data)
+                    rou2s.reset_and_update_rom(sfc_file_data)
                 else:
                     log_success(f"Running game matches { sfc_file_basename }")
 
                 while not fs_handler.reset_token.is_set():
                     fs_handler.continue_token.clear()
 
-                    await rou2s.run_until_stop_token_set()
+                    rou2s.run_until_stop_token_set()
 
                     # Wait until the continue token is set
-                    while not fs_handler.continue_token.is_set():
-                        await asyncio.sleep(WAITING_FOR_RESOURCE_DELAY)
+                    fs_handler.continue_token.wait()
                     fs_handler.stop_token.clear()
 
                 # Symbols file has changed.
@@ -813,7 +817,7 @@ async def create_and_process_websocket(address: str, sfc_file_relpath: Filename,
 
                 # Wait until the binary has been rebuilt
                 while not fs_handler.reset_token.is_set():
-                    await asyncio.sleep(WAITING_FOR_RESOURCE_DELAY)
+                    time.sleep(WAITING_FOR_RESOURCE_DELAY)
 
 
 # ASSUMES: current working directory is the resources directory
@@ -835,7 +839,7 @@ def resources_over_usb2snes(sfc_file_relpath: Filename, websocket_address: str, 
     fs_observer.schedule(fs_handler, path=sym_file_relpath)  # type: ignore[no-untyped-call]
     fs_observer.start()  # type: ignore[no-untyped-call]
 
-    asyncio.run(create_and_process_websocket(websocket_address, sfc_file_relpath, fs_handler))
+    create_and_process_websocket(websocket_address, sfc_file_relpath, fs_handler)
 
     fs_observer.stop()  # type: ignore[no-untyped-call]
     fs_observer.join()
