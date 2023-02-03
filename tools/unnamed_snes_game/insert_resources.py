@@ -12,7 +12,8 @@ from .common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET, ResourceType,
 from .common import print_error
 from .json_formats import Name, Filename, Mappings, MemoryMap
 from .entity_data import ENTITY_ROM_DATA_LABEL, validate_entity_rom_data_symbols, expected_blank_entity_rom_data
-from .resources_compiler import DataStore, Compilers, FixedInput, ResourceData, ResourceError, load_fixed_inputs, compile_all_resources
+from .resources_compiler import DataStore, Compilers, SharedInput, ResourceData, ResourceError
+from .resources_compiler import load_shared_inputs, compile_all_resources
 
 Address = int
 RomOffset = int
@@ -231,16 +232,16 @@ class ResourceInserter:
         self.insert_blob_into_start_of_bank(bank_offset, room_data_blob)
 
 
-def insert_resources(sfc_view: memoryview, fixed_input: FixedInput, data_store: DataStore) -> None:
+def insert_resources(sfc_view: memoryview, shared_input: SharedInput, data_store: DataStore) -> None:
     # sfc_view is a memoryview of a bytearray containing the SFC file
 
     # ::TODO confirm sfc_view is the correct file::
 
-    n_entities: Final = len(fixed_input.entities.entities)
-    validate_entity_rom_data_symbols(fixed_input.symbols, n_entities)
+    n_entities: Final = len(shared_input.entities.entities)
+    validate_entity_rom_data_symbols(shared_input.symbols, n_entities)
 
-    ri = ResourceInserter(sfc_view, fixed_input.symbols, fixed_input.mappings)
-    ri.confirm_initial_data_is_correct(ENTITY_ROM_DATA_LABEL, expected_blank_entity_rom_data(fixed_input.symbols, n_entities))
+    ri = ResourceInserter(sfc_view, shared_input.symbols, shared_input.mappings)
+    ri.confirm_initial_data_is_correct(ENTITY_ROM_DATA_LABEL, expected_blank_entity_rom_data(shared_input.symbols, n_entities))
 
     ri.insert_room_data(ROOM_DATA_BANK_OFFSET, data_store.get_data_for_all_rooms())
 
@@ -254,7 +255,7 @@ def insert_resources(sfc_view: memoryview, fixed_input: FixedInput, data_store: 
         ri.insert_resources(r_type, data_store.get_all_data_for_type(r_type))
 
     # Disable resources-over-usb2snes
-    if USE_RESOURCES_OVER_USB2SNES_LABEL in fixed_input.symbols:
+    if USE_RESOURCES_OVER_USB2SNES_LABEL in shared_input.symbols:
         ri.insert_blob_at_label(USE_RESOURCES_OVER_USB2SNES_LABEL, bytes(1))
 
 
@@ -292,7 +293,7 @@ def update_checksum(sfc_view: memoryview, memory_map: MemoryMap) -> None:
 
 
 class CompiledData(NamedTuple):
-    fixed_input: FixedInput
+    shared_input: SharedInput
     data_store: DataStore
 
 
@@ -309,14 +310,16 @@ def compile_data(resources_directory: Filename, symbols_file: Filename, n_proces
 
     os.chdir(resources_directory)
 
-    fixed_input = load_fixed_inputs(symbols_file_relpath)
-    compilers = Compilers(fixed_input)
-    data_store = compile_all_resources(compilers, n_processes, print_resource_error)
+    shared_input: Final = load_shared_inputs(symbols_file_relpath)
+    compilers: Final = Compilers(shared_input)
+    data_store: Final = DataStore(shared_input.mappings)
+
+    compile_all_resources(data_store, compilers, n_processes, print_resource_error)
 
     os.chdir(cwd)
 
     if valid:
-        return CompiledData(fixed_input, data_store)
+        return CompiledData(shared_input, data_store)
     else:
         return None
 
@@ -329,7 +332,7 @@ def insert_resources_into_binary(resources_dir: Filename, symbols: Filename, sfc
     sfc_data = bytearray(read_binary_file(sfc_input, 4 * 1024 * 1024))
     sfc_memoryview = memoryview(sfc_data)
 
-    insert_resources(sfc_memoryview, co.fixed_input, co.data_store)
-    update_checksum(sfc_memoryview, co.fixed_input.mappings.memory_map)
+    insert_resources(sfc_memoryview, co.shared_input, co.data_store)
+    update_checksum(sfc_memoryview, co.shared_input.mappings.memory_map)
 
     return sfc_data
