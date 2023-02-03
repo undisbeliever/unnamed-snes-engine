@@ -29,7 +29,6 @@
 
 import re
 import sys
-import time
 import json
 import os.path
 import secrets
@@ -149,11 +148,91 @@ def log_success(s: str) -> None:
     __log(s, AnsiColors.GREEN)
 
 
+#
+# Signals
+# =======
+
+
+class StopTokenEncountered(Exception):
+    pass
+
+
+class SfcFileChanged(Exception):
+    pass
+
+
+# Synchronisation signals/events for FsEventHandler and ResourcesOverUsb2Snes.
+#
+# No idea if this is thread safe or not
+class FsWatcherSignals:
+    def __init__(self) -> None:
+        # MUST NOT be modified outside this class
+        self._resource_changed_event: Final = threading.Event()
+        self._stop_token: Final = threading.Event()
+        self._continue_token: Final = threading.Event()
+        self._sym_file_changed_event: Final = threading.Event()
+
+    # FsEventHandler methods
+
+    def resource_changed(self) -> None:
+        self._resource_changed_event.set()
+
+    def set_stop_token(self) -> None:
+        self._stop_token.set()
+        self._resource_changed_event.set()
+
+    def is_stopped(self) -> bool:
+        return self._stop_token.is_set()
+
+    def set_continue_token(self) -> None:
+        self._continue_token.set()
+        self._stop_token.set()
+        self._resource_changed_event.set()
+
+    def sfc_file_changed(self) -> None:
+        # Reset token is only checked when waiting for a continue token
+        self._sym_file_changed_event.set()
+        self._stop_token.set()
+        self._resource_changed_event.set()
+
+    # ResourcesOverUsb2Snes methods
+
+    def sleep(self, delay: float) -> None:
+        s = self._stop_token.wait(delay)
+        if s:
+            raise StopTokenEncountered()
+
+    def wait_until_resource_changed(self) -> None:
+        self._resource_changed_event.wait()
+        self._resource_changed_event.clear()
+        if self._stop_token.is_set():
+            raise StopTokenEncountered()
+
+    def wait_for_continue_token(self) -> None:
+        self._continue_token.wait()
+        self._continue_token.clear()
+        self._stop_token.clear()
+        if self._sym_file_changed_event.is_set():
+            raise SfcFileChanged()
+
+    def wait_until_sfc_binary_changed(self) -> None:
+        self._sym_file_changed_event.wait()
+        self._sym_file_changed_event.clear()
+        self._continue_token.clear()
+        self._stop_token.clear()
+
+
+#
+# Filesystem watcher
+# ==================
+
+
 # ASSUMES: current working directory is the resources directory
 class FsEventHandler(watchdog.events.FileSystemEventHandler):
-    def __init__(self, data_store: DataStore, compilers: Compilers, n_processes: Optional[int]):
+    def __init__(self, signals: FsWatcherSignals, data_store: DataStore, compilers: Compilers, n_processes: Optional[int]):
         super().__init__()
 
+        self.signals: Final = signals
         self.data_store: Final = data_store
         self.compilers: Final = compilers
         self.n_processes: Final = n_processes
@@ -162,13 +241,6 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
         self.lists_to_recompile: Final[set[Optional[ResourceType]]] = set()
 
         self.rebuild_required: bool = False
-
-        # Set if a shared_resource has an error or the binary is rebuilt
-        self.stop_token: Final = threading.Event()
-        # Set if a failed shared resource has been fixed or the binary is rebuilt
-        self.continue_token: Final = threading.Event()
-        # Set if the binary has been rebuilt and a reset is requested
-        self.reset_token: Final = threading.Event()
 
     def on_closed(self, event: watchdog.events.FileSystemEvent) -> None:
         if event.is_directory is False:
@@ -196,10 +268,13 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
 
         shared_file_changed = self.process_shared_input_file_changed(filename)
 
+        file_is_resource = shared_file_changed
+
         if not shared_file_changed:
             if not self.shared_files_with_errors:
                 rdata = self.compilers.file_changed(filename)
                 if rdata:
+                    file_is_resource = True
                     self.data_store.insert_data(rdata)
                     if isinstance(rdata, MetaSpriteResourceData):
                         self.process_msfs_and_entity_data()
@@ -213,6 +288,9 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
         if self.rebuild_required:
             log_fs_watcher(f"REBUILD REQUIRED")
 
+        if file_is_resource:
+            self.signals.resource_changed()
+
     def process_aseprite_file_changed(self, filename: str) -> None:
         # ASSUMES: current directory is the resources directory
         png_filename = os.path.splitext(filename)[0] + ".png"
@@ -220,12 +298,14 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
         subprocess.call(("make", png_filename))
 
     def process_shared_input_file_changed(self, filename: str) -> bool:
+        had_shared_error: Final = bool(self.shared_files_with_errors)
+
         try:
             s_type: Final = check_shared_input_file_changed(filename, self.compilers.shared_input)
         except Exception as e:
             log_error(f"ERROR loading {filename}", e)
             self.shared_files_with_errors.add(filename)
-            self.stop_token.set()
+            self.signals.set_stop_token()
             return True
 
         if s_type is None:
@@ -247,17 +327,18 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
             self.lists_to_recompile.clear()
 
         if s_type == SharedInputType.SYMBOLS:
-            self.reset_token.set()
+            # Assumes the `.sfc` file changes when the symbol file changes
             self.rebuild_required = False
+            self.signals.sfc_file_changed()
 
         elif s_type.rebuild_required():
             self.rebuild_required = True
-            self.stop_token.set()
+            self.signals.set_stop_token()
 
-        if self.stop_token.is_set():
-            # Set continue token if rebuild is not required and there are no shared files with errors
-            if self.rebuild_required is False and not self.shared_files_with_errors:
-                self.continue_token.set()
+        if self.signals.is_stopped():
+            # Set continue token if there are no shared files with errors
+            if not self.rebuild_required and not self.shared_files_with_errors:
+                self.signals.set_continue_token()
 
         return True
 
@@ -466,16 +547,16 @@ class ResourcesOverUsb2Snes:
     # If a request is one of these types, then update msfs_and_entity_data before transferring request data.
     REQUEST_TYPE_USES_MSFS_OR_ENTITY_DATA: Final = (SpecialRequestType.rooms.value, ResourceType.ms_spritesheets.value)
 
-    def __init__(self, usb2snes: Usb2Snes, stop_token: threading.Event, data_store: DataStore, shared_input: SharedInput) -> None:
+    def __init__(self, usb2snes: Usb2Snes, signals: FsWatcherSignals, data_store: DataStore, shared_input: SharedInput) -> None:
+        self.usb2snes: Final = usb2snes
+        self.data_store: Final = data_store
+        self.signals: Final = signals
+
         symbols = shared_input.symbols
         memory_map = shared_input.mappings.memory_map
         n_entities = len(shared_input.entities.entities)
 
         address_to_rom_offset: Final = memory_map.mode.address_to_rom_offset
-
-        self.usb2snes: Final[Usb2Snes] = usb2snes
-        self.stop_token: Final[threading.Event] = stop_token
-        self.data_store: Final[DataStore] = data_store
 
         self.address_to_rom_offset: Final[Callable[[int], int]] = address_to_rom_offset
 
@@ -574,7 +655,7 @@ class ResourcesOverUsb2Snes:
         zeropage: Optional[bytes] = None
 
         while zeropage != expected_zeropage:
-            time.sleep(UPDATE_ROM_SPINLOOP_SLEEP_DELAY)
+            self.signals.sleep(UPDATE_ROM_SPINLOOP_SLEEP_DELAY)
             zeropage = self.usb2snes.read_wram_addr(0x7E0000, 256)
 
     def read_request(self) -> Request:
@@ -622,12 +703,8 @@ class ResourcesOverUsb2Snes:
             log_resource_error(co)
             log_notice(f"    Waiting until resource data is ready...")
             while isinstance(co, ResourceError):
-                # Exit early if stop_token set
-                if self.stop_token.is_set():
-                    log_notice("    Stop waiting")
-                    return ResponseStatus.ERROR, None
+                self.signals.wait_until_resource_changed()
                 co = self.data_store.get_room_data(room_id)
-                time.sleep(WAITING_FOR_RESOURCE_DELAY)
 
         if isinstance(co, ResourceData):
             status = ResponseStatus.OK
@@ -652,12 +729,8 @@ class ResourcesOverUsb2Snes:
             log_notice(f"    Waiting until resource data is ready...")
 
             while not isinstance(co, ResourceData):
-                # Exit early if stop_token set
-                if self.stop_token.is_set():
-                    log_notice("    Stop waiting")
-                    return ResponseStatus.ERROR, None
+                self.signals.wait_until_resource_changed()
                 co = self.data_store.get_resource_data(resource_type, resource_id)
-                time.sleep(WAITING_FOR_RESOURCE_DELAY)
 
         return ResponseStatus.OK, co.data
 
@@ -676,12 +749,8 @@ class ResourcesOverUsb2Snes:
             log_notice(f"    Waiting until data is ready...")
 
             while me is None or (not me.msfs_data) or (not me.entity_rom_data):
-                # Exit early if stop_token set
-                if self.stop_token.is_set():
-                    log_notice("    Stop waiting")
-                    return
+                self.signals.wait_until_resource_changed()
                 me = self.data_store.get_msfs_and_entity_data()
-                time.sleep(WAITING_FOR_RESOURCE_DELAY)
 
         assert len(me.entity_rom_data) == self.expected_entity_rom_data_size
 
@@ -715,7 +784,7 @@ class ResourcesOverUsb2Snes:
         try:
             while self.read_request() != INIT_REQUEST:
                 log_notice("Waiting for correctly formatted init request")
-                time.sleep(NORMAL_REQUEST_SLEEP_DELAY)
+                self.signals.sleep(NORMAL_REQUEST_SLEEP_DELAY)
 
             log_request("Init")
 
@@ -727,13 +796,11 @@ class ResourcesOverUsb2Snes:
             self.write_response(INIT_REQUEST.request_id, ResponseStatus.ERROR, None)
             raise
 
-    def run_until_stop_token_set(self) -> None:
+    def run(self) -> None:
         burst_read_counter: int = 0
         current_request_id: int = 0
 
-        sleep_time: float = BURST_SLEEP_DELAY
-
-        while not self.stop_token.is_set():
+        while True:
             request = self.read_request()
 
             if request.request_type == SpecialRequestType.init:
@@ -749,12 +816,14 @@ class ResourcesOverUsb2Snes:
 
             if burst_read_counter > 0:
                 burst_read_counter -= 1
-                time.sleep(BURST_SLEEP_DELAY)
+                self.signals.sleep(BURST_SLEEP_DELAY)
             else:
-                time.sleep(NORMAL_REQUEST_SLEEP_DELAY)
+                self.signals.sleep(NORMAL_REQUEST_SLEEP_DELAY)
 
 
-def create_and_process_websocket(address: str, sfc_file_relpath: Filename, fs_handler: FsEventHandler) -> None:
+def create_and_process_websocket(
+    address: str, sfc_file_relpath: Filename, fs_handler: FsEventHandler, signals: FsWatcherSignals
+) -> None:
     sfc_file_basename = os.path.basename(sfc_file_relpath)
 
     with contextlib.closing(websocket.WebSocket()) as ws:
@@ -772,12 +841,9 @@ def create_and_process_websocket(address: str, sfc_file_relpath: Filename, fs_ha
         # On my system there needs to be a 1/2 second delay between a usb2snes "Boot" command and a "GetAddress" command.
         #
         # ::TODO find a way to eliminate this::
-        time.sleep(0.5)
+        signals.sleep(0.5)
 
         while True:
-            fs_handler.reset_token.clear()
-            fs_handler.stop_token.clear()
-
             shared_input = fs_handler.compilers.shared_input
 
             try:
@@ -789,25 +855,29 @@ def create_and_process_websocket(address: str, sfc_file_relpath: Filename, fs_ha
                 sfc_file_valid = False
 
             if sfc_file_valid:
-                rou2s = ResourcesOverUsb2Snes(usb2snes, fs_handler.stop_token, fs_handler.data_store, shared_input)
+                try:
+                    rou2s = ResourcesOverUsb2Snes(usb2snes, signals, fs_handler.data_store, shared_input)
 
-                while not rou2s.is_correct_rom_running(sfc_file_basename):
-                    time.sleep(INCORRECT_ROM_SLEEP_DELAY)
+                    while not rou2s.is_correct_rom_running(sfc_file_basename):
+                        try:
+                            signals.sleep(INCORRECT_ROM_SLEEP_DELAY)
+                        except StopTokenEncountered:
+                            pass
 
-                if rou2s.test_game_matches_sfc_file(sfc_file_data, shared_input.mappings.memory_map) is False:
-                    log_notice(f"Running game does not match { sfc_file_basename }")
-                    rou2s.reset_and_update_rom(sfc_file_data)
-                else:
-                    log_success(f"Running game matches { sfc_file_basename }")
+                    if rou2s.test_game_matches_sfc_file(sfc_file_data, shared_input.mappings.memory_map) is False:
+                        log_notice(f"Running game does not match { sfc_file_basename }")
+                        rou2s.reset_and_update_rom(sfc_file_data)
+                    else:
+                        log_success(f"Running game matches { sfc_file_basename }")
 
-                while not fs_handler.reset_token.is_set():
-                    fs_handler.continue_token.clear()
-
-                    rou2s.run_until_stop_token_set()
-
-                    # Wait until the continue token is set
-                    fs_handler.continue_token.wait()
-                    fs_handler.stop_token.clear()
+                    while True:
+                        try:
+                            rou2s.run()
+                        except StopTokenEncountered:
+                            pass
+                        signals.wait_for_continue_token()
+                except SfcFileChanged:
+                    pass
 
                 # Symbols file has changed.
                 # It is simpler to recreate `rou2s` then update all of the addresses
@@ -816,8 +886,7 @@ def create_and_process_websocket(address: str, sfc_file_relpath: Filename, fs_ha
                 log_notice(f"Waiting until {sfc_file_basename} is rebuilt")
 
                 # Wait until the binary has been rebuilt
-                while not fs_handler.reset_token.is_set():
-                    time.sleep(WAITING_FOR_RESOURCE_DELAY)
+                signals.wait_until_sfc_binary_changed()
 
 
 # ASSUMES: current working directory is the resources directory
@@ -827,19 +896,21 @@ def resources_over_usb2snes(sfc_file_relpath: Filename, websocket_address: str, 
 
     shared_inputs = load_shared_inputs(sym_file_relpath)
 
+    signals = FsWatcherSignals()
+
     # ::TODO compile resources while creating usb2snes connection::
     compilers = Compilers(shared_inputs)
     data_store = DataStore(shared_inputs.mappings)
     compile_all_resources(data_store, compilers, n_processes, log_resource_error)
 
-    fs_handler = FsEventHandler(data_store, compilers, n_processes)
+    fs_handler = FsEventHandler(signals, data_store, compilers, n_processes)
 
     fs_observer = watchdog.observers.Observer()  # type: ignore[no-untyped-call]
     fs_observer.schedule(fs_handler, path=".", recursive=True)  # type: ignore[no-untyped-call]
     fs_observer.schedule(fs_handler, path=sym_file_relpath)  # type: ignore[no-untyped-call]
     fs_observer.start()  # type: ignore[no-untyped-call]
 
-    create_and_process_websocket(websocket_address, sfc_file_relpath, fs_handler)
+    create_and_process_websocket(websocket_address, sfc_file_relpath, fs_handler, signals)
 
     fs_observer.stop()  # type: ignore[no-untyped-call]
     fs_observer.join()
