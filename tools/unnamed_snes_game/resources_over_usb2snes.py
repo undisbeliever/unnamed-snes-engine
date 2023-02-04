@@ -243,7 +243,7 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
             data_store, sym_filename, n_processes, log_compiler_error, log_compiler_message
         )
 
-        self._project_compiler.compile_all_resources()
+        self._project_compiler.compile_everything()
 
         self.rebuild_required: bool = False
 

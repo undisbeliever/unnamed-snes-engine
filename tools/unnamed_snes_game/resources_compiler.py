@@ -125,7 +125,7 @@ class DataStore:
             self._msfs_and_entity_data = None
             self._msfs_and_entity_data_valid = False
 
-    def set_symbols(self, symbols: dict[ScopedName, int]) -> None:
+    def set_symbols(self, symbols: Optional[dict[ScopedName, int]]) -> None:
         with self._lock:
             self._symbols = symbols
 
@@ -251,38 +251,41 @@ def read_symbols_file(symbol_filename: Filename) -> dict[str, int]:
 
 # If this data changes, multiple resources must be recompiled
 # THREAD SAFETY: Must only exist in the ProjectCompiler classes
-@dataclass
 class SharedInput:
-    mappings: Mappings
-    entities: EntitiesJson
-    other_resources: OtherResources
-    ms_export_order: MsExportOrder
-    audio_samples: SamplesJson
-    symbols: dict[ScopedName, int]
-    symbols_filename: Filename
+    def __init__(self, sym_filename: Filename) -> None:
+        self.symbols_filename: Final[Filename] = sym_filename
+
+        self.mappings: Optional[Mappings] = None
+        self.entities: Optional[EntitiesJson] = None
+        self.other_resources: Optional[OtherResources] = None
+        self.ms_export_order: Optional[MsExportOrder] = None
+        self.audio_samples: Optional[SamplesJson] = None
+        self.symbols: Optional[dict[ScopedName, int]] = None
 
     # May throw an exception
     def load(self, s_type: SharedInputType) -> None:
-        if s_type == SharedInputType.MAPPINGS:
-            self.mappings = load_mappings_json(MAPPINGS_FILENAME)
+        def _load(field: str, filename: Filename, loader: Callable[[Filename], Any]) -> None:
+            try:
+                setattr(self, field, loader(filename))
+            except Exception:
+                setattr(self, field, None)
+                raise
 
-        elif s_type == SharedInputType.ENTITIES:
-            self.entities = load_entities_json(ENTITIES_FILENAME)
-
-        elif s_type == SharedInputType.OTHER_RESOURCES:
-            self.other_resources = load_other_resources_json(OTHER_RESOURCES_FILENAME)
-
-        elif s_type == SharedInputType.MS_EXPORT_ORDER:
-            self.ms_export_order = load_ms_export_order_json(MS_EXPORT_ORDER_FILENAME)
-
-        elif s_type == SharedInputType.AUDIO_SAMPLES:
-            self.audio_samples = load_samples_json(AUDIO_SAMPLES_FILENAME)
-
-        elif s_type == SharedInputType.SYMBOLS:
-            self.symbols = read_symbols_file(self.symbols_filename)
-
-        else:
-            raise RuntimeError("Unknown shared input file")
+        match s_type:
+            case SharedInputType.MAPPINGS:
+                _load("mappings", MAPPINGS_FILENAME, load_mappings_json)
+            case SharedInputType.ENTITIES:
+                _load("entities", ENTITIES_FILENAME, load_entities_json)
+            case SharedInputType.OTHER_RESOURCES:
+                _load("other_resources", OTHER_RESOURCES_FILENAME, load_other_resources_json)
+            case SharedInputType.MS_EXPORT_ORDER:
+                _load("ms_export_order", MS_EXPORT_ORDER_FILENAME, load_ms_export_order_json)
+            case SharedInputType.AUDIO_SAMPLES:
+                _load("audio_samples", AUDIO_SAMPLES_FILENAME, load_samples_json)
+            case SharedInputType.SYMBOLS:
+                _load("symbols", self.symbols_filename, read_symbols_file)
+            case other:
+                raise RuntimeError("Unknown shared input file")
 
 
 MAPPINGS_FILENAME: Final = "mappings.json"
@@ -308,20 +311,6 @@ SHARED_INPUT_NAMES: Final = {
     SharedInputType.AUDIO_SAMPLES: "audio Samples JSON",
     SharedInputType.SYMBOLS: "Symbols",
 }
-
-
-# ASSUMES: current working directory is the resources directory
-# THREAD SAFETY: MUST only be called by `Compilers` class
-def _load_shared_inputs(sym_filename: Filename) -> SharedInput:
-    return SharedInput(
-        mappings=load_mappings_json(MAPPINGS_FILENAME),
-        entities=load_entities_json(ENTITIES_FILENAME),
-        other_resources=load_other_resources_json(OTHER_RESOURCES_FILENAME),
-        ms_export_order=load_ms_export_order_json(MS_EXPORT_ORDER_FILENAME),
-        audio_samples=load_samples_json(AUDIO_SAMPLES_FILENAME),
-        symbols=read_symbols_file(sym_filename),
-        symbols_filename=sym_filename,
-    )
 
 
 #
@@ -369,6 +358,8 @@ class MsSpritesheetCompiler(BaseResourceCompiler):
         return None
 
     def compile_resource(self, resource_id: int) -> BaseResourceData:
+        assert self._shared_input.ms_export_order
+
         r_name = self.name_list()[resource_id]
         try:
             ms_dir = os.path.join("metasprites", r_name)
@@ -411,6 +402,8 @@ class MetaTileTilesetCompiler(SimpleResourceCompiler):
         return None
 
     def _compile(self, r_name: Name) -> bytes:
+        assert self._shared_input.mappings
+
         filename = os.path.join("metatiles/", r_name + ".tsx")
         return convert_mt_tileset(filename, self._shared_input.mappings)
 
@@ -421,7 +414,7 @@ class MetaTileTilesetCompiler(SimpleResourceCompiler):
 class OtherResourcesCompiler(SimpleResourceCompiler):
     def __init__(self, r_type: ResourceType, shared_input: SharedInput) -> None:
         super().__init__(r_type, shared_input)
-        self.filename_map = self.build_filename_map()
+        self.filename_map: dict[Filename, int] = dict()
 
     @final
     def test_filename_is_resource(self, filename: Filename) -> Optional[tuple[int, Name]]:
@@ -460,6 +453,8 @@ class TileCompiler(OtherResourcesCompiler):
         super().__init__(ResourceType.tiles, shared_input)
 
     def build_filename_map(self) -> dict[Filename, int]:
+        assert self._shared_input.other_resources
+
         tiles = self._shared_input.other_resources.tiles
 
         d = dict()
@@ -470,6 +465,8 @@ class TileCompiler(OtherResourcesCompiler):
         return d
 
     def _compile(self, r_name: Name) -> bytes:
+        assert self._shared_input.other_resources
+
         t = self._shared_input.other_resources.tiles[r_name]
         return convert_tiles(t)
 
@@ -479,6 +476,8 @@ class BgImageCompiler(OtherResourcesCompiler):
         super().__init__(ResourceType.bg_images, shared_input)
 
     def build_filename_map(self) -> dict[Filename, int]:
+        assert self._shared_input.other_resources
+
         tiles = self._shared_input.other_resources.bg_images
 
         d = dict()
@@ -490,6 +489,8 @@ class BgImageCompiler(OtherResourcesCompiler):
         return d
 
     def _compile(self, r_name: Name) -> bytes:
+        assert self._shared_input.other_resources
+
         bi = self._shared_input.other_resources.bg_images[r_name]
         return convert_bg_image(bi)
 
@@ -500,8 +501,6 @@ class SongCompiler(SimpleResourceCompiler):
 
     def __init__(self, shared_input: SharedInput) -> None:
         super().__init__(ResourceType.songs, shared_input)
-        if self.name_list()[0] != self.COMMON_DATA_RESOURCE_NAME:
-            raise RuntimeError(f"The first entry in the song resource list MUST BE `{self.COMMON_DATA_RESOURCE_NAME}`")
 
     def test_filename_is_resource(self, filename: Filename) -> Optional[tuple[int, Name]]:
         if filename == self.SFX_FILE:
@@ -509,10 +508,19 @@ class SongCompiler(SimpleResourceCompiler):
         return None
 
     def _compile(self, r_name: Name) -> bytes:
+        assert self._shared_input.mappings
+        assert self._shared_input.audio_samples
+
         if r_name == self.COMMON_DATA_RESOURCE_NAME:
+            if self.name_list()[0] != self.COMMON_DATA_RESOURCE_NAME:
+                raise RuntimeError(f"The first entry in the song resource list MUST BE `{self.COMMON_DATA_RESOURCE_NAME}`")
+
             sfx_file = load_sfx_file(self.SFX_FILE)
             return build_common_audio_data(self._shared_input.audio_samples, self._shared_input.mappings, sfx_file, self.SFX_FILE)
         else:
+            if self.name_list()[0] == r_name:
+                raise RuntimeError(f"The first entry in the song resource list MUST BE `{self.COMMON_DATA_RESOURCE_NAME}`")
+
             raise NotImplementedError("Songs is not yet implemented")
 
     def shared_input_changed(self, s_type: SharedInputType) -> bool:
@@ -524,6 +532,9 @@ class RoomCompiler:
         self._shared_input: Final = shared_input
 
     def compile_room(self, filename: Filename) -> BaseResourceData:
+        assert self._shared_input.mappings
+        assert self._shared_input.entities
+
         room_id = -1
         basename = os.path.basename(filename)
         name = os.path.splitext(basename)[0]
@@ -555,14 +566,15 @@ class ProjectCompiler:
         self.data_store: Final = data_store
 
         self.__sym_filename: Final = sym_filename
-        self.__shared_input: Final = _load_shared_inputs(sym_filename)
+        self.__shared_input: Final = SharedInput(sym_filename)
         self.__n_processes: Final = n_processes
 
         self.log_message: Final = message_handler
         self.log_error: Final = err_handler
 
-        self.__shared_input_valid: bool = True
-        self.__shared_inputs_with_errors: Final[set[SharedInputType]] = set()
+        # Mark all shared_inputs invalid
+        self.__shared_input_valid: bool = False
+        self.__shared_inputs_with_errors: Final[set[SharedInputType]] = set(SharedInputType)
 
         self.__resource_compilers: Final = [
             MetaTileTilesetCompiler(self.__shared_input),
@@ -572,12 +584,6 @@ class ProjectCompiler:
             SongCompiler(self.__shared_input),
         ]
         self.__room_compiler: Final = RoomCompiler(self.__shared_input)
-
-        n_entities = len(self.__shared_input.entities.entities)
-
-        self.data_store.reset_data(self.__shared_input.mappings)
-        self.data_store.set_symbols(self.__shared_input.symbols)
-        self.data_store.set_n_entities(n_entities)
 
         assert len(self.__resource_compilers) == len(ResourceType)
 
@@ -596,6 +602,7 @@ class ProjectCompiler:
         else:
             co = None
             if self.__shared_input_valid:
+                # Only compile resources if the shared input is valid
                 if filename.endswith(".tmx"):
                     self.log_message(f"Compiling room {filename}")
                     co = self.__room_compiler.compile_room(filename)
@@ -629,12 +636,17 @@ class ProjectCompiler:
             self.__shared_input_valid = False
             return
 
+        if s_type == SharedInputType.MAPPINGS:
+            if self.__shared_input.mappings:
+                self.data_store.reset_data(self.__shared_input.mappings)
+
         if s_type == SharedInputType.SYMBOLS:
             self.data_store.set_symbols(self.__shared_input.symbols)
 
         elif s_type == SharedInputType.ENTITIES:
-            n_entities: Final = len(self.__shared_input.entities.entities)
-            self.data_store.set_n_entities(n_entities)
+            if self.__shared_input.entities:
+                n_entities = len(self.__shared_input.entities.entities)
+                self.data_store.set_n_entities(n_entities)
 
         if self.__shared_input_valid:
             self.__recompile_resources_using_shared_input(s_type)
@@ -642,11 +654,11 @@ class ProjectCompiler:
             if not self.__shared_inputs_with_errors:
                 # All shared_inputs have been fixed
                 self.__shared_input_valid = True
-                self.compile_all_resources()
+                self.__compile_all_resources()
 
     def __recompile_resources_using_shared_input(self, s_type: SharedInputType) -> None:
         if s_type is SharedInputType.MAPPINGS:
-            self.compile_all_resources()
+            self.__compile_all_resources()
         else:
             to_recompile: list[Optional[ResourceType]] = list()
 
@@ -664,6 +676,10 @@ class ProjectCompiler:
     def __compile_msfs_and_entity_data(self) -> None:
         if not self.__shared_input_valid:
             raise RuntimeError("Shared Input is not valid")
+
+        assert self.__shared_input.mappings
+        assert self.__shared_input.entities
+        assert self.__shared_input.symbols
 
         optional_msfs_lists: Final = self.data_store.get_msfs_lists()
 
@@ -713,10 +729,16 @@ class ProjectCompiler:
 
         self.__compile_msfs_and_entity_data()
 
-    def compile_all_resources(self) -> None:
+    def __compile_all_resources(self) -> None:
         self.log_message("Compiling all resources")
 
         to_recompile: list[Optional[ResourceType]] = list(ResourceType)
         to_recompile.append(None)
 
         self.__compile_resource_lists(to_recompile)
+
+    def compile_everything(self) -> None:
+        # Load shared inputs
+        # After all shared inputs are loaded, then it will trigger a full recompile
+        for s_type in SharedInputType:
+            self._shared_input_file_changed(s_type)

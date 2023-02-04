@@ -292,6 +292,10 @@ def update_checksum(sfc_view: memoryview, memory_map: MemoryMap) -> None:
     sfc_view[cs_header_offset + 3] = checksum >> 8
 
 
+def null_print_function(message: str) -> None:
+    pass
+
+
 def compile_data(resources_directory: Filename, symbols_file: Filename, n_processes: Optional[int]) -> Optional[DataStore]:
     valid = True
 
@@ -309,8 +313,9 @@ def compile_data(resources_directory: Filename, symbols_file: Filename, n_proces
     os.chdir(resources_directory)
 
     data_store: Final = DataStore()
-    compiler: Final = ProjectCompiler(data_store, symbols_file_relpath, n_processes, print_resource_error, print)
-    compiler.compile_all_resources()
+    compiler: Final = ProjectCompiler(data_store, symbols_file_relpath, n_processes, print_resource_error, null_print_function)
+
+    compiler.compile_everything()
 
     os.chdir(cwd)
 
