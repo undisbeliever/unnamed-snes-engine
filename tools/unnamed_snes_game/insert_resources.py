@@ -299,7 +299,7 @@ def compile_data(resources_directory: Filename, symbols_file: Filename, n_proces
         nonlocal valid
         valid = False
         if isinstance(e, ResourceError):
-            print_error(f"ERROR: { e.resource_type }[{ e.resource_id}] { e.resource_name }", e.error)
+            print_error(f"ERROR: { e.res_string() }", e.error)
         else:
             print_error("ERROR: ", e)
 
@@ -309,7 +309,7 @@ def compile_data(resources_directory: Filename, symbols_file: Filename, n_proces
     os.chdir(resources_directory)
 
     data_store: Final = DataStore()
-    compiler: Final = ProjectCompiler(data_store, symbols_file_relpath, n_processes, print_resource_error)
+    compiler: Final = ProjectCompiler(data_store, symbols_file_relpath, n_processes, print_resource_error, print)
     compiler.compile_all_resources()
 
     os.chdir(cwd)

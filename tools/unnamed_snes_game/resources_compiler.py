@@ -41,6 +41,12 @@ class BaseResourceData:
     resource_id: int
     resource_name: Name
 
+    def res_string(self) -> str:
+        if self.resource_type:
+            return f"{ self.resource_type.name }[{ self.resource_id }] { self.resource_name }"
+        else:
+            return f"room[{ self.resource_id }] { self.resource_name }"
+
 
 @dataclass(frozen=True)
 class ResourceData(BaseResourceData):
@@ -294,6 +300,15 @@ SHARED_INPUT_FILENAME_MAP: Final = {
     AUDIO_SAMPLES_FILENAME: SharedInputType.AUDIO_SAMPLES,
 }
 
+SHARED_INPUT_NAMES: Final = {
+    SharedInputType.MAPPINGS: "mappings JSON",
+    SharedInputType.ENTITIES: "entities JSON",
+    SharedInputType.OTHER_RESOURCES: "other Resources JSON",
+    SharedInputType.MS_EXPORT_ORDER: "MetaSprite export order JSON",
+    SharedInputType.AUDIO_SAMPLES: "audio Samples JSON",
+    SharedInputType.SYMBOLS: "Symbols",
+}
+
 
 # ASSUMES: current working directory is the resources directory
 # THREAD SAFETY: MUST only be called by `Compilers` class
@@ -330,7 +345,7 @@ class BaseResourceCompiler(metaclass=ABCMeta):
     # Returns resource id if the filename is used by the compiler
     # ASSUMES: current working directory is the resources directory
     @abstractmethod
-    def test_filename_is_resource(self, filename: Filename) -> Optional[int]:
+    def test_filename_is_resource(self, filename: Filename) -> Optional[tuple[int, Name]]:
         pass
 
     @abstractmethod
@@ -347,9 +362,10 @@ class MsSpritesheetCompiler(BaseResourceCompiler):
     def __init__(self, shared_input: SharedInput) -> None:
         super().__init__(ResourceType.ms_spritesheets, shared_input)
 
-    def test_filename_is_resource(self, filename: Filename) -> Optional[int]:
+    def test_filename_is_resource(self, filename: Filename) -> Optional[tuple[int, Name]]:
         if m := MS_SPRITESHEET_FILE_REGEX.match(filename):
-            return self.name_list().index(m.group(1))
+            name = m.group(1)
+            return self.name_list().index(name), name
         return None
 
     def compile_resource(self, resource_id: int) -> BaseResourceData:
@@ -388,9 +404,10 @@ class MetaTileTilesetCompiler(SimpleResourceCompiler):
     def __init__(self, shared_input: SharedInput) -> None:
         super().__init__(ResourceType.mt_tilesets, shared_input)
 
-    def test_filename_is_resource(self, filename: Filename) -> Optional[int]:
+    def test_filename_is_resource(self, filename: Filename) -> Optional[tuple[int, Name]]:
         if m := MT_TILESET_FILE_REGEX.match(filename):
-            return self.name_list().index(m.group(1))
+            name = m.group(1)
+            return self.name_list().index(name), name
         return None
 
     def _compile(self, r_name: Name) -> bytes:
@@ -407,8 +424,11 @@ class OtherResourcesCompiler(SimpleResourceCompiler):
         self.filename_map = self.build_filename_map()
 
     @final
-    def test_filename_is_resource(self, filename: Filename) -> Optional[int]:
-        return self.filename_map.get(filename)
+    def test_filename_is_resource(self, filename: Filename) -> Optional[tuple[int, Name]]:
+        r_id = self.filename_map.get(filename)
+        if r_id:
+            return r_id, self.name_list()[r_id]
+        return None
 
     @final
     def shared_input_changed(self, s_type: SharedInputType) -> bool:
@@ -475,21 +495,21 @@ class BgImageCompiler(OtherResourcesCompiler):
 
 
 class SongCompiler(SimpleResourceCompiler):
-    COMMON_DATA_NAME: Final = "__null__common_data__"
+    COMMON_DATA_RESOURCE_NAME: Final = "__null__common_data__"
     SFX_FILE: Final = "audio/sound_effects.txt"
 
     def __init__(self, shared_input: SharedInput) -> None:
         super().__init__(ResourceType.songs, shared_input)
-        if self.name_list()[0] != self.COMMON_DATA_NAME:
-            raise RuntimeError(f"The first entry in the song resource list MUST BE `{self.COMMON_DATA_NAME}`")
+        if self.name_list()[0] != self.COMMON_DATA_RESOURCE_NAME:
+            raise RuntimeError(f"The first entry in the song resource list MUST BE `{self.COMMON_DATA_RESOURCE_NAME}`")
 
-    def test_filename_is_resource(self, filename: Filename) -> Optional[int]:
+    def test_filename_is_resource(self, filename: Filename) -> Optional[tuple[int, Name]]:
         if filename == self.SFX_FILE:
-            return 0
+            return 0, "common data and sound effects"
         return None
 
     def _compile(self, r_name: Name) -> bytes:
-        if r_name == self.COMMON_DATA_NAME:
+        if r_name == self.COMMON_DATA_RESOURCE_NAME:
             sfx_file = load_sfx_file(self.SFX_FILE)
             return build_common_audio_data(self._shared_input.audio_samples, self._shared_input.mappings, sfx_file, self.SFX_FILE)
         else:
@@ -529,6 +549,7 @@ class ProjectCompiler:
         sym_filename: Filename,
         n_processes: Optional[int],
         err_handler: Callable[[Union[ResourceError, Exception]], None],
+        message_handler: Callable[[str], None],
     ) -> None:
 
         self.data_store: Final = data_store
@@ -537,6 +558,7 @@ class ProjectCompiler:
         self.__shared_input: Final = _load_shared_inputs(sym_filename)
         self.__n_processes: Final = n_processes
 
+        self.log_message: Final = message_handler
         self.log_error: Final = err_handler
 
         self.__shared_input_valid: bool = True
@@ -575,11 +597,19 @@ class ProjectCompiler:
             co = None
             if self.__shared_input_valid:
                 if filename.endswith(".tmx"):
+                    self.log_message(f"Compiling room {filename}")
                     co = self.__room_compiler.compile_room(filename)
                 else:
                     for c in self.__resource_compilers:
-                        r_id = c.test_filename_is_resource(filename)
-                        if r_id is not None:
+                        try:
+                            res = c.test_filename_is_resource(filename)
+                        except Exception as e:
+                            self.log_error(e)
+                            return None
+
+                        if res:
+                            r_id, r_name = res
+                            self.log_message(f"Compiling { c.resource_type.name }[{ r_id }] { r_name }")
                             co = c.compile_resource(r_id)
                             break
             if co:
@@ -589,6 +619,7 @@ class ProjectCompiler:
             return co
 
     def _shared_input_file_changed(self, s_type: SharedInputType) -> None:
+        self.log_message(f"Loading { SHARED_INPUT_NAMES[s_type] } file")
         try:
             self.__shared_input.load(s_type)
             self.__shared_inputs_with_errors.discard(s_type)
@@ -621,9 +652,11 @@ class ProjectCompiler:
 
             for rc in self.__resource_compilers:
                 if rc.shared_input_changed(s_type):
+                    self.log_message(f"Compiling all {rc.resource_type.name}")
                     to_recompile.append(rc.resource_type)
 
             if self.__room_compiler.shared_input_changed(s_type):
+                self.log_message("Compiling all rooms")
                 to_recompile.append(None)
 
             self.__compile_resource_lists(to_recompile)
@@ -681,6 +714,8 @@ class ProjectCompiler:
         self.__compile_msfs_and_entity_data()
 
     def compile_all_resources(self) -> None:
+        self.log_message("Compiling all resources")
+
         to_recompile: list[Optional[ResourceType]] = list(ResourceType)
         to_recompile.append(None)
 

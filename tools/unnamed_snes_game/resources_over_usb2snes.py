@@ -124,9 +124,13 @@ def log_error(s: str, e: Optional[Exception] = None) -> None:
 
 def log_compiler_error(e: Union[ResourceError, Exception]) -> None:
     if isinstance(e, ResourceError):
-        log_error(f"ERROR: { e.resource_type }[{ e.resource_id}] { e.resource_name }", e.error)
+        log_error(f"ERROR: { e.res_string() }", e.error)
     else:
         log_error("ERROR:", e)
+
+
+def log_compiler_message(s: str) -> None:
+    __log(s, AnsiColors.BRIGHT_CYAN)
 
 
 def log_fs_watcher(s: str) -> None:
@@ -235,7 +239,9 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
 
         self.signals: Final = signals
         self.data_store: Final = data_store
-        self._project_compiler: Final = ProjectCompiler(data_store, sym_filename, n_processes, log_compiler_error)
+        self._project_compiler: Final = ProjectCompiler(
+            data_store, sym_filename, n_processes, log_compiler_error, log_compiler_message
+        )
 
         self._project_compiler.compile_all_resources()
 
@@ -270,13 +276,13 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
                     self.rebuild_required = True
                     self.signals.set_stop_token()
 
-            if self.rebuild_required:
-                log_fs_watcher(f"REBUILD REQUIRED")
-
             if r == SharedInputType.SYMBOLS:
                 # Assumes the `.sfc` file changes when the symbol file changes
                 self.rebuild_required = False
                 self.signals.sfc_file_changed()
+
+            if self.rebuild_required:
+                log_fs_watcher(f"REBUILD REQUIRED")
 
             if not self._project_compiler.is_shared_input_valid():
                 # ProjectCompiler is paused until shared inputs are fixed, stop ResourcesOverUsb2Snes
@@ -842,6 +848,8 @@ def resources_over_usb2snes(sfc_file_relpath: Filename, websocket_address: str, 
 
     # ::TODO compile resources while creating usb2snes connection::
     data_store = DataStore()
+
+    log_fs_watcher("Starting filesystem watcher")
     fs_handler = FsEventHandler(signals, data_store, sym_file_relpath, n_processes)
 
     fs_observer = watchdog.observers.Observer()  # type: ignore[no-untyped-call]
