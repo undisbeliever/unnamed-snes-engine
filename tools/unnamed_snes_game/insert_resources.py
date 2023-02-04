@@ -12,8 +12,7 @@ from .common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET, ResourceType,
 from .common import print_error
 from .json_formats import Name, Filename, Mappings, MemoryMap
 from .entity_data import ENTITY_ROM_DATA_LABEL, validate_entity_rom_data_symbols, expected_blank_entity_rom_data
-from .resources_compiler import DataStore, Compilers, SharedInput, ResourceData, ResourceError
-from .resources_compiler import load_shared_inputs, compile_all_resources
+from .resources_compiler import DataStore, ProjectCompiler, ResourceError
 
 Address = int
 RomOffset = int
@@ -232,21 +231,22 @@ class ResourceInserter:
         self.insert_blob_into_start_of_bank(bank_offset, room_data_blob)
 
 
-def insert_resources(sfc_view: memoryview, shared_input: SharedInput, data_store: DataStore) -> None:
+def insert_resources(sfc_view: memoryview, data_store: DataStore) -> None:
     # sfc_view is a memoryview of a bytearray containing the SFC file
 
     # ::TODO confirm sfc_view is the correct file::
 
-    n_entities: Final = len(shared_input.entities.entities)
-    validate_entity_rom_data_symbols(shared_input.symbols, n_entities)
+    mappings, symbols, n_entities = data_store.get_mappings_symbols_and_n_entities()
+    msfs_entity_data: Final = data_store.get_msfs_and_entity_data()
 
-    ri = ResourceInserter(sfc_view, shared_input.symbols, shared_input.mappings)
-    ri.confirm_initial_data_is_correct(ENTITY_ROM_DATA_LABEL, expected_blank_entity_rom_data(shared_input.symbols, n_entities))
+    assert msfs_entity_data and msfs_entity_data.msfs_data and msfs_entity_data.entity_rom_data
+
+    validate_entity_rom_data_symbols(symbols, n_entities)
+
+    ri = ResourceInserter(sfc_view, symbols, mappings)
+    ri.confirm_initial_data_is_correct(ENTITY_ROM_DATA_LABEL, expected_blank_entity_rom_data(symbols, n_entities))
 
     ri.insert_room_data(ROOM_DATA_BANK_OFFSET, data_store.get_data_for_all_rooms())
-
-    msfs_entity_data = data_store.get_msfs_and_entity_data()
-    assert msfs_entity_data and msfs_entity_data.msfs_data and msfs_entity_data.entity_rom_data
 
     ri.insert_blob_into_start_of_bank(MS_FS_DATA_BANK_OFFSET, msfs_entity_data.msfs_data)
     ri.insert_blob_at_label(ENTITY_ROM_DATA_LABEL, msfs_entity_data.entity_rom_data)
@@ -255,7 +255,7 @@ def insert_resources(sfc_view: memoryview, shared_input: SharedInput, data_store
         ri.insert_resources(r_type, data_store.get_all_data_for_type(r_type))
 
     # Disable resources-over-usb2snes
-    if USE_RESOURCES_OVER_USB2SNES_LABEL in shared_input.symbols:
+    if USE_RESOURCES_OVER_USB2SNES_LABEL in symbols:
         ri.insert_blob_at_label(USE_RESOURCES_OVER_USB2SNES_LABEL, bytes(1))
 
 
@@ -292,47 +292,43 @@ def update_checksum(sfc_view: memoryview, memory_map: MemoryMap) -> None:
     sfc_view[cs_header_offset + 3] = checksum >> 8
 
 
-class CompiledData(NamedTuple):
-    shared_input: SharedInput
-    data_store: DataStore
-
-
-def compile_data(resources_directory: Filename, symbols_file: Filename, n_processes: Optional[int]) -> Optional[CompiledData]:
+def compile_data(resources_directory: Filename, symbols_file: Filename, n_processes: Optional[int]) -> Optional[DataStore]:
     valid = True
 
-    def print_resource_error(re: ResourceError) -> None:
+    def print_resource_error(e: ResourceError | Exception) -> None:
         nonlocal valid
         valid = False
-        print_error(f"ERROR: { re.resource_type }[{ re.resource_id}] { re.resource_name }", re.error)
+        if isinstance(e, ResourceError):
+            print_error(f"ERROR: { e.resource_type }[{ e.resource_id}] { e.resource_name }", e.error)
+        else:
+            print_error("ERROR: ", e)
 
     cwd: Final = os.getcwd()
     symbols_file_relpath = os.path.relpath(symbols_file, resources_directory)
 
     os.chdir(resources_directory)
 
-    shared_input: Final = load_shared_inputs(symbols_file_relpath)
-    compilers: Final = Compilers(shared_input)
-    data_store: Final = DataStore(shared_input.mappings)
-
-    compile_all_resources(data_store, compilers, n_processes, print_resource_error)
+    data_store: Final = DataStore()
+    compiler: Final = ProjectCompiler(data_store, symbols_file_relpath, n_processes, print_resource_error)
+    compiler.compile_all_resources()
 
     os.chdir(cwd)
 
     if valid:
-        return CompiledData(shared_input, data_store)
+        return data_store
     else:
         return None
 
 
 def insert_resources_into_binary(resources_dir: Filename, symbols: Filename, sfc_input: Filename, n_processes: Optional[int]) -> bytes:
-    co = compile_data(resources_dir, symbols, n_processes)
-    if co is None:
+    data_store = compile_data(resources_dir, symbols, n_processes)
+    if data_store is None:
         raise RuntimeError("Error compiling resources")
 
     sfc_data = bytearray(read_binary_file(sfc_input, 4 * 1024 * 1024))
     sfc_memoryview = memoryview(sfc_data)
 
-    insert_resources(sfc_memoryview, co.shared_input, co.data_store)
-    update_checksum(sfc_memoryview, co.shared_input.mappings.memory_map)
+    insert_resources(sfc_memoryview, data_store)
+    update_checksum(sfc_memoryview, data_store.get_mappings().memory_map)
 
     return sfc_data

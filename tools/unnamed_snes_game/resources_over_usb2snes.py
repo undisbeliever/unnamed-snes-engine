@@ -50,9 +50,7 @@ from typing import cast, Any, Callable, Final, NamedTuple, Optional, Union
 from .ansi_color import AnsiColors
 from .entity_data import ENTITY_ROM_DATA_LABEL, ENTITY_ROM_DATA_BYTES_PER_ENTITY
 from .insert_resources import read_binary_file, validate_sfc_file, ROM_HEADER_V3_ADDR
-from .resources_compiler import DataStore, Compilers, SharedInput, SharedInputType, ResourceData, ResourceError, MetaSpriteResourceData
-from .resources_compiler import load_shared_inputs, check_shared_input_file_changed
-from .resources_compiler import compile_all_resources, compile_resource_lists, compile_msfs_and_entity_data
+from .resources_compiler import DataStore, ProjectCompiler, SharedInputType, ResourceData, ResourceError
 from .json_formats import Name, Filename, MemoryMap
 
 from .common import MultilineError, ResourceType, MS_FS_DATA_BANK_OFFSET, USB2SNES_DATA_BANK_OFFSET, USE_RESOURCES_OVER_USB2SNES_LABEL
@@ -124,8 +122,11 @@ def log_error(s: str, e: Optional[Exception] = None) -> None:
         __print_error(s, e, sys.stdout)
 
 
-def log_resource_error(re: ResourceError) -> None:
-    log_error(f"ERROR: { re.resource_type }[{ re.resource_id}] { re.resource_name }", re.error)
+def log_compiler_error(e: Union[ResourceError, Exception]) -> None:
+    if isinstance(e, ResourceError):
+        log_error(f"ERROR: { e.resource_type }[{ e.resource_id}] { e.resource_name }", e.error)
+    else:
+        log_error("ERROR:", e)
 
 
 def log_fs_watcher(s: str) -> None:
@@ -229,16 +230,14 @@ class FsWatcherSignals:
 
 # ASSUMES: current working directory is the resources directory
 class FsEventHandler(watchdog.events.FileSystemEventHandler):
-    def __init__(self, signals: FsWatcherSignals, data_store: DataStore, compilers: Compilers, n_processes: Optional[int]):
+    def __init__(self, signals: FsWatcherSignals, data_store: DataStore, sym_filename: Filename, n_processes: Optional[int]):
         super().__init__()
 
         self.signals: Final = signals
         self.data_store: Final = data_store
-        self.compilers: Final = compilers
-        self.n_processes: Final = n_processes
+        self._project_compiler: Final = ProjectCompiler(data_store, sym_filename, n_processes, log_compiler_error)
 
-        self.shared_files_with_errors: Final[set[Filename]] = set()
-        self.lists_to_recompile: Final[set[Optional[ResourceType]]] = set()
+        self._project_compiler.compile_all_resources()
 
         self.rebuild_required: bool = False
 
@@ -255,8 +254,6 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
             self.process_file(event.dest_path)
 
     def process_file(self, src_path: str) -> None:
-        # ::TODO do something about these hard coded filenames::
-
         filename: Final = src_path.removeprefix("./")
         ext = os.path.splitext(filename)[1]
 
@@ -266,88 +263,38 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
             self.process_aseprite_file_changed(filename)
             return
 
-        shared_file_changed = self.process_shared_input_file_changed(filename)
+        r = self._project_compiler.file_changed(filename)
+        if r is not None:
+            if isinstance(r, SharedInputType):
+                if r.rebuild_required():
+                    self.rebuild_required = True
+                    self.signals.set_stop_token()
 
-        file_is_resource = shared_file_changed
+            if self.rebuild_required:
+                log_fs_watcher(f"REBUILD REQUIRED")
 
-        if not shared_file_changed:
-            if not self.shared_files_with_errors:
-                rdata = self.compilers.file_changed(filename)
-                if rdata:
-                    file_is_resource = True
-                    self.data_store.insert_data(rdata)
-                    if isinstance(rdata, MetaSpriteResourceData):
-                        self.process_msfs_and_entity_data()
-                    if isinstance(rdata, ResourceError):
-                        log_resource_error(rdata)
-                    else:
-                        log_fs_watcher(f"    Compiled { rdata.resource_type }[{ rdata.resource_id }]: { rdata.resource_name }")
+            if r == SharedInputType.SYMBOLS:
+                # Assumes the `.sfc` file changes when the symbol file changes
+                self.rebuild_required = False
+                self.signals.sfc_file_changed()
+
+            if not self._project_compiler.is_shared_input_valid():
+                # ProjectCompiler is paused until shared inputs are fixed, stop ResourcesOverUsb2Snes
+                self.signals.set_stop_token()
+            elif self.signals.is_stopped():
+                # ProjectCompiler was paused
+                # Continue ResourcesOverUsb2Snes if a rebuild is not required
+                if not self.rebuild_required:
+                    self.signals.set_continue_token()
             else:
-                log_fs_watcher(f"COMPILER PAUSED: Waiting for {self.shared_files_with_errors}")
-
-        if self.rebuild_required:
-            log_fs_watcher(f"REBUILD REQUIRED")
-
-        if file_is_resource:
-            self.signals.resource_changed()
+                # Signal to ResourcesOverUsb2Snes that a resource has changed
+                self.signals.resource_changed()
 
     def process_aseprite_file_changed(self, filename: str) -> None:
         # ASSUMES: current directory is the resources directory
         png_filename = os.path.splitext(filename)[0] + ".png"
         log_fs_watcher(f"    make { png_filename }")
         subprocess.call(("make", png_filename))
-
-    def process_shared_input_file_changed(self, filename: str) -> bool:
-        had_shared_error: Final = bool(self.shared_files_with_errors)
-
-        try:
-            s_type: Final = check_shared_input_file_changed(filename, self.compilers.shared_input)
-        except Exception as e:
-            log_error(f"ERROR loading {filename}", e)
-            self.shared_files_with_errors.add(filename)
-            self.signals.set_stop_token()
-            return True
-
-        if s_type is None:
-            return False
-
-        self.lists_to_recompile.update(self.compilers.shared_input_changed(s_type))
-
-        self.shared_files_with_errors.discard(filename)
-
-        if not self.shared_files_with_errors:
-            # No errors in shared files, we can now recompile data
-            for rt in self.lists_to_recompile:
-                if rt:
-                    log_fs_watcher(f"    Compiling all {rt.name}")
-                else:
-                    log_fs_watcher(f"    Compiling all rooms")
-
-            compile_resource_lists(self.lists_to_recompile, self.data_store, self.compilers, self.n_processes, log_resource_error)
-            self.lists_to_recompile.clear()
-
-        if s_type == SharedInputType.SYMBOLS:
-            # Assumes the `.sfc` file changes when the symbol file changes
-            self.rebuild_required = False
-            self.signals.sfc_file_changed()
-
-        elif s_type.rebuild_required():
-            self.rebuild_required = True
-            self.signals.set_stop_token()
-
-        if self.signals.is_stopped():
-            # Set continue token if there are no shared files with errors
-            if not self.rebuild_required and not self.shared_files_with_errors:
-                self.signals.set_continue_token()
-
-        return True
-
-    def process_msfs_and_entity_data(self) -> None:
-        log_fs_watcher(f"    Compiling MsFs and Entity Data")
-        me_data = compile_msfs_and_entity_data(self.compilers.shared_input, self.data_store.get_msfs_lists())
-        if me_data.error:
-            log_error(f"    ERROR: MsFs and entity_rom_data", me_data.error)
-        self.data_store.insert_msfs_and_entity_data(me_data)
 
 
 # ==================
@@ -547,14 +494,13 @@ class ResourcesOverUsb2Snes:
     # If a request is one of these types, then update msfs_and_entity_data before transferring request data.
     REQUEST_TYPE_USES_MSFS_OR_ENTITY_DATA: Final = (SpecialRequestType.rooms.value, ResourceType.ms_spritesheets.value)
 
-    def __init__(self, usb2snes: Usb2Snes, signals: FsWatcherSignals, data_store: DataStore, shared_input: SharedInput) -> None:
+    def __init__(self, usb2snes: Usb2Snes, data_store: DataStore, signals: FsWatcherSignals) -> None:
         self.usb2snes: Final = usb2snes
         self.data_store: Final = data_store
         self.signals: Final = signals
 
-        symbols = shared_input.symbols
-        memory_map = shared_input.mappings.memory_map
-        n_entities = len(shared_input.entities.entities)
+        mappings, symbols, n_entities = data_store.get_mappings_symbols_and_n_entities()
+        memory_map: Final = mappings.memory_map
 
         address_to_rom_offset: Final = memory_map.mode.address_to_rom_offset
 
@@ -700,7 +646,7 @@ class ResourcesOverUsb2Snes:
         co = self.data_store.get_room_data(room_id)
 
         if isinstance(co, ResourceError):
-            log_resource_error(co)
+            log_compiler_error(co)
             log_notice(f"    Waiting until resource data is ready...")
             while isinstance(co, ResourceError):
                 self.signals.wait_until_resource_changed()
@@ -724,7 +670,7 @@ class ResourcesOverUsb2Snes:
 
         if not isinstance(co, ResourceData):
             if isinstance(co, ResourceError):
-                log_resource_error(co)
+                log_compiler_error(co)
 
             log_notice(f"    Waiting until resource data is ready...")
 
@@ -821,9 +767,7 @@ class ResourcesOverUsb2Snes:
                 self.signals.sleep(NORMAL_REQUEST_SLEEP_DELAY)
 
 
-def create_and_process_websocket(
-    address: str, sfc_file_relpath: Filename, fs_handler: FsEventHandler, signals: FsWatcherSignals
-) -> None:
+def create_and_process_websocket(address: str, sfc_file_relpath: Filename, data_store: DataStore, signals: FsWatcherSignals) -> None:
     sfc_file_basename = os.path.basename(sfc_file_relpath)
 
     with contextlib.closing(websocket.WebSocket()) as ws:
@@ -844,11 +788,11 @@ def create_and_process_websocket(
         signals.sleep(0.5)
 
         while True:
-            shared_input = fs_handler.compilers.shared_input
-
             try:
+                mappings, symbols, n_entities = data_store.get_mappings_symbols_and_n_entities()
+
                 sfc_file_data = read_binary_file(sfc_file_relpath, 512 * 1024)
-                validate_sfc_file(sfc_file_data, shared_input.symbols, shared_input.mappings)
+                validate_sfc_file(sfc_file_data, symbols, mappings)
                 sfc_file_valid = True
             except Exception as e:
                 log_error(f"Error validating {sfc_file_basename}", e)
@@ -856,7 +800,7 @@ def create_and_process_websocket(
 
             if sfc_file_valid:
                 try:
-                    rou2s = ResourcesOverUsb2Snes(usb2snes, signals, fs_handler.data_store, shared_input)
+                    rou2s = ResourcesOverUsb2Snes(usb2snes, data_store, signals)
 
                     while not rou2s.is_correct_rom_running(sfc_file_basename):
                         try:
@@ -864,7 +808,7 @@ def create_and_process_websocket(
                         except StopTokenEncountered:
                             pass
 
-                    if rou2s.test_game_matches_sfc_file(sfc_file_data, shared_input.mappings.memory_map) is False:
+                    if rou2s.test_game_matches_sfc_file(sfc_file_data, mappings.memory_map) is False:
                         log_notice(f"Running game does not match { sfc_file_basename }")
                         rou2s.reset_and_update_rom(sfc_file_data)
                     else:
@@ -894,23 +838,18 @@ def resources_over_usb2snes(sfc_file_relpath: Filename, websocket_address: str, 
 
     sym_file_relpath = os.path.splitext(sfc_file_relpath)[0] + ".sym"
 
-    shared_inputs = load_shared_inputs(sym_file_relpath)
-
     signals = FsWatcherSignals()
 
     # ::TODO compile resources while creating usb2snes connection::
-    compilers = Compilers(shared_inputs)
-    data_store = DataStore(shared_inputs.mappings)
-    compile_all_resources(data_store, compilers, n_processes, log_resource_error)
-
-    fs_handler = FsEventHandler(signals, data_store, compilers, n_processes)
+    data_store = DataStore()
+    fs_handler = FsEventHandler(signals, data_store, sym_file_relpath, n_processes)
 
     fs_observer = watchdog.observers.Observer()  # type: ignore[no-untyped-call]
     fs_observer.schedule(fs_handler, path=".", recursive=True)  # type: ignore[no-untyped-call]
     fs_observer.schedule(fs_handler, path=sym_file_relpath)  # type: ignore[no-untyped-call]
     fs_observer.start()  # type: ignore[no-untyped-call]
 
-    create_and_process_websocket(websocket_address, sfc_file_relpath, fs_handler, signals)
+    create_and_process_websocket(websocket_address, sfc_file_relpath, data_store, signals)
 
     fs_observer.stop()  # type: ignore[no-untyped-call]
     fs_observer.join()
