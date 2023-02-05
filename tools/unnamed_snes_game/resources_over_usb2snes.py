@@ -117,16 +117,16 @@ def __log(s: str, c: str) -> None:
 
 
 # Thread safe printing
-def log_error(s: str, e: Optional[Exception] = None) -> None:
+def log_error(s: str, e: Optional[Union[Exception, str]] = None) -> None:
     with __log_lock:
         __print_error(s, e, sys.stdout)
 
 
-def log_compiler_error(e: Union[ResourceError, Exception]) -> None:
+def log_compiler_error(e: Union[ResourceError, Exception, str]) -> None:
     if isinstance(e, ResourceError):
         log_error(f"ERROR: { e.res_string() }", e.error)
     else:
-        log_error("ERROR:", e)
+        log_error("ERROR", e)
 
 
 def log_compiler_message(s: str) -> None:

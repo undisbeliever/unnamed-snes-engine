@@ -154,7 +154,7 @@ def print_error(msg: str, e: Optional[Union[str, Exception]] = None, fp: Optiona
         fp.write(": ")
         fp.write(ac.NORMAL)
         if isinstance(e, str):
-            sys.stderr.write(e)
+            fp.write(e)
         elif isinstance(e, ValueError) or isinstance(e, RuntimeError):
             fp.write(str(e))
         elif isinstance(e, FileError):
