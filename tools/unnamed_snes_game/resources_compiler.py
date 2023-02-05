@@ -12,7 +12,7 @@ import multiprocessing
 from abc import abstractmethod, ABCMeta
 from enum import unique, auto, Enum
 from dataclasses import dataclass
-from typing import cast, final, Any, Callable, ClassVar, Final, Iterable, NamedTuple, Optional, Sequence, Union
+from typing import cast, final, Any, Callable, ClassVar, Final, Iterable, NamedTuple, Optional, Sequence, Set, Union
 
 from .common import ResourceType
 from .entity_data import create_entity_rom_data
@@ -147,7 +147,7 @@ class DataStore:
                 self._msfa_and_entity_rom_data = None
                 self._msfs_and_entity_data_valid = False
 
-    def insert_msfs_and_entity_data(self, me: MsFsAndEntityOutput) -> None:
+    def set_msfs_and_entity_data(self, me: Optional[MsFsAndEntityOutput]) -> None:
         with self._lock:
             self._msfs_and_entity_data = me
             self._not_room_counter += 1
@@ -518,6 +518,7 @@ class SongCompiler(SimpleResourceCompiler):
 class RoomCompiler:
     def __init__(self, shared_input: SharedInput) -> None:
         self._shared_input: Final = shared_input
+        self.resource_type: Final = None
 
     SHARED_INPUTS = (SharedInputType.MAPPINGS, SharedInputType.ENTITIES)
 
@@ -539,14 +540,36 @@ class RoomCompiler:
             return ResourceError(None, room_id, name, e)
 
 
+def _build_st_rt_map(
+    *compilers: Union[BaseResourceCompiler, RoomCompiler]
+) -> dict[SharedInputType, frozenset[Optional[ResourceType]]]:
+
+    out = dict()
+
+    for s_type in SharedInputType:
+        if s_type is SharedInputType.MAPPINGS:
+            s = list(ResourceType) + [None]
+        else:
+            s = list()
+            for rc in compilers:
+                if s_type in rc.SHARED_INPUTS:
+                    s.append(rc.resource_type)
+        out[s_type] = frozenset(s)
+
+    return out
+
+
 # THREAD SAFETY: Must only exist on a single thread
 class ProjectCompiler:
+    # A set containing all resource lists
+    ALL_RESOURCE_LISTS: Final = frozenset(ResourceType) | frozenset([None])
+
     def __init__(
         self,
         data_store: DataStore,
         sym_filename: Filename,
         n_processes: Optional[int],
-        err_handler: Callable[[Union[ResourceError, Exception]], None],
+        err_handler: Callable[[Union[ResourceError, Exception, str]], None],
         message_handler: Callable[[str], None],
     ) -> None:
 
@@ -559,23 +582,44 @@ class ProjectCompiler:
         self.log_message: Final = message_handler
         self.log_error: Final = err_handler
 
-        # Mark all shared_inputs invalid
-        self.__shared_input_valid: bool = False
-        self.__shared_inputs_with_errors: Final[set[SharedInputType]] = set(SharedInputType)
-
-        self.__resource_compilers: Final = [
+        self.__resource_compilers: Final = (
             MetaTileTilesetCompiler(self.__shared_input),
             MsSpritesheetCompiler(self.__shared_input),
             TileCompiler(self.__shared_input),
             BgImageCompiler(self.__shared_input),
             SongCompiler(self.__shared_input),
-        ]
+        )
         self.__room_compiler: Final = RoomCompiler(self.__shared_input)
 
         assert len(self.__resource_compilers) == len(ResourceType)
 
+        self.ST_RT_MAP: Final = _build_st_rt_map(*self.__resource_compilers, self.__room_compiler)
+
+        # Mark all shared_inputs invalid
+        self.__shared_inputs_with_errors: Final[set[SharedInputType]] = set(SharedInputType)
+
+        # This field serves two purposes:
+        #  * Keeps track of the resource lists to compile when a shared input has changed.
+        #    (If a shared input has an error, the compilation has to be delayed until the errors are fixed)
+        #  * Keeps track of which compilers cannot be used (as they rely on a shared input that is invalid)
+        #
+        # Mark all compilers as unusable.
+        # All compilers need a recompile when the shared inputs are loaded successfully.
+        self.__res_lists_waiting_on_shared_input: Final[set[Optional[ResourceType]]] = set(self.ALL_RESOURCE_LISTS)
+
     def is_shared_input_valid(self) -> bool:
-        return self.__shared_input_valid
+        return not self.__shared_inputs_with_errors
+
+    def compile_everything(self) -> None:
+        # Mark all shared inputs as invalid.
+        # Prevents multiple calls to `__compile_resource_lists()`
+        self.__shared_inputs_with_errors.update(SharedInputType)
+        self.__res_lists_waiting_on_shared_input.update(self.ALL_RESOURCE_LISTS)
+
+        # Load shared inputs
+        # After all shared inputs are loaded, then it will trigger a full recompile
+        for s_type in SharedInputType:
+            self._shared_input_file_changed(s_type)
 
     def file_changed(self, filename: Filename) -> Optional[BaseResourceData | SharedInputType]:
         if filename == self.__shared_input.symbols_filename:
@@ -588,25 +632,45 @@ class ProjectCompiler:
             return s_type
         else:
             co = None
-            if self.__shared_input_valid:
-                # Only compile resources if the shared input is valid
-                if filename.endswith(".tmx"):
+            if filename.endswith(".tmx"):
+                # Test if the room can be compiled (ie, all required shared inputs are valid)
+                if None not in self.__res_lists_waiting_on_shared_input:
                     self.log_message(f"Compiling room {filename}")
                     co = self.__room_compiler.compile_room(filename)
                 else:
-                    for c in self.__resource_compilers:
-                        r_id = c.test_filename_is_resource(filename)
-                        if r_id is not None:
-                            self.log_message(f"Compiling { c.resource_type.name }[{ r_id }] { c.name_list[r_id] }")
+                    self._log_cannot_compile_si_error(filename)
+            else:
+                for c in self.__resource_compilers:
+                    r_id = c.test_filename_is_resource(filename)
+
+                    if r_id is not None:
+                        # Test if the compiler can compile the resource (ie, all required shared inputs are valid)
+                        if c.resource_type not in self.__res_lists_waiting_on_shared_input:
+                            self.log_message(f"Compiling { c.rt_name }[{ r_id }] { c.name_list[r_id] }")
                             co = c.compile_resource(r_id)
-                            break
+                        else:
+                            self._log_cannot_compile_si_error(f"{ c.rt_name }[{ r_id }] { c.name_list[r_id] }")
+                        break
             if co:
                 self.data_store.insert_data(co)
                 if isinstance(co, ResourceError):
                     self.log_error(co)
             return co
 
+    def _log_cannot_compile_si_error(self, res_name: str) -> None:
+        si_list = [SHARED_INPUT_NAMES[s_type] for s_type in self.__shared_inputs_with_errors]
+        self.log_error(f"Cannot compile {res_name}: Errors in shared inputs ({ ', '.join(si_list) })")
+
     def _shared_input_file_changed(self, s_type: SharedInputType) -> None:
+        to_recompile: Final = self.ST_RT_MAP[s_type]
+
+        # Remove resources that depend on the shared input from `data_store`.
+        if s_type != SharedInputType.MAPPINGS:
+            self.data_store.reset_resources(to_recompile)
+
+        # Mark all compilers that rely on the shared input for later recompilation
+        self.__res_lists_waiting_on_shared_input.update(to_recompile)
+
         self.log_message(f"Loading { SHARED_INPUT_NAMES[s_type] } file")
         try:
             self.__shared_input.load(s_type)
@@ -614,7 +678,6 @@ class ProjectCompiler:
         except Exception as e:
             self.log_error(e)
             self.__shared_inputs_with_errors.add(s_type)
-            self.__shared_input_valid = False
             return
 
         if s_type == SharedInputType.MAPPINGS:
@@ -637,38 +700,17 @@ class ProjectCompiler:
         for c in self.__resource_compilers:
             c.shared_input_changed(s_type)
 
-        if self.__shared_input_valid:
-            self.__recompile_resources_using_shared_input(s_type)
-        else:
-            if not self.__shared_inputs_with_errors:
-                # All shared_inputs have been fixed
-                self.__shared_input_valid = True
-                self.__compile_all_resources()
-
-    def __recompile_resources_using_shared_input(self, s_type: SharedInputType) -> None:
-        if s_type is SharedInputType.MAPPINGS:
-            self.__compile_all_resources()
-        else:
-            to_recompile: list[Optional[ResourceType]] = list()
-
-            for rc in self.__resource_compilers:
-                if s_type in rc.SHARED_INPUTS:
-                    self.log_message(f"Compiling all {rc.resource_type.name}")
-                    to_recompile.append(rc.resource_type)
-
-            if s_type in self.__room_compiler.SHARED_INPUTS:
-                self.log_message("Compiling all rooms")
-                to_recompile.append(None)
-
-            self.__compile_resource_lists(to_recompile)
+        if not self.__shared_inputs_with_errors:
+            # No shared inputs have errors.
+            # Compile all resource lists that need recompiling
+            self.__compile_resource_lists(self.__res_lists_waiting_on_shared_input)
+            self.__res_lists_waiting_on_shared_input.clear()
 
     def __compile_msfs_and_entity_data(self) -> None:
-        if not self.__shared_input_valid:
-            raise RuntimeError("Shared Input is not valid")
-
-        assert self.__shared_input.mappings
-        assert self.__shared_input.entities
-        assert self.__shared_input.symbols
+        if self.__shared_input.mappings is None or self.__shared_input.entities is None or self.__shared_input.symbols is None:
+            self._log_cannot_compile_si_error("MsFs and Entity Data")
+            self.data_store.set_msfs_and_entity_data(None)
+            return
 
         optional_msfs_lists: Final = self.data_store.get_msfs_lists()
 
@@ -690,15 +732,24 @@ class ProjectCompiler:
                 self.log_error(e)
                 data = MsFsAndEntityOutput(error=e)
 
-        self.data_store.insert_msfs_and_entity_data(data)
+        self.data_store.set_msfs_and_entity_data(data)
 
-    def __compile_resource_lists(self, to_recompile: Iterable[Optional[ResourceType]]) -> None:
+    def __compile_resource_lists(self, to_recompile: Set[Optional[ResourceType]]) -> None:
         # Uses multiprocessing to speed up the compilation
 
-        if not self.__shared_input_valid:
-            raise RuntimeError("Shared Input is not valid")
+        if self.__shared_inputs_with_errors:
+            # This should not happen, log the error anyway
+            self._log_cannot_compile_si_error("resources")
+            return
 
-        self.data_store.reset_resources(to_recompile)
+        if to_recompile == self.ALL_RESOURCE_LISTS:
+            self.log_message("Compiling all resources")
+        else:
+            for rt in to_recompile:
+                if rt:
+                    self.log_message(f"Compiling all {rt.name}")
+                else:
+                    self.log_message("Compiling all rooms")
 
         with multiprocessing.Pool(processes=self.__n_processes) as mp:
             co_lists = list()
@@ -717,17 +768,3 @@ class ProjectCompiler:
                         self.log_error(co)
 
         self.__compile_msfs_and_entity_data()
-
-    def __compile_all_resources(self) -> None:
-        self.log_message("Compiling all resources")
-
-        to_recompile: list[Optional[ResourceType]] = list(ResourceType)
-        to_recompile.append(None)
-
-        self.__compile_resource_lists(to_recompile)
-
-    def compile_everything(self) -> None:
-        # Load shared inputs
-        # After all shared inputs are loaded, then it will trigger a full recompile
-        for s_type in SharedInputType:
-            self._shared_input_file_changed(s_type)

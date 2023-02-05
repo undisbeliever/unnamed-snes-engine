@@ -6,7 +6,7 @@
 import re
 import sys
 import os.path
-from typing import Callable, Final, NamedTuple, Optional
+from typing import Callable, Final, NamedTuple, Optional, Union
 
 from .common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET, ResourceType, USE_RESOURCES_OVER_USB2SNES_LABEL
 from .common import print_error
@@ -299,7 +299,7 @@ def null_print_function(message: str) -> None:
 def compile_data(resources_directory: Filename, symbols_file: Filename, n_processes: Optional[int]) -> Optional[DataStore]:
     valid = True
 
-    def print_resource_error(e: ResourceError | Exception) -> None:
+    def print_resource_error(e: Union[ResourceError, Exception, str]) -> None:
         nonlocal valid
         valid = False
         if isinstance(e, ResourceError):
