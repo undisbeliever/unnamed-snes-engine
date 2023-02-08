@@ -42,7 +42,7 @@ class BaseResourceData:
     resource_name: Name
 
     def res_string(self) -> str:
-        if self.resource_type:
+        if self.resource_type is not None:
             return f"{ self.resource_type.name }[{ self.resource_id }] { self.resource_name }"
         else:
             return f"room[{ self.resource_id }] { self.resource_name }"
