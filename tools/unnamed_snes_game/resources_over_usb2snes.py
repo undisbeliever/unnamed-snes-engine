@@ -37,7 +37,7 @@ import posixpath
 import threading
 import contextlib
 import subprocess
-import multiprocessing
+from abc import abstractmethod, ABCMeta
 from enum import IntEnum, unique
 
 import websocket  # type: ignore[import]
@@ -166,10 +166,10 @@ class SfcFileChanged(Exception):
     pass
 
 
-# Synchronisation signals/events for FsEventHandler and ResourcesOverUsb2Snes.
+# Synchronisation signals/events for the fs_watcher, usb2snes and gui threads.
 #
 # No idea if this is thread safe or not
-class FsWatcherSignals:
+class FsWatcherSignals(metaclass=ABCMeta):
     def __init__(self) -> None:
         # MUST NOT be modified outside this class
         self._resource_changed_event: Final = threading.Event()
@@ -180,6 +180,7 @@ class FsWatcherSignals:
     # FsEventHandler methods
 
     def resource_changed(self) -> None:
+        self.signal_resource_compiled()
         self._resource_changed_event.set()
 
     def set_stop_token(self) -> None:
@@ -226,6 +227,12 @@ class FsWatcherSignals:
         self._continue_token.clear()
         self._stop_token.clear()
 
+    # GUI methods
+
+    @abstractmethod
+    def signal_resource_compiled(self) -> None:
+        pass
+
 
 #
 # Filesystem watcher
@@ -244,6 +251,8 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
         )
 
         self._project_compiler.compile_everything()
+
+        signals.resource_changed()
 
         self.rebuild_required: bool = False
 
@@ -274,27 +283,20 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
             if isinstance(r, SharedInputType):
                 if r.rebuild_required():
                     self.rebuild_required = True
+                    # Stop ResourcesOverUsb2Snes until the `.sfc` file has been rebuilt
                     self.signals.set_stop_token()
 
             if r == SharedInputType.SYMBOLS:
                 # Assumes the `.sfc` file changes when the symbol file changes
                 self.rebuild_required = False
                 self.signals.sfc_file_changed()
+                self.signals.set_continue_token()
 
             if self.rebuild_required:
                 log_fs_watcher(f"REBUILD REQUIRED")
 
-            if not self._project_compiler.is_shared_input_valid():
-                # ProjectCompiler is paused until shared inputs are fixed, stop ResourcesOverUsb2Snes
-                self.signals.set_stop_token()
-            elif self.signals.is_stopped():
-                # ProjectCompiler was paused
-                # Continue ResourcesOverUsb2Snes if a rebuild is not required
-                if not self.rebuild_required:
-                    self.signals.set_continue_token()
-            else:
-                # Signal to ResourcesOverUsb2Snes that a resource has changed
-                self.signals.resource_changed()
+            # Signal to ResourcesOverUsb2Snes that a resource has changed
+            self.signals.resource_changed()
 
     def process_aseprite_file_changed(self, filename: str) -> None:
         # ASSUMES: current directory is the resources directory
@@ -840,24 +842,30 @@ def create_and_process_websocket(address: str, sfc_file_relpath: Filename, data_
 
 
 # ASSUMES: current working directory is the resources directory
-def resources_over_usb2snes(sfc_file_relpath: Filename, websocket_address: str, n_processes: Optional[int]) -> None:
+def create_fs_watcher_thread(
+    data_store: DataStore, signals: FsWatcherSignals, sfc_file_relpath: Filename, n_processes: Optional[int]
+) -> threading.Thread:
 
     sym_file_relpath = os.path.splitext(sfc_file_relpath)[0] + ".sym"
 
-    signals = FsWatcherSignals()
+    def run() -> None:
+        log_fs_watcher("Starting filesystem watcher")
+        fs_handler = FsEventHandler(signals, data_store, sym_file_relpath, n_processes)
 
-    # ::TODO compile resources while creating usb2snes connection::
-    data_store = DataStore()
+        fs_observer = watchdog.observers.Observer()  # type: ignore[no-untyped-call]
+        fs_observer.schedule(fs_handler, path=".", recursive=True)  # type: ignore[no-untyped-call]
+        fs_observer.schedule(fs_handler, path=sym_file_relpath)  # type: ignore[no-untyped-call]
+        fs_observer.start()  # type: ignore[no-untyped-call]
+        fs_observer.join()
 
-    log_fs_watcher("Starting filesystem watcher")
-    fs_handler = FsEventHandler(signals, data_store, sym_file_relpath, n_processes)
+    return threading.Thread(target=run, daemon=True)
 
-    fs_observer = watchdog.observers.Observer()  # type: ignore[no-untyped-call]
-    fs_observer.schedule(fs_handler, path=".", recursive=True)  # type: ignore[no-untyped-call]
-    fs_observer.schedule(fs_handler, path=sym_file_relpath)  # type: ignore[no-untyped-call]
-    fs_observer.start()  # type: ignore[no-untyped-call]
 
-    create_and_process_websocket(websocket_address, sfc_file_relpath, data_store, signals)
+# ASSUMES: current working directory is the resources directory
+def create_websocket_thread(
+    data_store: DataStore, signals: FsWatcherSignals, sfc_file_relpath: Filename, websocket_address: str
+) -> threading.Thread:
 
-    fs_observer.stop()  # type: ignore[no-untyped-call]
-    fs_observer.join()
+    return threading.Thread(
+        target=create_and_process_websocket, args=(websocket_address, sfc_file_relpath, data_store, signals), daemon=True
+    )

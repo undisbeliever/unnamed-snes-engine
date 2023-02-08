@@ -2,6 +2,7 @@
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
 import sys
+from io import StringIO
 from enum import IntEnum, Enum, unique
 from typing import Callable, Final, Optional, TextIO, Union
 from abc import abstractmethod
@@ -117,6 +118,11 @@ class MultilineError(Exception):
     @abstractmethod
     def print_indented(self, fp: TextIO) -> None:
         pass
+
+    def string_indented(self) -> str:
+        with StringIO() as f:
+            self.print_indented(f)
+            return f.getvalue()
 
 
 class SimpleMultilineError(MultilineError):

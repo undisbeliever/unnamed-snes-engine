@@ -84,7 +84,7 @@ def convert_bg_image(bgi: BackgroundImageInput) -> bytes:
     with PIL.Image.open(bgi.palette) as pal_image:
         pal_image.load()
 
-    tilemap, tile_data, palette_data = image_to_snes(image, pal_image, bpp)
+    tilemap, tile_data, palette_data = image_to_snes(image, bgi.source, pal_image, bpp)
 
     tilemap_data = create_tilemap_data(tilemap, bgi.tile_priority)
 

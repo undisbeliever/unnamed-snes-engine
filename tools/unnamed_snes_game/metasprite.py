@@ -92,15 +92,24 @@ class FrameError(MultilineError):
 
 
 class FramesetError(MultilineError):
-    def __init__(self, fs_name: Name, errors: Union[str, list[Union[str, FrameError, AnimationError]]]):
+    def __init__(self, fs: MsFrameset, errors: Union[str, list[Union[str, FrameError, AnimationError]]]):
         if not isinstance(errors, list):
             errors = [errors]
 
-        self.fs_name: Final = fs_name
+        self.fs_name: Final = fs.name
+        self.image_fn: Final = fs.source
         self.errors: Final = errors
+
+        self.tiles: Final[set[TileError]] = set()
+        for e in errors:
+            if isinstance(e, FrameError):
+                if e.tiles:
+                    self.tiles.update(e.tiles)
 
     def print_indented(self, fp: TextIO) -> None:
         fp.write(f"  Frameset { self.fs_name }: { len(self.errors) } errors\n")
+        if self.tiles:
+            fp.write(f"    { len(self.tiles) } tile errors in { self.image_fn }\n")
         for e in self.errors:
             if isinstance(e, str):
                 fp.write(f"    { e }\n")
@@ -109,8 +118,9 @@ class FramesetError(MultilineError):
 
 
 class SpritesheetError(MultilineError):
-    def __init__(self, errors: list[FramesetError]):
+    def __init__(self, errors: list[FramesetError], ms_dir: str):
         self.errors: Final = errors
+        self.ms_dir: Final = ms_dir
 
     def print_indented(self, fp: TextIO) -> None:
         fp.write(f"{ len(self.errors) } invalid framesets:\n")
@@ -451,7 +461,7 @@ def build_frame_data(
             errors.append(FrameError(frame_name, str(e)))
 
     if errors:
-        raise FramesetError(fs.name, errors)
+        raise FramesetError(fs, errors)
 
     return frames, patterns_used
 
@@ -556,7 +566,7 @@ def extract_frame_locations(
     hurtboxes = build_override_table(fs.hurtbox_overrides, fs.default_hurtbox, fs, errors)
 
     if errors:
-        raise FramesetError(fs.name, errors)
+        raise FramesetError(fs, errors)
 
     frames_per_row: Final = image_width // fs.frame_width
 
@@ -602,7 +612,7 @@ def extract_frame_locations(
                 frame_locations[c.name] = clone_frame_location(source, c.flip, fs, image_width, image_height)
 
     if errors:
-        raise FramesetError(fs.name, errors)
+        raise FramesetError(fs, errors)
 
     return frame_locations
 
@@ -718,7 +728,7 @@ def build_frameset(
         errors.append(f"Unknown export order: { fs.ms_export_order }")
 
     if errors:
-        raise FramesetError(fs.name, errors)
+        raise FramesetError(fs, errors)
 
     # Confirm all frames have been processed
     assert len(frames) == len(fs.frames) + len(fs.clones)
@@ -748,7 +758,7 @@ def build_frameset(
             errors.append(AnimationError(ani.name, str(e)))
 
     if errors:
-        raise FramesetError(fs.name, errors)
+        raise FramesetError(fs, errors)
 
     if len(exported_frames) > MAX_N_FRAMES:
         errors.append(f"Too many frames ({ len(exported_frames) }, max: { MAX_N_FRAMES })")
@@ -767,7 +777,7 @@ def build_frameset(
             errors.append(f"Cannot find animation: { ea_name }")
 
     if errors:
-        raise FramesetError(fs.name, errors)
+        raise FramesetError(fs, errors)
 
     if len(patterns_used) == 1:
         pattern_name = next(iter(patterns_used))
@@ -949,10 +959,10 @@ def convert_spritesheet(ms_input: MsSpritesheet, ms_export_orders: MsExportOrder
         except FramesetError as e:
             errors.append(e)
         except Exception as e:
-            errors.append(FramesetError(fs.name, f"{ type(e).__name__ }({ e })"))
+            errors.append(FramesetError(fs, f"{ type(e).__name__ }({ e })"))
 
     if errors:
-        raise SpritesheetError(errors)
+        raise SpritesheetError(errors, ms_dir)
 
     bin_data = generate_ppu_data(ms_input, tileset.get_tiles(), palette_data)
 

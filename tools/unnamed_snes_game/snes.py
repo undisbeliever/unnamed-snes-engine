@@ -47,8 +47,9 @@ class ImageError(FileError):
 
 
 class InvalidTilesError(MultilineError):
-    def __init__(self, message: str, invalid_tiles: list[int], tilemap_width: int, tile_size: Literal[8, 16]):
+    def __init__(self, message: str, filename: Filename, invalid_tiles: list[int], tilemap_width: int, tile_size: Literal[8, 16]):
         self.message: Final = message
+        self.filename: Final = filename
         self.invalid_tiles: Final = invalid_tiles
         self.tilemap_width: Final = tilemap_width
         self.tile_size: Final = tile_size
@@ -57,7 +58,7 @@ class InvalidTilesError(MultilineError):
         to_print: Final = min(48, len(self.invalid_tiles))
         per_line: Final = 16
 
-        fp.write(f"{ self.message } for { len(self.invalid_tiles) } { self.tile_size }px tiles:")
+        fp.write(f"{ self.message } for { len(self.invalid_tiles) } { self.tile_size }px tiles in { self.filename }:")
         for i in range(0, to_print, per_line):
             fp.write(f"\n   ")
             fp.write(",".join(f"{t:5}" for t in self.invalid_tiles[i : i + per_line]))
@@ -253,7 +254,7 @@ def split_large_tile(tile: LargeTileData) -> tuple[SmallTileData, SmallTileData,
 
 
 def convert_tilemap_and_tileset(
-    tiles: Generator[SmallColorTile, None, None], palettes_map: list[PaletteMap], map_width: int, map_height: int
+    tiles: Generator[SmallColorTile, None, None], filename: Filename, palettes_map: list[PaletteMap], map_width: int, map_height: int
 ) -> tuple[TileMap, list[SmallTileData]]:
     # Returns a tuple(tilemap, tileset)
 
@@ -294,7 +295,7 @@ def convert_tilemap_and_tileset(
             invalid_tiles.append(tile_index)
 
     if invalid_tiles:
-        raise InvalidTilesError("Cannot find palette", invalid_tiles, map_width, 8)
+        raise InvalidTilesError("Cannot find palette", filename, invalid_tiles, map_width, 8)
 
     assert len(tilemap) == map_width * map_height
 
@@ -354,11 +355,13 @@ def create_tilemap_data_high(tilemap: Union[TileMap, Sequence[TileMapEntry]], de
     return data
 
 
-def image_to_snes(image: PIL.Image.Image, palette_image: PIL.Image.Image, bpp: int) -> tuple[TileMap, bytes, bytes]:
+def image_to_snes(
+    image: PIL.Image.Image, image_filename: Filename, palette_image: PIL.Image.Image, bpp: int
+) -> tuple[TileMap, bytes, bytes]:
     # Return (tilemap, tile_data, palette_data)
 
     tilemap, tileset = convert_tilemap_and_tileset(
-        extract_small_tile_grid(image), create_palettes_map(palette_image, bpp), image.width // 8, image.height // 8
+        extract_small_tile_grid(image), image_filename, create_palettes_map(palette_image, bpp), image.width // 8, image.height // 8
     )
 
     tile_data = convert_snes_tileset(tileset, bpp)

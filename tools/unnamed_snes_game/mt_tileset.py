@@ -306,7 +306,7 @@ def convert_mt_tileset(tsx_filename: Filename, mappings: Mappings) -> bytes:
             if image.width != 256 or image.height != 256:
                 raise ImageError(tsx_file.image_filename, "Tileset Image MUST BE 256x256 px in size")
 
-            tilemap, tile_data, palette_data = image_to_snes(image, palette_image, TILE_DATA_BPP)
+            tilemap, tile_data, palette_data = image_to_snes(image, tsx_file.image_filename, palette_image, TILE_DATA_BPP)
 
     error_list: list[str] = list()
 

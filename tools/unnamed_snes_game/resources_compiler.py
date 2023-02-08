@@ -10,6 +10,7 @@ import threading
 import subprocess
 import multiprocessing
 from abc import abstractmethod, ABCMeta
+from collections import OrderedDict
 from enum import unique, auto, Enum
 from dataclasses import dataclass
 from typing import cast, final, Any, Callable, ClassVar, Final, Iterable, NamedTuple, Optional, Sequence, Set, Union
@@ -27,6 +28,19 @@ from .json_formats import load_mappings_json, load_entities_json, load_ms_export
 from .json_formats import load_metasprites_json, Name, ScopedName, Filename, JsonError, MemoryMap, Mappings, EntitiesJson
 from .json_formats import MsExportOrder, OtherResources, TilesInput, BackgroundImageInput
 from .audio.json_formats import load_samples_json, SamplesJson
+
+
+@unique
+class SharedInputType(Enum):
+    MAPPINGS = auto()
+    ENTITIES = auto()
+    OTHER_RESOURCES = auto()
+    MS_EXPORT_ORDER = auto()
+    AUDIO_SAMPLES = auto()
+    SYMBOLS = auto()
+
+    def rebuild_required(self) -> bool:
+        return self in REBUILD_REQUIRED_MAPPINS
 
 
 #
@@ -58,15 +72,38 @@ class MetaSpriteResourceData(ResourceData):
     msfs_entries: list[MsFsEntry]
 
 
-@dataclass(frozen=True)
-class ResourceError(BaseResourceData):
-    error: Exception
-
-
 class MsFsAndEntityOutput(NamedTuple):
     msfs_data: Optional[bytes] = None
     entity_rom_data: Optional[bytes] = None
     error: Optional[Exception] = None
+
+
+# Used to track errors in the DataStore
+class ErrorKey(NamedTuple):
+    r_type: Optional[ResourceType]
+    r_id: Union[int, SharedInputType]
+
+
+MS_FS_AND_ENTITY_ERROR_KEY: Final = ErrorKey(None, -1)
+
+
+class NonResourceError(NamedTuple):
+    error_key: ErrorKey
+    name: str
+    error: Exception
+
+    def res_string(self) -> str:
+        return self.name
+
+
+@dataclass(frozen=True)
+class ResourceError(BaseResourceData):
+    error_key: ErrorKey
+    error: Exception
+
+
+def create_resource_error(r_type: Optional[ResourceType], r_id: int, r_name: Name, error: Exception) -> ResourceError:
+    return ResourceError(r_type, r_id, r_name, ErrorKey(r_type, r_id), error)
 
 
 # Thread Safety: This class MUST ONLY be accessed via method calls.
@@ -84,6 +121,8 @@ class DataStore:
 
             self._resources: list[list[Optional[BaseResourceData]]] = [list() for rt in ResourceType]
             self._rooms: list[Optional[BaseResourceData]] = list()
+
+            self._errors: OrderedDict[ErrorKey, Union[ResourceError, NonResourceError]] = OrderedDict()
 
             self._msfs_lists: list[Optional[list[MsFsEntry]]] = list()
 
@@ -133,6 +172,15 @@ class DataStore:
         with self._lock:
             self._n_entities = n_entities
 
+    def add_non_resource_error(self, e: NonResourceError) -> None:
+        with self._lock:
+            self._errors[e.error_key] = e
+
+    def clear_shared_input_error(self, s_type: SharedInputType) -> None:
+        with self._lock:
+            key: Final = ErrorKey(None, s_type)
+            self._errors.pop(key, None)
+
     def insert_data(self, c: BaseResourceData) -> None:
         with self._lock:
             if c.resource_type is None:
@@ -147,10 +195,22 @@ class DataStore:
                 self._msfa_and_entity_rom_data = None
                 self._msfs_and_entity_data_valid = False
 
+            if isinstance(c, ResourceError):
+                self._errors[c.error_key] = c
+            else:
+                e_key: Final = ErrorKey(c.resource_type, c.resource_id)
+                self._errors.pop(e_key, None)
+
     def set_msfs_and_entity_data(self, me: Optional[MsFsAndEntityOutput]) -> None:
         with self._lock:
             self._msfs_and_entity_data = me
             self._not_room_counter += 1
+            if me:
+                if me.error:
+                    e = NonResourceError(MS_FS_AND_ENTITY_ERROR_KEY, "MsFs and entity data", me.error)
+                    self._errors[e.error_key] = e
+                else:
+                    self._errors.pop(MS_FS_AND_ENTITY_ERROR_KEY, None)
 
     def get_not_room_counter(self) -> int:
         with self._lock:
@@ -196,6 +256,10 @@ class DataStore:
         with self._lock:
             return self._rooms[room_id]
 
+    def get_errors(self) -> list[Union[ResourceError, NonResourceError]]:
+        with self._lock:
+            return list(self._errors.values())
+
     # Assumes no errors in the DataStore
     def get_all_data_for_type(self, r_type: ResourceType) -> list[bytes]:
         with self._lock:
@@ -210,19 +274,6 @@ class DataStore:
 #
 # Shared Input
 # ============
-
-
-@unique
-class SharedInputType(Enum):
-    MAPPINGS = auto()
-    ENTITIES = auto()
-    OTHER_RESOURCES = auto()
-    MS_EXPORT_ORDER = auto()
-    AUDIO_SAMPLES = auto()
-    SYMBOLS = auto()
-
-    def rebuild_required(self) -> bool:
-        return self in REBUILD_REQUIRED_MAPPINS
 
 
 REBUILD_REQUIRED_MAPPINS: Final = (SharedInputType.MAPPINGS, SharedInputType.ENTITIES, SharedInputType.MS_EXPORT_ORDER)
@@ -362,7 +413,7 @@ class SimpleResourceCompiler(BaseResourceCompiler):
             data = self._compile(r_name)
             return ResourceData(self.resource_type, resource_id, r_name, data)
         except Exception as e:
-            return ResourceError(self.resource_type, resource_id, r_name, e)
+            return create_resource_error(self.resource_type, resource_id, r_name, e)
 
     @abstractmethod
     def _compile(self, r_name: Name) -> bytes:
@@ -416,7 +467,7 @@ class MsSpritesheetCompiler(BaseResourceCompiler):
 
             return MetaSpriteResourceData(self.resource_type, resource_id, r_name, data, msfs_entries)
         except Exception as e:
-            return ResourceError(self.resource_type, resource_id, r_name, e)
+            return create_resource_error(self.resource_type, resource_id, r_name, e)
 
 
 class MetaTileTilesetCompiler(SimpleResourceCompiler):
@@ -537,7 +588,7 @@ class RoomCompiler:
 
             return ResourceData(None, room_id, name, data)
         except Exception as e:
-            return ResourceError(None, room_id, name, e)
+            return create_resource_error(None, room_id, name, e)
 
 
 def _build_st_rt_map(
@@ -675,9 +726,13 @@ class ProjectCompiler:
         try:
             self.__shared_input.load(s_type)
             self.__shared_inputs_with_errors.discard(s_type)
+            self.data_store.clear_shared_input_error(s_type)
         except Exception as e:
             self.log_error(e)
             self.__shared_inputs_with_errors.add(s_type)
+
+            error = NonResourceError(ErrorKey(None, s_type), SHARED_INPUT_NAMES[s_type], e)
+            self.data_store.add_non_resource_error(error)
             return
 
         if s_type == SharedInputType.MAPPINGS:
