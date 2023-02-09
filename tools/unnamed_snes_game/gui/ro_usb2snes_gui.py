@@ -23,15 +23,55 @@ if tkinter.Tcl().eval("set tcl_platform(threaded)") != "1":
 
 class GuiSignals(FsWatcherSignals):
     RES_COMPILED_EVENT_NAME: Final = "<<ResCompiled>>"
+    STATUS_CHANGED_EVENT_NAME: Final = "<<StatusChanged>>"
 
     def __init__(self, root: tk.Tk):
         super().__init__()
         self.root: Final = root
 
+    def signal_status_changed(self) -> None:
+        # `event_generate` is thread safe
+        # https://tkdocs.com/tutorial/eventloop.html#threads
+        self.root.event_generate(self.STATUS_CHANGED_EVENT_NAME)
+
     def signal_resource_compiled(self) -> None:
         # `event_generate` is thread safe
         # https://tkdocs.com/tutorial/eventloop.html#threads
         self.root.event_generate(self.RES_COMPILED_EVENT_NAME)
+
+
+class StatusBar:
+    def __init__(self, signals: GuiSignals, parent: tk.Tk):
+        self.signals: Final = signals
+
+        self.frame: Final = tk.Frame(parent)
+        self.frame.columnconfigure(2, weight=1)
+        self.frame.columnconfigure(4, weight=2)
+
+        status1: Final = tk.Label(self.frame, text="FS Watcher:  ")
+        status1.grid(row=0, column=1, sticky=tk.W)
+
+        self.fs_status: Final = tk.StringVar()
+        fs_status_l: Final = tk.Label(self.frame, textvariable=self.fs_status, anchor=tk.W, borderwidth=2, relief=tk.SUNKEN, width=15)
+        fs_status_l.grid(row=0, column=2, sticky=tk.EW)
+
+        status2: Final = tk.Label(self.frame, text="usb2snes:  ")
+        status2.grid(row=0, column=3, sticky=tk.W)
+
+        self.usb2snes_status: Final = tk.StringVar()
+        usb2snes_status_l: Final = tk.Label(
+            self.frame, textvariable=self.usb2snes_status, anchor=tk.W, borderwidth=2, relief=tk.SUNKEN, width=25
+        )
+        usb2snes_status_l.grid(row=0, column=4, sticky=tk.EW)
+
+        # ::TODO add a pause/resume button::
+
+        self.on_status_changed(None)
+
+    def on_status_changed(self, event: Any) -> None:
+        fs_status, usb2snes_status = self.signals.get_status()
+        self.fs_status.set(fs_status)
+        self.usb2snes_status.set(usb2snes_status)
 
 
 class Rou2sWindow:
@@ -43,18 +83,25 @@ class Rou2sWindow:
         self.signals: Final = GuiSignals(self._window)
 
         self._window.title("Resources over usb2snes")
-        self._window.minsize(width=1000, height=700)
+        self._window.minsize(width=400, height=400)
 
         self._window.columnconfigure(0, weight=1)
-        self._window.rowconfigure(0, weight=1)
+        self._window.rowconfigure(2, weight=1)
+
+        self._statusbar: Final = StatusBar(self.signals, self._window)
+        self._statusbar.frame.grid(row=0, column=0, sticky=tk.EW)
+
+        separator: Final = ttk.Separator(self._window, orient=tk.HORIZONTAL)
+        separator.grid(row=1, column=0, sticky=tk.EW)
 
         self._notebook: Final = ttk.Notebook(self._window)
-        self._notebook.grid(row=0, column=0, columnspan=2, sticky=tk.NSEW)
+        self._notebook.grid(row=2, column=0, sticky=tk.NSEW)
 
         self._errors_tab: Final = ErrorsTab(data_store, self._notebook)
         self._notebook.add(self._errors_tab.frame, text="Errors")
 
         # Signals
+        self._window.bind(GuiSignals.STATUS_CHANGED_EVENT_NAME, self._statusbar.on_status_changed)
         self._window.bind(GuiSignals.RES_COMPILED_EVENT_NAME, self._errors_tab.on_resource_compiled)
 
     def mainloop(self) -> None:

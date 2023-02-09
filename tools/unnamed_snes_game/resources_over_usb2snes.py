@@ -177,6 +177,26 @@ class FsWatcherSignals(metaclass=ABCMeta):
         self._continue_token: Final = threading.Event()
         self._sym_file_changed_event: Final = threading.Event()
 
+        # lock MUST be used on all non event or queue fields
+        self._status_lock: Final = threading.Lock()
+        self._fs_watcher_status: str = ""
+        self._usb2snes_status: str = ""
+
+    # State methods
+    def set_fs_watcher_status(self, state: str) -> None:
+        with self._status_lock:
+            self._fs_watcher_status = state
+        self.signal_status_changed()
+
+    def set_usb2snes_status(self, state: str) -> None:
+        with self._status_lock:
+            self._usb2snes_status = state
+        self.signal_status_changed()
+
+    def get_status(self) -> tuple[str, str]:
+        with self._status_lock:
+            return self._fs_watcher_status, self._usb2snes_status
+
     # FsEventHandler methods
 
     def resource_changed(self) -> None:
@@ -230,6 +250,10 @@ class FsWatcherSignals(metaclass=ABCMeta):
     # GUI methods
 
     @abstractmethod
+    def signal_status_changed(self) -> None:
+        pass
+
+    @abstractmethod
     def signal_resource_compiled(self) -> None:
         pass
 
@@ -250,7 +274,11 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
             data_store, sym_filename, n_processes, log_compiler_error, log_compiler_message
         )
 
+        signals.set_fs_watcher_status("Compiling")
+
         self._project_compiler.compile_everything()
+
+        signals.set_fs_watcher_status("Running")
 
         signals.resource_changed()
 
@@ -289,10 +317,12 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
             if r == SharedInputType.SYMBOLS:
                 # Assumes the `.sfc` file changes when the symbol file changes
                 self.rebuild_required = False
+                self.signals.set_fs_watcher_status("Running")
                 self.signals.sfc_file_changed()
                 self.signals.set_continue_token()
 
             if self.rebuild_required:
+                self.signals.set_fs_watcher_status("REBUILD REQUIRED")
                 log_fs_watcher(f"REBUILD REQUIRED")
 
             # Signal to ResourcesOverUsb2Snes that a resource has changed
@@ -785,6 +815,7 @@ def create_and_process_websocket(address: str, sfc_file_relpath: Filename, data_
 
         connected: bool = usb2snes.find_and_attach_device()
         if not connected:
+            signals.set_usb2snes_status("Cannot connect to usb2snes")
             raise RuntimeError("Could not connect to usb2snes device.")
 
         log_success(f"Connected to { usb2snes.device_name() }")
@@ -810,6 +841,7 @@ def create_and_process_websocket(address: str, sfc_file_relpath: Filename, data_
                 try:
                     rou2s = ResourcesOverUsb2Snes(usb2snes, data_store, signals)
 
+                    signals.set_usb2snes_status(f"Device not running {sfc_file_basename}")
                     while not rou2s.is_correct_rom_running(sfc_file_basename):
                         try:
                             signals.sleep(INCORRECT_ROM_SLEEP_DELAY)
@@ -818,9 +850,12 @@ def create_and_process_websocket(address: str, sfc_file_relpath: Filename, data_
 
                     if rou2s.test_game_matches_sfc_file(sfc_file_data, mappings.memory_map) is False:
                         log_notice(f"Running game does not match { sfc_file_basename }")
+                        signals.set_usb2snes_status("Updating binary...")
                         rou2s.reset_and_update_rom(sfc_file_data)
                     else:
                         log_success(f"Running game matches { sfc_file_basename }")
+
+                    signals.set_usb2snes_status("Running")
 
                     while True:
                         try:
@@ -836,6 +871,7 @@ def create_and_process_websocket(address: str, sfc_file_relpath: Filename, data_
                 del rou2s
             else:
                 log_notice(f"Waiting until {sfc_file_basename} is rebuilt")
+                signals.set_usb2snes_status("Waiting for binary rebuild")
 
                 # Wait until the binary has been rebuilt
                 signals.wait_until_sfc_binary_changed()
