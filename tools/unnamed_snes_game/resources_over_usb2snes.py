@@ -179,6 +179,8 @@ class FsWatcherSignals(metaclass=ABCMeta):
         self._connect_button_event: Final = threading.Event()
         self._disconnect_event: Final = threading.Event()
 
+        self._quit_event: Final = threading.Event()
+
         # lock MUST be used on all non event or queue fields
         self._status_lock: Final = threading.Lock()
         self._fs_watcher_status: str = ""
@@ -212,6 +214,12 @@ class FsWatcherSignals(metaclass=ABCMeta):
         self._sym_file_changed_event.set()
         self._resource_changed_event.set()
 
+    def send_quit_event(self) -> None:
+        self._quit_event.set()
+        # Interrupt `sleep()` and `wait_until_*()` events
+        self.send_disconnect_event()
+        self._connect_button_event.set()
+
     # FsEventHandler methods
 
     def resource_changed(self) -> None:
@@ -226,7 +234,13 @@ class FsWatcherSignals(metaclass=ABCMeta):
     def sfc_file_changed(self) -> None:
         self._sym_file_changed_event.set()
 
+    def wait_until_quit(self) -> None:
+        self._quit_event.wait()
+
     # ResourcesOverUsb2Snes methods
+
+    def is_quit_event_set(self) -> bool:
+        return self._quit_event.is_set()
 
     def set_disconnected_flag(self) -> None:
         self._disconnect_event.set()
@@ -266,7 +280,6 @@ class FsWatcherSignals(metaclass=ABCMeta):
             raise DisconnectEventException()
 
     def wait_for_ws_connect_button(self) -> None:
-        # Mark websocket as disconnected
         self._connect_button_event.wait()
         self._connect_button_event.clear()
 
@@ -282,6 +295,33 @@ class FsWatcherSignals(metaclass=ABCMeta):
 
     @abstractmethod
     def signal_ws_connection_changed(self) -> None:
+        pass
+
+    # Called when a BgThread stops
+    @abstractmethod
+    def signal_bg_thread_stopped(self) -> None:
+        pass
+
+
+#
+# BG Threads
+# ==========
+
+
+class BgThread(threading.Thread):
+    def __init__(self, signals: FsWatcherSignals, name: str) -> None:
+        super().__init__(name=name)
+        self.signals: Final = signals
+
+    @final
+    def run(self) -> None:
+        try:
+            self.run_bg_thread()
+        finally:
+            self.signals.signal_bg_thread_stopped()
+
+    @abstractmethod
+    def run_bg_thread(self) -> None:
         pass
 
 
@@ -359,6 +399,37 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
         png_filename = os.path.splitext(filename)[0] + ".png"
         log_fs_watcher(f"    make { png_filename }")
         subprocess.call(("make", png_filename))
+
+
+class FsWatcherThread(BgThread):
+    def __init__(
+        self, data_store: DataStore, signals: FsWatcherSignals, sfc_file_relpath: Filename, n_processes: Optional[int]
+    ) -> None:
+        super().__init__(signals, name="FS Watcher")
+
+        self.data_store: Final = data_store
+        self.sym_file_relpath: Final = os.path.splitext(sfc_file_relpath)[0] + ".sym"
+        self.n_processes: Final = n_processes
+
+    @final
+    def run_bg_thread(self) -> None:
+        try:
+            log_fs_watcher("Starting filesystem watcher")
+            fs_handler = FsEventHandler(self.signals, self.data_store, self.sym_file_relpath, self.n_processes)
+
+            fs_observer = watchdog.observers.Observer()  # type: ignore[no-untyped-call]
+            fs_observer.schedule(fs_handler, path=".", recursive=True)  # type: ignore[no-untyped-call]
+            fs_observer.schedule(fs_handler, path=self.sym_file_relpath)  # type: ignore[no-untyped-call]
+            fs_observer.start()  # type: ignore[no-untyped-call]
+
+            self.signals.wait_until_quit()
+
+        finally:
+            log_fs_watcher("Stopping filesystem watcher")
+            self.signals.set_fs_watcher_status("Stopped")
+
+            fs_observer.stop()  # type: ignore[no-untyped-call]
+            fs_observer.join()
 
 
 # ==================
@@ -835,14 +906,12 @@ class ResourcesOverUsb2Snes:
                 self.signals.request_sleep(NORMAL_REQUEST_SLEEP_DELAY)
 
 
-class WebsocketThread(threading.Thread):
-    def __init__(
-        self, data_store: DataStore, signals: FsWatcherSignals, sfc_file_relpath: Filename, ws_address: str, **kwargs: Any
-    ) -> None:
-        super().__init__(**kwargs)
+# ASSUMES: current working directory is the resources directory
+class WebsocketThread(BgThread):
+    def __init__(self, data_store: DataStore, signals: FsWatcherSignals, sfc_file_relpath: Filename, ws_address: str) -> None:
+        super().__init__(signals, name="Websocket")
 
         self.data_store: Final = data_store
-        self.signals: Final = signals
         self.sfc_file_relpath: Final = sfc_file_relpath
         self.sfc_file_basename: Final = os.path.basename(sfc_file_relpath)
         self.ws_address: Final = ws_address
@@ -923,58 +992,35 @@ class WebsocketThread(threading.Thread):
                 self.signals.set_usb2snes_status("Cannot connect to usb2snes")
                 self.signals.sleep(INCORRECT_ROM_SLEEP_DELAY)
 
+    def start_websocket(self) -> None:
+        try:
+            with contextlib.closing(websocket.WebSocket()) as ws:
+                ws.connect(self.ws_address, origin="http://localhost")
+
+                self.signals.clear_disconnected_flag()
+
+                self.process_websocket(ws)
+
+        except DisconnectEventException:
+            log_notice("Closed websocket")
+            self.signals.set_usb2snes_status("Closed")
+
+        except ConnectionRefusedError as e:
+            ws_connected = False
+            log_error(f"Cannot connect to {self.ws_address}", e)
+            self.signals.set_usb2snes_status(f"Cannot connect to {self.ws_address}: {e}")
+
+        except Exception as e:
+            log_error("Websocket ERROR", e)
+            self.signals.set_usb2snes_status(type(e).__name__)
+
     @final
-    def run(self) -> None:
-        while True:
-            try:
-                with contextlib.closing(websocket.WebSocket()) as ws:
-                    ws.connect(self.ws_address, origin="http://localhost")
+    def run_bg_thread(self) -> None:
+        while not self.signals.is_quit_event_set():
+            self.start_websocket()
 
-                    self.signals.clear_disconnected_flag()
+            if not self.signals.is_quit_event_set():
+                self.signals.set_disconnected_flag()
+                self.signals.wait_for_ws_connect_button()
 
-                    self.process_websocket(ws)
-
-            except DisconnectEventException:
-                log_fs_watcher("Closed websocket")
-                self.signals.set_usb2snes_status("Closed")
-                pass
-
-            except ConnectionRefusedError as e:
-                ws_connected = False
-                log_error(f"Cannot connect to {self.ws_address}", e)
-                self.signals.set_usb2snes_status(f"Cannot connect to {self.ws_address}: {e}")
-
-            except Exception as e:
-                log_error("Websocket ERROR", e)
-                self.signals.set_usb2snes_status(type(e).__name__)
-
-            self.signals.set_disconnected_flag()
-            self.signals.wait_for_ws_connect_button()
-
-
-# ASSUMES: current working directory is the resources directory
-def create_fs_watcher_thread(
-    data_store: DataStore, signals: FsWatcherSignals, sfc_file_relpath: Filename, n_processes: Optional[int]
-) -> threading.Thread:
-
-    sym_file_relpath = os.path.splitext(sfc_file_relpath)[0] + ".sym"
-
-    def run() -> None:
-        log_fs_watcher("Starting filesystem watcher")
-        fs_handler = FsEventHandler(signals, data_store, sym_file_relpath, n_processes)
-
-        fs_observer = watchdog.observers.Observer()  # type: ignore[no-untyped-call]
-        fs_observer.schedule(fs_handler, path=".", recursive=True)  # type: ignore[no-untyped-call]
-        fs_observer.schedule(fs_handler, path=sym_file_relpath)  # type: ignore[no-untyped-call]
-        fs_observer.start()  # type: ignore[no-untyped-call]
-        fs_observer.join()
-
-    return threading.Thread(target=run, daemon=True)
-
-
-# ASSUMES: current working directory is the resources directory
-def create_websocket_thread(
-    data_store: DataStore, signals: FsWatcherSignals, sfc_file_relpath: Filename, websocket_address: str
-) -> threading.Thread:
-
-    return WebsocketThread(data_store, signals, sfc_file_relpath, websocket_address, daemon=True)
+        self.signals.set_usb2snes_status("Stopped")

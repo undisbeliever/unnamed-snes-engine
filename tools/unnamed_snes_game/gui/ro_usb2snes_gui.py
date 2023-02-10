@@ -11,7 +11,7 @@ import tkinter.messagebox
 
 from .errors_tab import ErrorsTab
 
-from ..resources_over_usb2snes import FsWatcherSignals
+from ..resources_over_usb2snes import FsWatcherSignals, BgThread
 from ..resources_compiler import DataStore
 from .. import metasprite as ms
 
@@ -25,6 +25,7 @@ class GuiSignals(FsWatcherSignals):
     RES_COMPILED_EVENT_NAME: Final = "<<ResCompiled>>"
     STATUS_CHANGED_EVENT_NAME: Final = "<<StatusChanged>>"
     WS_CONNECTION_CHANGED_EVENT_NAME: Final = "<<WsConnectionChanged>>"
+    BG_THREAD_STOPPED_EVENT_NAME: Final = "<<BgThreadStopped>>"
 
     def __init__(self, root: tk.Tk):
         super().__init__()
@@ -42,6 +43,9 @@ class GuiSignals(FsWatcherSignals):
 
     def signal_ws_connection_changed(self) -> None:
         self.root.event_generate(self.WS_CONNECTION_CHANGED_EVENT_NAME)
+
+    def signal_bg_thread_stopped(self) -> None:
+        self.root.event_generate(self.BG_THREAD_STOPPED_EVENT_NAME)
 
 
 class StatusBar:
@@ -96,6 +100,11 @@ class Rou2sWindow:
 
         self.signals: Final = GuiSignals(self._window)
 
+        self._bg_threads: Final[list[BgThread]] = list()
+        self._n_stopped_threads = 0
+
+        self._window.protocol("WM_DELETE_WINDOW", self._on_close_request)
+
         self._window.title("Resources over usb2snes")
         self._window.minsize(width=400, height=400)
 
@@ -118,6 +127,24 @@ class Rou2sWindow:
         self._window.bind(GuiSignals.STATUS_CHANGED_EVENT_NAME, self._statusbar.on_status_changed)
         self._window.bind(GuiSignals.WS_CONNECTION_CHANGED_EVENT_NAME, self._statusbar.on_ws_connected_status_changed)
         self._window.bind(GuiSignals.RES_COMPILED_EVENT_NAME, self._errors_tab.on_resource_compiled)
+        self._window.bind(GuiSignals.BG_THREAD_STOPPED_EVENT_NAME, self._on_bg_thread_stopped)
+
+    def add_and_start_bg_thread(self, t: BgThread) -> None:
+        self._bg_threads.append(t)
+        t.start()
+
+    def _on_close_request(self) -> None:
+        self.signals.send_quit_event()
+        # Cannot put a join here, system deadlocks in when a BG Thread sends a signal to the GUI MainThread.
+        #
+        # Instead, closed BgThreads will send a `GuiSignals.BG_THREAD_STOPPED_EVENT_NAME` signal when they are finished.
+        # (which is handled by `_on_bg_thread_stopped()`)
+
+    # Close the window when all of the BG threads have ended
+    def _on_bg_thread_stopped(self, event: Any) -> None:
+        self._n_stopped_threads += 1
+        if self._n_stopped_threads >= len(self._bg_threads):
+            self._window.quit()
 
     def mainloop(self) -> None:
         self._window.mainloop()
