@@ -45,13 +45,13 @@ import websocket  # type: ignore[import]
 import watchdog.events
 import watchdog.observers
 
-from typing import cast, Any, Callable, Final, NamedTuple, Optional, Union
+from typing import cast, final, Any, Callable, Final, NamedTuple, Optional, Union
 
 from .ansi_color import AnsiColors
 from .entity_data import ENTITY_ROM_DATA_LABEL, ENTITY_ROM_DATA_BYTES_PER_ENTITY
 from .insert_resources import read_binary_file, validate_sfc_file, ROM_HEADER_V3_ADDR
 from .resources_compiler import DataStore, ProjectCompiler, SharedInputType, ResourceData, ResourceError
-from .json_formats import Name, Filename, MemoryMap
+from .json_formats import Name, Filename, Mappings, MemoryMap
 
 from .common import MultilineError, ResourceType, MS_FS_DATA_BANK_OFFSET, USB2SNES_DATA_BANK_OFFSET, USE_RESOURCES_OVER_USB2SNES_LABEL
 from .common import print_error as __print_error
@@ -158,11 +158,11 @@ def log_success(s: str) -> None:
 # =======
 
 
-class StopTokenEncountered(Exception):
+class RebuildRequiredException(Exception):
     pass
 
 
-class SfcFileChanged(Exception):
+class DisconnectEventException(Exception):
     pass
 
 
@@ -171,11 +171,13 @@ class SfcFileChanged(Exception):
 # No idea if this is thread safe or not
 class FsWatcherSignals(metaclass=ABCMeta):
     def __init__(self) -> None:
-        # MUST NOT be modified outside this class
+        # All fields MUST NOT be modified outside this class
         self._resource_changed_event: Final = threading.Event()
-        self._stop_token: Final = threading.Event()
-        self._continue_token: Final = threading.Event()
+        self._rebuild_required_event: Final = threading.Event()
         self._sym_file_changed_event: Final = threading.Event()
+
+        self._connect_button_event: Final = threading.Event()
+        self._disconnect_event: Final = threading.Event()
 
         # lock MUST be used on all non event or queue fields
         self._status_lock: Final = threading.Lock()
@@ -197,55 +199,76 @@ class FsWatcherSignals(metaclass=ABCMeta):
         with self._status_lock:
             return self._fs_watcher_status, self._usb2snes_status
 
+    # GUI methods
+    def is_connected(self) -> bool:
+        return not self._disconnect_event.is_set()
+
+    def send_connect_event(self) -> None:
+        self._connect_button_event.set()
+
+    def send_disconnect_event(self) -> None:
+        self._disconnect_event.set()
+        # Interrupt `sleep()` and `wait_until_*()` events
+        self._sym_file_changed_event.set()
+        self._resource_changed_event.set()
+
     # FsEventHandler methods
 
     def resource_changed(self) -> None:
         self.signal_resource_compiled()
         self._resource_changed_event.set()
 
-    def set_stop_token(self) -> None:
-        self._stop_token.set()
-        self._resource_changed_event.set()
-
-    def is_stopped(self) -> bool:
-        return self._stop_token.is_set()
-
-    def set_continue_token(self) -> None:
-        self._continue_token.set()
-        self._stop_token.set()
+    def set_rebuild_required_flag(self) -> None:
+        self._rebuild_required_event.set()
+        # Interrupt `sleep()` and `wait_until_resource_changed()`
         self._resource_changed_event.set()
 
     def sfc_file_changed(self) -> None:
-        # Reset token is only checked when waiting for a continue token
         self._sym_file_changed_event.set()
-        self._stop_token.set()
-        self._resource_changed_event.set()
 
     # ResourcesOverUsb2Snes methods
 
+    def set_disconnected_flag(self) -> None:
+        self._disconnect_event.set()
+        self._connect_button_event.clear()
+        self.signal_ws_connection_changed()
+
+    def clear_disconnected_flag(self) -> None:
+        self._disconnect_event.clear()
+        self._connect_button_event.clear()
+        self.signal_ws_connection_changed()
+
     def sleep(self, delay: float) -> None:
-        s = self._stop_token.wait(delay)
+        s = self._disconnect_event.wait(delay)
         if s:
-            raise StopTokenEncountered()
+            raise DisconnectEventException()
+
+    def request_sleep(self, delay: float) -> None:
+        s = self._rebuild_required_event.wait(delay)
+        if self._disconnect_event.is_set():
+            raise DisconnectEventException()
+        if s:
+            raise RebuildRequiredException()
 
     def wait_until_resource_changed(self) -> None:
         self._resource_changed_event.wait()
         self._resource_changed_event.clear()
-        if self._stop_token.is_set():
-            raise StopTokenEncountered()
-
-    def wait_for_continue_token(self) -> None:
-        self._continue_token.wait()
-        self._continue_token.clear()
-        self._stop_token.clear()
-        if self._sym_file_changed_event.is_set():
-            raise SfcFileChanged()
+        if self._disconnect_event.is_set():
+            raise DisconnectEventException()
+        if self._rebuild_required_event.is_set():
+            raise RebuildRequiredException()
 
     def wait_until_sfc_binary_changed(self) -> None:
         self._sym_file_changed_event.wait()
         self._sym_file_changed_event.clear()
-        self._continue_token.clear()
-        self._stop_token.clear()
+        self._rebuild_required_event.clear()
+        if self._disconnect_event.is_set():
+            raise DisconnectEventException()
+
+    def wait_for_ws_connect_button(self) -> None:
+        # Mark websocket as disconnected
+        self._connect_button_event.wait()
+        self._connect_button_event.clear()
 
     # GUI methods
 
@@ -255,6 +278,10 @@ class FsWatcherSignals(metaclass=ABCMeta):
 
     @abstractmethod
     def signal_resource_compiled(self) -> None:
+        pass
+
+    @abstractmethod
+    def signal_ws_connection_changed(self) -> None:
         pass
 
 
@@ -312,14 +339,13 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
                 if r.rebuild_required():
                     self.rebuild_required = True
                     # Stop ResourcesOverUsb2Snes until the `.sfc` file has been rebuilt
-                    self.signals.set_stop_token()
+                    self.signals.set_rebuild_required_flag()
 
             if r == SharedInputType.SYMBOLS:
                 # Assumes the `.sfc` file changes when the symbol file changes
                 self.rebuild_required = False
                 self.signals.set_fs_watcher_status("Running")
                 self.signals.sfc_file_changed()
-                self.signals.set_continue_token()
 
             if self.rebuild_required:
                 self.signals.set_fs_watcher_status("REBUILD REQUIRED")
@@ -537,27 +563,29 @@ class ResourcesOverUsb2Snes:
         self.data_store: Final = data_store
         self.signals: Final = signals
 
-        mappings, symbols, n_entities = data_store.get_mappings_symbols_and_n_entities()
-        memory_map: Final = mappings.memory_map
+    def update_mappings(self, mappings: Mappings, symbols: dict[Name, int], n_entities: int) -> None:
+        memory_map = mappings.memory_map
+
+        self.mappings = mappings
 
         address_to_rom_offset: Final = memory_map.mode.address_to_rom_offset
 
-        self.address_to_rom_offset: Final[Callable[[int], int]] = address_to_rom_offset
+        self.address_to_rom_offset: Callable[[int], int] = address_to_rom_offset
 
-        self.request_addr: Final[int] = symbols["resources_over_usb2snes.request"]
-        self.response_offset: Final[int] = address_to_rom_offset(symbols["resources_over_usb2snes.response"])
-        self.urou2s_offset: Final[int] = address_to_rom_offset(symbols[USE_RESOURCES_OVER_USB2SNES_LABEL])
-        self.entity_rom_data_offset: Final[int] = address_to_rom_offset(symbols[ENTITY_ROM_DATA_LABEL])
-        self.response_data_offset: Final[int] = address_to_rom_offset(address_at_bank_offset(memory_map, USB2SNES_DATA_BANK_OFFSET))
-        self.msfs_data_offset: Final[int] = address_to_rom_offset(address_at_bank_offset(memory_map, MS_FS_DATA_BANK_OFFSET))
+        self.request_addr: int = symbols["resources_over_usb2snes.request"]
+        self.response_offset: int = address_to_rom_offset(symbols["resources_over_usb2snes.response"])
+        self.urou2s_offset: int = address_to_rom_offset(symbols[USE_RESOURCES_OVER_USB2SNES_LABEL])
+        self.entity_rom_data_offset: int = address_to_rom_offset(symbols[ENTITY_ROM_DATA_LABEL])
+        self.response_data_offset: int = address_to_rom_offset(address_at_bank_offset(memory_map, USB2SNES_DATA_BANK_OFFSET))
+        self.msfs_data_offset: int = address_to_rom_offset(address_at_bank_offset(memory_map, MS_FS_DATA_BANK_OFFSET))
 
-        self.rom_update_required_offset: Final[int] = address_to_rom_offset(ROM_UPDATE_REQUIRED_ADDR)
+        self.rom_update_required_offset: int = address_to_rom_offset(ROM_UPDATE_REQUIRED_ADDR)
 
-        self.expected_entity_rom_data_size: Final[int] = n_entities * ENTITY_ROM_DATA_BYTES_PER_ENTITY
+        self.expected_entity_rom_data_size: int = n_entities * ENTITY_ROM_DATA_BYTES_PER_ENTITY
 
-        self.max_data_size: Final[int] = min(memory_map.mode.bank_size, 0xFFFF)
+        self.max_data_size: int = min(memory_map.mode.bank_size, 0xFFFF)
 
-        self.not_room_counter: int = data_store.get_not_room_counter()
+        self.not_room_counter: int = self.data_store.get_not_room_counter()
 
     def is_correct_rom_running(self, sfc_file_basename: Filename) -> bool:
         playing_basename: Final[str] = self.usb2snes.get_playing_basename()
@@ -565,15 +593,12 @@ class ResourcesOverUsb2Snes:
             log_error(f"{ self.usb2snes.device_name() } is not running { sfc_file_basename } (currently playing { playing_basename })")
             return False
 
-        urou2s_data = self.usb2snes.read_offset(self.urou2s_offset, 1)
-        if urou2s_data != b"\xff":
-            log_error(f"{ self.usb2snes.device_name() } is not running the build without resources")
-            return False
-
         return True
 
-    def test_game_matches_sfc_file(self, sfc_file_data: bytes, memory_map: MemoryMap) -> bool:
+    def test_game_matches_sfc_file(self, sfc_file_data: bytes) -> bool:
         # Assumes `sfc_file_data` passes `validate_sfc_file()` tests
+
+        memory_map: Final = self.mappings.memory_map
 
         n_bytes_to_test: Final = (memory_map.first_resource_bank & 0x3F) * memory_map.mode.bank_size
         assert len(sfc_file_data) >= n_bytes_to_test
@@ -591,6 +616,11 @@ class ResourcesOverUsb2Snes:
         p2 = self.entity_rom_data_offset + self.expected_entity_rom_data_size
         assert p2 < n_bytes_to_test
         usb2snes_data[p1:p2] = sfc_file_data[p1:p2]
+
+        urou2s_data = self.usb2snes.read_offset(self.urou2s_offset, 1)
+        if urou2s_data != b"\xff":
+            log_error(f"{ self.usb2snes.device_name() } is not running the build without resources")
+            return False
 
         return usb2snes_data == sfc_file_data[:n_bytes_to_test]
 
@@ -800,81 +830,126 @@ class ResourcesOverUsb2Snes:
 
             if burst_read_counter > 0:
                 burst_read_counter -= 1
-                self.signals.sleep(BURST_SLEEP_DELAY)
+                self.signals.request_sleep(BURST_SLEEP_DELAY)
             else:
-                self.signals.sleep(NORMAL_REQUEST_SLEEP_DELAY)
+                self.signals.request_sleep(NORMAL_REQUEST_SLEEP_DELAY)
 
 
-def create_and_process_websocket(address: str, sfc_file_relpath: Filename, data_store: DataStore, signals: FsWatcherSignals) -> None:
-    sfc_file_basename = os.path.basename(sfc_file_relpath)
+class WebsocketThread(threading.Thread):
+    def __init__(
+        self, data_store: DataStore, signals: FsWatcherSignals, sfc_file_relpath: Filename, ws_address: str, **kwargs: Any
+    ) -> None:
+        super().__init__(**kwargs)
 
-    with contextlib.closing(websocket.WebSocket()) as ws:
-        ws.connect(address, origin="http://localhost")
+        self.data_store: Final = data_store
+        self.signals: Final = signals
+        self.sfc_file_relpath: Final = sfc_file_relpath
+        self.sfc_file_basename: Final = os.path.basename(sfc_file_relpath)
+        self.ws_address: Final = ws_address
 
-        usb2snes = Usb2Snes(ws)
+    def wait_until_sfc_file_valid_and_update_binary(self, rou2s: ResourcesOverUsb2Snes) -> None:
+        # Wait until device is running the correct ROM
+        while not rou2s.is_correct_rom_running(self.sfc_file_basename):
+            self.signals.set_usb2snes_status(f"Device not running {self.sfc_file_basename}")
+            self.signals.sleep(INCORRECT_ROM_SLEEP_DELAY)
 
-        connected: bool = usb2snes.find_and_attach_device()
-        if not connected:
-            signals.set_usb2snes_status("Cannot connect to usb2snes")
-            raise RuntimeError("Could not connect to usb2snes device.")
+        # Wait until the `sfc_file` is valid
+        sfc_file_valid = False
+        while not sfc_file_valid:
+            try:
+                mappings, symbols, n_entities = self.data_store.get_mappings_symbols_and_n_entities()
 
-        log_success(f"Connected to { usb2snes.device_name() }")
+                sfc_file_data = read_binary_file(self.sfc_file_relpath, 512 * 1024 + 1)
+                validate_sfc_file(sfc_file_data, symbols, mappings)
 
+                sfc_file_valid = True
+
+            except Exception as e:
+                pass
+                log_error(f"Error validating { self.sfc_file_basename }", e)
+                self.signals.set_usb2snes_status(f"Invalid { self.sfc_file_basename }: {e}")
+
+            if not sfc_file_valid:
+                self.signals.wait_until_sfc_binary_changed()
+
+        rou2s.update_mappings(mappings, symbols, n_entities)
+
+        # Double check device is running the correct ROM
+        while not rou2s.is_correct_rom_running(self.sfc_file_basename):
+            self.signals.set_usb2snes_status(f"Device not running {self.sfc_file_basename}")
+            self.signals.sleep(INCORRECT_ROM_SLEEP_DELAY)
+
+        # Update the running binary (if necessary)
+        if rou2s.test_game_matches_sfc_file(sfc_file_data) is False:
+            log_notice(f"Running game does not match { self.sfc_file_basename }")
+            self.signals.set_usb2snes_status("Updating binary...")
+            rou2s.reset_and_update_rom(sfc_file_data)
+        else:
+            log_success(f"Running game matches { self.sfc_file_basename }")
+
+    def process_rou2s(self, rou2s: ResourcesOverUsb2Snes) -> None:
+        while True:
+            try:
+                self.wait_until_sfc_file_valid_and_update_binary(rou2s)
+
+                self.signals.set_usb2snes_status("Running")
+
+                rou2s.run()
+
+            except RebuildRequiredException:
+                pass
+
+            self.signals.set_usb2snes_status("REBUILD REQUIRED")
+            self.signals.wait_until_sfc_binary_changed()
+
+    def process_websocket(self, ws: websocket.WebSocket) -> None:
         # This sleep statement is required.
         # On my system there needs to be a 1/2 second delay between a usb2snes "Boot" command and a "GetAddress" command.
         #
         # ::TODO find a way to eliminate this::
-        signals.sleep(0.5)
+        self.signals.sleep(0.5)
 
         while True:
-            try:
-                mappings, symbols, n_entities = data_store.get_mappings_symbols_and_n_entities()
+            usb2snes = Usb2Snes(ws)
 
-                sfc_file_data = read_binary_file(sfc_file_relpath, 512 * 1024)
-                validate_sfc_file(sfc_file_data, symbols, mappings)
-                sfc_file_valid = True
-            except Exception as e:
-                log_error(f"Error validating {sfc_file_basename}", e)
-                sfc_file_valid = False
+            connected = usb2snes.find_and_attach_device()
+            if connected:
+                log_success(f"Connected to { usb2snes.device_name() }")
 
-            if sfc_file_valid:
-                try:
-                    rou2s = ResourcesOverUsb2Snes(usb2snes, data_store, signals)
-
-                    signals.set_usb2snes_status(f"Device not running {sfc_file_basename}")
-                    while not rou2s.is_correct_rom_running(sfc_file_basename):
-                        try:
-                            signals.sleep(INCORRECT_ROM_SLEEP_DELAY)
-                        except StopTokenEncountered:
-                            pass
-
-                    if rou2s.test_game_matches_sfc_file(sfc_file_data, mappings.memory_map) is False:
-                        log_notice(f"Running game does not match { sfc_file_basename }")
-                        signals.set_usb2snes_status("Updating binary...")
-                        rou2s.reset_and_update_rom(sfc_file_data)
-                    else:
-                        log_success(f"Running game matches { sfc_file_basename }")
-
-                    signals.set_usb2snes_status("Running")
-
-                    while True:
-                        try:
-                            rou2s.run()
-                        except StopTokenEncountered:
-                            pass
-                        signals.wait_for_continue_token()
-                except SfcFileChanged:
-                    pass
-
-                # Symbols file has changed.
-                # It is simpler to recreate `rou2s` then update all of the addresses
-                del rou2s
+                rou2s = ResourcesOverUsb2Snes(usb2snes, self.data_store, self.signals)
+                self.process_rou2s(rou2s)
             else:
-                log_notice(f"Waiting until {sfc_file_basename} is rebuilt")
-                signals.set_usb2snes_status("Waiting for binary rebuild")
+                log_error("Cannot connect to usb2snes")
+                self.signals.set_usb2snes_status("Cannot connect to usb2snes")
+                self.signals.sleep(INCORRECT_ROM_SLEEP_DELAY)
 
-                # Wait until the binary has been rebuilt
-                signals.wait_until_sfc_binary_changed()
+    @final
+    def run(self) -> None:
+        while True:
+            try:
+                with contextlib.closing(websocket.WebSocket()) as ws:
+                    ws.connect(self.ws_address, origin="http://localhost")
+
+                    self.signals.clear_disconnected_flag()
+
+                    self.process_websocket(ws)
+
+            except DisconnectEventException:
+                log_fs_watcher("Closed websocket")
+                self.signals.set_usb2snes_status("Closed")
+                pass
+
+            except ConnectionRefusedError as e:
+                ws_connected = False
+                log_error(f"Cannot connect to {self.ws_address}", e)
+                self.signals.set_usb2snes_status(f"Cannot connect to {self.ws_address}: {e}")
+
+            except Exception as e:
+                log_error("Websocket ERROR", e)
+                self.signals.set_usb2snes_status(type(e).__name__)
+
+            self.signals.set_disconnected_flag()
+            self.signals.wait_for_ws_connect_button()
 
 
 # ASSUMES: current working directory is the resources directory
@@ -902,6 +977,4 @@ def create_websocket_thread(
     data_store: DataStore, signals: FsWatcherSignals, sfc_file_relpath: Filename, websocket_address: str
 ) -> threading.Thread:
 
-    return threading.Thread(
-        target=create_and_process_websocket, args=(websocket_address, sfc_file_relpath, data_store, signals), daemon=True
-    )
+    return WebsocketThread(data_store, signals, sfc_file_relpath, websocket_address, daemon=True)

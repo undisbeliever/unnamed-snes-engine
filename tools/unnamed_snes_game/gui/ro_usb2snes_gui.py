@@ -24,6 +24,7 @@ if tkinter.Tcl().eval("set tcl_platform(threaded)") != "1":
 class GuiSignals(FsWatcherSignals):
     RES_COMPILED_EVENT_NAME: Final = "<<ResCompiled>>"
     STATUS_CHANGED_EVENT_NAME: Final = "<<StatusChanged>>"
+    WS_CONNECTION_CHANGED_EVENT_NAME: Final = "<<WsConnectionChanged>>"
 
     def __init__(self, root: tk.Tk):
         super().__init__()
@@ -39,6 +40,9 @@ class GuiSignals(FsWatcherSignals):
         # https://tkdocs.com/tutorial/eventloop.html#threads
         self.root.event_generate(self.RES_COMPILED_EVENT_NAME)
 
+    def signal_ws_connection_changed(self) -> None:
+        self.root.event_generate(self.WS_CONNECTION_CHANGED_EVENT_NAME)
+
 
 class StatusBar:
     def __init__(self, signals: GuiSignals, parent: tk.Tk):
@@ -48,14 +52,14 @@ class StatusBar:
         self.frame.columnconfigure(2, weight=1)
         self.frame.columnconfigure(4, weight=2)
 
-        status1: Final = tk.Label(self.frame, text="FS Watcher:  ")
+        status1: Final = tk.Label(self.frame, text="FS Watcher: ")
         status1.grid(row=0, column=1, sticky=tk.W)
 
         self.fs_status: Final = tk.StringVar()
         fs_status_l: Final = tk.Label(self.frame, textvariable=self.fs_status, anchor=tk.W, borderwidth=2, relief=tk.SUNKEN, width=15)
         fs_status_l.grid(row=0, column=2, sticky=tk.EW)
 
-        status2: Final = tk.Label(self.frame, text="usb2snes:  ")
+        status2: Final = tk.Label(self.frame, text="  usb2snes: ")
         status2.grid(row=0, column=3, sticky=tk.W)
 
         self.usb2snes_status: Final = tk.StringVar()
@@ -64,7 +68,8 @@ class StatusBar:
         )
         usb2snes_status_l.grid(row=0, column=4, sticky=tk.EW)
 
-        # ::TODO add a pause/resume button::
+        self.button: Final = tk.Button(self.frame, width=9, command=self.on_button_pressed)
+        self.button.grid(row=0, column=5)
 
         self.on_status_changed(None)
 
@@ -72,6 +77,15 @@ class StatusBar:
         fs_status, usb2snes_status = self.signals.get_status()
         self.fs_status.set(fs_status)
         self.usb2snes_status.set(usb2snes_status)
+
+    def on_ws_connected_status_changed(self, event: Any) -> None:
+        self.button["text"] = "Disconnect" if self.signals.is_connected() else "Connect"
+
+    def on_button_pressed(self) -> None:
+        if self.signals.is_connected():
+            self.signals.send_disconnect_event()
+        else:
+            self.signals.send_connect_event()
 
 
 class Rou2sWindow:
@@ -102,6 +116,7 @@ class Rou2sWindow:
 
         # Signals
         self._window.bind(GuiSignals.STATUS_CHANGED_EVENT_NAME, self._statusbar.on_status_changed)
+        self._window.bind(GuiSignals.WS_CONNECTION_CHANGED_EVENT_NAME, self._statusbar.on_ws_connected_status_changed)
         self._window.bind(GuiSignals.RES_COMPILED_EVENT_NAME, self._errors_tab.on_resource_compiled)
 
     def mainloop(self) -> None:
