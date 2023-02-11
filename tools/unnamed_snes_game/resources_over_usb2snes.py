@@ -187,15 +187,27 @@ class FsWatcherSignals(metaclass=ABCMeta):
         self._usb2snes_status: str = ""
 
     # State methods
-    def set_fs_watcher_status(self, state: str) -> None:
+    def set_fs_watcher_status(self, s: str) -> None:
         with self._status_lock:
-            self._fs_watcher_status = state
-        self.signal_status_changed()
+            if self._fs_watcher_status != s:
+                self._fs_watcher_status = s
+                changed = True
+            else:
+                changed = False
 
-    def set_usb2snes_status(self, state: str) -> None:
+        if changed:
+            self.signal_status_changed()
+
+    def set_usb2snes_status(self, s: str) -> None:
         with self._status_lock:
-            self._usb2snes_status = state
-        self.signal_status_changed()
+            if self._usb2snes_status != s:
+                self._usb2snes_status = s
+                changed = True
+            else:
+                changed = False
+
+        if changed:
+            self.signal_status_changed()
 
     def get_status(self) -> tuple[str, str]:
         with self._status_lock:
@@ -777,7 +789,10 @@ class ResourcesOverUsb2Snes:
 
             self.write_response(request.request_id, status, data)
 
+            self.signals.set_usb2snes_status("Running")
+
         except Exception as e:
+            self.signals.set_usb2snes_status(f"ERROR: {type(e).__name__}")
             self.write_response(request.request_id, ResponseStatus.ERROR, None)
             raise
 
@@ -787,6 +802,8 @@ class ResourcesOverUsb2Snes:
         if isinstance(co, ResourceError):
             log_compiler_error(co)
             log_notice(f"    Waiting until resource data is ready...")
+            self.signals.set_usb2snes_status(f"WAITING for room {room_id}")
+
             while isinstance(co, ResourceError):
                 self.signals.wait_until_resource_changed()
                 co = self.data_store.get_room_data(room_id)
@@ -812,6 +829,7 @@ class ResourcesOverUsb2Snes:
                 log_compiler_error(co)
 
             log_notice(f"    Waiting until resource data is ready...")
+            self.signals.set_usb2snes_status(f"WAITING for {resource_type.name}[{resource_id}]")
 
             while not isinstance(co, ResourceData):
                 self.signals.wait_until_resource_changed()
@@ -832,6 +850,7 @@ class ResourcesOverUsb2Snes:
                 log_error(f"    Cannot access entity_rom_data", me.error)
 
             log_notice(f"    Waiting until data is ready...")
+            self.signals.set_usb2snes_status("WAITING for MsFs and entity data")
 
             while me is None or (not me.msfs_data) or (not me.entity_rom_data):
                 self.signals.wait_until_resource_changed()
@@ -878,6 +897,7 @@ class ResourcesOverUsb2Snes:
             self.write_response(INIT_REQUEST.request_id, ResponseStatus.INIT_OK, None)
 
         except Exception as e:
+            self.signals.set_usb2snes_status(f"Init ERROR: {type(e).__name__}")
             self.write_response(INIT_REQUEST.request_id, ResponseStatus.ERROR, None)
             raise
 
