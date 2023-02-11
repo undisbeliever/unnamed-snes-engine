@@ -100,6 +100,7 @@ class Rou2sWindow:
 
         self.signals: Final = GuiSignals(self._window)
 
+        self._running: bool = False
         self._bg_threads: Final[list[BgThread]] = list()
         self._n_stopped_threads = 0
 
@@ -129,15 +130,17 @@ class Rou2sWindow:
         self._window.bind(GuiSignals.RES_COMPILED_EVENT_NAME, self._errors_tab.on_resource_compiled)
         self._window.bind(GuiSignals.BG_THREAD_STOPPED_EVENT_NAME, self._on_bg_thread_stopped)
 
-    def add_and_start_bg_thread(self, t: BgThread) -> None:
+    def add_bg_thread(self, t: BgThread) -> None:
+        if self._running:
+            raise RuntimeError("Cannot add a BG thread after mainloop() has started")
         self._bg_threads.append(t)
-        t.start()
 
     def _on_close_request(self) -> None:
         self.signals.send_quit_event()
-        # Cannot put a join here, system deadlocks in when a BG Thread sends a signal to the GUI MainThread.
+        # Cannot destroy _window while a BG threads is active, it might generate an event (`event_generate()` call in `GuiSignals).
+        # Cannot put a join here, system deadlocks in when a BG Thread generates an event.
         #
-        # Instead, closed BgThreads will send a `GuiSignals.BG_THREAD_STOPPED_EVENT_NAME` signal when they are finished.
+        # Instead, closed BgThreads will send a `GuiSignals.BG_THREAD_STOPPED_EVENT_NAME` event when they are finished.
         # (which is handled by `_on_bg_thread_stopped()`)
 
     # Close the window when all of the BG threads have ended
@@ -146,5 +149,13 @@ class Rou2sWindow:
         if self._n_stopped_threads >= len(self._bg_threads):
             self._window.quit()
 
+    def __start_bg_threads(self) -> None:
+        self._running = True
+        for t in self._bg_threads:
+            t.start()
+
     def mainloop(self) -> None:
+        # Start BG threads after the Tk mainloop has started
+        self._window.after(10, self.__start_bg_threads)
+
         self._window.mainloop()

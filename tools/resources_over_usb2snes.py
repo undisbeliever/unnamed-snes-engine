@@ -25,8 +25,8 @@ def main() -> None:
     gui = Rou2sWindow(data_store)
     signals = gui.signals
 
-    gui.add_and_start_bg_thread(FsWatcherThread(data_store, signals, sfc_file_relpath, args.processes))
-    gui.add_and_start_bg_thread(WebsocketThread(data_store, signals, sfc_file_relpath, args.address))
+    gui.add_bg_thread(FsWatcherThread(data_store, signals, sfc_file_relpath, args.processes))
+    gui.add_bg_thread(WebsocketThread(data_store, signals, sfc_file_relpath, args.address))
 
     gui.mainloop()
 
