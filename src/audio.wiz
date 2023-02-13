@@ -63,6 +63,13 @@ in zeropage {
 }
 
 
+in lowram {
+    // Non-zero if the common audio data has been loaded into Audio-RAM.
+    // (byte flag)
+    var _common_audio_data_loaded : u8;
+}
+
+
 in code {
 
 
@@ -77,6 +84,8 @@ var _res : resources.ResourceEntry in resources.res;
 
     // ::TODO add a first-call check::
 
+    _common_audio_data_loaded = a = 0;
+
     __transfer_loader_via_ipl__inline();
 
 
@@ -87,8 +96,11 @@ var _res : resources.ResourceEntry in resources.res;
     __transfer_data_to_loader(_res, LoaderDataType.CODE);
 
 
+    // Cannot use `_transfer_common_audio_data()`, system deadlocks trying to send the `EXECUTE_LOADER` command.
     _res = resources.load_songs_resource(resources.songs.__null__common_data__);
     __transfer_data_to_loader(_res, LoaderDataType.COMMON_DATA);
+
+    _common_audio_data_loaded = a = 1;
 }
 
 
@@ -148,6 +160,46 @@ inline func process_sfx_queue__inline() {
             sfxQueue = a = 0xff;
         }
     }
+}
+
+
+
+// Mark the common audio data in Audio-RAM as out-of-date
+//
+// DB access lowram
+#[mem8]
+inline func common_audio_data_changed() {
+    _common_audio_data_loaded = 0;
+}
+
+
+
+// Load common audio data into Audio-RAM if required.
+//
+// DB = 0x80
+#[mem8, idx16]
+func load_common_data_if_required__inline() {
+    a = _common_audio_data_loaded;
+    if zero {
+        _transfer_common_audio_data();
+    }
+}
+
+
+
+// Load common audio data into Audio-RAM.
+//
+// DB = 0x80
+#[mem8, idx16]
+func _transfer_common_audio_data() {
+var _res : resources.ResourceEntry in resources.res;
+
+    __send_command(IoCommand.EXECUTE_LOADER);
+
+    _res = resources.load_songs_resource(resources.songs.__null__common_data__);
+    __transfer_data_to_loader(_res, LoaderDataType.COMMON_DATA);
+
+    _common_audio_data_loaded = a = 1;
 }
 
 

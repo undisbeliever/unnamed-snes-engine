@@ -161,16 +161,21 @@ MAX_COMMAND_SIZE: Final = 8192
 
 MAX_COMMAND_DATA_SIZE: Final = MAX_COMMAND_SIZE - 4
 
+
 # Order MUST MATCH Rou2sCommands in `src/rou2s-commands.wiz`
 @unique
 class Rou2sCommands(Enum):
     # Skipping `null`.  `auto()` starts at 1
+    COMMON_AUDIO_DATA_CHANGED = auto()
     UPLOAD_SONG = auto()
 
 
 class Command(NamedTuple):
     command: Rou2sCommands
     data: bytes
+
+
+COMMON_AUDIO_DATA_CHANGED_COMMAND: Final = Command(Rou2sCommands.COMMON_AUDIO_DATA_CHANGED, bytes())
 
 
 #
@@ -243,6 +248,9 @@ class FsWatcherSignals(metaclass=ABCMeta):
     # Command methods
     def send_command(self, c: Command) -> None:
         with self._lock:
+            # ::TODO add a priority system. ::
+            # ::: Ensure important commands (like COMMON_AUDIO_DATA_CHANGED) do not get overridden. ::
+
             self._command = c
             self._interrupt_request_sleep_event.set()
 
@@ -438,7 +446,11 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
 
         r = self._project_compiler.file_changed(filename)
         if r is not None:
-            if isinstance(r, SharedInputType):
+            if isinstance(r, ResourceData):
+                # Test if common audio data changed.
+                if r.resource_type == ResourceType.songs and r.resource_id == 0:
+                    self.signals.send_command(COMMON_AUDIO_DATA_CHANGED_COMMAND)
+            elif isinstance(r, SharedInputType):
                 if r.rebuild_required():
                     self.rebuild_required = True
                     # Stop ResourcesOverUsb2Snes until the `.sfc` file has been rebuilt
@@ -452,6 +464,7 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
 
             if r == SharedInputType.AUDIO_SAMPLES:
                 self.signals.audio_samples_changed()
+                self.signals.send_command(COMMON_AUDIO_DATA_CHANGED_COMMAND)
 
             if self.rebuild_required:
                 self.signals.set_fs_watcher_status("REBUILD REQUIRED")
