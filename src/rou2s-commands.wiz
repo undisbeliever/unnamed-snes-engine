@@ -1,0 +1,157 @@
+// Copyright (c) 2023, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "memmap";
+
+import "resources-over-usb2snes";
+import "audio";
+import "resources";
+
+namespace rou2s_commands {
+
+// order MUST match Rou2sCommands in `resources_over_usb2snes.py`
+// order MUST command_function_table
+enum Rou2sCommand : u8 {
+    null,
+    upload_song,
+};
+
+in code {
+    const function_table = [
+        commands.null,
+        commands.upload_song,
+    ];
+}
+
+
+// This is a reserved command_id that is only used in `init__inline()`
+let INIT_COMMAND_ID = 0xff;
+
+
+// Must match MAX_COMMAND_SIZE in `resources_over_usb2snes.py`
+let MAX_COMMAND_SIZE = 8192;
+
+// ::TODO find a better place to put the command block::
+let _COMMAND_BLOCK_ADDR = resources._USB2SNES_DATA_ADDR + resources._BANK_SIZE - MAX_COMMAND_SIZE - 1;
+
+
+// MUST use far addressing to read `Command` data
+namespace Command {
+    // Command id.  When id != `_current_command_id`, a new command has been sent to the console.
+    // May change while the command is being processed.
+    // MUST only be read by `process_commands()`
+    extern const id         @ _COMMAND_BLOCK_ADDR + 0 : u8;
+
+    // Command to execute.
+    // May change while the command is being processed.
+    extern const command    @ _COMMAND_BLOCK_ADDR + 1 : Rou2sCommand;
+
+    extern const data_size  @ _COMMAND_BLOCK_ADDR + 2 : u16;
+    extern const data       @ _COMMAND_BLOCK_ADDR + 4 : [u8 ; MAX_COMMAND_SIZE - 4];
+}
+
+let command_data = far& data as far * const u8;
+
+
+in wram7e {
+    var _current_command_id : u8;
+}
+
+
+in code {
+
+
+// DB unknown
+#[mem8, idx8]
+inline func init__inline() {
+    // MUST ONLY use far addressing in this function
+
+    a = Command.data[x];
+
+    // Wait until the `command` is NULL
+    do {
+        a = *(far &Command.command) as u8;
+    } while !zero;
+
+    a = INIT_COMMAND_ID;
+    *(far &_current_command_id) = a;
+    resources_over_usb2snes.set_last_command_id__inline(a);
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process_commands() {
+    // Only process commands if we are running the build without resources.
+    a = *far &resources.UseResourcesOverUsb2Snes;
+    if !zero {
+        // NOTE: `Command.id` and `Command.command` might change while processing the command.
+        //       `Command.data_size` and `Command.data` will remain unmodified while the command is processed.
+        a = *(far &Command.id);
+        if a != _current_command_id {
+            _current_command_id = a;
+
+            a = *(far &Command.command) as u8;
+            if a < function_table.len {
+                x = a = a << 1;
+
+                idx16();
+                #[mem8, idx16] {
+                    function_table[unaligned xx]();
+                }
+                mem8_idx8();
+            }
+
+            resources_over_usb2snes.set_last_command_id__inline(_current_command_id);
+        }
+    }
+}
+
+}
+
+
+namespace commands {
+in code {
+
+
+// Dummy command used to reset the `command_id`
+//
+// DB = 0x7e
+#[mem8, idx16]
+func null() {
+    // MUST not use `command.data`
+}
+
+
+// DB = 0x7e
+#[mem8, idx16]
+func upload_song() {
+var _res : resources.ResourceEntry in resources.res;
+
+    push16(0x7e80);
+    data_bank = pop8();
+    // DB = 0x80
+
+    // ::TODO update common data (if required)::
+
+    #:_res.farPtr = a = #:far &Command.data;
+    *(&_res.farPtr as *u16) = xx = &Command.data as u16;
+
+    mem16();
+    #[mem16] {
+        _res.size = aa = *(far &Command.data_size);
+    }
+    mem8();
+
+    audio._transfer_song_data(_res);
+
+    data_bank = pop8();
+// DB = 0x7e
+}
+
+}
+}
+
+}
+

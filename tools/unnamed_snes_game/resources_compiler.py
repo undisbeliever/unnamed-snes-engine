@@ -119,6 +119,8 @@ class DataStore:
             self._symbols: Optional[dict[ScopedName, int]] = None
             self._n_entities: int = 0
 
+            self._audio_samples: Optional[SamplesJson] = None
+
             self._resources: list[list[Optional[BaseResourceData]]] = [list() for rt in ResourceType]
             self._rooms: list[Optional[BaseResourceData]] = list()
 
@@ -171,6 +173,10 @@ class DataStore:
     def set_n_entities(self, n_entities: int) -> None:
         with self._lock:
             self._n_entities = n_entities
+
+    def set_audio_samples(self, audio_samples: Optional[SamplesJson]) -> None:
+        with self._lock:
+            self._audio_samples = audio_samples
 
     def add_non_resource_error(self, e: NonResourceError) -> None:
         with self._lock:
@@ -231,6 +237,10 @@ class DataStore:
 
             # dict (symbols) is not immutable, return a copy instead
             return self._mappings, self._symbols.copy(), self._n_entities
+
+    def get_audio_samples(self) -> Optional[SamplesJson]:
+        with self._lock:
+            return self._audio_samples
 
     def get_msfs_lists(self) -> list[Optional[list[MsFsEntry]]]:
         with self._lock:
@@ -733,6 +743,9 @@ class ProjectCompiler:
 
             error = NonResourceError(ErrorKey(None, s_type), SHARED_INPUT_NAMES[s_type], e)
             self.data_store.add_non_resource_error(error)
+
+            if s_type == SharedInputType.AUDIO_SAMPLES:
+                self.data_store.set_audio_samples(None)
             return
 
         if s_type == SharedInputType.MAPPINGS:
@@ -750,6 +763,9 @@ class ProjectCompiler:
             if self.__shared_input.entities:
                 n_entities = len(self.__shared_input.entities.entities)
                 self.data_store.set_n_entities(n_entities)
+
+        elif s_type == SharedInputType.AUDIO_SAMPLES:
+            self.data_store.set_audio_samples(self.__shared_input.audio_samples)
 
         # Must be called after `c.update_name_list()`
         for c in self.__resource_compilers:

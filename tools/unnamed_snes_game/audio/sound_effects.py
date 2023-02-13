@@ -5,14 +5,42 @@ import re
 from typing import Final, Optional, Sequence
 
 from .driver_constants import N_SOUND_EFFECTS, TICKS_PER_SECOND, SFX_BPM, KEY_OFF_DELAY, Addr
-from .bytecode import BcMappings, Bytecode
-from .json_formats import parse_name
+from .bytecode import BcMappings, Bytecode, create_bc_mappings
+from .json_formats import parse_name, SamplesJson
 from ..json_formats import Filename, Name, Mappings
 
 
 END_INSTRUCTION: Final = "disable_channel"
 
 SOUND_EFFECT_SEPARATOR_REGEX = re.compile(r"^==+ *([a-zA-Z][a-zA-Z0-9_]*) *==+")
+
+
+def compile_sound_effect(sfx: str, samples_input: SamplesJson) -> bytes:
+    errors = list()
+    previous_line = ""
+
+    bc_mappings = create_bc_mappings(samples_input, SFX_BPM)
+
+    bc = Bytecode(bc_mappings, False)
+
+    for line_no, line in enumerate(sfx.split("\n")):
+        try:
+            line, _sep, _comment = line.partition(";")
+            line = line.strip()
+
+            if line:
+                bc.parse_line(line)
+                previous_line = line
+        except Exception as e:
+            errors.append(f"Line {line_no+1}: {e}")
+
+    if previous_line != END_INSTRUCTION:
+        errors.append(f"The sound effect must end with a `{END_INSTRUCTION}` instruction")
+
+    if errors:
+        raise RuntimeError(f"{len(errors)} errors compiling sound effects\n    " + "\n    ".join(errors))
+
+    return bc.bytecode
 
 
 def compile_sound_effects_file(lines: Sequence[str], filename: str, bcMappings: BcMappings) -> dict[Name, bytes]:

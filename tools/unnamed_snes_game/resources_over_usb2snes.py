@@ -38,7 +38,7 @@ import threading
 import contextlib
 import subprocess
 from abc import abstractmethod, ABCMeta
-from enum import IntEnum, unique
+from enum import IntEnum, Enum, auto, unique
 
 import websocket  # type: ignore[import]
 
@@ -154,6 +154,26 @@ def log_success(s: str) -> None:
 
 
 #
+# Commands
+# ========
+
+MAX_COMMAND_SIZE: Final = 8192
+
+MAX_COMMAND_DATA_SIZE: Final = MAX_COMMAND_SIZE - 4
+
+# Order MUST MATCH Rou2sCommands in `src/rou2s-commands.wiz`
+@unique
+class Rou2sCommands(Enum):
+    # Skipping `null`.  `auto()` starts at 1
+    UPLOAD_SONG = auto()
+
+
+class Command(NamedTuple):
+    command: Rou2sCommands
+    data: bytes
+
+
+#
 # Signals
 # =======
 
@@ -179,16 +199,23 @@ class FsWatcherSignals(metaclass=ABCMeta):
         self._connect_button_event: Final = threading.Event()
         self._disconnect_event: Final = threading.Event()
 
+        self._interrupt_request_sleep_event: Final = threading.Event()
+
         self._quit_event: Final = threading.Event()
 
         # lock MUST be used on all non event or queue fields
-        self._status_lock: Final = threading.Lock()
+        self._lock: Final = threading.Lock()
+
+        # MUST access status via `_lock`
         self._fs_watcher_status: str = ""
         self._usb2snes_status: str = ""
 
-    # State methods
+        # MUST access _command via `_lock`
+        self._command: Optional[Command] = None
+
+    # Status methods
     def set_fs_watcher_status(self, s: str) -> None:
-        with self._status_lock:
+        with self._lock:
             if self._fs_watcher_status != s:
                 self._fs_watcher_status = s
                 changed = True
@@ -199,7 +226,7 @@ class FsWatcherSignals(metaclass=ABCMeta):
             self.signal_status_changed()
 
     def set_usb2snes_status(self, s: str) -> None:
-        with self._status_lock:
+        with self._lock:
             if self._usb2snes_status != s:
                 self._usb2snes_status = s
                 changed = True
@@ -210,8 +237,20 @@ class FsWatcherSignals(metaclass=ABCMeta):
             self.signal_status_changed()
 
     def get_status(self) -> tuple[str, str]:
-        with self._status_lock:
+        with self._lock:
             return self._fs_watcher_status, self._usb2snes_status
+
+    # Command methods
+    def send_command(self, c: Command) -> None:
+        with self._lock:
+            self._command = c
+            self._interrupt_request_sleep_event.set()
+
+    def pop_command(self) -> Optional[Command]:
+        with self._lock:
+            c = self._command
+            self._command = None
+            return c
 
     # GUI methods
     def is_connected(self) -> bool:
@@ -243,7 +282,11 @@ class FsWatcherSignals(metaclass=ABCMeta):
         # Interrupt `sleep()` and `wait_until_resource_changed()`
         self._resource_changed_event.set()
 
+    def audio_samples_changed(self) -> None:
+        self.signal_audio_samples_changed()
+
     def sfc_file_changed(self) -> None:
+        self._interrupt_request_sleep_event.set()
         self._sym_file_changed_event.set()
 
     def wait_until_quit(self) -> None:
@@ -270,15 +313,18 @@ class FsWatcherSignals(metaclass=ABCMeta):
             raise DisconnectEventException()
 
     def request_sleep(self, delay: float) -> None:
-        s = self._rebuild_required_event.wait(delay)
+        s = self._interrupt_request_sleep_event.wait(delay)
+        self._interrupt_request_sleep_event.clear()
+
         if self._disconnect_event.is_set():
             raise DisconnectEventException()
-        if s:
+        if self._rebuild_required_event.is_set():
             raise RebuildRequiredException()
 
     def wait_until_resource_changed(self) -> None:
         self._resource_changed_event.wait()
         self._resource_changed_event.clear()
+
         if self._disconnect_event.is_set():
             raise DisconnectEventException()
         if self._rebuild_required_event.is_set():
@@ -303,6 +349,10 @@ class FsWatcherSignals(metaclass=ABCMeta):
 
     @abstractmethod
     def signal_resource_compiled(self) -> None:
+        pass
+
+    @abstractmethod
+    def signal_audio_samples_changed(self) -> None:
         pass
 
     @abstractmethod
@@ -360,6 +410,7 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
         signals.set_fs_watcher_status("Running")
 
         signals.resource_changed()
+        self.signals.audio_samples_changed()
 
         self.rebuild_required: bool = False
 
@@ -398,6 +449,9 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
                 self.rebuild_required = False
                 self.signals.set_fs_watcher_status("Running")
                 self.signals.sfc_file_changed()
+
+            if r == SharedInputType.AUDIO_SAMPLES:
+                self.signals.audio_samples_changed()
 
             if self.rebuild_required:
                 self.signals.set_fs_watcher_status("REBUILD REQUIRED")
@@ -613,10 +667,11 @@ class Request(NamedTuple):
     request_id: int
     request_type: Union[ResourceType, SpecialRequestType]
     resource_id: int
+    last_command_id: int
 
 
 # Must match `INIT_REQUEST` in `src/resources-over-usb2snes.wiz`
-INIT_REQUEST: Final = Request(0, SpecialRequestType.init, SpecialRequestType.init ^ 0xFF)
+INIT_REQUEST: Final = Request(0, SpecialRequestType.init, SpecialRequestType.init ^ 0xFF, 0xFF)
 
 
 # Must match `ResponseStatus` enum in `src/resources-over-usb2snes.wiz`
@@ -646,6 +701,11 @@ class ResourcesOverUsb2Snes:
         self.data_store: Final = data_store
         self.signals: Final = signals
 
+        # Previous command_id sent by `ResourcesOverUsb2Snes`.
+        # The next command will only be sent if `Request.last_command_id` == previous_command_id
+        # (setting it to a value > 0x100 to ensure no commands are sent until the next `sync_command_id()`)
+        self.previous_command_id: int = 0x1000
+
     def update_mappings(self, mappings: Mappings, symbols: dict[Name, int], n_entities: int) -> None:
         memory_map = mappings.memory_map
 
@@ -667,6 +727,13 @@ class ResourcesOverUsb2Snes:
         self.expected_entity_rom_data_size: int = n_entities * ENTITY_ROM_DATA_BYTES_PER_ENTITY
 
         self.max_data_size: int = min(memory_map.mode.bank_size, 0xFFFF)
+
+        assert self.max_data_size > MAX_COMMAND_SIZE * 2
+
+        # Steal `MAX_COMMAND_SIZE` bytes from the end of the self.response_data_offset and use it for commands.
+        # ::TODO find a proper place to put the command block::
+        self.max_data_size -= MAX_COMMAND_SIZE
+        self.command_offset: int = self.response_data_offset + self.max_data_size
 
         self.not_room_counter: int = self.data_store.get_not_room_counter()
 
@@ -756,7 +823,7 @@ class ResourcesOverUsb2Snes:
             zeropage = self.usb2snes.read_wram_addr(0x7E0000, 256)
 
     def read_request(self) -> Request:
-        rb = self.usb2snes.read_wram_addr(self.request_addr, 3)
+        rb = self.usb2snes.read_wram_addr(self.request_addr, 4)
 
         r_type_id = rb[1]
 
@@ -766,7 +833,7 @@ class ResourcesOverUsb2Snes:
         else:
             rt = SpecialRequestType(r_type_id)
 
-        return Request(rb[0], rt, rb[2])
+        return Request(rb[0], rt, rb[2], rb[3])
 
     # NOTE: This method will sleep until the resource data is valid
     def process_request(self, request: Request) -> None:
@@ -896,14 +963,73 @@ class ResourcesOverUsb2Snes:
 
             self.write_response(INIT_REQUEST.request_id, ResponseStatus.INIT_OK, None)
 
+            while self.read_request().request_type != 0:
+                self.signals.sleep(BURST_SLEEP_DELAY)
+
+            self.sync_command_id()
+
         except Exception as e:
             self.signals.set_usb2snes_status(f"Init ERROR: {type(e).__name__}")
             self.write_response(INIT_REQUEST.request_id, ResponseStatus.ERROR, None)
             raise
 
+    def sync_command_id(self) -> None:
+        # When ResourcesOverUsb2Snes starts `command_id` is unknown.
+        #
+        # We cannot just grab the command_id from `Request` as we have no idea if the console
+        # is executing the previous command or not.
+        #
+        # Instead we send a `null` command (which does nothing) with a new `command_id`, without
+        # changing the command data.  As we did not change the command data, the previous command
+        # continues without issues.
+        #
+        # When the console is ready to process new commands it will process the `null` command
+        # and update `Request.last_command_id`, signaling the console is ready to receive new
+        # commands.
+
+        request = self.read_request()
+
+        command_id = ((request.last_command_id + 2) & 0x7F) | 0x80
+        # Command id cannot be 0xff (console sets last_command_id to 0xff on reset)
+        if command_id >= 0xFF:
+            command_id = 0x80
+
+        # MUST only change `comamnd_id` and `command`.
+        # `data_size` and `data` might still be used by the console.
+        b = bytes([command_id, 0])
+        self.usb2snes.write_to_offset(self.command_offset, b)
+        log_response(f"Reset command_id")
+
+        self.previous_command_id = command_id
+
+    # Assumes previous command has been processed and the console is ready for new commands
+    def send_command(self, c: Command) -> None:
+        # command_id's >= 0x80 are reserved for `send_null_command()`
+        command_id = (self.previous_command_id + 1) & 0x7F
+        if command_id == 0:
+            command_id = 1
+
+        d_size = len(c.data)
+        if d_size < MAX_COMMAND_DATA_SIZE:
+            b = bytes([command_id, c.command.value, d_size & 0xFF, d_size >> 8]) + c.data
+            assert len(b) < MAX_COMMAND_SIZE
+
+            self.usb2snes.write_to_offset(self.command_offset, b)
+
+            self.previous_command_id = command_id
+
+            m = f"Sent {c.command.name.lower()} command"
+            log_response(m)
+            self.signals.set_usb2snes_status(m)
+        else:
+            self.signals.set_usb2snes_status("Cannot send command: command too large")
+            log_error("Cannot send command", "command too large")
+
     def run(self) -> None:
         burst_read_counter: int = 0
         current_request_id: int = 0
+
+        self.sync_command_id()
 
         while True:
             request = self.read_request()
@@ -914,10 +1040,18 @@ class ResourcesOverUsb2Snes:
                 self.process_init_request()
                 current_request_id = INIT_REQUEST.request_id
 
-            elif request.request_id != current_request_id:
-                self.process_request(request)
-                current_request_id = request.request_id
-                burst_read_counter = BURST_COUNT
+            else:
+                if request.last_command_id == self.previous_command_id:
+                    # Previous command has been processed by the console, a new command can now be sent
+                    command = self.signals.pop_command()
+                    if command:
+                        self.send_command(command)
+                        burst_read_counter = BURST_COUNT
+
+                if request.request_id != current_request_id:
+                    self.process_request(request)
+                    current_request_id = request.request_id
+                    burst_read_counter = BURST_COUNT
 
             if burst_read_counter > 0:
                 burst_read_counter -= 1

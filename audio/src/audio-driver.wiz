@@ -93,6 +93,7 @@ struct MusicChannelHeader {
     loop: u16,
 };
 
+// Size MUST match `audio/driver_constants.py`
 struct SongHeader {
     channels : [MusicChannelHeader ; N_MUSIC_CHANNELS],
 
@@ -130,6 +131,10 @@ namespace IO {
 // MUST match `audio/src/audio-driver.wiz`
 enum IoCommand : u8 {
     // commands 0-127: Play sound effect.
+
+    // ::TODO add a few 'EXECUTE_LOADER' checks in the bytecode::
+    // ::: Prevent an infinite loop in the bytecode from deadlocking the S-CPU code::
+    EXECUTE_LOADER = 0x80 | 'L',
 };
 
 
@@ -566,8 +571,11 @@ inline func process_io_ports__inline() {
         previousCommandId = x;
 
         // Assumes N_SOUND_EFFECTS == 128
+        y = a;
         if negative {
-            // ::TODO process other commands::
+            if a == IoCommand.EXECUTE_LOADER as u8 {
+                ^goto (LOADER_ADDR as func);
+            }
         }
         else {
             // Play sound effect command

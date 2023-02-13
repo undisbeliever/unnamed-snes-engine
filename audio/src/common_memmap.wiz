@@ -33,8 +33,3 @@ in loader_zeropage {
 extern const songPtr @ &__loader_songPtr : *const u8;
 
 
-inline func execute_loader() {
-    goto (LOADER_ADDR as func);
-}
-
-

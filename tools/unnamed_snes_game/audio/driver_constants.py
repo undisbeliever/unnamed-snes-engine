@@ -45,3 +45,11 @@ BRR_DATA_ADDRESS: Final[Addr] = EXTERNAL_DATA_HEADER_ADDR + EXTERNAL_DATA_HEADER
 MAX_COMMON_DATA_SIZE: Final = 0xD000
 
 assert EXTERNAL_DATA_HEADER_ADDR & 0xFF == 0
+
+# Song constants
+
+N_MUSIC_CHANNELS: Final = 6
+
+# MUST match `audio/src/common_memmap.wiz`
+# MUST match `SongHeader` in `audio/src/audio-driver.wiz`
+SONG_HEADER_SIZE = N_MUSIC_CHANNELS * 4 + 3

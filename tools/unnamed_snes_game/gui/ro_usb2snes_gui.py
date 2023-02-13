@@ -10,6 +10,7 @@ import tkinter.ttk as ttk
 import tkinter.messagebox
 
 from .errors_tab import ErrorsTab
+from .test_sfx_tab import TestSoundEffectTab
 
 from ..resources_over_usb2snes import FsWatcherSignals, BgThread
 from ..resources_compiler import DataStore
@@ -24,6 +25,7 @@ if tkinter.Tcl().eval("set tcl_platform(threaded)") != "1":
 class GuiSignals(FsWatcherSignals):
     RES_COMPILED_EVENT_NAME: Final = "<<ResCompiled>>"
     STATUS_CHANGED_EVENT_NAME: Final = "<<StatusChanged>>"
+    AUDIO_SAMPLES_CHANGED_EVENT_NAME: Final = "<<AudioSamplesChanged>>"
     WS_CONNECTION_CHANGED_EVENT_NAME: Final = "<<WsConnectionChanged>>"
     BG_THREAD_STOPPED_EVENT_NAME: Final = "<<BgThreadStopped>>"
 
@@ -37,9 +39,10 @@ class GuiSignals(FsWatcherSignals):
         self.root.event_generate(self.STATUS_CHANGED_EVENT_NAME)
 
     def signal_resource_compiled(self) -> None:
-        # `event_generate` is thread safe
-        # https://tkdocs.com/tutorial/eventloop.html#threads
         self.root.event_generate(self.RES_COMPILED_EVENT_NAME)
+
+    def signal_audio_samples_changed(self) -> None:
+        self.root.event_generate(self.AUDIO_SAMPLES_CHANGED_EVENT_NAME)
 
     def signal_ws_connection_changed(self) -> None:
         self.root.event_generate(self.WS_CONNECTION_CHANGED_EVENT_NAME)
@@ -124,11 +127,15 @@ class Rou2sWindow:
         self._errors_tab: Final = ErrorsTab(data_store, self._notebook)
         self._notebook.add(self._errors_tab.frame, text="Errors")
 
+        self._test_sfx_tab: Final = TestSoundEffectTab(data_store, self.signals, self._notebook)
+        self._notebook.add(self._test_sfx_tab.frame, text="Test Sound Effect")
+
         # Signals
         self._window.bind(GuiSignals.STATUS_CHANGED_EVENT_NAME, self._statusbar.on_status_changed)
         self._window.bind(GuiSignals.WS_CONNECTION_CHANGED_EVENT_NAME, self._statusbar.on_ws_connected_status_changed)
         self._window.bind(GuiSignals.RES_COMPILED_EVENT_NAME, self._errors_tab.on_resource_compiled)
         self._window.bind(GuiSignals.BG_THREAD_STOPPED_EVENT_NAME, self._on_bg_thread_stopped)
+        self._window.bind(GuiSignals.AUDIO_SAMPLES_CHANGED_EVENT_NAME, self._test_sfx_tab.on_audio_samples_changed)
 
     def add_bg_thread(self, t: BgThread) -> None:
         if self._running:

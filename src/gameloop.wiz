@@ -19,6 +19,9 @@ import "entities/_common";
 import "entities/player-bomb";
 import "room-events/_callers";
 
+// ::TODO find a better place to call `rou2s_commands.process_commands()`::
+import "rou2s-commands";
+
 
 namespace gameloop {
 
@@ -72,6 +75,9 @@ func run_game {
             break;
         }
 
+        // ::TODO find a better spot to put this::
+        // Cannot put it in `wait_frame()`, it might use `zpTmp` variables
+        rou2s_commands.process_commands();
 
         wait_frame();
 

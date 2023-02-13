@@ -3,6 +3,8 @@
 
 import "memmap";
 
+import "rou2s-commands";
+
 import "resources";
 import "room";
 import "common/reset";
@@ -47,7 +49,9 @@ enum SpecialRequestType : u8 {
 //
 // When making a request, the `request_id` variable should be written last.
 //
-// NOTE: `resources_over_usb2snes.py` may update `MsFsData` and `entity_rom_data` a request has been made.
+// `last_command_id` is used to signal to `resources_over_usb2snes.py` that the console is ready to receive new commands.
+//
+// NOTE: `resources_over_usb2snes.py` may update `MsFsData` and `entity_rom_data` when a request has been made.
 struct Request {
     // Request ID.
     request_id   : u8,
@@ -59,13 +63,17 @@ struct Request {
 
     // ::SHOULDDO increase to u16 when implementing multiple-worlds ::
     resource_id  : u8,
+
+    // The last rou2s command that has been processed the console.
+    last_command_id: u8,
 };
 
 // Must match `INIT_REQUEST` in `tools/resources_over_usb2snes.py`
 let INIT_REQUEST = Request{
-        request_id    = 0,
-        request_type = SpecialRequestType.init as u8,
-        resource_id   = ~(SpecialRequestType.init as u8)
+        request_id      = 0,
+        request_type    = SpecialRequestType.init as u8,
+        resource_id     = ~(SpecialRequestType.init as u8),
+        last_command_id = 0xff
 };
 
 
@@ -126,6 +134,11 @@ in rodata0 {
 }
 
 
+in rodata0 {
+    const InitRequest = INIT_REQUEST;
+}
+
+
 in code {
 
 
@@ -176,18 +189,19 @@ func __send_init_request_and_wait_for_response() {
 
     // Annoying hack to access var struct elements with far addressing
     in wram7e {
-        extern var __request_id   @ &request.request_id   : u8;
         extern var __request_type @ &request.request_type : u8;
-        extern var __resource_id  @ &request.resource_id  : u8;
     }
 
     // This function MUST ONLY use long addressing
 
     // Send INIT_REQUEST
     // (`request_id` must be written last)
-    *(far& __request_type) = a = INIT_REQUEST.request_type as u8;
-    *(far& __resource_id) = a = INIT_REQUEST.resource_id;
-    *(far& __request_id) = a = INIT_REQUEST.request_id;
+    // ASSUMES `request_id` is the first element in `Request` struct
+    x = sizeof(Request) - 1;
+    do {
+        (far &request as far *u8)[x] = a = (far&InitRequest as far *u8)[x];
+        x--;
+    } while !negative;
 
 
     // Wait until the response_id matches request_id and response status is INIT_OK
@@ -199,10 +213,10 @@ func __send_init_request_and_wait_for_response() {
     }
     mem8();
 
+    rou2s_commands.init__inline();
 
     // Change request_type so it is not `SpecialRequestType.init`
-    // A = request_id(0)
-    *(far& __request_type) = a;
+    *(far& __request_type) = a = 0;
 }
 
 
@@ -282,6 +296,23 @@ inline func init() {
 
         __send_init_request_and_wait_for_response();
     }
+}
+
+
+// Set the `last_command_id` variable
+//
+// DB unknown
+#[mem8, idx8]
+inline func set_last_command_id__inline(cId : u8 in a) {
+
+    // This function MUST ONLY use long addressing
+
+    // Annoying hack to access var struct elements with far addressing
+    in wram7e {
+        extern var __request_last_command_id @ &request.last_command_id : u8;
+    }
+
+    *(far &__request_last_command_id) = a;
 }
 
 
