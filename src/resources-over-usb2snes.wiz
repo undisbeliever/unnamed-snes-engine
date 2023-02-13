@@ -274,7 +274,7 @@ in rodata0 {
 // This function MUST be called as early as possible after a system reset.
 //
 // DB unknown
-#[mem8, idx16]
+#[mem8, idx8]
 inline func init() {
     a = *far &resources.UseResourcesOverUsb2Snes;
     if !zero {
