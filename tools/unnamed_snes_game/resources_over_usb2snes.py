@@ -835,7 +835,7 @@ class ResourcesOverUsb2Snes:
             self.signals.sleep(UPDATE_ROM_SPINLOOP_SLEEP_DELAY)
             zeropage = self.usb2snes.read_wram_addr(0x7E0000, 256)
 
-    def read_request(self) -> Request:
+    def read_request(self) -> Optional[Request]:
         rb = self.usb2snes.read_wram_addr(self.request_addr, 4)
 
         r_type_id = rb[1]
@@ -844,7 +844,11 @@ class ResourcesOverUsb2Snes:
         if r_type_id < N_RESOURCE_TYPES:
             rt = ResourceType(r_type_id)
         else:
-            rt = SpecialRequestType(r_type_id)
+            try:
+                rt = SpecialRequestType(r_type_id)
+            except ValueError:
+                # r_type_id is invalid
+                return None
 
         return Request(rb[0], rt, rb[2], rb[3])
 
@@ -976,8 +980,11 @@ class ResourcesOverUsb2Snes:
 
             self.write_response(INIT_REQUEST.request_id, ResponseStatus.INIT_OK, None)
 
-            while self.read_request().request_type != 0:
+            # Wait until request_type is 0
+            r = self.read_request()
+            while r is None or r.request_type != 0:
                 self.signals.sleep(BURST_SLEEP_DELAY)
+                r = self.read_request()
 
             self.sync_command_id()
 
@@ -1001,6 +1008,8 @@ class ResourcesOverUsb2Snes:
         # commands.
 
         request = self.read_request()
+        if request is None:
+            raise ValueError("Invalid request")
 
         command_id = ((request.last_command_id + 2) & 0x7F) | 0x80
         # Command id cannot be 0xff (console sets last_command_id to 0xff on reset)
@@ -1046,25 +1055,25 @@ class ResourcesOverUsb2Snes:
 
         while True:
             request = self.read_request()
+            if request:
+                if request.request_type == SpecialRequestType.init:
+                    # `SpecialRequestType.init` is a special case.
+                    # The game has been reset, current_request_id is invalid
+                    self.process_init_request()
+                    current_request_id = INIT_REQUEST.request_id
 
-            if request.request_type == SpecialRequestType.init:
-                # `SpecialRequestType.init` is a special case.
-                # The game has been reset, current_request_id is invalid
-                self.process_init_request()
-                current_request_id = INIT_REQUEST.request_id
+                else:
+                    if request.last_command_id == self.previous_command_id:
+                        # Previous command has been processed by the console, a new command can now be sent
+                        command = self.signals.pop_command()
+                        if command:
+                            self.send_command(command)
+                            burst_read_counter = BURST_COUNT
 
-            else:
-                if request.last_command_id == self.previous_command_id:
-                    # Previous command has been processed by the console, a new command can now be sent
-                    command = self.signals.pop_command()
-                    if command:
-                        self.send_command(command)
+                    if request.request_id != current_request_id:
+                        self.process_request(request)
+                        current_request_id = request.request_id
                         burst_read_counter = BURST_COUNT
-
-                if request.request_id != current_request_id:
-                    self.process_request(request)
-                    current_request_id = request.request_id
-                    burst_read_counter = BURST_COUNT
 
             if burst_read_counter > 0:
                 burst_read_counter -= 1
