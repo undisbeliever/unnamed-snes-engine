@@ -551,8 +551,21 @@ class SongCompiler(SimpleResourceCompiler):
 
     def __init__(self, shared_input: SharedInput) -> None:
         super().__init__(ResourceType.songs, shared_input)
+        # Sample source files used in the common audio data
+        self._sample_files: Final[set[Filename]] = set()
+
+    @final
+    def shared_input_changed(self, s_type: SharedInputType) -> None:
+        if s_type == SharedInputType.AUDIO_SAMPLES:
+            self._sample_files.clear()
+            audio_samples = self._shared_input.audio_samples
+            if audio_samples:
+                for inst in audio_samples.instruments:
+                    self._sample_files.add(inst.source)
 
     def test_filename_is_resource(self, filename: Filename) -> Optional[int]:
+        if filename in self._sample_files:
+            return 0
         if filename == self.SFX_FILE:
             return 0
         return None
