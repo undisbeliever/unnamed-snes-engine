@@ -105,7 +105,7 @@ def _read_adsr(s: str) -> Adsr:
     if len(values) == 5:
         e = values.pop(0)
         if e == "D":
-            enabled = True
+            enabled = False
         elif e == "E":
             enabled = True
         else:
