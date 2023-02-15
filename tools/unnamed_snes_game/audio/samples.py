@@ -217,7 +217,7 @@ def _build_instrument_pitch_table(mst_map: OrderedDict[int, list[InstrumentPitch
                 pitch_table.append(pitch_fp)
 
         for inst in inst_list:
-            o = pt_offset - (inst.octaves_above_c0 + inst.min_octave_offset) * SEMITONES_PER_OCTAVE
+            o = pt_offset - (inst.octaves_above_c0 + min_octave_offset) * SEMITONES_PER_OCTAVE
             instrument_pt_offsets[inst.instrument_id] = o
 
     assert all(o is not None for o in instrument_pt_offsets)
