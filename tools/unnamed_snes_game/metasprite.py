@@ -817,7 +817,6 @@ def build_msfs_entry(
     frames: list[bytes],
     animations: list[bytes],
 ) -> MsFsEntry:
-
     header = bytearray().zfill(3)
 
     header[0] = SHADOW_SIZES[shadow_size]

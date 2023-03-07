@@ -43,7 +43,6 @@ def write_enum(out: TextIO, name: Name, name_list: list[Name]) -> None:
 
 
 def generate_wiz_code(mappings: Mappings) -> str:
-
     with StringIO() as out:
         out.write("namespace resources {\n\n")
 

@@ -527,7 +527,6 @@ def create_room_entities_soa(entities: list[RoomEntity]) -> bytes:
 
 
 def create_map_data(room: RoomIntermediate) -> bytes:
-
     data = bytearray(room.map_data)
 
     # Tileset byte

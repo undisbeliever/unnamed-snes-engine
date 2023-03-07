@@ -75,7 +75,6 @@ VALID_BGI_HEADER_TM_SIZES: Final = (1, 2, 4)
 
 
 def convert_bg_image(bgi: BackgroundImageInput) -> bytes:
-
     bpp = BI_BPP_FORMATS[bgi.format]
 
     with PIL.Image.open(bgi.source) as image:

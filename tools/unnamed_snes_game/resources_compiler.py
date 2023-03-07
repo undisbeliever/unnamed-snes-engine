@@ -617,7 +617,6 @@ class RoomCompiler:
 def _build_st_rt_map(
     *compilers: Union[BaseResourceCompiler, RoomCompiler]
 ) -> dict[SharedInputType, frozenset[Optional[ResourceType]]]:
-
     out = dict()
 
     for s_type in SharedInputType:
@@ -646,7 +645,6 @@ class ProjectCompiler:
         err_handler: Callable[[Union[ResourceError, Exception, str]], None],
         message_handler: Callable[[str], None],
     ) -> None:
-
         self.data_store: Final = data_store
 
         self.__sym_filename: Final = sym_filename

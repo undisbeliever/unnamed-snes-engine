@@ -298,7 +298,6 @@ def create_tileset_data(palette_data: bytes, tile_data: bytes, metatile_map: byt
 
 
 def convert_mt_tileset(tsx_filename: Filename, mappings: Mappings) -> bytes:
-
     tsx_file = read_tsx_file(tsx_filename)
 
     with PIL.Image.open(tsx_file.palette_filename) as palette_image:

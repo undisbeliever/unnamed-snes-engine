@@ -14,7 +14,6 @@ MAX_INTERACTIVE_FUNCTIONS: Final = 1 << 6
 
 
 def generate_wiz_code(interactive_tile_functions: list[str]) -> str:
-
     # function 0 is null
     n_functions = len(interactive_tile_functions) + 1
 

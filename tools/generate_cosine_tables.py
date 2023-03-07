@@ -38,9 +38,7 @@ def build_cosine_table(amplitude: int) -> list[int]:
 
 
 def generate_wiz_code() -> str:
-
     with StringIO() as out:
-
         out.write(
             """
 import "../src/memmap";

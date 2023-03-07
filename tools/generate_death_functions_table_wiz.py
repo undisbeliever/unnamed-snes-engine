@@ -13,7 +13,6 @@ from unnamed_snes_game.json_formats import load_entities_json, EntitiesJson
 
 
 def generate_wiz_code(entities_json: EntitiesJson) -> str:
-
     death_functions = entities_json.death_functions
     if not death_functions:
         raise ValueError("No death functions")

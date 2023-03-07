@@ -10,7 +10,6 @@ from unnamed_snes_game.json_formats import load_entities_json, load_ms_export_or
 
 
 def generate_wiz_code(entities_input: EntitiesJson, ms_export_orders: MsExportOrder) -> str:
-
     entity_functions = entities_input.entity_functions.values()
     entities = entities_input.entities.values()
 

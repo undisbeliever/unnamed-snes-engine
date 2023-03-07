@@ -32,7 +32,6 @@ def build_arctan_32x2_table() -> list[int]:
 
 
 def generate_wiz_code(arctan_32x2_table: list[int]) -> str:
-
     assert len(arctan_32x2_table) < 0xFF
 
     with StringIO() as out:

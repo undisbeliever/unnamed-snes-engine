@@ -48,7 +48,6 @@ def expected_blank_entity_rom_data(symbols: dict[str, int], n_entities: int) -> 
 def create_entity_rom_data(
     entities_input: EntitiesJson, symbols: dict[str, int], metasprite_map: dict[ScopedName, tuple[int, Name]]
 ) -> bytes:
-
     out = bytearray(2 * len(entities_input.entities) * len(ENTITY_ROM_DATA_SOA_LABELS))
     i = 0
 

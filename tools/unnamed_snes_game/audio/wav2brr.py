@@ -74,7 +74,6 @@ class BrrBlock(NamedTuple):
 def __encode(
     samples: SampleBlock, shift: int, prev1: int, prev2: int, filter_id: int, offset_calc: Callable[[int, int], int]
 ) -> BrrBlock:
-
     assert len(samples) == SAMPLES_PER_BLOCK
     assert 0 <= shift <= MAX_SHIFT
 

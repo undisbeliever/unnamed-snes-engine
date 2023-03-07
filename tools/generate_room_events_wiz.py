@@ -33,7 +33,6 @@ PARAM_SIZE = {
 
 
 def generate_wiz_code(room_events: OrderedDict[Name, RoomEvent]) -> str:
-
     n_functions = len(room_events)
 
     with StringIO() as out:

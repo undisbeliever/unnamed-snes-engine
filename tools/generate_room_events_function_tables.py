@@ -12,7 +12,6 @@ from unnamed_snes_game.json_formats import load_mappings_json, Mappings, Name, R
 
 
 def generate_wiz_code(room_events: OrderedDict[Name, RoomEvent]) -> str:
-
     n_functions = len(room_events)
 
     with StringIO() as out:

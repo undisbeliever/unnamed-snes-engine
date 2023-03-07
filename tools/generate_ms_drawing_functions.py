@@ -12,7 +12,6 @@ from unnamed_snes_game.json_formats import load_ms_export_order_json, Name, MsPa
 
 
 def generate_pattern_code(out: StringIO, pattern: MsPattern) -> None:
-
     # Kept `square_four_32` in `src/metasprites.wiz` as an example
     if pattern.name == "square_four_32":
         return
@@ -111,7 +110,6 @@ def generate_ms_patterns_table(out: StringIO, ms_patterns: OrderedDict[Name, MsP
 
 
 def generate_wiz_code(ms_patterns: OrderedDict[Name, MsPattern]) -> str:
-
     with StringIO() as out:
         out.write(
             """
