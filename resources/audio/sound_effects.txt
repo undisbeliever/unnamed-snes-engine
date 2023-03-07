@@ -1,7 +1,7 @@
 
 
 == menu_cursor ==
-    set_instrument      square_500
+    set_instrument      square
     set_channel_volume  20
     change_octave       +1
 
@@ -12,7 +12,7 @@
 
 
 == menu_select ==
-    set_instrument  sawtooth_333
+    set_instrument  sawtooth
     change_octave   4
 
     play_note       c+  16
@@ -23,7 +23,7 @@
 
 
 == slur_loop_test ==
-    set_instrument      square_500
+    set_instrument      square
     set_channel_volume  127
 
     start_loop
