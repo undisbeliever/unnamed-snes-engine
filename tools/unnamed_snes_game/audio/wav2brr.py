@@ -9,7 +9,7 @@ import struct
 import sys
 import argparse
 
-from typing import Callable, Final, NamedTuple, Sequence, TypeAlias
+from typing import Callable, Final, Generator, NamedTuple, Optional, Sequence, TypeAlias
 
 
 SAMPLES_PER_BLOCK: Final = 16
@@ -116,12 +116,23 @@ def calc_error(to_test: BrrBlock, target_samples: SampleBlock) -> int:
     return sum(abs(t - s) ** 2 for t, s in zip(to_test.decoded_samples, target_samples))
 
 
-def encode_brr(wave_file: WaveFile, loop_flag: bool) -> bytes:
+def encode_brr(wave_file: WaveFile, loop_flag: bool, dupe_block_hack: Optional[int]) -> bytes:
     out = bytearray()
 
-    last_block: Final = len(wave_file.blocks) - 1
+    if dupe_block_hack is None:
+        dupe_block_hack = 0
+    else:
+        if dupe_block_hack < 0:
+            raise ValueError("dupe_block_hack MUST be >= 0")
+        if dupe_block_hack > 0 and not loop_flag:
+            raise ValueError("dupe_block_hack can only be applied to looping samples")
 
-    for block_number, samples in enumerate(wave_file.blocks):
+    len_blocks: Final = len(wave_file.blocks)
+    last_block: Final = len_blocks + dupe_block_hack - 1
+
+    for block_number in range(last_block + 1):
+        samples = wave_file.blocks[block_number % len_blocks]
+
         tests = list[BrrBlock]()
 
         for s in range(MAX_SHIFT + 1):
@@ -161,6 +172,8 @@ def parse_arguments() -> argparse.Namespace:
     g.add_argument("-l", "--loop", action="store_true", help="Set the loop flag")
     g.add_argument("-n", "--no-loop", action="store_true", help="Do not set the loop flag")
 
+    g.add_argument("--dupe-block-hack", action="store_int")
+
     parser.add_argument("wav_file", action="store", help="wav file input")
 
     args = parser.parse_args()
@@ -173,7 +186,7 @@ def main() -> None:
         args = parse_arguments()
 
         wave_file = load_wav_file(args.wav_file)
-        brr_data = encode_brr(wave_file, args.loop)
+        brr_data = encode_brr(wave_file, args.loop, args.dupe_block_hack)
 
         with open(args.output, "wb") as fp:
             fp.write(brr_data)

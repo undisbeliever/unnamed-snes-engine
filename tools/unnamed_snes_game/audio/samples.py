@@ -8,7 +8,7 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Final, NamedTuple, Optional, TypeAlias, Union
 
-from .wav2brr import load_wav_file, encode_brr, SAMPLES_PER_BLOCK, BYTES_PER_BRR_BLOCK
+from .wav2brr import load_wav_file, encode_brr, WaveFile, SAMPLES_PER_BLOCK, BYTES_PER_BRR_BLOCK
 from .driver_constants import *
 from .json_formats import SamplesJson, Instrument, Filename, Name
 
@@ -31,21 +31,21 @@ def _compile_brr_samples(instruments: list[Instrument]) -> BrrData:
 
     # Mapping of wave files to the address of BRR data
     # filename, loop flag => brr address, brr size
-    brr_data_map: dict[tuple[Filename, bool], tuple[Addr, int]] = dict()
+    brr_data_map: dict[tuple[Filename, bool, Optional[int]], tuple[Addr, int]] = dict()
 
     # Mapping of wave files and loop points to sample directory ids
     # filename, loop flag, loop_point => sample directory id
-    scrn_map: dict[tuple[Filename, bool, int], int] = dict()
+    scrn_map: dict[tuple[Filename, bool, int, Optional[int]], int] = dict()
 
-    def encode_wave_file(filename: Filename, loop_flag: bool) -> tuple[Addr, int]:
+    def encode_wave_file(filename: Filename, loop_flag: bool, dupe_block_hack: Optional[int]) -> tuple[Addr, int]:
         nonlocal brr_data, brr_data_map
 
-        key: Final = filename, loop_flag
+        key: Final = filename, loop_flag, dupe_block_hack
 
         out = brr_data_map.get(key)
         if out is None:
             w = load_wav_file(filename)
-            b = encode_brr(w, loop_flag)
+            b = encode_brr(w, loop_flag, dupe_block_hack)
 
             addr = len(brr_data) + BRR_DATA_ADDRESS
             size = len(b)
@@ -55,21 +55,26 @@ def _compile_brr_samples(instruments: list[Instrument]) -> BrrData:
             brr_data_map[key] = out = addr, size
         return out
 
-    def add_sample(filename: Filename, loop_flag: bool, loop_point: Optional[int]) -> int:
+    def add_sample(filename: Filename, loop_flag: bool, loop_point: Optional[int], dupe_block_hack: Optional[int]) -> int:
         nonlocal scrn_map
 
-        if loop_point is None:
-            loop_point = 0
+        if dupe_block_hack is not None:
+            if loop_point is not None:
+                raise ValueError("Cannot use `loop_point` and `dupe_block_hack` at the same time")
+            loop_point = dupe_block_hack * SAMPLES_PER_BLOCK
+        else:
+            if loop_point is None:
+                loop_point = 0
 
-        key: Final = filename, loop_flag, loop_point
+        key: Final = filename, loop_flag, loop_point, dupe_block_hack
         sample_id = scrn_map.get(key)
         if sample_id is None:
-            brr_addr, brr_size = encode_wave_file(filename, loop_flag)
+            brr_addr, brr_size = encode_wave_file(filename, loop_flag, dupe_block_hack)
 
             if loop_point < 0 or loop_point % SAMPLES_PER_BLOCK != 0:
                 raise ValueError(f"Loop point must be a multiple of {SAMPLES_PER_BLOCK}")
 
-            loop_offset = (loop_point // 16) * BYTES_PER_BRR_BLOCK
+            loop_offset = (loop_point // SAMPLES_PER_BLOCK) * BYTES_PER_BRR_BLOCK
 
             if loop_offset >= brr_size:
                 raise ValueError("Loop point must be < number of samples in the wave file")
@@ -88,7 +93,7 @@ def _compile_brr_samples(instruments: list[Instrument]) -> BrrData:
 
     for i, inst in enumerate(instruments):
         try:
-            instrument_scrn_table.append(add_sample(inst.source, inst.looping, inst.loop_point))
+            instrument_scrn_table.append(add_sample(inst.source, inst.looping, inst.loop_point, inst.dupe_block_hack))
         except Exception as e:
             errors.append(f"ERROR in Instrument {i} {inst.name}: {e}")
 

@@ -81,6 +81,12 @@ class Instrument:
     looping: bool
     loop_point: Optional[int]
 
+    # Duplicates `N` blocks to the end of the sample in an attempt to improve the sample quality of the first-looping BRR block.
+    # Increases the sample size by `N * 9` bytes.
+    # Most samples created by this hack will not loop perfectly which adds low-frequency oscillation to the sample.
+    # (Hence the name `duple_block_hack`.)
+    dupe_block_hack: Optional[int]
+
     first_octave: int
     last_octave: int
 
@@ -137,6 +143,7 @@ def _read_instruments(json_input: dict[str, list[dict[str, Any]]], filename: Fil
                 name=parse_name(ji["name"]),
                 source=_read_filename(ji["source"], dirname),
                 looping=bool(ji["looping"]),
+                dupe_block_hack=_read_optional_int(ji.get("dupe_block_hack")),
                 freq=float(ji["freq"]),
                 loop_point=_read_optional_int(ji.get("loop_point")),
                 first_octave=_read_int(ji["first_octave"]),
