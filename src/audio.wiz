@@ -43,12 +43,12 @@ enum IoCommand : u8 {
 
 
 in rodata0 {
-    const __Loader = embed "../audio/loader.bin";
+    const __Loader = embed "gen/audio-loader.bin";
 
     let Loader = far &__Loader as far * const u8;
     let LOADER_SIZE = sizeof(typeof(__Loader));
 
-    const AudioDriver = embed "../audio/audio-driver.bin";
+    const AudioDriver = embed "gen/audio-driver.bin";
 }
 
 

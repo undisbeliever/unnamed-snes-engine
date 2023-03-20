@@ -26,6 +26,10 @@ GEN_SOURCES  += gen/cosine-tables.wiz
 RESOURCES_SRC := $(wildcard $(RESOURCES_DIR)/*.json $(RESOURCES_DIR)/* $(RESOURCES_DIR)/*/* $(RESOURCES_DIR)/*/*/*)
 
 
+AUDIO_DRIVER_SRC := $(wildcard audio-driver/*.wiz)
+AUDIO_DRIVER_BINARIES := gen/audio-loader.bin gen/audio-driver.bin
+
+
 COMMON_PYTHON_SCRIPTS = $(wildcard tools/unnamed_snes_game/*.py tools/unnamed_snes_game/*/*.py)
 
 # Python interpreter
@@ -42,8 +46,20 @@ $(BINARY): $(INTERMEDIATE_BINARY) tools/insert_resources.py $(COMMON_PYTHON_SCRI
 	cp $(INTERMEDIATE_BINARY:.sfc=.sym) $(BINARY:.sfc=.sym)
 
 
-$(INTERMEDIATE_BINARY): wiz/bin/wiz $(SOURCES) $(GEN_SOURCES)
+$(INTERMEDIATE_BINARY): wiz/bin/wiz $(SOURCES) $(GEN_SOURCES) $(AUDIO_DRIVER_BINARIES)
 	wiz/bin/wiz -s wla -I src src/main.wiz -o $(INTERMEDIATE_BINARY)
+
+
+
+.PHONY: audio-driver
+audio-driver: $(AUDIO_DRIVER_BINARIES)
+
+gen/audio-loader.bin: audio-driver/loader.wiz audio-driver/common_memmap.wiz
+	wiz/bin/wiz --system=spc700 -s wla audio-driver/loader.wiz -o '$@'
+
+gen/audio-driver.bin: $(AUDIO_DRIVER_SRC)
+	wiz/bin/wiz --system=spc700 -s wla audio-driver/audio-driver.wiz -o '$@'
+
 
 
 .PHONY: wiz
@@ -55,21 +71,8 @@ wiz wiz/bin/wiz:
 __UNUSED__ := $(shell $(MAKE) --quiet --question -C 'wiz' bin/wiz)
 ifneq ($(.SHELLSTATUS), 0)
   $(BINARY): wiz
+  $(AUDIO_DRIVER_BINARIES): wiz
 endif
-
-
-
-# Test if the audio driver needs recompiling
-__UNUSED2__ := $(shell $(MAKE) --quiet --question -C 'audio')
-ifneq ($(.SHELLSTATUS), 0)
-  $(INTERMEDIATE_BINARY): audio
-endif
-
-.PHONY: audio
-audio audio/audio-driver.bin:
-	$(MAKE) -C audio
-
-$(INTERMEDIATE_BINARY): audio/audio-driver.bin
 
 
 gen/interactive-tiles.wiz: resources/mappings.json tools/generate_interactive_tiles_wiz.py $(COMMON_PYTHON_SCRIPTS)
@@ -108,7 +111,7 @@ gen/:
 
 .PHONY: clean
 clean:
-	$(MAKE) -C audio clean
+	$(RM) $(AUDIO_DRIVER_BINARIES)
 	$(RM) $(BINARY) $(INTERMEDIATE_BINARY)
 	$(RM) $(GEN_SOURCES)
 
