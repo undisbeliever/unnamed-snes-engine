@@ -29,6 +29,8 @@ RESOURCES_SRC := $(wildcard $(RESOURCES_DIR)/*.json $(RESOURCES_DIR)/* $(RESOURC
 AUDIO_DRIVER_SRC := $(wildcard audio-driver/*.wiz)
 AUDIO_DRIVER_BINARIES := gen/audio-loader.bin gen/audio-driver.bin
 
+MLB_FILE  := $(patsubst %.sfc,%.mlb,$(BINARY))
+SYM_FILES := $(patsubst %.sfc,%.sym,$(INTERMEDIATE_BINARY)) $(patsubst %.bin,%.sym,$(AUDIO_DRIVER_BINARIES))
 
 COMMON_PYTHON_SCRIPTS = $(wildcard tools/unnamed_snes_game/*.py tools/unnamed_snes_game/*/*.py)
 
@@ -38,12 +40,15 @@ PYTHON3  := python3 -bb
 
 
 .PHONY: all
-all: $(BINARY)
+all: $(BINARY) $(MLB_FILE)
 
 
 $(BINARY): $(INTERMEDIATE_BINARY) tools/insert_resources.py $(COMMON_PYTHON_SCRIPTS) $(RESOURCES_SRC)
 	$(PYTHON3) tools/insert_resources.py -o '$(BINARY)' '$(RESOURCES_DIR)' '$(INTERMEDIATE_BINARY:.sfc=.sym)' '$(INTERMEDIATE_BINARY)'
-	cp $(INTERMEDIATE_BINARY:.sfc=.sym) $(BINARY:.sfc=.sym)
+
+
+$(MLB_FILE): $(INTERMEDIATE_BINARY) $(AUDIO_DRIVER_BINARIES) tools/sym_to_mlb.py
+	$(PYTHON3) tools/sym_to_mlb.py -o '$@' --hirom $(SYM_FILES)
 
 
 $(INTERMEDIATE_BINARY): wiz/bin/wiz $(SOURCES) $(GEN_SOURCES) $(AUDIO_DRIVER_BINARIES)
@@ -111,8 +116,8 @@ gen/:
 
 .PHONY: clean
 clean:
-	$(RM) $(AUDIO_DRIVER_BINARIES)
-	$(RM) $(BINARY) $(INTERMEDIATE_BINARY)
+	$(RM) $(BINARY) $(INTERMEDIATE_BINARY) $(AUDIO_DRIVER_BINARIES)
+	$(RM) $(MLB_FILE) $(SYM_FILES)
 	$(RM) $(GEN_SOURCES)
 
 

@@ -1,6 +1,7 @@
 *.sfc
 *.sym
 *.bin
+*.mlb
 
 *.sh
 
