@@ -396,8 +396,8 @@ var _loopEnd : u8 in zpTmp;
         channelSoA.octaveOffset[x] = a;
         channelSoA.pitchTableOffset[x] = a;
 
-        bytecode.set_channel_volume(x, 96);
-        bytecode.set_instrument(x, 0);
+        set_channel_volume(x, 96);
+        __set_instrument__inline(x, 0);
 
         channelSoA.defaultNoteLength[x] = a = STARTING_DEFAULT_NOTE_LENGTH;
 
@@ -537,6 +537,47 @@ func delay() {
 }
 
 
+
+// KEEP: X
+// MUST NOT USE `currentChannelIndex`
+// MUST NOT USE `zpTmp`
+func __set_instrument__inline(channelIndex : u8 in x, instrumentId : u8 in a) {
+    // Using addr,y addressing mode for `channels`, 1 cycle faster then transferring y to x.
+
+    y = a = a & INSTRUMENT_MASK;
+
+    smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.SCRN as u8;
+    smp.dsp_data = a = external_data.instruments.scrn[y];
+
+    smp.dsp_addr++;
+    smp.dsp_data = a = external_data.instruments.adsr1[y];
+
+    smp.dsp_addr++;
+    smp.dsp_data = a = external_data.instruments.adsr2[y];
+
+    smp.dsp_addr++;
+    smp.dsp_data = a = external_data.instruments.gain[y];
+
+    a = external_data.instruments.pitchOffset[y];
+    __set_pt_offset(x, a, channelSoA.instPitchOffset);
+}
+
+
+// KEEP: X
+// MUST NOT USE `currentChannelIndex`
+// MUST NOT USE `zpTmp`
+func set_channel_volume(channelIndex : u8 in x, volume : u8 in a) {
+    y = a;
+
+    // ASSUMES VoiceDspAddr.VOL_L == 0
+    smp.dsp_addr = a = ChannelVoiceOffset[x];
+    smp.dsp_data = y;
+
+    smp.dsp_addr++;
+    smp.dsp_data = y;
+}
+
+
 // IO Ports
 // ========
 
@@ -625,7 +666,7 @@ func __play_sfx_on_channel(channelIndex : u8 in x, sfxBytecode : u16 in ya) {
 
     channelSoA.defaultNoteLength[x] = a = SFX_DEFAULT_NOTE_LENGTH;
 
-    ^return bytecode.set_channel_volume(x, 96);
+    ^return set_channel_volume(x, 96);
 }
 
 
@@ -651,68 +692,20 @@ inline func process_channel__inline(channelIndex : u8 in x) {
             increment_next_event__fixed_u8__inline(x, KEY_OFF_DELAY);
         }
         else {
-            process_bytecode__inline(x);
+            currentChannelIndex = x;
+
+            a = channelSoA.instructionPtr_l[x];
+            y = channelSoA.instructionPtr_h[x];
+
+            process_bytecode(x, ya);
+
+            x = currentChannelIndex;
+
+            ya = instructionPtr as u16;
+            channelSoA.instructionPtr_l[x] = a;
+            channelSoA.instructionPtr_h[x] = y;
         }
     }
-}
-
-
-
-// KEEP: X
-inline func process_bytecode__inline(channelIndex : u8 in x) {
-
-    currentChannelIndex = x;
-
-    a = channelSoA.instructionPtr_l[x];
-    y = channelSoA.instructionPtr_h[x];
-    instructionPtr = ya as *const u8;
-
-    do {
-        y = 0;
-        a = instructionPtr[y];
-        instructionPtr++;
-
-        if a < sizeof(typeof(bytecode.ByteInstructions_l)) {
-            y = a;
-            // Set address of the instruction using self-modifying code
-            // (If I used the `JMP [!abs+X]` it would have clobbered `X` and cost be ~80 bytes to do a `x = _currentChannelIndex` on every instruction).
-            (&CallInstruction as *u8)[1] = a = bytecode.ByteInstructions_l[y];
-            (&CallInstruction as *u8)[2] = a = bytecode.ByteInstructions_h[y];
-
-            if y < bytecode.N_SINGLE_ARGUMENT_INSTRUCTIONS {
-                // Instruction has a parameter
-                y = 0;
-                a = instructionPtr[y];
-                instructionPtr++;
-            }
-        }
-        else {
-            x = a;
-
-            a &= 0b11100000;
-            swap_digits(a);
-            y = a;
-
-            // Y = instruction_index * 2
-
-            // Set address of the instruction using self-modifying code
-            (&CallInstruction as *u8)[1] = a = (&<:bytecode.InlineArgumentInstructions[0] as *const u8)[unaligned y];
-            (&CallInstruction as *u8)[2] = a = (&>:bytecode.InlineArgumentInstructions[0] as *const u8)[unaligned y];
-
-            a = x & bytecode.INLINE_ARGUMENT_MASK;
-            x = currentChannelIndex;
-        }
-
-    CallInstruction:
-        carry = bytecode.null_instruction(x, a);
-        // carry set if there are more instructions to process
-    } while !carry;
-
-    x = currentChannelIndex;
-
-    ya = instructionPtr as u16;
-    channelSoA.instructionPtr_l[x] = a;
-    channelSoA.instructionPtr_h[x] = y;
 }
 
 
@@ -728,8 +721,77 @@ inline func increment_next_event__fixed_u8__inline(channelIndex : u8 in x, let T
 }
 
 
+// Process Bytecode
+// ================
+
+
+// Set the bytecode `instructionPtr` and execute the next bytecode instruction.
+// KEEP: X
+#[fallthrough]
+func process_bytecode(channelIndex : u8 in x, addr : u16 in ya) {
+    instructionPtr = ya as *const u8;
+
+// Fallthrough
+}
+
+
+// Execute the next bytecode instruction
+//
+// KEEP: X
+func process_next_bytecode(channelIndex : u8 in x) {
+    y = 0;
+    a = instructionPtr[y];
+    instructionPtr++;
+
+    if a < sizeof(typeof(bytecode.ByteInstructions_l)) {
+        y = a;
+        // Set address of the instruction using self-modifying code
+        // (If I used the `JMP [!abs+X]` it would have clobbered `X` and cost be ~80 bytes to do a `x = _currentChannelIndex` on every instruction).
+        (&JumpInstruction as *u8)[1] = a = bytecode.ByteInstructions_l[y];
+        (&JumpInstruction as *u8)[2] = a = bytecode.ByteInstructions_h[y];
+
+        if y < bytecode.N_SINGLE_ARGUMENT_INSTRUCTIONS {
+            // Instruction has a parameter
+            y = 0;
+            a = instructionPtr[y];
+            instructionPtr++;
+        }
+
+        // Have to use `^goto` here, `^return` outputs a `BRA` instruction.
+    JumpInstruction:
+        ^goto bytecode.null_instruction;
+    }
+    else {
+        x = a;
+
+        a &= 0b11100000;
+        swap_digits(a);
+        y = a;
+
+        // Y = instruction_index * 2
+
+        // Set address of the instruction using self-modifying code
+        (&JumpInstruction as *u8)[1] = a = (&<:bytecode.InlineArgumentInstructions[0] as *const u8)[unaligned y];
+        (&JumpInstruction as *u8)[2] = a = (&>:bytecode.InlineArgumentInstructions[0] as *const u8)[unaligned y];
+
+        a = x & bytecode.INLINE_ARGUMENT_MASK;
+        x = currentChannelIndex;
+
+        // Have to use `^goto` here, `^return` outputs a `BRA` instruction.
+    JumpInstruction:
+        ^goto bytecode.null_instruction;
+    }
+}
+
+
 
 // NOTE: BYTECODE INSTRUCTIONS MUST KEEP X
+//
+// Bytecode instruction must either:
+//    * Return after setting `channelSoA.nextEvent_*` (to start sleeping)
+//    * Jump to `process_next_bytecode` to execute the next bytecode instruction
+//    * Jump to `process_bytecode` to change the bytecode instruction pointer and execute it.
+//
 namespace bytecode {
 
 const ByteInstructions_l : [ u8 ; 1 << 5 ] = [ <:&f for let f in SINGLE_ARGUMENT_INSTRUCTIONS ]
@@ -738,18 +800,15 @@ const ByteInstructions_l : [ u8 ; 1 << 5 ] = [ <:&f for let f in SINGLE_ARGUMENT
 const ByteInstructions_h : [ u8 ; 1 << 5 ] = [ >:&f for let f in SINGLE_ARGUMENT_INSTRUCTIONS ]
                                            ~ [ >:&f for let f in NO_PARAMETER_INSTRUCTIONS ];
 
-const InlineArgumentInstructions : [ func(u8 in x, u8 in y) : bool in carry ; 1 << 3 ] = INLINE_ARGUMENT_INSTRUCTIONS;
+const InlineArgumentInstructions : [ func(u8 in x, u8 in y) ; 1 << 3 ] = INLINE_ARGUMENT_INSTRUCTIONS;
 
 
-
-func null_instruction(channelIndex : u8 in x, note : u8 in a) : bool in carry {
-    return disable_channel(x);
-}
+let null_instruction = disable_channel as func(u8 in x, u8 in a);
 
 
 
 // KEEP: X
-func disable_channel(channelIndex : u8 in x) : bool in carry {
+func disable_channel(channelIndex : u8 in x) {
     // Set the nextEvent clock to the highest it can go
     a = 0xff;
     channelSoA.nextEvent_l[x] = a;
@@ -762,26 +821,24 @@ func disable_channel(channelIndex : u8 in x) : bool in carry {
     y = >:&ChannelDisabledBytecode;
     instructionPtr = ya as *const u8;
 
-    // return true (do not execute the next bytecode and sleep)
-    return true;
+    // return (do not execute the next bytecode and sleep)
+    return;
 }
 
 
 // KEEP: X
-func end(channelIndex : u8 in x) : bool in carry {
+func end(channelIndex : u8 in x) {
     y = channelSoA.instructionPtrAfterEnd_h[x];
     goto disable_channel if zero;
 
     a = channelSoA.instructionPtrAfterEnd_l[x];
 
-    instructionPtr = ya as *const u8;
-
-    return false;
+    ^return process_bytecode(x, ya);
 }
 
 
 // KEEP: X
-func call_subroutine(channelIndex : u8 in x, subroutineId : u8 in a) : bool in carry {
+func call_subroutine(channelIndex : u8 in x, subroutineId : u8 in a) {
 var _subroutineId : u8 in zpTmp;
 
     _subroutineId = a;
@@ -797,22 +854,21 @@ var _subroutineId : u8 in zpTmp;
     y++;
     >:instructionPtr = a = (subroutineTable as *u8)[y];
 
-    return false;
+    ^return process_next_bytecode(x);
 }
 
 
 // KEEP: X
-func return_from_subroutine(channelIndex : u8 in x) : bool in carry {
+func return_from_subroutine(channelIndex : u8 in x) {
     a = channelSoA.returnInstPtr_l[x];
     y = channelSoA.returnInstPtr_h[x];
-    instructionPtr = ya as *const u8;
 
-    return false;
+    ^return process_bytecode(x, ya);
 }
 
 
 // KEEP: X
-inline func __start_loop(channelIndex : u8 in x, let LOOP_ID : u8) : bool in carry {
+inline func __start_loop(channelIndex : u8 in x, let LOOP_ID : u8) {
     ya = instructionPtr as u16;
 
     channelSoA.loopState[LOOP_ID].loopPoint_l[x] = a;
@@ -820,81 +876,57 @@ inline func __start_loop(channelIndex : u8 in x, let LOOP_ID : u8) : bool in car
 
     channelSoA.loopState[LOOP_ID].counter[x] = a = 0;
 
-    return false;
+    ^return process_next_bytecode(x);
 }
 
 
 // KEEP: X
-inline func __end_loop(channelIndex : u8 in x, loopCount : u8 in a, let LOOP_ID : u8) : bool in carry {
+inline func __end_loop(channelIndex : u8 in x, loopCount : u8 in a, let LOOP_ID : u8) {
     if a >= channelSoA.loopState[LOOP_ID].counter[x] {
         channelSoA.loopState[LOOP_ID].counter[x]++;
 
         a = channelSoA.loopState[LOOP_ID].loopPoint_l[x];
         y = channelSoA.loopState[LOOP_ID].loopPoint_h[x];
-        instructionPtr = ya as *const u8;
 
-        carry = false;
+        ^return process_bytecode(x, ya);
     }
-    // carry false if `a < loopState`
-    // return false
-    return carry;
+    ^return process_next_bytecode(x);
 }
 
 
 // KEEP: X
-func start_loop_0(channelIndex : u8 in x) : bool in carry {
+func start_loop_0(channelIndex : u8 in x) {
     return __start_loop(x, 0);
 }
 
 // KEEP: X
-func start_loop_1(channelIndex : u8 in x) : bool in carry {
+func start_loop_1(channelIndex : u8 in x) {
     return __start_loop(x, 1);
 }
 
 
 // KEEP: X
-func end_loop_0(channelIndex : u8 in x, loopCount : u8 in a) : bool in carry {
+func end_loop_0(channelIndex : u8 in x, loopCount : u8 in a) {
     return __end_loop(x, a, 0);
 }
 
 // KEEP: X
-func end_loop_1(channelIndex : u8 in x, loopCount : u8 in a) : bool in carry {
+func end_loop_1(channelIndex : u8 in x, loopCount : u8 in a) {
     return __end_loop(x, a, 1);
 }
 
 
 
-// KEEP: X
-// MUST NOT USE `currentChannelIndex`
-// MUST NOT USE `zpTmp`
-func set_instrument(channelIndex : u8 in x, instrumentId : u8 in a) : bool in carry {
-    // Using addr,y addressing mode for `channels`, 1 cycle faster then transferring y to x.
-
-    y = a = a & INSTRUMENT_MASK;
-
-    smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.SCRN as u8;
-    smp.dsp_data = a = external_data.instruments.scrn[y];
-
-    smp.dsp_addr++;
-    smp.dsp_data = a = external_data.instruments.adsr1[y];
-
-    smp.dsp_addr++;
-    smp.dsp_data = a = external_data.instruments.adsr2[y];
-
-    smp.dsp_addr++;
-    smp.dsp_data = a = external_data.instruments.gain[y];
-
-    a = external_data.instruments.pitchOffset[y];
-    __set_pt_offset(x, a, channelSoA.instPitchOffset);
-
-    return false;
+func set_instrument(channelIndex : u8 in x, instrumentId : u8 in a) {
+    __set_instrument__inline(x, a);
+    ^return process_next_bytecode(x);
 }
 
 
 
 // ASSUMES: parameter is 5 bits
 // KEEP: X
-func change_octave(channelIndex : u8 in x, parameter : u8 in a) : bool in carry {
+func change_octave(channelIndex : u8 in x, parameter : u8 in a) {
     y = a = a >>>= 1;
     if carry {
         // relative octave change
@@ -902,7 +934,7 @@ func change_octave(channelIndex : u8 in x, parameter : u8 in a) : bool in carry 
         a = OctaveTable[y] as u8;
         __add_to_pt_offset(x, a as i8, channelSoA.octaveOffset);
 
-        return false;
+        ^return process_next_bytecode(x);
     }
     else {
         // Set octave
@@ -910,7 +942,7 @@ func change_octave(channelIndex : u8 in x, parameter : u8 in a) : bool in carry 
         a = OctaveTable[y] as u8;
         __set_pt_offset(x, a, channelSoA.octaveOffset);
 
-        return false;
+        ^return process_next_bytecode(x);
     }
 }
 
@@ -919,27 +951,25 @@ const OctaveTable : [i8 ; 16] = [i * 12 for let i in -6..9];
 
 
 // KEEP: X
-func set_semitone_offset(channelIndex : u8 in x, parameter : i8 in a) : bool in carry {
+func set_semitone_offset(channelIndex : u8 in x, parameter : i8 in a) {
     __set_pt_offset(x, a, channelSoA.semitoneOffset);
 
-    return false;
+    ^return process_next_bytecode(x);
 }
 
 
 
 // KEEP: X
-func relative_semitone_offset(channelIndex : u8 in x, parameter : i8 in a) : bool in carry {
+func relative_semitone_offset(channelIndex : u8 in x, parameter : i8 in a) {
     __add_to_pt_offset(x, a as i8, channelSoA.semitoneOffset);
 
-    return false;
+    ^return process_next_bytecode(x);
 }
 
 
 
 // KEEP: X
-// MUST NOT USE `currentChannelIndex`
-// MUST NOT USE `zpTmp`
-func set_channel_volume(channelIndex : u8 in x, volume : u8 in a) : bool in carry {
+func set_channel_volume(channelIndex : u8 in x, volume : u8 in a) {
     y = a;
 
     // ASSUMES VoiceDspAddr.VOL_L == 0
@@ -949,13 +979,13 @@ func set_channel_volume(channelIndex : u8 in x, volume : u8 in a) : bool in carr
     smp.dsp_addr++;
     smp.dsp_data = y;
 
-    return false;
+    ^return process_next_bytecode(x);
 }
 
 
 
 // KEEP: x
-func play_note(channelIndex : u8 in x, note : u8 in a) : bool in carry {
+func play_note(channelIndex : u8 in x, note : u8 in a) {
     zpTmp = a;
 
     // Set note pitch
@@ -993,13 +1023,16 @@ func play_note(channelIndex : u8 in x, note : u8 in a) : bool in carry {
         instructionPtr++;
     }
 
-    return _rest_with_keyoff__inline(x, a);
+    _rest_with_keyoff__inline(x, a);
+
+    // returns (do not execute the next bytecode and sleep)
+    return;
 }
 
 
 
 // KEEP: x
-func play_note_slur_next(channelIndex : u8 in x, note : u8 in a) : bool in carry {
+func play_note_slur_next(channelIndex : u8 in x, note : u8 in a) {
     zpTmp = a;
 
     // Set note pitch
@@ -1046,10 +1079,10 @@ func play_note_slur_next(channelIndex : u8 in x, note : u8 in a) : bool in carry
 
 // NOTE: Always returns true
 // KEEP: x
-func rest(channelIndex : u8 in x, length: u8 in a) : bool in carry {
+func rest(channelIndex : u8 in x, length: u8 in a) {
 var _tmp : u8 in zpTmp;
 
-    // No need to zero `nextEventIsKeyOff` it is cleared by `process_bytecode__inline()`.
+    // No need to zero `nextEventIsKeyOff` it is cleared by `process_channel__inline()`.
 
     // Calculate number of ticks to sleep
     // (Q16.8)nextEvent += (Q8.8)tempo * (Q8.0)note
@@ -1072,15 +1105,15 @@ var _tmp : u8 in zpTmp;
     channelSoA.nextEvent_l[x] = a = a + channelSoA.nextEvent_l[x];
     channelSoA.nextEvent_h[x] = a = y +# channelSoA.nextEvent_h[x];
 
-    // return true (do not execute the next bytecode and sleep)
-    return true;
+    // return (do not execute the next bytecode and sleep)
+    return;
 }
 
 
 
 // NOTE: Always returns true
 // KEEP: x
-inline func _rest_with_keyoff__inline(channelIndex : u8 in x, length: u8 in a) : bool in carry {
+inline func _rest_with_keyoff__inline(channelIndex : u8 in x, length: u8 in a) {
 var _tmp : u8 in zpTmp;
 
     _tmp = a;
@@ -1111,9 +1144,6 @@ var _tmp : u8 in zpTmp;
 
     channelSoA.nextEvent_l[x] = a = a + channelSoA.nextEvent_l[x];
     channelSoA.nextEvent_h[x] = a = y +# channelSoA.nextEvent_h[x];
-
-    // return true (do not execute the next bytecode and sleep)
-    return true;
 }
 
 
