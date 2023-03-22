@@ -394,13 +394,11 @@ var _loopEnd : u8 in zpTmp;
     // Reset all music channels
     x = N_MUSIC_CHANNELS - 1;
     do {
-        // These variables MUST be set before set_instrument
         a = STARTING_OCTAVE * 12;
         channelSoA.octaveOffset[x] = a;
         channelSoA.pitchTableOffset[x] = a;
 
         set_channel_volume(x, 96);
-        __set_instrument__inline(x, 0);
 
         channelSoA.defaultNoteLength[x] = a = STARTING_DEFAULT_NOTE_LENGTH;
 
@@ -537,32 +535,6 @@ func delay() {
     do {
         y--;
     } while !zero;
-}
-
-
-
-// KEEP: X
-// MUST NOT USE `currentChannelIndex`
-// MUST NOT USE `zpTmp`
-func __set_instrument__inline(channelIndex : u8 in x, instrumentId : u8 in a) {
-    // Using addr,y addressing mode for `channels`, 1 cycle faster then transferring y to x.
-
-    y = a = a & INSTRUMENT_MASK;
-
-    smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.SCRN as u8;
-    smp.dsp_data = a = external_data.instruments.scrn[y];
-
-    smp.dsp_addr++;
-    smp.dsp_data = a = external_data.instruments.adsr1[y];
-
-    smp.dsp_addr++;
-    smp.dsp_data = a = external_data.instruments.adsr2[y];
-
-    smp.dsp_addr++;
-    smp.dsp_data = a = external_data.instruments.gain[y];
-
-    a = external_data.instruments.pitchOffset[y];
-    __set_pt_offset(x, a, channelSoA.instPitchOffset);
 }
 
 
@@ -921,7 +893,25 @@ func end_loop_1(channelIndex : u8 in x, loopCount : u8 in a) {
 
 
 func set_instrument(channelIndex : u8 in x, instrumentId : u8 in a) {
-    __set_instrument__inline(x, a);
+    // Using addr,y addressing mode for `channels`, 1 cycle faster then transferring y to x.
+
+    y = a = a & INSTRUMENT_MASK;
+
+    smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.SCRN as u8;
+    smp.dsp_data = a = external_data.instruments.scrn[y];
+
+    smp.dsp_addr++;
+    smp.dsp_data = a = external_data.instruments.adsr1[y];
+
+    smp.dsp_addr++;
+    smp.dsp_data = a = external_data.instruments.adsr2[y];
+
+    smp.dsp_addr++;
+    smp.dsp_data = a = external_data.instruments.gain[y];
+
+    a = external_data.instruments.pitchOffset[y];
+    __set_pt_offset(x, a, channelSoA.instPitchOffset);
+
     ^return process_next_bytecode(x);
 }
 
