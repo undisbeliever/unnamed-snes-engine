@@ -201,7 +201,10 @@ in zeropage {
         var defaultNoteLength : [u8 ; N_CHANNELS];
 
         // if non-zero: The next play_note is a slur
-        // ::BUGFIX have to use a byte-flag for each channel as `test_and_set()` and `test_and_clear()` cause a segmentation fault in wiz::
+        //
+        // This is a byte-flag,  I wanted to turn this into a bit-field but unfortunately the
+        // `test_and_set()` (`TSET1`) and `test_and_clear()` (`TCLR1`) instructions do not test if
+        // the bit(s) were set.  (Instead zero flag is `(A - old_mem) == 0`,  according to higan).
         var slurNextNote : [u8 ; N_CHANNELS];
 
         // If non-zero, the next event is a key-off event
@@ -1001,14 +1004,14 @@ func play_note(channelIndex : u8 in x, note : u8 in a) {
 
     // Only set `KON` if `slurNextNote` is false.
     y = channelSoA.slurNextNote[x];
-    if zero {
+    if !zero {
+        // No not slur the next note
+        channelSoA.slurNextNote[x] = a = 0;
+    }
+    else {
         // queue KON
         a = ChannelVoiceBit[x];
         test_and_set(a, keyOnShadow);
-    }
-    else {
-        // No not slur the next note
-        channelSoA.slurNextNote[x] = a = 0;
     }
 
 
