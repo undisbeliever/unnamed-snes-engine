@@ -42,13 +42,13 @@ let SOUND_EFFECT_MASK = N_SOUND_EFFECTS - 1;
 let KEY_OFF_DELAY = (64 + 48) / TIMER_DIVIDER;
 
 
+let STARTING_CHANNEL_VOLUME = 96;
 let STARTING_OCTAVE = 3;
-let STARTING_DEFAULT_NOTE_LENGTH = 64 / 4;
+let STARTING_DEFAULT_NOTE_LENGTH = 96 / 4;
 
 
 let SFX_BPM = 125;
 let SFX_TEMPO = (TICKS_PER_SECOND * 60 * 0x100) / (SFX_BPM * 48);
-let SFX_DEFAULT_NOTE_LENGTH = 96 / 4;
 
 
 struct DirItem {
@@ -394,13 +394,7 @@ var _loopEnd : u8 in zpTmp;
     // Reset all music channels
     x = N_MUSIC_CHANNELS - 1;
     do {
-        a = STARTING_OCTAVE * 12;
-        channelSoA.octaveOffset[x] = a;
-        channelSoA.pitchTableOffset[x] = a;
-
-        set_channel_volume(x, 96);
-
-        channelSoA.defaultNoteLength[x] = a = STARTING_DEFAULT_NOTE_LENGTH;
+        __reset_channel(x);
 
         y = offsetof(SongHeader, tempo);
         channelSoA.tempo_f[x] = a = songPtr[y];
@@ -431,12 +425,6 @@ var _loopEnd : u8 in zpTmp;
             a = 0;
         }
         channelSoA.instructionPtrAfterEnd_h[x] = a;
-
-
-        // Set nextEvent to 0x8080 to test `__rewind_tick_clock()`
-        a = 0x80;
-        channelSoA.nextEvent_l[x] = a;
-        channelSoA.nextEvent_h[x] = a;
 
         x--;
     } while !negative;
@@ -530,21 +518,6 @@ func __rewind_tick_clock() {
 }
 
 
-// KEEP: X
-// MUST NOT USE `currentChannelIndex`
-// MUST NOT USE `zpTmp`
-func set_channel_volume(channelIndex : u8 in x, volume : u8 in a) {
-    y = a;
-
-    // ASSUMES VoiceDspAddr.VOL_L == 0
-    smp.dsp_addr = a = ChannelVoiceOffset[x];
-    smp.dsp_data = y;
-
-    smp.dsp_addr++;
-    smp.dsp_data = y;
-}
-
-
 // IO Ports
 // ========
 
@@ -610,18 +583,34 @@ inline func play_sound_effect__inline(sfx_id : u8 in x) {
     }
 }
 
+
+// KEEP: X
+#[fallthrough]
 func __play_sfx_on_channel(channelIndex : u8 in x, sfxBytecode : u16 in ya) {
     channelSoA.instructionPtr_l[x] = a;
     channelSoA.instructionPtr_h[x] = y;
 
-    ya = tickClock;
-    channelSoA.nextEvent_l[x] = a;
-    channelSoA.nextEvent_h[x] = y;
+// Fallthrough    
+}
 
+// NOTE: Does not set:
+//  * channelSoA.tempo
+//  * channelSoA.instructionPtr
+//
+// NOTE: Also disables looping.
+//
+// KEEP: X
+func __reset_channel(channelIndex : u8 in x) {
+    ya = tickClock;
+    channelSoA.nextEvent_h[x] = y;
+    channelSoA.nextEvent_l[x] = a;
     a = 0;
-    channelSoA.disabled[x] = a;
     channelSoA.nextEvent_f[x] = a;
+
+    // A = 0
     channelSoA.instructionPtrAfterEnd_h[x] = a;     // don't loop SFX
+
+    channelSoA.disabled[x] = a;
     channelSoA.slurNextNote[x] = a;
     channelSoA.nextEventIsKeyOff[x] = a;
     channelSoA.instPitchOffset[x] = a;
@@ -631,9 +620,17 @@ func __play_sfx_on_channel(channelIndex : u8 in x, sfxBytecode : u16 in ya) {
     channelSoA.octaveOffset[x] = a;
     channelSoA.pitchTableOffset[x] = a;
 
-    channelSoA.defaultNoteLength[x] = a = SFX_DEFAULT_NOTE_LENGTH;
+    channelSoA.defaultNoteLength[x] = a = STARTING_DEFAULT_NOTE_LENGTH;
 
-    ^return set_channel_volume(x, 96);
+    // Reset channel volume
+    y = STARTING_CHANNEL_VOLUME;
+
+    // ASSUMES VoiceDspAddr.VOL_L == 0
+    smp.dsp_addr = a = ChannelVoiceOffset[x];
+    smp.dsp_data = y;
+
+    smp.dsp_addr++;
+    smp.dsp_data = y;
 }
 
 
