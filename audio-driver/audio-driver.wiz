@@ -684,8 +684,8 @@ inline func process_channel__inline(channelIndex : u8 in x) {
         // Check if a KEY_OFF is required
         a = channelSoA.nextEventIsKeyOff[x];
         if !zero {
-            // ::BUGFIX `test_and_set(a, keyOffShadow);` causes a wiz Segmentation fault::
-            keyOffShadow = a = keyOffShadow | ChannelVoiceBit[x];
+            a = ChannelVoiceBit[x];
+            test_and_set(a, keyOffShadow);
 
             // schedule a bytecode event
             channelSoA.nextEventIsKeyOff[x] = a = 0;
@@ -1003,8 +1003,8 @@ func play_note(channelIndex : u8 in x, note : u8 in a) {
     y = channelSoA.slurNextNote[x];
     if zero {
         // queue KON
-        // ::BUGFIX `test_and_set(a, keyOnShadow);` causes a wiz Segmentation fault::
-        keyOnShadow = a = keyOnShadow | ChannelVoiceBit[x];
+        a = ChannelVoiceBit[x];
+        test_and_set(a, keyOnShadow);
     }
     else {
         // No not slur the next note
@@ -1050,8 +1050,8 @@ func play_note_slur_next(channelIndex : u8 in x, note : u8 in a) {
     y = channelSoA.slurNextNote[x];
     if zero {
         // queue KON
-        // ::BUGFIX `test_and_set(a, keyOnShadow);` causes a wiz Segmentation fault::
-        keyOnShadow = a = keyOnShadow | ChannelVoiceBit[x];
+        a = ChannelVoiceBit[x];
+        test_and_set(a, keyOnShadow);
 
         // Slur the next note
         // A is non-zero
