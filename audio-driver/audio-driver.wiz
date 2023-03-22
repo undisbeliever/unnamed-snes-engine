@@ -530,14 +530,6 @@ func __rewind_tick_clock() {
 }
 
 
-func delay() {
-    y = 0;
-    do {
-        y--;
-    } while !zero;
-}
-
-
 // KEEP: X
 // MUST NOT USE `currentChannelIndex`
 // MUST NOT USE `zpTmp`
