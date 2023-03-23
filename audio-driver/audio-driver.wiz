@@ -966,6 +966,44 @@ func set_channel_volume(channelIndex : u8 in x, volume : u8 in a) {
 
 
 
+// KEEP: X
+func set_adsr(channelIndex: u8 in x, adsr1 : u8 in a) {
+    y = a;
+
+    smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.ADSR1 as u8;
+    smp.dsp_data = y;
+
+    y = 0;
+    a = instructionPtr[y];
+
+    // Set ADSR2
+    smp.dsp_addr++;
+    smp.dsp_data = a;
+
+    instructionPtr++;
+
+    ^return process_next_bytecode(x);
+}
+
+
+
+// KEEP: X
+func set_gain(channelIndex: u8 in x, gain : u8 in a) {
+    y = a;
+
+    smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.GAIN as u8;
+    smp.dsp_data = y;
+
+    // clear ADSR1 enable bit
+    // ASSUMES: VoiceDspAddr.GAIN - VoiceDspAddr.ADSR1 == 1 << 1
+    smp.dsp_addr $ 1 = false;
+    smp.dsp_data $ dsp.ADSR1_ENABLE_BIT = false;
+
+    ^return process_next_bytecode(x);
+}
+
+
+
 // KEEP: x
 func play_note(channelIndex : u8 in x, note : u8 in a) {
     zpTmp = a;

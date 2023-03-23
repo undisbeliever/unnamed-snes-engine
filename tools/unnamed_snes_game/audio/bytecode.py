@@ -20,12 +20,14 @@ END_LOOP_0: Final = 4
 END_LOOP_1: Final = 5
 SET_SEMITONE_OFFSET: Final = 6
 RELATIVE_SEMITONE_OFFSET: Final = 7
+SET_ADSR: Final = 8
+SET_GAIN: Final = 9
 
-DISABLE_CHANNEL: Final = 8
-END: Final = 9
-RETURN_FROM_SUBROUTINE: Final = 10
-START_LOOP_0: Final = 11
-START_LOOP_1: Final = 12
+DISABLE_CHANNEL: Final = 10
+END: Final = 11
+RETURN_FROM_SUBROUTINE: Final = 12
+START_LOOP_0: Final = 13
+START_LOOP_1: Final = 14
 
 PLAY_NOTE: Final = 1 << 5
 PLAY_NOTE_SLUR_NEXT: Final = 2 << 5
@@ -86,6 +88,18 @@ def name_argument(s: str) -> tuple[Name]:
 
 def integer_argument(s: str) -> tuple[int]:
     return (int(s, 0),)
+
+
+def adsr_argument(s: str) -> tuple[int, int, int, int]:
+    if "," in s:
+        args = s.split(",")
+    else:
+        args = s.split(" ")
+
+    if len(args) != 4:
+        raise ValueError(f"ADSR instruction requires 4 arguments")
+
+    return tuple(int(a.strip()) for a in args)  # type: ignore
 
 
 def optional_integer_argument(s: str) -> tuple[Optional[int]]:
@@ -245,6 +259,29 @@ class Bytecode:
     def relative_semitone_offset(self, offset: int) -> None:
         self.bytecode.append(RELATIVE_SEMITONE_OFFSET)
         self.bytecode.append(cast_i8(offset))
+
+    @_instruction(adsr_argument)
+    def set_adsr(self, a: int, d: int, sl: int, sr: int) -> None:
+        if a & 0b1111 != a:
+            raise BytecodeError("Invalid ADSR attack value")
+        if d & 0b111 != d:
+            raise BytecodeError("Invalid ADSR decay value")
+        if sl & 0b111 != sl:
+            raise BytecodeError("Invalid ADSR sustain level value")
+        if sr & 0b11111 != sr:
+            raise BytecodeError("Invalid ADSR sustain rate value")
+
+        self.bytecode.append(SET_ADSR)
+        self.bytecode.append((1 << 7) | (d << 4) | (a))
+        self.bytecode.append((sl << 5) | (sr))
+
+    # ::TODO parse gain (after I figure out what it does)::
+    @_instruction(integer_argument)
+    def set_gain(self, gain: int) -> None:
+        if gain < 0 or gain > 0xFF:
+            raise BytecodeError("Invalid GAIN value")
+        self.bytecode.append(SET_GAIN)
+        self.bytecode.append(gain)
 
     @_instruction(no_argument)
     def disable_channel(self) -> None:

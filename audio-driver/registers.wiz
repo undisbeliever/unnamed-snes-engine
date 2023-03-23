@@ -55,6 +55,9 @@ namespace dsp {
     let FLG__MUTE_ALL           = 0x40;
     let FLG__ECHO_DISABLE       = 0x20;
     let FLG__NOISE_FREQ_MASK    = 0x1f;
+
+
+    let ADSR1_ENABLE_BIT = 7;
 }
 
 

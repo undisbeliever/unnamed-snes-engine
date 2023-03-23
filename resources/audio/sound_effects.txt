@@ -36,3 +36,40 @@
     disable_channel
 
 
+
+
+== adsr_test ==
+    set_instrument      sine
+    change_octave       5
+
+    play_note c 96
+    rest 32
+
+    set_adsr 15 3 3 5
+    play_note c 96
+    rest 32
+
+    set_adsr 10 7 3 5
+    play_note c 96
+    rest 32
+
+    set_adsr 10 3 7 5
+    play_note c 96
+    rest 32
+
+    set_adsr 10 3 3 31
+    play_note c 96
+
+    disable_channel
+
+
+
+== gain_test ==
+    set_instrument      sine
+    change_octave       5
+
+    set_gain 0x7f
+    play_note c 255
+
+    disable_channel
+

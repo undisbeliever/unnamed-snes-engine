@@ -32,7 +32,9 @@
  "sound_effects": [
    "menu_cursor",
    "menu_select",
-   "slur_loop_test"
+   "slur_loop_test",
+   "adsr_test",
+   "gain_test"
  ],
 
  "interactive_tile_functions": [

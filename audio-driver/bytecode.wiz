@@ -43,6 +43,14 @@ let SINGLE_ARGUMENT_INSTRUCTIONS = [
 
     // parameter = i8 semitones adjust the current semitone offset by
     relative_semitone_offset,
+
+
+    // parameter = u16 value to send to the ADSR register
+    set_adsr,
+
+    // parameter = u8 value to send to the GAIN register
+    // NOTE: Disables ADSR
+    set_gain,
 ];
 
 
@@ -67,8 +75,6 @@ let NO_PARAMETER_INSTRUCTIONS = [
 
 
     // padding
-    disable_channel,
-    disable_channel,
     disable_channel,
     disable_channel,
     disable_channel,
