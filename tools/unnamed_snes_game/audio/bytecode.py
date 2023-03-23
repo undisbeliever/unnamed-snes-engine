@@ -22,12 +22,14 @@ SET_SEMITONE_OFFSET: Final = 6
 RELATIVE_SEMITONE_OFFSET: Final = 7
 SET_ADSR: Final = 8
 SET_GAIN: Final = 9
+PLAY_SPECIFIC_NOTE: Final = 10
+PLAY_SPECIFIC_NOTE_SLUR_NEXT: Final = 11
 
-DISABLE_CHANNEL: Final = 10
-END: Final = 11
-RETURN_FROM_SUBROUTINE: Final = 12
-START_LOOP_0: Final = 13
-START_LOOP_1: Final = 14
+DISABLE_CHANNEL: Final = 12
+END: Final = 13
+RETURN_FROM_SUBROUTINE: Final = 14
+START_LOOP_0: Final = 15
+START_LOOP_1: Final = 16
 
 PLAY_NOTE: Final = 1 << 5
 PLAY_NOTE_SLUR_NEXT: Final = 2 << 5
@@ -148,6 +150,54 @@ def note_argument(s: str) -> tuple[int, Optional[int]]:
             decoded_note = int(note, 0)
         except ValueError as e:
             raise ValueError("Cannot parse note: Expected note (a-g, followed by + or -) or an integer note id (0-15)")
+
+    if length:
+        decoded_length: Optional[int] = int(length, 0)
+    if not length:
+        decoded_length = None
+
+    return decoded_note, decoded_length
+
+
+SPECIFIC_NOTE_REGEX: Final = re.compile(r"([a-fA-F])([\-+]*)([0-8])$")
+
+
+def specific_note_argument(s: str) -> tuple[int, Optional[int]]:
+    if "," in s:
+        note, _sep, length = s.partition(",")
+        note = note.strip()
+        length = length.strip()
+    elif " " in s:
+        note, _sep, length = s.partition(" ")
+        length = length.strip()
+    else:
+        note = s
+        length = None
+
+    if not note:
+        raise ValueError("Cannot parse note: Missing argument")
+
+    m = SPECIFIC_NOTE_REGEX.match(note)
+    if m:
+        decoded_note = NOTE_MAP.get(m.group(1).lower())
+        if decoded_note is None:
+            raise ValueError(f"Cannot parse note: Unknown note {m.group(1)}")
+
+        for c in m.group(2):
+            if c == "-":
+                decoded_note -= 1
+            elif c == "+":
+                decoded_note += 1
+            else:
+                raise ValueError("Cannot parse note: Expected sharp (+) or flat(-)")
+
+        octave = int(m.group(3))
+        decoded_note += octave * 12
+    else:
+        try:
+            decoded_note = int(note, 0)
+        except ValueError as e:
+            raise ValueError("Cannot parse note: Expected note (a-g, followed by + or -, then 0-8) or an integer note id (0-15)")
 
     if length:
         decoded_length: Optional[int] = int(length, 0)
@@ -293,22 +343,13 @@ class Bytecode:
 
     @_instruction(note_argument)
     def play_note(self, note_id: int, length: Optional[int] = None) -> None:
-        if note_id < 0 or note_id > 15:
-            raise BytecodeError("note is out of range")
-        if length is not None:
-            if length < self.mappings.minimum_note_length:
-                raise BytecodeError("Note length is too short")
-            if length > 255:
-                raise BytecodeError("Note length is too long")
-            opcode = PLAY_NOTE | 0x10 | note_id
-            self.bytecode.append(opcode)
-            self.bytecode.append(length)
-        else:
-            opcode = PLAY_NOTE | note_id
-            self.bytecode.append(opcode)
+        self._play_note(note_id, length, PLAY_NOTE)
 
     @_instruction(note_argument)
     def play_note_slur_next(self, note_id: int, length: Optional[int] = None) -> None:
+        self._play_note(note_id, length, PLAY_NOTE_SLUR_NEXT)
+
+    def _play_note(self, note_id: int, length: Optional[int], opcode: int) -> None:
         if note_id < 0 or note_id > 15:
             raise BytecodeError("note is out of range")
         if length is not None:
@@ -316,12 +357,33 @@ class Bytecode:
                 raise BytecodeError("Note length is too short")
             if length > 255:
                 raise BytecodeError("Note length is too long")
-            opcode = PLAY_NOTE_SLUR_NEXT | 0x10 | note_id
-            self.bytecode.append(opcode)
+            self.bytecode.append(opcode | (note_id << 1) | 1)
             self.bytecode.append(length)
         else:
-            opcode = PLAY_NOTE_SLUR_NEXT | note_id
+            self.bytecode.append(opcode | (note_id << 1))
+
+    @_instruction(specific_note_argument)
+    def play_specific_note(self, note_id: int, length: Optional[int] = None) -> None:
+        self._specific_note(note_id, length, PLAY_SPECIFIC_NOTE)
+
+    @_instruction(specific_note_argument)
+    def play_specific_note_slur_next(self, note_id: int, length: Optional[int] = None) -> None:
+        self._specific_note(note_id, length, PLAY_SPECIFIC_NOTE_SLUR_NEXT)
+
+    def _specific_note(self, note_id: int, length: Optional[int], opcode: int) -> None:
+        if note_id < 0 or note_id > 127:
+            raise BytecodeError("note is out of range")
+        if length is not None:
+            if length < self.mappings.minimum_note_length:
+                raise BytecodeError("Note length is too short")
+            if length > 255:
+                raise BytecodeError("Note length is too long")
             self.bytecode.append(opcode)
+            self.bytecode.append((note_id << 1) | 1)
+            self.bytecode.append(length)
+        else:
+            self.bytecode.append(opcode)
+            self.bytecode.append(note_id << 1)
 
     @_instruction(change_octave_argument)
     def change_octave(self, relative_change: bool, octave: int) -> None:

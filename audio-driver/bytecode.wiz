@@ -51,6 +51,26 @@ let SINGLE_ARGUMENT_INSTRUCTIONS = [
     // parameter = u8 value to send to the GAIN register
     // NOTE: Disables ADSR
     set_gain,
+
+
+    // Play a specific note (ignore octave and semitone offset).
+    //
+    // Useful for sound effects (no need to set octave).
+    //
+    // parameter = nnnnnnnl
+    //   l       = next byte contains length of the note
+    //   nnnnnnn = note to play
+    play_specific_note,
+
+
+    // Play a specific note (ignore octave and semitone offset) and slur the next note.
+    //
+    // Useful for sound effects (no need to set octave).
+    //
+    // parameter = nnnnnnnl
+    //   l       = next byte contains length of the note
+    //   nnnnnnn = note to play
+    play_specific_note_slur_next,
 ];
 
 
@@ -90,8 +110,6 @@ let NO_PARAMETER_INSTRUCTIONS = [
     disable_channel,
     disable_channel,
     disable_channel,
-    disable_channel,
-    disable_channel,
 ];
 
 
@@ -100,7 +118,7 @@ let NO_PARAMETER_INSTRUCTIONS = [
 let INLINE_ARGUMENT_INSTRUCTIONS = [
     null_instruction,
 
-    // parameter: lnnnn
+    // parameter: nnnnl
     //      l    = next byte contains length of the note
     //      nnnn = note to play
     play_note,
@@ -109,7 +127,7 @@ let INLINE_ARGUMENT_INSTRUCTIONS = [
     //
     // The next `play_note*` command will not send a KON event.
     //
-    // parameter: lnnnn
+    // parameter: nnnnl
     //      l    = next byte contains length of the note
     //      nnnn = note to play
     play_note_slur_next,

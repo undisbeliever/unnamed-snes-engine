@@ -1005,13 +1005,38 @@ func set_gain(channelIndex: u8 in x, gain : u8 in a) {
 
 
 // KEEP: x
-func play_note(channelIndex : u8 in x, note : u8 in a) {
+func play_specific_note(channelIndex : u8 in x, noteAndLengthBit : u8 in a) {
+    // save length bit for later
     zpTmp = a;
 
-    // Set note pitch
-    a &= 0xf;
-    y = a = a + channelSoA.pitchTableOffset[x];
+    // calculate pitch table index
+    a >>>= 1;
+    a += channelSoA.instPitchOffset[x];
 
+    ^return __play_pitch(x, a, zpTmp);
+}
+
+
+
+// KEEP: x
+#[fallthrough]
+func play_note(channelIndex : u8 in x, noteAndLengthBit : u8 in a) {
+    // save length bit for later
+    zpTmp = a;
+
+    // calculate pitch table index
+    a >>>= 1;
+    a = a + channelSoA.pitchTableOffset[x];
+
+// Fallthrough
+}
+
+
+// KEEP: x
+func __play_pitch(channelIndex : u8 in x, pitchTableIndex : u8 in a, lengthBit : u8 in zpTmp) {
+    y = a;
+
+    // Set voice pitch
     smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.PITCH_L as u8;
     smp.dsp_data = a = external_data.pitchTable_l[y];
 
@@ -1032,7 +1057,7 @@ func play_note(channelIndex : u8 in x, note : u8 in a) {
     }
 
 
-    carry = zpTmp $ 4;
+    carry = zpTmp $ 0;
     if !carry {
         a = channelSoA.defaultNoteLength[x];
     }
@@ -1052,13 +1077,37 @@ func play_note(channelIndex : u8 in x, note : u8 in a) {
 
 
 // KEEP: x
+func play_specific_note_slur_next(channelIndex : u8 in x, noteAndLengthBit : u8 in a) {
+    // Save length bit for later
+    zpTmp = a;
+
+    // calculate pitch table index
+    a >>>= 1;
+    a += channelSoA.instPitchOffset[x];
+
+    ^return __play_pitch_slur_next(x, a, zpTmp);
+}
+
+
+
+// KEEP: x
+#[fallthrough]
 func play_note_slur_next(channelIndex : u8 in x, note : u8 in a) {
     zpTmp = a;
 
-    // Set note pitch
-    a &= 0xf;
-    y = a = a + channelSoA.pitchTableOffset[x];
+    // calculate pitch table index
+    a >>>= 1;
+    a += channelSoA.pitchTableOffset[x];
 
+// Fallthrough
+}
+
+
+// KEEP: X
+func __play_pitch_slur_next(channelIndex : u8 in x, pitchTableIndex : u8 in a, lengthBit : u8 in zpTmp) {
+    y = a;
+
+    // Set voice pitch
     smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.PITCH_L as u8;
     smp.dsp_data = a = external_data.pitchTable_l[y];
 
@@ -1079,7 +1128,7 @@ func play_note_slur_next(channelIndex : u8 in x, note : u8 in a) {
     }
 
 
-    carry = zpTmp $ 4;
+    carry = zpTmp $ 0;
     if !carry {
         a = channelSoA.defaultNoteLength[x];
 

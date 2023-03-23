@@ -3,9 +3,8 @@
 == menu_cursor ==
     set_instrument      square
     set_channel_volume  20
-    change_octave       +1
 
-    play_note           d, 8
+    play_specific_note  d4 8
 
     disable_channel
 
@@ -27,8 +26,8 @@
     set_channel_volume  127
 
     start_loop
-        play_note_slur_next   5, 12
-        play_note_slur_next  10, 12
+        play_specific_note_slur_next    41,  8
+        play_note_slur_next             10, 12
     end_loop    6
 
     play_note   5
