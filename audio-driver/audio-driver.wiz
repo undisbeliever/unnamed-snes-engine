@@ -439,12 +439,6 @@ var _loopEnd : u8 in zpTmp;
     }
 
 
-    // Set nextEvent to 0x8080 to test `__rewind_tick_clock()`
-    a = 0x80;
-    <:tickClock = a;
-    >:tickClock = a;
-
-
     init_io_ports__inline();
 
 
