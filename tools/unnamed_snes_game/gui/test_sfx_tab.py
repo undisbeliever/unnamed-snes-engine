@@ -4,6 +4,7 @@
 
 from typing import Any, Final, Optional, Union
 
+import re
 import tkinter as tk
 import tkinter.ttk as ttk
 from tkinter import font
@@ -11,6 +12,7 @@ from tkinter.scrolledtext import ScrolledText
 
 from ..audio.json_formats import SamplesJson
 from ..audio.bytecode import Bytecode
+from ..audio.bytecode import no_argument as bc_parser__no_argument
 from ..audio.driver_constants import SFX_BPM
 from ..audio.sound_effects import compile_sound_effect
 from ..audio.songs import song_header
@@ -80,47 +82,102 @@ class TestSoundEffectTab:
         )
         self._errors.grid(column=0, row=7, sticky=tk.NSEW)
 
-        # Column 1
+        # Columns 1 & 4
 
         inst_label: Final = tk.Label(self.frame, text="Instruments:")
         inst_label.grid(column=1, row=2, columnspan=2, sticky=tk.SW)
 
-        self._instruments: Final = ScrolledText(self.frame, state=tk.DISABLED, width=25, height=4, font=fixed_font)
+        instrument_sb: Final = tk.Scrollbar(self.frame, orient=tk.VERTICAL)
+
+        self.instrument_list: Final = tk.StringVar()
+        self._instruments: Final = tk.Listbox(
+            self.frame, width=25, height=4, font=fixed_font, listvariable=self.instrument_list, yscrollcommand=instrument_sb.set
+        )
         self._instruments.grid(column=1, row=4, columnspan=2, sticky=tk.NSEW)
+        instrument_sb.grid(column=3, row=4, sticky=tk.NS)
+
+        self._instruments.bind("<Double-1>", self._on_instrument_dclicked)
 
         bc_label: Final = tk.Label(self.frame, text="Bytecodes:")
         bc_label.grid(column=1, row=5, columnspan=2, sticky=tk.SW)
 
-        bc_instructions: Final = ScrolledText(self.frame, width=25, height=4, font=fixed_font)
-        bc_instructions.insert("1.0", bytecode_instructions_string())
-        bc_instructions["state"] = tk.DISABLED
-        bc_instructions.grid(column=1, row=6, columnspan=2, rowspan=2, sticky=tk.NSEW)
+        bc_instruction_sb: Final = tk.Scrollbar(self.frame, orient=tk.VERTICAL)
+
+        bc_instruction_list: Final = tk.StringVar(value=sorted(list(Bytecode.instructions.keys())))  # type: ignore
+        self._bc_instructions: Final = tk.Listbox(
+            self.frame, width=25, height=4, font=fixed_font, listvariable=bc_instruction_list, yscrollcommand=bc_instruction_sb.set
+        )
+        self._bc_instructions.grid(column=1, row=6, columnspan=2, rowspan=2, sticky=tk.NSEW)
+        bc_instruction_sb.grid(column=3, row=6, rowspan=2, sticky=tk.NS)
+
+        self._bc_instructions.bind("<Double-1>", self._on_bc_instruction_dclicked)
 
         # Column 2
 
         compile_button: Final = tk.Button(self.frame, text="Compile", width=10, command=self._compile)
-        compile_button.grid(column=2, row=0, sticky="new")
+        compile_button.grid(column=2, row=0, columnspan=2, sticky="new")
 
         send_button: Final = tk.Button(self.frame, text="Play", width=10, command=self._send_to_console)
-        send_button.grid(column=2, row=1, sticky="new")
+        send_button.grid(column=2, row=1, columnspan=2, sticky="new")
 
     def on_audio_samples_changed(self, event: Any) -> None:
         self._audio_samples = self.data_store.get_audio_samples()
 
-        self._instruments["state"] = tk.NORMAL
-        self._instruments.delete("1.0", "end")
-        if self._audio_samples:
-            if self._populate_text:
-                # Only populate text if _text is empty
-                if len(self._text.get("1.0", "end")) <= 1:
+        if self._populate_text:
+            # Only populate text if _text is empty
+            if len(self._text.get("1.0", "end")) <= 1:
+                if self._audio_samples:
                     self._text.insert("1.0", example_sound_effect(self._audio_samples))
                 self._populate_text = False
 
-            s = "\n".join(i.name for i in self._audio_samples.instruments)
-            self._instruments.insert("1.0", s)
-        self._instruments["state"] = tk.DISABLED
+        if self._audio_samples:
+            instruments = [i.name for i in self._audio_samples.instruments]
+        else:
+            instruments = list()
+
+        self.instrument_list.set(instruments)  # type: ignore
 
         self._compile()
+
+    def _on_instrument_dclicked(self, event: Any) -> None:
+        sel: list[int] = self._instruments.curselection()  # type: ignore
+
+        if sel:
+            selected = self._instruments.get(sel[0])
+            self.insert_instruction(f"set_instrument {selected}", False)
+
+    def _on_bc_instruction_dclicked(self, event: Any) -> None:
+        sel: list[int] = self._bc_instructions.curselection()  # type: ignore
+
+        if sel:
+            selected = self._bc_instructions.get(sel[0])
+
+            bc = Bytecode.instructions.get(selected)
+            if bc:
+                if bc[0] == bc_parser__no_argument:
+                    self.insert_instruction(selected, False)
+                else:
+                    self.insert_instruction(selected, True)
+
+    PADDING_REGEX: Final = re.compile(r"[ \t]*")
+
+    def insert_instruction(self, text: str, has_argument: bool) -> None:
+        current_line = self._text.get("insert linestart", "insert lineend")
+        m = self.PADDING_REGEX.match(current_line)
+        if m:
+            padding = m.group()
+            if len(padding) != len(current_line):
+                text = f"\n{padding}{text}"
+        else:
+            padding = ""
+
+        if has_argument:
+            text += " "
+        else:
+            text += "\n" + padding
+
+        self._text.focus_force()
+        self._text.insert("insert lineend", text)
 
     def _on_text_modified(self, event: Any) -> None:
         if self._text.edit_modified():
