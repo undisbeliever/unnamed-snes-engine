@@ -21,8 +21,8 @@ let SINGLE_ARGUMENT_INSTRUCTIONS = [
 
     set_channel_volume,
 
-    // parameter = number of 1/64 beats to pause
-    // NOTE: Does not send a keyoff event after.
+    // parameter = number of beats to pause
+    // NOTE: Does not send a keyoff event after resting.
     rest,
 
     // parameter = subroutine ID (MAX: 127)
@@ -53,24 +53,25 @@ let SINGLE_ARGUMENT_INSTRUCTIONS = [
     set_gain,
 
 
-    // Play a specific note (ignore octave and semitone offset).
+    // Play a specific note at the default length (ignore octave and semitone offset).
     //
     // Useful for sound effects (no need to set octave).
     //
-    // parameter = nnnnnnnl
-    //   l       = next byte contains length of the note
+    // parameter = nnnnnnnO
+    //   O       = key-off after note ends
     //   nnnnnnn = note to play
     play_specific_note,
 
 
-    // Play a specific note (ignore octave and semitone offset) and slur the next note.
+    // Play a specific note at a given length (ignore octave and semitone offset) and slur the next note.
     //
     // Useful for sound effects (no need to set octave).
     //
-    // parameter = nnnnnnnl
-    //   l       = next byte contains length of the note
-    //   nnnnnnn = note to play
-    play_specific_note_slur_next,
+    // parameter = nnnnnnnO llllllll
+    //  O        = key-off after note ends
+    //  nnnnnnn  = note to play
+    //  llllllll = note length
+    play_specific_note_length,
 ];
 
 
@@ -118,19 +119,20 @@ let NO_PARAMETER_INSTRUCTIONS = [
 let INLINE_ARGUMENT_INSTRUCTIONS = [
     null_instruction,
 
-    // parameter: nnnnl
-    //      l    = next byte contains length of the note
+    // Play a note at the current octave with the default length
+    // parameter: nnnnO
+    //      O    = key-off after note ends
     //      nnnn = note to play
     play_note,
 
-    // Does not send a KOFF after the note ends.
+    // Play a note at the current octave with a given length
     //
-    // The next `play_note*` command will not send a KON event.
+    // parameters: nnnnO  llllllll
+    //  O        = key-off after note ends
+    //  nnnn     = note to play
+    //  llllllll = note length
     //
-    // parameter: nnnnl
-    //      l    = next byte contains length of the note
-    //      nnnn = note to play
-    play_note_slur_next,
+    play_note_length,
 
 
     // Changes the current octave for the channel.

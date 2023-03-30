@@ -602,7 +602,7 @@ func __play_sfx_on_channel(channelIndex : u8 in x, sfxBytecode : u16 in ya) {
     channelSoA.instructionPtr_l[x] = a;
     channelSoA.instructionPtr_h[x] = y;
 
-// Fallthrough    
+// Fallthrough
 }
 
 // NOTE: Does not set:
@@ -1022,27 +1022,31 @@ func set_gain(channelIndex: u8 in x, gain : u8 in a) {
 
 
 // KEEP: x
-func play_specific_note(channelIndex : u8 in x, noteAndLengthBit : u8 in a) {
-    // save length bit for later
-    zpTmp = a;
-
-    // calculate pitch table index
+func play_specific_note(channelIndex : u8 in x, noteAndKeyOffBit : u8 in a) {
+    // carry = key-off after note ends bit
     a >>>= 1;
+
+    // Set MSB of nextEventIsKeyOff to carry
+    channelSoA.nextEventIsKeyOff[x] >>>>#= 1;
+
+    // Calculate pitch table index
     a += channelSoA.instPitchOffset[x];
 
-    ^return __play_pitch(x, a, zpTmp);
+    ^return __play_pitch(x, a);
 }
 
 
 
 // KEEP: x
 #[fallthrough]
-func play_note(channelIndex : u8 in x, noteAndLengthBit : u8 in a) {
-    // save length bit for later
-    zpTmp = a;
+func play_note(channelIndex : u8 in x, noteAndKeyOffBit : u8 in a) {
+    // carry = key-off after note ends bit
+    a >>>= 1;
+
+    // Set MSB of nextEventIsKeyOff to carry
+    channelSoA.nextEventIsKeyOff[x] >>>>#= 1;
 
     // calculate pitch table index
-    a >>>= 1;
     a = a + channelSoA.pitchTableOffset[x];
 
 // Fallthrough
@@ -1050,7 +1054,8 @@ func play_note(channelIndex : u8 in x, noteAndLengthBit : u8 in a) {
 
 
 // KEEP: x
-func __play_pitch(channelIndex : u8 in x, pitchTableIndex : u8 in a, lengthBit : u8 in zpTmp) {
+func __play_pitch(channelIndex : u8 in x, pitchTableIndex : u8 in a) {
+
     y = a;
 
     // Set voice pitch
@@ -1065,47 +1070,36 @@ func __play_pitch(channelIndex : u8 in x, pitchTableIndex : u8 in a, lengthBit :
     a = ChannelVoiceBit[x] & keyOnMask;
     test_and_set(a, keyOnShadow);
 
-
-    carry = zpTmp $ 0;
-    if !carry {
-        a = channelSoA.defaultNoteLength[x];
-    }
-    else {
-        // Get note length from the next byte in the instructionPtr
-        y = 0;
-        a = instructionPtr[y];
-        instructionPtr++;
-    }
-
-    _rest_with_keyoff__inline(x, a);
-
-    // returns (do not execute the next bytecode and sleep)
-    return;
+    ^return rest(x, channelSoA.defaultNoteLength[x]);
 }
 
 
 
 // KEEP: x
-func play_specific_note_slur_next(channelIndex : u8 in x, noteAndLengthBit : u8 in a) {
-    // Save length bit for later
-    zpTmp = a;
+func play_specific_note_length(channelIndex : u8 in x, noteAndKeyOffBit : u8 in a) {
+    // carry = key-off after note ends bit
+    a >>>= 1;
+
+    // Set MSB of nextEventIsKeyOff to carry
+    channelSoA.nextEventIsKeyOff[x] >>>>#= 1;
 
     // calculate pitch table index
-    a >>>= 1;
     a += channelSoA.instPitchOffset[x];
 
-    ^return __play_pitch_slur_next(x, a, zpTmp);
+    ^return __play_pitch_length(x, a);
 }
 
 
 
 // KEEP: x
 #[fallthrough]
-func play_note_slur_next(channelIndex : u8 in x, note : u8 in a) {
-    zpTmp = a;
-
-    // calculate pitch table index
+func play_note_length(channelIndex : u8 in x, noteAndKeyOffBit : u8 in a) {
+    // carry = key-off after note ends bit
     a >>>= 1;
+
+    // Set MSB of nextEventIsKeyOff to carry
+    channelSoA.nextEventIsKeyOff[x] >>>>#= 1;
+
     a += channelSoA.pitchTableOffset[x];
 
 // Fallthrough
@@ -1113,7 +1107,8 @@ func play_note_slur_next(channelIndex : u8 in x, note : u8 in a) {
 
 
 // KEEP: X
-func __play_pitch_slur_next(channelIndex : u8 in x, pitchTableIndex : u8 in a, lengthBit : u8 in zpTmp) {
+#[fallthrough]
+func __play_pitch_length(channelIndex : u8 in x, pitchTableIndex : u8 in a) {
     y = a;
 
     // Set voice pitch
@@ -1129,31 +1124,24 @@ func __play_pitch_slur_next(channelIndex : u8 in x, pitchTableIndex : u8 in a, l
     test_and_set(a, keyOnShadow);
 
 
+    // Get note length from the next byte in the instructionPtr
+    y = 0;
+    a = instructionPtr[y];
+    instructionPtr++;
 
-    carry = zpTmp $ 0;
-    if !carry {
-        a = channelSoA.defaultNoteLength[x];
-
-        return rest(x, a);
-    }
-    else {
-        // Get note length from the next byte in the instructionPtr
-        y = 0;
-        a = instructionPtr[y];
-        instructionPtr++;
-
-        return rest(x, a);
-    }
+// Fallthrough
 }
 
 
 
-// NOTE: Always returns true
 // KEEP: x
 func rest(channelIndex : u8 in x, length: u8 in a) {
 var _tmp : u8 in zpTmp;
 
-    // No need to zero `nextEventIsKeyOff` it is cleared by `process_channel__inline()`.
+    // `nextEventIsKeyOff` is cleared in `process_channel__inline()` and set in the play note instructions
+    y = channelSoA.nextEventIsKeyOff[x];
+    return __rest_subtract_keyoffdelay(x, a) if !zero;
+
 
     // Calculate number of ticks to sleep
     // (Q16.8)nextEvent += (Q8.8)tempo * (Q8.0)note
@@ -1182,16 +1170,13 @@ var _tmp : u8 in zpTmp;
 
 
 
-// NOTE: Always returns true
 // KEEP: x
-inline func _rest_with_keyoff__inline(channelIndex : u8 in x, length: u8 in a) {
+func __rest_subtract_keyoffdelay(channelIndex : u8 in x, length: u8 in a) {
 var _tmp : u8 in zpTmp;
 
     _tmp = a;
 
-    channelSoA.nextEventIsKeyOff[x] = y = 1;
-
-    // Calculate number of ticks to sleep
+    // Calculate number of ticks to sleep (subtracting keyoff delay)
     // (Q16.8)nextEvent += (Q8.8)tempo * (Q8.0)note - KEY_OFF_DELAY
 
     y = channelSoA.tempo_f[x];
@@ -1215,6 +1200,9 @@ var _tmp : u8 in zpTmp;
 
     channelSoA.nextEvent_l[x] = a = a + channelSoA.nextEvent_l[x];
     channelSoA.nextEvent_h[x] = a = y +# channelSoA.nextEvent_h[x];
+
+    // return (do not execute the next bytecode and sleep)
+    return;
 }
 
 

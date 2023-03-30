@@ -26,8 +26,8 @@
     set_channel_volume  127
 
     start_loop
-        play_specific_note_slur_next    41,  8
-        play_note_slur_next             10, 12
+        play_specific_note    41, no_keyoff,  8
+        play_note             10, slur_next, 12
     end_loop    6
 
     play_note   5
