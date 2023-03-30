@@ -159,7 +159,7 @@ def note_argument(s: str) -> tuple[int, Optional[int]]:
     return decoded_note, decoded_length
 
 
-SPECIFIC_NOTE_REGEX: Final = re.compile(r"([a-fA-F])([\-+]*)([0-8])$")
+SPECIFIC_NOTE_REGEX: Final = re.compile(r"([a-gA-G])([\-+]*)([0-8])$")
 
 
 def specific_note_argument(s: str) -> tuple[int, Optional[int]]:
