@@ -168,6 +168,19 @@ in zeropage {
     var keyOnShadow : u8;
 
 
+    // `keyOnShadow` mask.
+    //
+    // Each bit determines the KON/KOFF state of each channel.
+    //  * If set - the next play note instruction will set `keyOnShadow`.
+    //  * If clear - the channel is playing something and the play note instruction will
+    //               leave `keyOnShadow` unchanged (slurring the note).
+    //
+    // The bits are set on `KON` and cleared on `KOFF`, at the start of `process_event_loop()`.
+    //
+    // (8x bitfield)
+    var keyOnMask : u8;
+
+
     // Only valid inside bytecode instructions
     var instructionPtr : *const u8;
 
@@ -199,13 +212,6 @@ in zeropage {
 
         // Default note length (in 64ths)
         var defaultNoteLength : [u8 ; N_CHANNELS];
-
-        // if non-zero: The next play_note is a slur
-        //
-        // This is a byte-flag,  I wanted to turn this into a bit-field but unfortunately the
-        // `test_and_set()` (`TSET1`) and `test_and_clear()` (`TCLR1`) instructions do not test if
-        // the bit(s) were set.  (Instead zero flag is `(A - old_mem) == 0`,  according to higan).
-        var slurNextNote : [u8 ; N_CHANNELS];
 
         // If non-zero, the next event is a key-off event
         // If zero, the next event will process bytecode
@@ -455,8 +461,20 @@ var _loopEnd : u8 in zpTmp;
 #[fallthrough]
 func process_event_loop() {
     ^while true {
-        write_dsp(GlobalDspAddr.KOFF,   keyOffShadow);
-        write_dsp(GlobalDspAddr.KON,    keyOnShadow);
+        // Send KOFF events
+        write_dsp(GlobalDspAddr.KOFF, keyOffShadow);
+        // Enable KON in play-note instructions
+        keyOnMask |= keyOffShadow;
+
+
+        a = keyOnShadow;
+        // Disable KON in play-note instructions (slur the note)
+        test_and_clear(a, keyOnMask);
+
+        // Send KON events
+        y = a;
+        write_dsp(GlobalDspAddr.KON, y);
+
 
         a = 0;
         keyOffShadow = a;
@@ -605,7 +623,6 @@ func __reset_channel(channelIndex : u8 in x) {
     channelSoA.instructionPtrAfterEnd_h[x] = a;     // don't loop SFX
 
     channelSoA.disabled[x] = a;
-    channelSoA.slurNextNote[x] = a;
     channelSoA.nextEventIsKeyOff[x] = a;
     channelSoA.instPitchOffset[x] = a;
     channelSoA.semitoneOffset[x] = a;
@@ -615,6 +632,12 @@ func __reset_channel(channelIndex : u8 in x) {
     channelSoA.pitchTableOffset[x] = a;
 
     channelSoA.defaultNoteLength[x] = a = STARTING_DEFAULT_NOTE_LENGTH;
+
+
+    // Set keyOnMask.  The next play-note instruction will queue a KON event.
+    a = ChannelVoiceBit[x];
+    test_and_set(a, keyOnMask);
+
 
     // Reset channel volume
     y = STARTING_CHANNEL_VOLUME;
@@ -1038,17 +1061,9 @@ func __play_pitch(channelIndex : u8 in x, pitchTableIndex : u8 in a, lengthBit :
     smp.dsp_data = a = external_data.pitchTable_h[y];
 
 
-    // Only set `KON` if `slurNextNote` is false.
-    y = channelSoA.slurNextNote[x];
-    if !zero {
-        // No not slur the next note
-        channelSoA.slurNextNote[x] = a = 0;
-    }
-    else {
-        // queue KON
-        a = ChannelVoiceBit[x];
-        test_and_set(a, keyOnShadow);
-    }
+    // queue KON if the previous note has been KOFFed
+    a = ChannelVoiceBit[x] & keyOnMask;
+    test_and_set(a, keyOnShadow);
 
 
     carry = zpTmp $ 0;
@@ -1109,17 +1124,10 @@ func __play_pitch_slur_next(channelIndex : u8 in x, pitchTableIndex : u8 in a, l
     smp.dsp_data = a = external_data.pitchTable_h[y];
 
 
-    // Only set `KON` if `slurNextNote` is false.
-    y = channelSoA.slurNextNote[x];
-    if zero {
-        // queue KON
-        a = ChannelVoiceBit[x];
-        test_and_set(a, keyOnShadow);
+    // queue KON if the previous note has been KOFFed
+    a = ChannelVoiceBit[x] & keyOnMask;
+    test_and_set(a, keyOnShadow);
 
-        // Slur the next note
-        // A is non-zero
-        channelSoA.slurNextNote[x] = a;
-    }
 
 
     carry = zpTmp $ 0;
