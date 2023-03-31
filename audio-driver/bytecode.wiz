@@ -15,13 +15,17 @@ let N_SINGLE_ARGUMENT_INSTRUCTIONS = sizeof(typeof(SINGLE_ARGUMENT_INSTRUCTIONS)
 let N_NO_ARGUMENT_INSTRUCTIONS = sizeof(typeof(NO_ARGUMENT_INSTRUCTIONS)) / sizeof(typeof(NO_ARGUMENT_INSTRUCTIONS[0]));
 
 
+// Notes about rest/note length:
+//   * A rest/note length of 0 will pause for 256 ticks
+//   * A play-note instruction will wait for an extra tick if the key-off bit is set.
+
 // These bytecodes do have parameters
 let SINGLE_ARGUMENT_INSTRUCTIONS = [
     set_instrument,
 
     set_channel_volume,
 
-    // parameter = number of beats to pause
+    // parameter = number of ticks to wait.
     // NOTE: Does not send a keyoff event after resting.
     rest,
 

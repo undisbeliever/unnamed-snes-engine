@@ -18,7 +18,7 @@ def build_common_data(samples_input: SamplesJson, mappings: Mappings, sfx_file: 
 
     sfx_addr: Final = BRR_DATA_ADDRESS + len(samples_and_instruments.brr_data)
 
-    bc_mappings = create_bc_mappings(samples_input, SFX_TEMPO)
+    bc_mappings = create_bc_mappings(samples_input)
     sfx = compile_sound_effects_file(sfx_file, sfx_filename, bc_mappings)
     sfx_header, sfx_data = build_sfx_header_and_data(sfx, mappings, sfx_addr)
 

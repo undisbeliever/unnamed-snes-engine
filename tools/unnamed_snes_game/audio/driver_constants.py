@@ -7,13 +7,9 @@ from typing import Final, TypeAlias
 Addr: TypeAlias = int
 
 
-TIMER_DIVISOR: Final = 16
-TICKS_PER_SECOND: Final = 8000 // TIMER_DIVISOR
+MIN_TICK_TIMER: Final = 64
 
-KEY_OFF_DELAY: Final = (64 + 48) // TIMER_DIVISOR
-
-SFX_BPM: Final = 125
-SFX_TEMPO: Final = (TICKS_PER_SECOND * 60) // (SFX_BPM * 48)
+SFX_TICK_TIMER: Final = 64
 
 
 BYTES_PER_SAMPLE_DIRECTORY_ITEM: Final = 4
@@ -52,4 +48,4 @@ N_MUSIC_CHANNELS: Final = 6
 
 # MUST match `audio/src/common_memmap.wiz`
 # MUST match `SongHeader` in `audio/src/audio-driver.wiz`
-SONG_HEADER_SIZE = N_MUSIC_CHANNELS * 4 + 3
+SONG_HEADER_SIZE = N_MUSIC_CHANNELS * 4 + 2

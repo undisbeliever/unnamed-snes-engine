@@ -15,14 +15,23 @@ bank code           @ CODE_ADDR : [constdata;   CODE_SIZE];
 // Data Structures
 // ===============
 
+// The minimum timer value required to ensure Key-Off event completely silences the sample before
+// the next note plays.
+let MIN_TICK_CLOCK = 64;
 
-let TIMER_DIVIDER = 16;
-let TICKS_PER_SECOND = 8000 / TIMER_DIVIDER;
+
+// The tempo (timer register value) for the sound effects
+// MUST BE >= MIN_TICK_CLOCK
+let SFX_TICK_CLOCK = 64;
 
 
 let N_CHANNELS = 8;
 let N_MUSIC_CHANNELS = 6;
-let N_SFX_CHANNELS = N_CHANNELS = N_MUSIC_CHANNELS;
+let N_SFX_CHANNELS = N_CHANNELS - N_MUSIC_CHANNELS;
+
+let SONG_CHANNEL_MASK = (1 << N_MUSIC_CHANNELS) - 1;
+let SFX_CHANNEL_MASK = SONG_CHANNEL_MASK ^ 0xff;
+
 
 let N_BRR_SAMPLES   = 64;
 let N_INSTRUMENTS   = 64;
@@ -31,15 +40,6 @@ let N_SOUND_EFFECTS = 128;
 
 let INSTRUMENT_MASK = N_INSTRUMENTS - 1;
 let SOUND_EFFECT_MASK = N_SOUND_EFFECTS - 1;
-
-
-// Number of clock ticks after a KOFF event before the bytecode is processed.
-//
-// This delay MUST be > 64 8Khz timer ticks to ensure the Key-Off event completely silences
-// the sample before the next note plays.
-//
-// ::TODO somehow confirm this value is large enough to ensure all KOFF events always occur 256 samples before KON events::
-let KEY_OFF_DELAY = (64 + 48) / TIMER_DIVIDER;
 
 
 let STARTING_CHANNEL_VOLUME = 96;
@@ -97,9 +97,12 @@ struct MusicChannelHeader {
 struct SongHeader {
     channels : [MusicChannelHeader ; N_MUSIC_CHANNELS],
 
-    // Starting tempo.
-    // (Q8.8)
-    tempo   : u16,
+
+    // Length of a tick in 1/8000 cycles (song tempo).
+    //
+    // MUST BE >= MIN_TICK_CLOCK
+    tickTimer : u8,
+
 
     // Number of subroutines
     // NOTE: This variable has a maximum value of 128.
@@ -155,11 +158,7 @@ in zeropage {
     // The table of subroutine addresses
     var subroutineTable : **const u8;
 
-
-    // Incremented once every tick (1/8000 seconds)
-    var tickClock : u16;
-
-    // Maximum value of the timer counter0 register.
+    // Maximum value of the timer counter_0 or counter_1 register.
     var maxTimerCounter : u8;
 
 
@@ -191,31 +190,29 @@ in zeropage {
     var currentChannelIndex : u8;
 
 
+    // The one-past-the-end index when looping through the channels.
+    //
+    // Used to deduplicate code when processing music and sound effects.
+    //
+    // MUST ONLY BE USED IN `process_event_loop__inline()`
+    var channelIndexEndLoop : u8;
+
+
     namespace channelSoA {
         // If non-zero, the channel is disabled.
         // (Used to determine which channel to play a sound effect on)
         var disabled : [u8 ; N_CHANNELS];
 
-        // The time of the next event
-        // (Q16.8 fixed point)
-        var nextEvent_f : [u8 ; N_CHANNELS];
-        var nextEvent_l : [u8 ; N_CHANNELS];
-        var nextEvent_h : [u8 ; N_CHANNELS];
-
-        // Number of ticks (1/8000 seconds) per 1/64 beat.
-        //
-        // NOTE: This variable is only set once (at the start of the song).
-        //
-        // (Q8.8 fixed point)
-        var tempo_f : [u8 ; N_CHANNELS];
-        var tempo_l : [u8 ; N_CHANNELS];
-
-        // Default note length (in 64ths)
-        var defaultNoteLength : [u8 ; N_CHANNELS];
+        // Counter (in ticks) until the event
+        var countdownTimer : [u8 ; N_CHANNELS];
 
         // If non-zero, the next event is a key-off event
         // If zero, the next event will process bytecode
         var nextEventIsKeyOff : [u8 ; N_CHANNELS];
+
+
+        // Default note length (in ticks)
+        var defaultNoteLength : [u8 ; N_CHANNELS];
 
 
         // The address of the next bytecode to execute
@@ -373,6 +370,9 @@ var _loopEnd : u8 in zpTmp;
     inline for let i in N_MUSIC_CHANNELS..7 {
         channelSoA.instructionPtr_l[i] = a;
         channelSoA.instructionPtr_h[i] = y;
+
+        // y is non-zero
+        channelSoA.disabled[i] = y;
     }
 
 
@@ -402,12 +402,6 @@ var _loopEnd : u8 in zpTmp;
     do {
         __reset_channel(x);
 
-        y = offsetof(SongHeader, tempo);
-        channelSoA.tempo_f[x] = a = songPtr[y];
-        y++;
-        channelSoA.tempo_l[x] = a = songPtr[y];
-
-
         // ASSUMES offsetof(SongHeader, channels) == 0
         // ASSUMES sizeof(MusicChannelHeader) == 4
         y = a = x <<< 2;
@@ -436,97 +430,113 @@ var _loopEnd : u8 in zpTmp;
     } while !negative;
 
 
-    // Set SFX tempo
-    a = <:SFX_TEMPO;
-    y = >:SFX_TEMPO;
-    inline for let i in N_MUSIC_CHANNELS..7 {
-        channelSoA.tempo_f[i] = a;
-        channelSoA.tempo_l[i] = y;
-    }
-
-
     init_io_ports__inline();
 
 
-    // Setup and enable the timer
-    smp.timer_0 = a = TIMER_DIVIDER;
-    smp.control = a = smp.CONTROL__ENABLE_TIMER_0;
+    // Setup and enable the timers
+    y = offsetof(SongHeader, tickTimer);
+    smp.timer_0 = a = songPtr[y];
+
+    smp.timer_1 = SFX_TICK_CLOCK;
+    smp.control = smp.CONTROL__ENABLE_TIMER_0 | smp.CONTROL__ENABLE_TIMER_1;
+
+    // Reset counters to ensure `maxTimerCounter` is accurate
     a = smp.counter_0;
+    a = smp.counter_1;
 
-    return process_event_loop();
-}
-
-
-
-#[fallthrough]
-func process_event_loop() {
     ^while true {
-        // Send KOFF events
-        write_dsp(GlobalDspAddr.KOFF, keyOffShadow);
-        // Enable KON in play-note instructions
-        keyOnMask |= keyOffShadow;
-
-
-        a = keyOnShadow;
-        // Disable KON in play-note instructions (slur the note)
-        test_and_clear(a, keyOnMask);
-
-        // Send KON events
-        y = a;
-        write_dsp(GlobalDspAddr.KON, y);
-
-
-        a = 0;
-        keyOffShadow = a;
-        keyOnShadow = a;
-
-
-        process_io_ports__inline();
-
-
-        x = N_CHANNELS - 1;
-        do {
-            process_channel__inline(x);
-
-            x--;
-        } while !negative;
-
-
-        // Wait until the timer counter has incremented
-        // ::TODO confirm `counter_0` with never overflow
-        do {
-            a = smp.counter_0;
-        } while zero;
-
-        if a >= maxTimerCounter {
-            maxTimerCounter = a;
-        }
-
-        <:tickClock = a = a + <:tickClock;
-        if carry {
-            (>:tickClock)++;
-            goto __rewind_tick_clock if negative;
-        }
+        process_event_loop__inline();
     }
 }
 
 
 
-// To prevent the tick clock from overflowing it needs to be rewound regularly.
-//
-// This function will rewind the clock and all events by 0x7f00 ticks.
-//
-// MUST be called when `tickClock >= 0x8000`
-#[fallthrough]
-func __rewind_tick_clock() {
-    >:tickClock = a = >:tickClock - 0x7f;
-    x = N_CHANNELS - 1;
-    do {
-        channelSoA.nextEvent_h[x] = a = channelSoA.nextEvent_h[x] - 0x7f;
-        x--;
-    } while !negative;
+inline func process_event_loop__inline() {
+    // Loop until a timer has ticked
+    ^while true {
+        // Song tick timer
+        a = smp.counter_0;
+        if !zero {
+            if a >= maxTimerCounter {
+                maxTimerCounter = a;
+            }
 
-    ^goto process_event_loop;
+            __update_kon_koff__inline(SONG_CHANNEL_MASK);
+
+            x = 0;
+            y = N_MUSIC_CHANNELS;
+
+            break;
+        }
+
+        // SFX tick timer
+        a = smp.counter_1;
+        if !zero {
+            if a >= maxTimerCounter {
+                maxTimerCounter = a;
+            }
+
+            __update_kon_koff__inline(SFX_CHANNEL_MASK);
+
+            x = N_MUSIC_CHANNELS;
+            y = N_CHANNELS;
+
+            break;
+        }
+    }
+
+
+    // X = starting channelIndex
+    // Y = channelIndex end (starting channelIndex + number of channels)
+
+    channelIndexEndLoop = y;
+    do {
+        process_channel__inline(x);
+        x++;
+    } while x < channelIndexEndLoop;
+
+
+    process_io_ports__inline();
+}
+
+
+
+// Set the KON/KOFF/keyOnMask bits for the music or sound effects (depending on MASK value).
+//
+// This code is a bit messy, but it satisfies all of my requirements:
+//
+//  * KON/KOFF set immediately after timer has ticked (NOT after process_channel loop)
+//    to reduce jitter in the KON/KOFF timings
+//
+//  * Music and Sound effects send KON and KOFF according to two different timer clocks.
+//
+//  * Separates the music and sfx channel bits in `keyOnShadow` and `keyOffShadow` while still
+//    still reusing the process_channel loop and bytecode instruction code for music and sfx.
+//
+//  * Separates music and sfx channel bits without adding a music/sfc conditional to the end of
+//    the process_channel loop or bytecode instructions.
+inline func __update_kon_koff__inline(let MASK : u8) {
+    a = keyOffShadow & MASK;
+    // Enable KON in play-note instructions
+    test_and_set(a, keyOnMask);
+
+    // Send KOFF events
+    y = a;
+    write_dsp(GlobalDspAddr.KOFF, y);
+
+
+    a = keyOnShadow & MASK;
+    // Disable KON in play-note instructions (slur the note)
+    test_and_clear(a, keyOnMask);
+
+    // Send KON events
+    y = a;
+    write_dsp(GlobalDspAddr.KON, y);
+
+
+    // Clear keyOnShadow and keyOffShadow
+    keyOnShadow &= (0xff ^ MASK);
+    keyOffShadow &= (0xff ^ MASK);
 }
 
 
@@ -606,20 +616,17 @@ func __play_sfx_on_channel(channelIndex : u8 in x, sfxBytecode : u16 in ya) {
 }
 
 // NOTE: Does not set:
-//  * channelSoA.tempo
 //  * channelSoA.instructionPtr
 //
 // NOTE: Also disables looping.
 //
 // KEEP: X
 func __reset_channel(channelIndex : u8 in x) {
-    ya = tickClock;
-    channelSoA.nextEvent_h[x] = y;
-    channelSoA.nextEvent_l[x] = a;
-    a = 0;
-    channelSoA.nextEvent_f[x] = a;
+    // Immediately process the next event
+    channelSoA.countdownTimer[x] = a = 1;
 
     // A = 0
+    a = 0;
     channelSoA.instructionPtrAfterEnd_h[x] = a;     // don't loop SFX
 
     channelSoA.disabled[x] = a;
@@ -658,10 +665,9 @@ func __reset_channel(channelIndex : u8 in x) {
 
 // KEEP: X
 inline func process_channel__inline(channelIndex : u8 in x) {
-    a = channelSoA.nextEvent_l[x];
-    y = channelSoA.nextEvent_h[x];
 
-    if ya < tickClock {
+    channelSoA.countdownTimer[x]--;
+    if zero {
         // Check if a KEY_OFF is required
         a = channelSoA.nextEventIsKeyOff[x];
         if !zero {
@@ -670,7 +676,9 @@ inline func process_channel__inline(channelIndex : u8 in x) {
 
             // schedule a bytecode event
             channelSoA.nextEventIsKeyOff[x] = a = 0;
-            increment_next_event__fixed_u8__inline(x, KEY_OFF_DELAY);
+
+            // Previous countdownTimer value was 0
+            channelSoA.countdownTimer[x]++;
         }
         else {
             currentChannelIndex = x;
@@ -686,18 +694,6 @@ inline func process_channel__inline(channelIndex : u8 in x) {
             channelSoA.instructionPtr_l[x] = a;
             channelSoA.instructionPtr_h[x] = y;
         }
-    }
-}
-
-
-
-// KEEP: X
-inline func increment_next_event__fixed_u8__inline(channelIndex : u8 in x, let TICKS : u8) {
-    // Do not update fractional bits
-
-    channelSoA.nextEvent_l[x] = a = channelSoA.nextEvent_l[x] + TICKS;
-    if carry {
-        channelSoA.nextEvent_h[x]++;
     }
 }
 
@@ -790,13 +786,10 @@ let null_instruction = disable_channel as func(u8 in x, u8 in a);
 
 // KEEP: X
 func disable_channel(channelIndex : u8 in x) {
-    // Set the nextEvent clock to the highest it can go
-    a = 0xff;
-    channelSoA.nextEvent_l[x] = a;
-    channelSoA.nextEvent_h[x] = a;
+    // countdownTimer value of 0 means wait 256 ticks
+    channelSoA.countdownTimer[x] = a = 0;
 
-    // A is non-zero
-    channelSoA.disabled[x] = a;
+    channelSoA.disabled[x] = a = 1;
 
     a = <:&ChannelDisabledBytecode;
     y = >:&ChannelDisabledBytecode;
@@ -1070,7 +1063,18 @@ func __play_pitch(channelIndex : u8 in x, pitchTableIndex : u8 in a) {
     a = ChannelVoiceBit[x] & keyOnMask;
     test_and_set(a, keyOnShadow);
 
-    ^return rest(x, channelSoA.defaultNoteLength[x]);
+
+    a = channelSoA.defaultNoteLength[x];
+
+    // Subtract the key-off delay from countdownTimer if the `key-off` bit is set.
+    y = channelSoA.nextEventIsKeyOff[x];
+    if negative {
+        a--;
+    }
+    channelSoA.countdownTimer[x] = a;
+
+    // return (do not execute the next bytecode and sleep)
+    return;
 }
 
 
@@ -1136,83 +1140,10 @@ func __play_pitch_length(channelIndex : u8 in x, pitchTableIndex : u8 in a) {
 
 // KEEP: x
 func rest(channelIndex : u8 in x, length: u8 in a) {
-var _tmp : u8 in zpTmp;
-
-    // `nextEventIsKeyOff` is cleared in `process_channel__inline()` and set in the play note instructions
-    y = channelSoA.nextEventIsKeyOff[x];
-    return __rest_subtract_keyoffdelay(x, a) if !zero;
-
-
-    // Calculate number of ticks to sleep
-    // (Q16.8)nextEvent += (Q8.8)tempo * (Q8.0)note
-
-    _tmp = a;
-
-    y = channelSoA.tempo_f[x];
-    ya = __multiply(y, a);
-
-    channelSoA.nextEvent_f[x] = a = a + channelSoA.nextEvent_f[x];
-    channelSoA.nextEvent_l[x] = a = y +# channelSoA.nextEvent_l[x];
-    if carry {
-        channelSoA.nextEvent_h[x]++;
-    }
-
-    a = _tmp;
-    y = channelSoA.tempo_l[x];
-    ya = __multiply(y, a);
-
-    channelSoA.nextEvent_l[x] = a = a + channelSoA.nextEvent_l[x];
-    channelSoA.nextEvent_h[x] = a = y +# channelSoA.nextEvent_h[x];
+    channelSoA.countdownTimer[x] = a;
 
     // return (do not execute the next bytecode and sleep)
     return;
-}
-
-
-
-// KEEP: x
-func __rest_subtract_keyoffdelay(channelIndex : u8 in x, length: u8 in a) {
-var _tmp : u8 in zpTmp;
-
-    _tmp = a;
-
-    // Calculate number of ticks to sleep (subtracting keyoff delay)
-    // (Q16.8)nextEvent += (Q8.8)tempo * (Q8.0)note - KEY_OFF_DELAY
-
-    y = channelSoA.tempo_f[x];
-    ya = __multiply(y, a);
-
-    channelSoA.nextEvent_f[x] = a = a + channelSoA.nextEvent_f[x];
-    channelSoA.nextEvent_l[x] = a = y +# channelSoA.nextEvent_l[x];
-    if carry {
-        channelSoA.nextEvent_h[x]++;
-    }
-
-    a = _tmp;
-    y = channelSoA.tempo_l[x];
-    ya = __multiply(y, a);
-
-    // Subtract `KEY_OFF_DELAY`
-    a -= KEY_OFF_DELAY;
-    if !carry {
-        y--;
-    }
-
-    channelSoA.nextEvent_l[x] = a = a + channelSoA.nextEvent_l[x];
-    channelSoA.nextEvent_h[x] = a = y +# channelSoA.nextEvent_h[x];
-
-    // return (do not execute the next bytecode and sleep)
-    return;
-}
-
-
-
-// ::BUGFIX wiz cannot compile `ya = y * a`::
-// ::: wiz outputs error: left-hand side of type `u16` cannot be assigned `u8` expression ::
-//
-// KEEP: x
-inline func __multiply(v1 : u8 in y, v2 : u8 in a) : u16 in ya {
-    return y * a;
 }
 
 }

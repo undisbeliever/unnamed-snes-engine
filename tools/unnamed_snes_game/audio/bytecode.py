@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from collections import OrderedDict
 from typing import Any, Callable, Final, Optional
 
-from .driver_constants import KEY_OFF_DELAY
 from .json_formats import SamplesJson, Name, Instrument, NAME_REGEX
 
 
@@ -42,11 +41,14 @@ assert START_LOOP_1 == START_LOOP_0 + 1
 assert END_LOOP_1 == END_LOOP_0 + 1
 
 
+# Number of ticks between key-off and the next instruction
+KEY_OFF_TICK_DELAY = 1
+
+
 @dataclass
 class BcMappings:
     instruments: dict[Name, int]
     subroutines: dict[Name, int]
-    minimum_note_length: int
 
 
 def _instrument_mapping(instruments: list[Instrument]) -> OrderedDict[Name, int]:
@@ -56,11 +58,10 @@ def _instrument_mapping(instruments: list[Instrument]) -> OrderedDict[Name, int]
     return out
 
 
-def create_bc_mappings(samples: SamplesJson, tempo: int) -> BcMappings:
+def create_bc_mappings(samples: SamplesJson) -> BcMappings:
     return BcMappings(
         instruments=_instrument_mapping(samples.instruments),
         subroutines={},
-        minimum_note_length=math.ceil((KEY_OFF_DELAY + 1) / tempo),
     )
 
 
@@ -278,9 +279,10 @@ class Bytecode:
         self.bytecode.append(v)
 
     @_instruction(integer_argument)
-    def rest(self, beats: int) -> None:
+    def rest(self, length: int) -> None:
+        length = test_length_argument(length)
         self.bytecode.append(REST)
-        self.bytecode.append(beats)
+        self.bytecode.append(length)
 
     @_instruction(no_argument)
     def start_loop(self) -> None:
@@ -349,10 +351,9 @@ class Bytecode:
         if note_id < 0 or note_id > 15:
             raise BytecodeError("note is out of range")
         if length is not None:
-            if length < self.mappings.minimum_note_length:
-                raise BytecodeError("Note length is too short")
-            if length > 255:
-                raise BytecodeError("Note length is too long")
+            if key_off:
+                length -= KEY_OFF_TICK_DELAY
+            length = test_length_argument(length)
             self.bytecode.append(PLAY_NOTE_LENGTH | (note_id << 1) | (key_off & 1))
             self.bytecode.append(length)
         else:
@@ -363,10 +364,9 @@ class Bytecode:
         if note_id < 0 or note_id > 127:
             raise BytecodeError("note is out of range")
         if length is not None:
-            if length < self.mappings.minimum_note_length:
-                raise BytecodeError("Note length is too short")
-            if length > 255:
-                raise BytecodeError("Note length is too long")
+            if key_off:
+                length -= KEY_OFF_TICK_DELAY
+            length = test_length_argument(length)
             self.bytecode.append(PLAY_SPECIFIC_NOTE_LENGTH)
             self.bytecode.append((note_id << 1) | (key_off & 1))
             self.bytecode.append(length)
@@ -411,3 +411,11 @@ class Bytecode:
         if not self.is_subroutine:
             raise BytecodeError("Not a subroutine")
         self.bytecode.append(RETURN_FROM_SUBROUTINE)
+
+
+def test_length_argument(length: int) -> int:
+    if length <= 0:
+        raise BytecodeError("Note length is too short")
+    if length > 0x100:
+        raise BytecodeError("Note length is too long")
+    return length & 0xFF

@@ -3,19 +3,10 @@
 
 from typing import Final, Optional
 
-from .driver_constants import SONG_HEADER_SIZE, N_MUSIC_CHANNELS, TICKS_PER_SECOND
+from .driver_constants import SONG_HEADER_SIZE, N_MUSIC_CHANNELS, MIN_TICK_TIMER
 
 
-def calc_tempo(bpm: int) -> int:
-    t = int((TICKS_PER_SECOND * 60 * 0x100) // (bpm * 48))
-    if t < 2:
-        raise ValueError("Tempo is too fast")
-    if t > 0x6000:
-        raise ValueError("Tempo is too slow")
-    return t
-
-
-def song_header(bpm: int, channels: list[bytes], loop_points: list[Optional[int]], subroutines: list[bytes]) -> bytes:
+def song_header(tick_clock: int, channels: list[bytes], loop_points: list[Optional[int]], subroutines: list[bytes]) -> bytes:
     if len(channels) == 0:
         raise RuntimeError("No music channels")
 
@@ -24,6 +15,9 @@ def song_header(bpm: int, channels: list[bytes], loop_points: list[Optional[int]
 
     if len(subroutines) > 128:
         raise RuntimeError("Too many subroutines")
+
+    if tick_clock < MIN_TICK_TIMER or tick_clock > 0xFF:
+        raise RuntimeError(f"Tick clock out of bounds (got {tick_clock}, min: {MIN_TICK_TIMER}, max: {0xff})")
 
     assert len(channels) == len(loop_points)
 
@@ -55,9 +49,7 @@ def song_header(bpm: int, channels: list[bytes], loop_points: list[Optional[int]
         out.append(c_loop & 0xFF)
         out.append(c_loop >> 8)
 
-    tempo: Final = calc_tempo(bpm)
-    out.append(tempo & 0xFF)
-    out.append(tempo >> 8)
+    out.append(tick_clock)
 
     out.append(len(subroutines))
 

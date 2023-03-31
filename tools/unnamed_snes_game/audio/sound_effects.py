@@ -4,7 +4,7 @@
 import re
 from typing import Final, Optional, Sequence
 
-from .driver_constants import N_SOUND_EFFECTS, TICKS_PER_SECOND, SFX_BPM, KEY_OFF_DELAY, Addr
+from .driver_constants import N_SOUND_EFFECTS, Addr
 from .bytecode import BcMappings, Bytecode, create_bc_mappings
 from .json_formats import parse_name, SamplesJson
 from ..json_formats import Filename, Name, Mappings
@@ -19,7 +19,7 @@ def compile_sound_effect(sfx: str, samples_input: SamplesJson) -> bytes:
     errors = list()
     previous_line = ""
 
-    bc_mappings = create_bc_mappings(samples_input, SFX_BPM)
+    bc_mappings = create_bc_mappings(samples_input)
 
     bc = Bytecode(bc_mappings, False)
 

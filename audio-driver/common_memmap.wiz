@@ -15,7 +15,7 @@ let COMMON_DATA_ADDR = 0x700;
 let CODE_ADDR = 0x200;
 let CODE_SIZE = COMMON_DATA_ADDR - CODE_ADDR;
 
-let SONG_HEADER_SIZE = 27;
+let SONG_HEADER_SIZE = 26;
 
 
 bank zeropage        @ 0x0000 : [vardata;     0x00ed];
