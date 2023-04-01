@@ -14,21 +14,22 @@ from .json_formats import SamplesJson, Name, Instrument, NAME_REGEX
 SET_INSTRUMENT: Final = 0
 SET_CHANNEL_VOLUME: Final = 1
 REST: Final = 2
-CALL_SUBROUTINE: Final = 3
-END_LOOP_0: Final = 4
-END_LOOP_1: Final = 5
-SET_SEMITONE_OFFSET: Final = 6
-RELATIVE_SEMITONE_OFFSET: Final = 7
-SET_ADSR: Final = 8
-SET_GAIN: Final = 9
-PLAY_SPECIFIC_NOTE: Final = 10
-PLAY_SPECIFIC_NOTE_LENGTH: Final = 11
+REST_KEYOFF: Final = 3
+CALL_SUBROUTINE: Final = 4
+END_LOOP_0: Final = 5
+END_LOOP_1: Final = 6
+SET_SEMITONE_OFFSET: Final = 7
+RELATIVE_SEMITONE_OFFSET: Final = 8
+SET_ADSR: Final = 9
+SET_GAIN: Final = 10
+PLAY_SPECIFIC_NOTE: Final = 11
+PLAY_SPECIFIC_NOTE_LENGTH: Final = 12
 
-DISABLE_CHANNEL: Final = 12
-END: Final = 13
-RETURN_FROM_SUBROUTINE: Final = 14
-START_LOOP_0: Final = 15
-START_LOOP_1: Final = 16
+DISABLE_CHANNEL: Final = 13
+END: Final = 14
+RETURN_FROM_SUBROUTINE: Final = 15
+START_LOOP_0: Final = 16
+START_LOOP_1: Final = 17
 
 PLAY_NOTE: Final = 1 << 5
 PLAY_NOTE_LENGTH: Final = 2 << 5
@@ -282,6 +283,12 @@ class Bytecode:
     def rest(self, length: int) -> None:
         length = test_length_argument(length)
         self.bytecode.append(REST)
+        self.bytecode.append(length)
+
+    @_instruction(integer_argument)
+    def rest_keyoff(self, length: int) -> None:
+        length = test_length_argument(length - KEY_OFF_TICK_DELAY)
+        self.bytecode.append(REST_KEYOFF)
         self.bytecode.append(length)
 
     @_instruction(no_argument)

@@ -30,6 +30,8 @@
         play_note             10, slur_next, 12
     end_loop    6
 
+    rest_keyoff 24
+
     play_note   5
 
     disable_channel

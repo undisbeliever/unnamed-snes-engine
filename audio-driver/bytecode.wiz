@@ -17,7 +17,7 @@ let N_NO_ARGUMENT_INSTRUCTIONS = sizeof(typeof(NO_ARGUMENT_INSTRUCTIONS)) / size
 
 // Notes about rest/note length:
 //   * A rest/note length of 0 will pause for 256 ticks
-//   * A play-note instruction will wait for an extra tick if the key-off bit is set.
+//   * A rest/note instruction will wait for an extra tick if the key-off bit is set.
 
 // These bytecodes do have parameters
 let SINGLE_ARGUMENT_INSTRUCTIONS = [
@@ -28,6 +28,10 @@ let SINGLE_ARGUMENT_INSTRUCTIONS = [
     // parameter = number of ticks to wait.
     // NOTE: Does not send a keyoff event after resting.
     rest,
+
+    // parameter = number of ticks to wait.
+    // Sends a keyoff event after resting (NOTE: waits an extra tick after keyoff).
+    rest_keyoff,
 
     // parameter = subroutine ID (MAX: 127)
     //
@@ -100,7 +104,6 @@ let NO_PARAMETER_INSTRUCTIONS = [
 
 
     // padding
-    disable_channel,
     disable_channel,
     disable_channel,
     disable_channel,

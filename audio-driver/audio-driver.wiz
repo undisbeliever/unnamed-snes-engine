@@ -1146,6 +1146,17 @@ func rest(channelIndex : u8 in x, length: u8 in a) {
     return;
 }
 
+
+// KEEP: x
+func rest_keyoff(channelIndex : u8 in x, length: u8 in a) {
+    channelSoA.nextEventIsKeyOff[x] = y = 1;
+
+    channelSoA.countdownTimer[x] = a;
+
+    // return (do not execute the next bytecode and sleep)
+    return;
+}
+
 }
 
 }
