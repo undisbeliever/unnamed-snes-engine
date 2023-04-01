@@ -43,23 +43,25 @@
     set_instrument      sine
     change_octave       5
 
-    play_note c 96
+    set_default_length  96
+
+    play_note c
     rest 32
 
     set_adsr 15 3 3 5
-    play_note c 96
+    play_note c
     rest 32
 
     set_adsr 10 7 3 5
-    play_note c 96
+    play_note c
     rest 32
 
     set_adsr 10 3 7 5
-    play_note c 96
+    play_note c
     rest 32
 
     set_adsr 10 3 3 31
-    play_note c 96
+    play_note c
 
     disable_channel
 

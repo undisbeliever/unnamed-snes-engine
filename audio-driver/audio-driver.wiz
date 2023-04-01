@@ -1015,6 +1015,15 @@ func set_gain(channelIndex: u8 in x, gain : u8 in a) {
 
 
 // KEEP: x
+func set_default_length(channelIndex: u8 in x, noteLength: u8 in a) {
+    channelSoA.defaultNoteLength[x] = a;
+
+    ^return process_next_bytecode(x);
+}
+
+
+
+// KEEP: x
 func play_specific_note(channelIndex : u8 in x, noteAndKeyOffBit : u8 in a) {
     // carry = key-off after note ends bit
     a >>>= 1;

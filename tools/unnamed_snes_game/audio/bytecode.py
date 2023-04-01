@@ -22,14 +22,15 @@ SET_SEMITONE_OFFSET: Final = 7
 RELATIVE_SEMITONE_OFFSET: Final = 8
 SET_ADSR: Final = 9
 SET_GAIN: Final = 10
-PLAY_SPECIFIC_NOTE: Final = 11
-PLAY_SPECIFIC_NOTE_LENGTH: Final = 12
+SET_DEFAULT_LENGTH: Final = 11
+PLAY_SPECIFIC_NOTE: Final = 12
+PLAY_SPECIFIC_NOTE_LENGTH: Final = 13
 
-DISABLE_CHANNEL: Final = 13
-END: Final = 14
-RETURN_FROM_SUBROUTINE: Final = 15
-START_LOOP_0: Final = 16
-START_LOOP_1: Final = 17
+DISABLE_CHANNEL: Final = 14
+END: Final = 15
+RETURN_FROM_SUBROUTINE: Final = 16
+START_LOOP_0: Final = 17
+START_LOOP_1: Final = 18
 
 PLAY_NOTE: Final = 1 << 5
 PLAY_NOTE_LENGTH: Final = 2 << 5
@@ -344,6 +345,13 @@ class Bytecode:
             raise BytecodeError("Invalid GAIN value")
         self.bytecode.append(SET_GAIN)
         self.bytecode.append(gain)
+
+    @_instruction(integer_argument)
+    def set_default_length(self, length: int) -> None:
+        if length < 1 or length > 0xFF:
+            raise BytecodeError("Invalid default note length (expected 1 - 255)")
+        self.bytecode.append(SET_DEFAULT_LENGTH)
+        self.bytecode.append(length)
 
     @_instruction(no_argument)
     def disable_channel(self) -> None:

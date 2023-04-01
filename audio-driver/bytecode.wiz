@@ -61,6 +61,12 @@ let SINGLE_ARGUMENT_INSTRUCTIONS = [
     set_gain,
 
 
+    // parameter = u8 new default note length (MUST NOT BE 0)
+    //
+    // A default note length of 0 cause a `play_note` instruction with the key-off bit set to sleep for 257 ticks.
+    set_default_length,
+
+
     // Play a specific note at the default length (ignore octave and semitone offset).
     //
     // Useful for sound effects (no need to set octave).
@@ -104,7 +110,6 @@ let NO_PARAMETER_INSTRUCTIONS = [
 
 
     // padding
-    disable_channel,
     disable_channel,
     disable_channel,
     disable_channel,
