@@ -4,7 +4,7 @@
     set_instrument      square
     set_channel_volume  20
 
-    play_specific_note  d4 8
+    play_note           d4 8
 
     disable_channel
 
@@ -12,10 +12,9 @@
 
 == menu_select ==
     set_instrument  sawtooth
-    change_octave   4
 
-    play_note       c+  16
-    play_note       b-  96
+    play_note       c+4  16
+    play_note       b-4  96
 
     disable_channel
 
@@ -26,13 +25,13 @@
     set_channel_volume  127
 
     start_loop
-        play_specific_note    41, no_keyoff,  8
-        play_note             10, slur_next, 12
+        play_note    41, no_keyoff,  8
+        play_note    46, slur_next, 12
     end_loop    6
 
     rest_keyoff 24
 
-    play_note   5
+    play_note   41, 24
 
     disable_channel
 
@@ -41,27 +40,24 @@
 
 == adsr_test ==
     set_instrument      sine
-    change_octave       5
 
-    set_default_length  96
-
-    play_note c
+    play_note c5 96
     rest 32
 
     set_adsr 15 3 3 5
-    play_note c
+    play_note c5 96
     rest 32
 
     set_adsr 10 7 3 5
-    play_note c
+    play_note c5 96
     rest 32
 
     set_adsr 10 3 7 5
-    play_note c
+    play_note c5 96
     rest 32
 
     set_adsr 10 3 3 31
-    play_note c
+    play_note c5 96
 
     disable_channel
 
@@ -69,10 +65,9 @@
 
 == gain_test ==
     set_instrument      sine
-    change_octave       5
 
     set_gain 0x7f
-    play_note c 255
+    play_note c5 255
 
     disable_channel
 

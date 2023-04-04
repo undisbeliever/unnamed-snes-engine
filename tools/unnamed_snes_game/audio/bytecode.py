@@ -10,37 +10,34 @@ from typing import Any, Callable, Final, Optional
 from .json_formats import SamplesJson, Name, Instrument, NAME_REGEX
 
 
+N_OCTAVES: Final = 8
+N_NOTES: Final = N_OCTAVES * 12
+
 # Opcode values MUST MATCH `src/bytecode.wiz`
-SET_INSTRUMENT: Final = 0
-SET_CHANNEL_VOLUME: Final = 1
-REST: Final = 2
-REST_KEYOFF: Final = 3
-CALL_SUBROUTINE: Final = 4
-END_LOOP_0: Final = 5
-END_LOOP_1: Final = 6
-SET_SEMITONE_OFFSET: Final = 7
-RELATIVE_SEMITONE_OFFSET: Final = 8
-SET_ADSR: Final = 9
-SET_GAIN: Final = 10
-SET_DEFAULT_LENGTH: Final = 11
-PLAY_SPECIFIC_NOTE: Final = 12
-PLAY_SPECIFIC_NOTE_LENGTH: Final = 13
+DISABLE_CHANNEL: Final = 0xFE
 
-DISABLE_CHANNEL: Final = 14
-END: Final = 15
-RETURN_FROM_SUBROUTINE: Final = 16
-START_LOOP_0: Final = 17
-START_LOOP_1: Final = 18
+SET_INSTRUMENT: Final = 0xC0
+SET_CHANNEL_VOLUME: Final = 0xC2
+REST: Final = 0xC4
+REST_KEYOFF: Final = 0xC6
+CALL_SUBROUTINE: Final = 0xC8
+END_LOOP_0: Final = 0xCA
+END_LOOP_1: Final = 0xCC
+SET_ADSR: Final = 0xCE
+SET_GAIN: Final = 0xD0
 
-PLAY_NOTE: Final = 1 << 5
-PLAY_NOTE_LENGTH: Final = 2 << 5
-CHANGE_OCTAVE: Final = 3 << 5
+END: Final = 0xD2
+RETURN_FROM_SUBROUTINE: Final = 0xD4
+START_LOOP_0: Final = 0xD6
+START_LOOP_1: Final = 0xD8
 
+
+assert SET_INSTRUMENT == N_NOTES * 2
 
 MAX_N_LOOPS: Final = 2
 
-assert START_LOOP_1 == START_LOOP_0 + 1
-assert END_LOOP_1 == END_LOOP_0 + 1
+assert START_LOOP_1 == START_LOOP_0 + 2
+assert END_LOOP_1 == END_LOOP_0 + 2
 
 
 # Number of ticks between key-off and the next instruction
@@ -122,28 +119,25 @@ NOTE_MAP: Final = {
     "a": 9,
     "b": 11,
 }
+SPECIFIC_NOTE_REGEX: Final = re.compile(r"([a-gA-G])([\-+]*)([0-8])$")
+KEY_OFF_ARGS: Final = ("keyoff",)
+NO_KEY_OFF_ARGS: Final = ("no_keyoff", "nko", "slur_next", "sn")
 
 
-def _decode_note(note: str) -> int:
-    decoded_note = NOTE_MAP.get(note[0].lower())
-    if decoded_note is not None:
-        for c in note[1:]:
-            if c == "-":
-                decoded_note -= 1
-            elif c == "+":
-                decoded_note += 1
-            else:
-                raise ValueError("Cannot parse note: Expected sharp (+) or flat(-)")
-        return decoded_note
+def play_note_argument(s: str) -> tuple[int, bool, int]:
+    if "," in s:
+        args = s.split(",")
     else:
-        try:
-            return int(note, 0)
-        except ValueError as e:
-            raise ValueError("Cannot parse note: Expected note (a-g, followed by + or -) or an integer note id (0-15)")
+        args = s.split()
 
+    if not args:
+        raise ValueError("Missing argument")
+    if len(args) > 3:
+        raise ValueError("Too many arguments")
 
-def _decode_specific_note(note: str) -> int:
-    m = SPECIFIC_NOTE_REGEX.match(note)
+    note: Final = args.pop(0).strip()
+
+    m: Final = SPECIFIC_NOTE_REGEX.match(note)
     if m:
         decoded_note = NOTE_MAP.get(m.group(1).lower())
         if decoded_note is None:
@@ -159,31 +153,15 @@ def _decode_specific_note(note: str) -> int:
 
         octave = int(m.group(3))
 
-        return decoded_note + octave * 12
+        decoded_note += octave * 12
     else:
         try:
-            return int(note, 0)
+            decoded_note = int(note, 0)
         except ValueError as e:
-            raise ValueError("Cannot parse note: Expected note (a-g, followed by + or -, then 0-8) or an integer note id (0-15)")
+            raise ValueError(
+                f"Cannot parse note: Expected note (a-g, followed by + or -, then 0-{N_OCTAVES-1}) or an integer note id (0-{N_NOTES-1})"
+            )
 
-
-SPECIFIC_NOTE_REGEX: Final = re.compile(r"([a-gA-G])([\-+]*)([0-8])$")
-KEY_OFF_ARGS: Final = ("keyoff",)
-NO_KEY_OFF_ARGS: Final = ("no_keyoff", "nko", "slur_next", "sn")
-
-
-def __note_argument(s: str, decode_note: Callable[[str], int]) -> tuple[int, bool, Optional[int]]:
-    if "," in s:
-        args = s.split(",")
-    else:
-        args = s.split()
-
-    if not args:
-        raise ValueError("Missing argument")
-    if len(args) > 3:
-        raise ValueError("Too many arguments")
-
-    note: Final = decode_note(args.pop(0).strip())
     length = None
     key_off = None
 
@@ -202,24 +180,10 @@ def __note_argument(s: str, decode_note: Callable[[str], int]) -> tuple[int, boo
     if key_off is None:
         key_off = True
 
-    return note, key_off, length
+    if length is None:
+        raise ValueError("Missing note length")
 
-
-def play_note_argument(s: str) -> tuple[int, bool, Optional[int]]:
-    return __note_argument(s, _decode_note)
-
-
-def play_specific_note_argument(s: str) -> tuple[int, bool, Optional[int]]:
-    return __note_argument(s, _decode_specific_note)
-
-
-def change_octave_argument(s: str) -> tuple[bool, int]:
-    if s[0] == "-":
-        return True, -int(s[1:], 0)
-    elif s[0] == "+":
-        return True, +int(s[1:], 0)
-    else:
-        return False, int(s, 0)
+    return decoded_note, key_off, length
 
 
 def _instruction(argument_parser: Callable[[str], Any]) -> Callable[..., Callable[..., None]]:
@@ -265,6 +229,15 @@ class Bytecode:
         arg_parser, inst = arg_parser_and_inst
         inst(self, *arg_parser(argument))
 
+    @_instruction(play_note_argument)
+    def play_note(self, note_id: int, key_off: bool, length: int) -> None:
+        if note_id < 0 or note_id > N_NOTES:
+            raise BytecodeError("note is out of range")
+        length = test_length_argument(length)
+
+        self.bytecode.append((note_id << 1) | (key_off & 1))
+        self.bytecode.append(length)
+
     @_instruction(name_argument)
     def set_instrument(self, name: Name) -> None:
         instrument_id = self.mappings.instruments.get(name)
@@ -296,7 +269,7 @@ class Bytecode:
     def start_loop(self) -> None:
         if self.n_nested_loops >= MAX_N_LOOPS:
             raise BytecodeError(f"Too many loops.  The maximum number of nested loops is { MAX_N_LOOPS}.")
-        opcode = START_LOOP_0 + self.n_nested_loops
+        opcode = START_LOOP_0 + self.n_nested_loops * 2
         self.n_nested_loops += 1
         self.bytecode.append(opcode)
 
@@ -310,18 +283,11 @@ class Bytecode:
             raise BytecodeError("There is no loop to end")
         self.n_nested_loops -= 1
         assert self.n_nested_loops >= 0
-        self.bytecode.append(END_LOOP_0 + self.n_nested_loops)
+
+        opcode = END_LOOP_0 + self.n_nested_loops * 2
+
+        self.bytecode.append(opcode)
         self.bytecode.append(loop_count - 2)
-
-    @_instruction(integer_argument)
-    def set_semitone_offset(self, offset: int) -> None:
-        self.bytecode.append(SET_SEMITONE_OFFSET)
-        self.bytecode.append(cast_i8(offset))
-
-    @_instruction(integer_argument)
-    def relative_semitone_offset(self, offset: int) -> None:
-        self.bytecode.append(RELATIVE_SEMITONE_OFFSET)
-        self.bytecode.append(cast_i8(offset))
 
     @_instruction(adsr_argument)
     def set_adsr(self, a: int, d: int, sl: int, sr: int) -> None:
@@ -346,13 +312,6 @@ class Bytecode:
         self.bytecode.append(SET_GAIN)
         self.bytecode.append(gain)
 
-    @_instruction(integer_argument)
-    def set_default_length(self, length: int) -> None:
-        if length < 1 or length > 0xFF:
-            raise BytecodeError("Invalid default note length (expected 1 - 255)")
-        self.bytecode.append(SET_DEFAULT_LENGTH)
-        self.bytecode.append(length)
-
     @_instruction(no_argument)
     def disable_channel(self) -> None:
         self.bytecode.append(DISABLE_CHANNEL)
@@ -360,55 +319,6 @@ class Bytecode:
     @_instruction(no_argument)
     def end(self) -> None:
         self.bytecode.append(END)
-
-    @_instruction(play_note_argument)
-    def play_note(self, note_id: int, key_off: bool, length: Optional[int] = None) -> None:
-        if note_id < 0 or note_id > 15:
-            raise BytecodeError("note is out of range")
-        if length is not None:
-            if key_off:
-                length -= KEY_OFF_TICK_DELAY
-            length = test_length_argument(length)
-            self.bytecode.append(PLAY_NOTE_LENGTH | (note_id << 1) | (key_off & 1))
-            self.bytecode.append(length)
-        else:
-            self.bytecode.append(PLAY_NOTE | (note_id << 1) | (key_off & 1))
-
-    @_instruction(play_specific_note_argument)
-    def play_specific_note(self, note_id: int, key_off: bool, length: Optional[int] = None) -> None:
-        if note_id < 0 or note_id > 127:
-            raise BytecodeError("note is out of range")
-        if length is not None:
-            if key_off:
-                length -= KEY_OFF_TICK_DELAY
-            length = test_length_argument(length)
-            self.bytecode.append(PLAY_SPECIFIC_NOTE_LENGTH)
-            self.bytecode.append((note_id << 1) | (key_off & 1))
-            self.bytecode.append(length)
-        else:
-            self.bytecode.append(PLAY_SPECIFIC_NOTE)
-            self.bytecode.append((note_id << 1) | (key_off & 1))
-
-    @_instruction(change_octave_argument)
-    def change_octave(self, relative_change: bool, octave: int) -> None:
-        if octave < -6 or octave > 9:
-            raise BytecodeError("Octave is out of range (range is -6 .. 9 inclusive)")
-        opcode = CHANGE_OCTAVE | ((octave + 6) << 1) | bool(relative_change)
-        self.bytecode.append(opcode)
-
-    @_instruction(optional_integer_argument)
-    def increment_octave(self, n_steps: Optional[int] = None) -> None:
-        if n_steps is not None:
-            self.change_octave(True, n_steps)
-        else:
-            self.change_octave(True, 1)
-
-    @_instruction(optional_integer_argument)
-    def decrement_octave(self, n_steps: Optional[int] = None) -> None:
-        if n_steps is not None:
-            self.change_octave(True, -n_steps)
-        else:
-            self.change_octave(True, -1)
 
     @_instruction(name_argument)
     def call_subroutine(self, name: Name) -> None:

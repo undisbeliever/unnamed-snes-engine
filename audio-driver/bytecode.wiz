@@ -7,12 +7,27 @@ import "audio-driver";
 
 namespace bytecode {
 
-let DISABLE_CHANNEL_BYTECODE = N_SINGLE_ARGUMENT_INSTRUCTIONS;
+let N_NOTE_OCTAVES = 8;
+let N_PLAY_NOTE_INSTRUCTIONS = N_NOTE_OCTAVES * 12 * 2;
 
-let INLINE_ARGUMENT_MASK = 0x1f;
+let FIRST_INSTRUCTION_WITH_ARGUMENT_OPCODE = N_PLAY_NOTE_INSTRUCTIONS;
+let FIRST_NO_ARGUMENT_INSTRUCTION_OPCODE = FIRST_INSTRUCTION_WITH_ARGUMENT_OPCODE + bytecode.INSTRUCTIONS_WITH_ARGUMENTS.len * 2;
 
-let N_SINGLE_ARGUMENT_INSTRUCTIONS = sizeof(typeof(SINGLE_ARGUMENT_INSTRUCTIONS)) / sizeof(typeof(SINGLE_ARGUMENT_INSTRUCTIONS[0]));
-let N_NO_ARGUMENT_INSTRUCTIONS = sizeof(typeof(NO_ARGUMENT_INSTRUCTIONS)) / sizeof(typeof(NO_ARGUMENT_INSTRUCTIONS[0]));
+// Last instruction is the `disable_channel` instruction
+let DISABLE_CHANNEL_BYTECODE = 0xfe;
+
+
+
+// OPCODES < N_PLAY_NOTE_INSTRUCTIONS are a two-byte play note instruction.
+//
+//  nnnnnnnO llllllll
+//      nnnnnnn = note to play (number of semitones above c0)
+//            O = key-off after note ends
+//     llllllll = note length
+//
+//  NOTE: This instruction will wait an extra tick if the `key-off` bit is set.
+
+// The remaining instructions have an opcode of `0xc0 + instruction_index * 2`
 
 
 // Notes about rest/note length:
@@ -20,7 +35,7 @@ let N_NO_ARGUMENT_INSTRUCTIONS = sizeof(typeof(NO_ARGUMENT_INSTRUCTIONS)) / size
 //   * A rest/note instruction will wait for an extra tick if the key-off bit is set.
 
 // These bytecodes do have parameters
-let SINGLE_ARGUMENT_INSTRUCTIONS = [
+let INSTRUCTIONS_WITH_ARGUMENTS = [
     set_instrument,
 
     set_channel_volume,
@@ -32,6 +47,7 @@ let SINGLE_ARGUMENT_INSTRUCTIONS = [
     // parameter = number of ticks to wait.
     // Sends a keyoff event after resting (NOTE: waits an extra tick after keyoff).
     rest_keyoff,
+
 
     // parameter = subroutine ID (MAX: 127)
     //
@@ -46,53 +62,17 @@ let SINGLE_ARGUMENT_INSTRUCTIONS = [
     end_loop_1,
 
 
-    // parameter = i8 semitone offset to use
-    set_semitone_offset,
-
-    // parameter = i8 semitones adjust the current semitone offset by
-    relative_semitone_offset,
-
-
     // parameter = u16 value to send to the ADSR register
     set_adsr,
 
     // parameter = u8 value to send to the GAIN register
     // NOTE: Disables ADSR
     set_gain,
-
-
-    // parameter = u8 new default note length (MUST NOT BE 0)
-    //
-    // A default note length of 0 cause a `play_note` instruction with the key-off bit set to sleep for 257 ticks.
-    set_default_length,
-
-
-    // Play a specific note at the default length (ignore octave and semitone offset).
-    //
-    // Useful for sound effects (no need to set octave).
-    //
-    // parameter = nnnnnnnO
-    //   O       = key-off after note ends
-    //   nnnnnnn = note to play
-    play_specific_note,
-
-
-    // Play a specific note at a given length (ignore octave and semitone offset) and slur the next note.
-    //
-    // Useful for sound effects (no need to set octave).
-    //
-    // parameter = nnnnnnnO llllllll
-    //  O        = key-off after note ends
-    //  nnnnnnn  = note to play
-    //  llllllll = note length
-    play_specific_note_length,
 ];
 
 
 // These bytecodes do not have parameters
-let NO_PARAMETER_INSTRUCTIONS = [
-    disable_channel,
-
+let NO_ARGUMENT_INSTRUCTIONS = [
     // End of channel bytecode.
     //
     // This instruction will either jump to the loop point or stop the channel
@@ -101,6 +81,7 @@ let NO_PARAMETER_INSTRUCTIONS = [
     // This instruction is not recommended for sound effects.
     // NOTE: `disable_channel` is slightly faster then `end`.
     end,
+
 
     // Return from a call instruction
     return_from_subroutine,
@@ -123,49 +104,11 @@ let NO_PARAMETER_INSTRUCTIONS = [
     disable_channel,
     disable_channel,
     disable_channel,
-];
-
-
-// These bytecode combine instruction and parameter in a single byte
-// byte value = `bbbppppp`
-let INLINE_ARGUMENT_INSTRUCTIONS = [
-    null_instruction,
-
-    // Play a note at the current octave with the default length
-    // parameter: nnnnO
-    //      O    = key-off after note ends
-    //      nnnn = note to play
-    play_note,
-
-    // Play a note at the current octave with a given length
-    //
-    // parameters: nnnnO  llllllll
-    //  O        = key-off after note ends
-    //  nnnn     = note to play
-    //  llllllll = note length
-    //
-    play_note_length,
-
-
-    // Changes the current octave for the channel.
-    //
-    // parameter: oooor
-    //      r    = relative change flag.
-    //             If set: octave is incremented/decremented by `oooo`.
-    //             If clear: octave is set to `oooo`.
-    //
-    //      oooo = octave.
-    //             Biased Integer -6
-    //             Range is [-6..9] (inclusive).
-    //             MUST not be negative if `r` is clear.
-    change_octave,
-
-
-    // padding
-    null_instruction,
-    null_instruction,
-    null_instruction,
-    null_instruction,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
+    disable_channel,
 ];
 
 }
