@@ -19,9 +19,10 @@ in loader_zeropage {
 
 enum LoaderDataType : u8 {
     // These values cannot be 0 or negative.
-    CODE        = 'C',
-    COMMON_DATA = 'D',
-    SONG_DATA   = 'S',
+    CODE             = 'C',
+    COMMON_DATA      = 'D',
+    STEREO_SONG_DATA = 'S',
+    MONO_SONG_DATA   = 'M', // Value MUST BE < STEREO_SONG_DATA
 };
 
 
@@ -61,6 +62,10 @@ func start_loader() {
             y = >:COMMON_DATA_ADDR;
         }
         else {
+            // Assumes STEREO_SONG_DATA > MONO_SONG_DATA
+            cmp(x, LoaderDataType.STEREO_SONG_DATA);
+            stereoFlag $ STEREO_FLAG_BIT = carry;
+
             // Assumes `_songPtr` is even
             ya = _songPtr as u16;
         }

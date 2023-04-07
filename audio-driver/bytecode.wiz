@@ -5,6 +5,9 @@
 import "audio-driver";
 
 
+let MAX_PAN = 128;
+
+
 namespace bytecode {
 
 let N_NOTE_OCTAVES = 8;
@@ -38,7 +41,6 @@ let DISABLE_CHANNEL_BYTECODE = 0xfe;
 let INSTRUCTIONS_WITH_ARGUMENTS = [
     set_instrument,
 
-    set_channel_volume,
 
     // parameter = number of ticks to wait.
     // NOTE: Does not send a keyoff event after resting.
@@ -68,6 +70,18 @@ let INSTRUCTIONS_WITH_ARGUMENTS = [
     // parameter = u8 value to send to the GAIN register
     // NOTE: Disables ADSR
     set_gain,
+
+
+    // parameter = u8 volume (0-255)
+    set_volume,
+
+    // parameter = pan (0-MAX_PAN, MAX_PAN/2 is centered)
+    set_pan,
+
+    // parameter: pppppppp vvvvvvvv
+    //      pppppppp = pan (0 - MAX_PAN, MAX_PAN/2 is centered)
+    //      vvvvvvvv = volume
+    set_pan_and_volume,
 ];
 
 
@@ -91,8 +105,6 @@ let NO_ARGUMENT_INSTRUCTIONS = [
 
 
     // padding
-    disable_channel,
-    disable_channel,
     disable_channel,
     disable_channel,
     disable_channel,

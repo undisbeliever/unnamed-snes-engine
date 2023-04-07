@@ -9,6 +9,7 @@ from typing import Any, Callable, Final, Optional
 
 from .json_formats import SamplesJson, Name, Instrument, NAME_REGEX
 
+MAX_PAN: Final = 128
 
 N_OCTAVES: Final = 8
 N_NOTES: Final = N_OCTAVES * 12
@@ -17,19 +18,22 @@ N_NOTES: Final = N_OCTAVES * 12
 DISABLE_CHANNEL: Final = 0xFE
 
 SET_INSTRUMENT: Final = 0xC0
-SET_CHANNEL_VOLUME: Final = 0xC2
-REST: Final = 0xC4
-REST_KEYOFF: Final = 0xC6
-CALL_SUBROUTINE: Final = 0xC8
-END_LOOP_0: Final = 0xCA
-END_LOOP_1: Final = 0xCC
-SET_ADSR: Final = 0xCE
-SET_GAIN: Final = 0xD0
+REST: Final = 0xC2
+REST_KEYOFF: Final = 0xC4
+CALL_SUBROUTINE: Final = 0xC6
+END_LOOP_0: Final = 0xC8
+END_LOOP_1: Final = 0xCA
+SET_ADSR: Final = 0xCC
+SET_GAIN: Final = 0xCE
 
-END: Final = 0xD2
-RETURN_FROM_SUBROUTINE: Final = 0xD4
-START_LOOP_0: Final = 0xD6
-START_LOOP_1: Final = 0xD8
+SET_VOLUME: Final = 0xD0
+SET_PAN: Final = 0xD2
+SET_PAN_AND_VOLUME: Final = 0xD4
+
+END: Final = 0xD6
+RETURN_FROM_SUBROUTINE: Final = 0xD8
+START_LOOP_0: Final = 0xDA
+START_LOOP_1: Final = 0xDC
 
 
 assert SET_INSTRUMENT == N_NOTES * 2
@@ -90,6 +94,18 @@ def name_argument(s: str) -> tuple[Name]:
 
 def integer_argument(s: str) -> tuple[int]:
     return (int(s, 0),)
+
+
+def two_integer_arguments(s: str) -> tuple[int, int]:
+    if "," in s:
+        args = s.split(",")
+    else:
+        args = s.split(" ")
+
+    if len(args) != 2:
+        raise ValueError(f"Instruction requires 2 arguments")
+
+    return int(args[0], 0), int(args[1], 0)
 
 
 def adsr_argument(s: str) -> tuple[int, int, int, int]:
@@ -247,13 +263,6 @@ class Bytecode:
         self.bytecode.append(instrument_id)
 
     @_instruction(integer_argument)
-    def set_channel_volume(self, v: int) -> None:
-        if v < 0 or v > 127:
-            raise BytecodeError(f"Volume out of range")
-        self.bytecode.append(SET_CHANNEL_VOLUME)
-        self.bytecode.append(v)
-
-    @_instruction(integer_argument)
     def rest(self, length: int) -> None:
         length = test_length_argument(length)
         self.bytecode.append(REST)
@@ -311,6 +320,30 @@ class Bytecode:
             raise BytecodeError("Invalid GAIN value")
         self.bytecode.append(SET_GAIN)
         self.bytecode.append(gain)
+
+    @_instruction(integer_argument)
+    def set_volume(self, v: int) -> None:
+        if v < 0 or v > 255:
+            raise BytecodeError(f"Volume out of range")
+        self.bytecode.append(SET_VOLUME)
+        self.bytecode.append(v)
+
+    @_instruction(integer_argument)
+    def set_pan(self, p: int) -> None:
+        if p < 0 or p > MAX_PAN:
+            raise BytecodeError(f"Pan out of range (0 - {MAX_PAN})")
+        self.bytecode.append(SET_PAN)
+        self.bytecode.append(p)
+
+    @_instruction(two_integer_arguments)
+    def set_pan_and_volume(self, p: int, v: int) -> None:
+        if p < 0 or p > MAX_PAN:
+            raise BytecodeError(f"Pan out of range (0 - {MAX_PAN})")
+        if v < 0 or v > 255:
+            raise BytecodeError(f"Volume out of range")
+        self.bytecode.append(SET_PAN_AND_VOLUME)
+        self.bytecode.append(p)
+        self.bytecode.append(v)
 
     @_instruction(no_argument)
     def disable_channel(self) -> None:

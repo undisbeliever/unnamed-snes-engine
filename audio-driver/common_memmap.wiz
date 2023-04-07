@@ -18,8 +18,8 @@ let CODE_SIZE = COMMON_DATA_ADDR - CODE_ADDR;
 let SONG_HEADER_SIZE = 26;
 
 
-bank zeropage        @ 0x0000 : [vardata;     0x00ed];
-bank loader_zeropage @ 0x00ed : [vardata;     0x0002];
+bank zeropage        @ 0x0000 : [vardata;     0x00ec];
+bank loader_zeropage @ 0x00ec : [vardata;     0x0003];
 // addresses 0x00f0 - 0x00ff contains registers
 bank stack           @ STACK_BOTTOM_ADDR : [vardata; STACK_SIZE];
 
@@ -27,6 +27,14 @@ bank stack           @ STACK_BOTTOM_ADDR : [vardata; STACK_SIZE];
 in loader_zeropage {
     // The address of the song data
     var __loader_songPtr : *const u8;
+
+    // Mono/Stereo flag.
+    //
+    // Set by the loader when a song is loaded:
+    //   Advantages: Simpler and uses less code space (no IoCommand for to set/clear stereoFlag).
+    //   Disadvantages: Stereo flag is not set until a song is loaded.
+    var stereoFlag : u8;
+    let STEREO_FLAG_BIT = 7;
 }
 
 // Provide read-only access to songPtr address and data in `audio-driver.wiz`

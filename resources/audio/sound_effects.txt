@@ -2,7 +2,7 @@
 
 == menu_cursor ==
     set_instrument      square
-    set_channel_volume  20
+    set_volume          20
 
     play_note           d4 8
 
@@ -22,7 +22,7 @@
 
 == slur_loop_test ==
     set_instrument      square
-    set_channel_volume  127
+    set_volume          127
 
     start_loop
         play_note    41, no_keyoff,  8
@@ -70,4 +70,62 @@
     play_note c5 255
 
     disable_channel
+
+
+== pan_test ==
+    set_instrument      square
+
+    set_pan_and_volume 0 80
+    play_note d4 8
+
+    set_pan 8
+    play_note d4 8
+
+    set_pan 16
+    play_note d4 8
+
+    set_pan 24
+    play_note d4 8
+
+    set_pan 32
+    play_note d4 8
+
+    set_pan 40
+    play_note d4 8
+
+    set_pan 48
+    play_note d4 8
+
+    set_pan 56
+    play_note d4 8
+
+    set_pan 64
+    play_note d4 8
+
+    set_pan 72
+    play_note d4 8
+
+    set_pan 80
+    play_note d4 8
+
+    set_pan 88
+    play_note d4 8
+
+    set_pan 96
+    play_note d4 8
+
+    set_pan 104
+    play_note d4 8
+
+    set_pan 112
+    play_note d4 8
+
+    set_pan 120
+    play_note d4 8
+
+    set_pan 128
+    play_note d4 8
+
+    disable_channel
+
 

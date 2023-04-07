@@ -42,7 +42,7 @@ let INSTRUMENT_MASK = N_INSTRUMENTS - 1;
 let SOUND_EFFECT_MASK = N_SOUND_EFFECTS - 1;
 
 
-let STARTING_CHANNEL_VOLUME = 96;
+let STARTING_VOLUME = 96;
 
 
 let SFX_BPM = 125;
@@ -201,6 +201,7 @@ in zeropage {
         // (Used to determine which channel to play a sound effect on)
         var disabled : [u8 ; N_CHANNELS];
 
+
         // Counter (in ticks) until the event
         var countdownTimer : [u8 ; N_CHANNELS];
 
@@ -233,10 +234,18 @@ in zeropage {
         };
         var loopState : [LoopState ; 2];
 
+
         // Offset between the note to play and the pitch table.
         //
         // NOTE: Adding `instPitchOffset` to the note to play is allowed to an can overflow.
         var instPitchOffset : [u8 ; N_CHANNELS];
+
+
+        // Channel volume (0-255)
+        var volume : [u8 ; N_CHANNELS];
+
+        // Channel pan (0-MAX_PAN)
+        var pan : [u8 ; N_CHANNELS];
     }
 
     // Used for testing sound effects
@@ -252,6 +261,12 @@ in zeropage {
 // KEEP: a, x, y
 inline func write_dsp(addr : GlobalDspAddr in a, data : u8 in y) {
     smp.dsp_addr_and_data = ya;
+}
+
+
+// ::BUGFIG This inline func fixes a "left-hand side of type `u16` cannot be assigned `u8` expression" error when multiplying a and y::
+inline func mul(u8a : u8 in a, u8b : u8 in y) : u16 in ya {
+    return a * y;
 }
 
 
@@ -535,6 +550,8 @@ inline func process_io_ports__inline() {
 
 // ASSUMES: sfx_id < N_SOUND_EFFECTS (128)
 inline func play_sound_effect__inline(sfx_id : u8 in x) {
+    // ::TODO add panning to play sound effect commands::
+
     y = a = external_data.soundEffects_h[x];
     if !zero {
         a = external_data.soundEffects_l[x];
@@ -585,7 +602,10 @@ func __reset_channel(channelIndex : u8 in x) {
 
 
     // Reset channel volume
-    y = STARTING_CHANNEL_VOLUME;
+    channelSoA.volume[x] = a = STARTING_VOLUME;
+    channelSoA.pan[x] = a = MAX_PAN / 2;
+
+    y = (STARTING_VOLUME * (MAX_PAN / 2)) >> 8;
 
     // ASSUMES VoiceDspAddr.VOL_L == 0
     smp.dsp_addr = a = ChannelVoiceOffset[x];
@@ -679,6 +699,8 @@ func process_next_bytecode(channelIndex : u8 in x) {
             instructionPtr++;
         }
 
+        // Y MUST be 0 if the instruction has an argument
+
         // Jump to the bytecode instruction routine that was just pushed onto the stack.
         return;
     }
@@ -689,6 +711,8 @@ func process_next_bytecode(channelIndex : u8 in x) {
 
 
 // NOTE: BYTECODE INSTRUCTIONS MUST KEEP X
+//
+// NOTE: If the instruction has an argument, Y will be 0
 //
 // Bytecode instruction must either:
 //    * Return after setting `channelSoA.nextEvent_*` (to start sleeping)
@@ -872,22 +896,6 @@ func set_instrument(channelIndex : u8 in x, instrumentId : u8 in a) {
 
 
 // KEEP: X
-func set_channel_volume(channelIndex : u8 in x, volume : u8 in a) {
-    y = a;
-
-    // ASSUMES VoiceDspAddr.VOL_L == 0
-    smp.dsp_addr = a = ChannelVoiceOffset[x];
-    smp.dsp_data = y;
-
-    smp.dsp_addr++;
-    smp.dsp_data = y;
-
-    ^return process_next_bytecode(x);
-}
-
-
-
-// KEEP: X
 func set_adsr(channelIndex: u8 in x, adsr1 : u8 in a) {
     y = a;
 
@@ -921,6 +929,92 @@ func set_gain(channelIndex: u8 in x, gain : u8 in a) {
     smp.dsp_data $ dsp.ADSR1_ENABLE_BIT = false;
 
     ^return process_next_bytecode(x);
+}
+
+
+// KEEP: X
+func set_pan(channelIndex : u8 in x, volume : u8 in a) {
+
+    channelSoA.pan[x] = a;
+
+    y = channelSoA.volume[x];
+
+    ^return __update_voll_and_volr(x, a, y);
+}
+
+
+
+// REQUIRES: Y = 0
+// KEEP: X
+#[fallthrough]
+func set_pan_and_volume(channelIndex : u8 in x, volume : u8 in a) {
+    // Y is 0
+
+    channelSoA.pan[x] = a;
+
+    a = instructionPtr[y];
+    instructionPtr++;
+
+// Fallthrough
+}
+
+
+// KEEP: X
+#[fallthrough]
+func set_volume(channelIndex : u8 in x, volume : u8 in a) {
+    channelSoA.volume[x] = a;
+
+    y = channelSoA.pan[x];
+
+// Fallthrough
+}
+
+
+// KEEP: x
+func __update_voll_and_volr(channelIndex : u8 in x, vol_or_pan : u8 in a, pan_or_vol : u8 in y) {
+
+    // Reading carry here saves a `SEC` instruction when calculating VOL_R
+    carry = stereoFlag $ STEREO_FLAG_BIT;
+    if carry {
+        // Stereo
+
+        // Calculate left volume
+        // (MUST NOT USE CARRY)
+
+        ya = mul(a, y);
+
+        // ASSUMES VoiceDspAddr.VOL_L == 0
+        smp.dsp_addr = a = ChannelVoiceOffset[x];
+        smp.dsp_data = y;
+
+        // Calculate right volume
+
+        // Carry set (MUL does not set carry)
+        a = MAX_PAN -# channelSoA.pan[x];
+        y = channelSoA.volume[x];
+        ya = mul(a, y);
+
+        smp.dsp_addr++;
+        smp.dsp_data = y;
+
+        ^return process_next_bytecode(x);
+    }
+    else {
+        // Mono
+
+        // ASSUMES VoiceDspAddr.VOL_L == 0
+        smp.dsp_addr = a = ChannelVoiceOffset[x];
+
+        // First shift converts 8-bit volume to 7-bit VOL
+        // Second shift ensure mono vol has same combined amplitude as stereo vol
+        a = channelSoA.volume[x] >>> 2;
+
+        smp.dsp_data = a;
+        smp.dsp_addr++;
+        smp.dsp_data = a;
+
+        ^return process_next_bytecode(x);
+    }
 }
 
 

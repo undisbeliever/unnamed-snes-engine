@@ -34,7 +34,8 @@
    "menu_select",
    "slur_loop_test",
    "adsr_test",
-   "gain_test"
+   "gain_test",
+   "pan_test"
  ],
 
  "interactive_tile_functions": [

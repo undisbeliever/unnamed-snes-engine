@@ -10,6 +10,8 @@ import "../wiz/common/snes/snes";
 
 namespace audio {
 
+// ::TODO add menu to set/clear monoFlag::
+
 
 // Address to store the loader (in Audio-RAM).
 // Address (in Audio-RAM) to execute after loading the Loader.
@@ -28,9 +30,10 @@ namespace IO {
 // MUST match `audio/src/loader.wiz`
 enum LoaderDataType : u8 {
     // These values cannot be 0 or negative.
-    CODE        = 'C',
-    COMMON_DATA = 'D',
-    SONG_DATA   = 'S',
+    CODE             = 'C',
+    COMMON_DATA      = 'D',
+    STEREO_SONG_DATA = 'S',
+    MONO_SONG_DATA   = 'M',
 };
 
 
@@ -67,6 +70,12 @@ in lowram {
     // Non-zero if the common audio data has been loaded into Audio-RAM.
     // (byte flag)
     var _common_audio_data_loaded : u8;
+
+    // Mono sound flag.
+    //   * Mono if non-zero
+    //   * Stereo if zero (default)
+    // (byte flag)
+    var monoFlag : u8;
 }
 
 
@@ -239,7 +248,14 @@ func _transfer_song_data(_res : resources.ResourceEntry in resources.res) {
 
     __send_command(IoCommand.EXECUTE_LOADER);
 
-    __transfer_data_to_loader(_res, LoaderDataType.SONG_DATA);
+    a = monoFlag;
+    if !zero {
+        a = LoaderDataType.MONO_SONG_DATA as u8;
+    }
+    else {
+        a = LoaderDataType.STEREO_SONG_DATA as u8;
+    }
+    __transfer_data_to_loader(_res, a as LoaderDataType);
 }
 
 
