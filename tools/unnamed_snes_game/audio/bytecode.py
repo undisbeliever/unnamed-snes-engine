@@ -17,26 +17,28 @@ N_NOTES: Final = N_OCTAVES * 12
 # Opcode values MUST MATCH `src/bytecode.wiz`
 DISABLE_CHANNEL: Final = 0xFE
 
-SET_INSTRUMENT: Final = 0xC0
-REST: Final = 0xC2
-REST_KEYOFF: Final = 0xC4
-CALL_SUBROUTINE: Final = 0xC6
-END_LOOP_0: Final = 0xC8
-END_LOOP_1: Final = 0xCA
-SET_ADSR: Final = 0xCC
-SET_GAIN: Final = 0xCE
+PORTAMENTO: Final = 0xC0
 
-SET_VOLUME: Final = 0xD0
-SET_PAN: Final = 0xD2
-SET_PAN_AND_VOLUME: Final = 0xD4
+SET_INSTRUMENT: Final = 0xC2
+REST: Final = 0xC4
+REST_KEYOFF: Final = 0xC6
+CALL_SUBROUTINE: Final = 0xC8
+END_LOOP_0: Final = 0xCA
+END_LOOP_1: Final = 0xCC
+SET_ADSR: Final = 0xCE
+SET_GAIN: Final = 0xD0
 
-END: Final = 0xD6
-RETURN_FROM_SUBROUTINE: Final = 0xD8
-START_LOOP_0: Final = 0xDA
-START_LOOP_1: Final = 0xDC
+SET_VOLUME: Final = 0xD2
+SET_PAN: Final = 0xD4
+SET_PAN_AND_VOLUME: Final = 0xD6
+
+END: Final = 0xD8
+RETURN_FROM_SUBROUTINE: Final = 0xDA
+START_LOOP_0: Final = 0xDC
+START_LOOP_1: Final = 0xDE
 
 
-assert SET_INSTRUMENT == N_NOTES * 2
+assert PORTAMENTO == N_NOTES * 2
 
 MAX_N_LOOPS: Final = 2
 
@@ -140,6 +142,33 @@ KEY_OFF_ARGS: Final = ("keyoff",)
 NO_KEY_OFF_ARGS: Final = ("no_keyoff", "nko", "slur_next", "sn")
 
 
+def parse_note(note: str) -> int:
+    m: Final = SPECIFIC_NOTE_REGEX.match(note)
+    if m:
+        n = NOTE_MAP.get(m.group(1).lower())
+        if n is None:
+            raise ValueError(f"Cannot parse note: Unknown note {m.group(1)}")
+
+        for c in m.group(2):
+            if c == "-":
+                n -= 1
+            elif c == "+":
+                n += 1
+            else:
+                raise ValueError("Cannot parse note: Expected sharp (+) or flat(-)")
+
+        octave = int(m.group(3))
+
+        return n + octave * 12
+    else:
+        try:
+            return int(note, 0)
+        except ValueError as e:
+            raise ValueError(
+                f"Cannot parse note: Expected note (a-g, followed by + or -, then 0-{N_OCTAVES-1}) or an integer note id (0-{N_NOTES-1})"
+            )
+
+
 def play_note_argument(s: str) -> tuple[int, bool, int]:
     if "," in s:
         args = s.split(",")
@@ -152,31 +181,7 @@ def play_note_argument(s: str) -> tuple[int, bool, int]:
         raise ValueError("Too many arguments")
 
     note: Final = args.pop(0).strip()
-
-    m: Final = SPECIFIC_NOTE_REGEX.match(note)
-    if m:
-        decoded_note = NOTE_MAP.get(m.group(1).lower())
-        if decoded_note is None:
-            raise ValueError(f"Cannot parse note: Unknown note {m.group(1)}")
-
-        for c in m.group(2):
-            if c == "-":
-                decoded_note -= 1
-            elif c == "+":
-                decoded_note += 1
-            else:
-                raise ValueError("Cannot parse note: Expected sharp (+) or flat(-)")
-
-        octave = int(m.group(3))
-
-        decoded_note += octave * 12
-    else:
-        try:
-            decoded_note = int(note, 0)
-        except ValueError as e:
-            raise ValueError(
-                f"Cannot parse note: Expected note (a-g, followed by + or -, then 0-{N_OCTAVES-1}) or an integer note id (0-{N_NOTES-1})"
-            )
+    decoded_note: Final = parse_note(note)
 
     length = None
     key_off = None
@@ -200,6 +205,34 @@ def play_note_argument(s: str) -> tuple[int, bool, int]:
         raise ValueError("Missing note length")
 
     return decoded_note, key_off, length
+
+
+def portamento_argument(s: str) -> tuple[int, bool, int, int]:
+    if "," in s:
+        args = s.split(",")
+    else:
+        args = s.split()
+
+    if len(args) != 4:
+        raise ValueError("Expected 4 arguments")
+
+    decoded_note: Final = parse_note(args[0])
+
+    if args[1] in KEY_OFF_ARGS:
+        key_off = True
+    elif args[1] in NO_KEY_OFF_ARGS:
+        key_off = False
+    else:
+        raise ValueError(f"Unknown argument: {args[1]}")
+
+    v_direction = args[2][0]
+    if v_direction != "+" and v_direction != "-":
+        raise ValueError(f"portamento velocity must start with a + or -")
+
+    velocity: Final = int(args[2], 0)
+    length: Final = int(args[3], 0)
+
+    return decoded_note, key_off, velocity, length
 
 
 def _instruction(argument_parser: Callable[[str], Any]) -> Callable[..., Callable[..., None]]:
@@ -253,6 +286,21 @@ class Bytecode:
 
         self.bytecode.append((note_id << 1) | (key_off & 1))
         self.bytecode.append(length)
+
+    @_instruction(portamento_argument)
+    def portamento(self, note_id: int, key_off: bool, velocity: int, length: int) -> None:
+        if note_id < 0 or note_id > N_NOTES:
+            raise BytecodeError("note is out of range")
+        if velocity == 0:
+            raise BytecodeError("portamento velocity cannot be 0")
+        if velocity < -128 or velocity > 127:
+            raise BytecodeError("portamento velocity is out of range")
+        length = test_length_argument(length)
+
+        self.bytecode.append(PORTAMENTO)
+        self.bytecode.append(cast_i8(velocity))
+        self.bytecode.append(length)
+        self.bytecode.append((note_id << 1) | (key_off & 1))
 
     @_instruction(name_argument)
     def set_instrument(self, name: Name) -> None:

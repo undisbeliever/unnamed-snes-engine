@@ -35,7 +35,8 @@
    "slur_loop_test",
    "adsr_test",
    "gain_test",
-   "pan_test"
+   "pan_test",
+   "portamento_test"
  ],
 
  "interactive_tile_functions": [

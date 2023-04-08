@@ -129,3 +129,16 @@
     disable_channel
 
 
+
+=== portamento_test ===
+    set_instrument  square
+    set_volume      128
+    set_gain        0x7f
+
+    play_note       c2 no_keyoff 1
+
+    portamento      c4 no_keyoff +25 128
+    portamento      c2 keyoff    -40 64
+
+    disable_channel
+

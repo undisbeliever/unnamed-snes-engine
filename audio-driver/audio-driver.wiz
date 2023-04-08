@@ -246,11 +246,16 @@ in zeropage {
 
         // Channel pan (0-MAX_PAN)
         var pan : [u8 ; N_CHANNELS];
-    }
 
-    // Used for testing sound effects
-    var _countdownToNextSfx : u16;
-    var _sfxToPlay : u8;
+
+        // Portamento Velocity
+        // Portamento is disabled if velocity is 0.
+        var portamento_velocity : [i8 ; N_CHANNELS];
+
+        // Portamento target pitch
+        var portamento_target_l : [u8 ; N_CHANNELS];
+        var portamento_target_h : [u8 ; N_CHANNELS];
+    }
 }
 
 
@@ -450,7 +455,9 @@ inline func process_event_loop__inline() {
     // Y = channelIndex end (starting channelIndex + number of channels)
 
     channelIndexEndLoop = y;
-    do {
+    ^do {
+        process_portamento__inline(x);
+
         process_channel__inline(x);
         x++;
     } while x < channelIndexEndLoop;
@@ -595,6 +602,8 @@ func __reset_channel(channelIndex : u8 in x) {
     channelSoA.nextEventIsKeyOff[x] = a;
     channelSoA.instPitchOffset[x] = a;
 
+    channelSoA.portamento_velocity[x] = a as i8;
+
 
     // Set keyOnMask.  The next play-note instruction will queue a KON event.
     a = ChannelVoiceBit[x];
@@ -619,6 +628,97 @@ func __reset_channel(channelIndex : u8 in x) {
 
 // Process Channels
 // ================
+
+
+// KEEP: X
+inline func process_portamento__inline(channelIndex : u8 in x) {
+var _target_h : u8 in zpTmp;
+
+    a = channelSoA.portamento_velocity[x] as u8;
+    if !zero {
+        if negative {
+            // portamento down
+
+            // Save target_h for later (no `cpy dp,x` instruction)
+            _target_h = a = channelSoA.portamento_target_h[x];
+
+            // Read pitch from DSP
+            smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.PITCH_H as u8;
+            y = smp.dsp_data;
+            smp.dsp_addr--;
+            a = smp.dsp_data;
+
+            // Add velocity to pitch (i8 velocity is negative)
+            a += channelSoA.portamento_velocity[x] as u8;
+            if !carry {
+                y--;
+                goto Underflowed if negative;
+            }
+
+            // Test pitch against target
+            cmp(y, _target_h);
+            if zero {
+                cmp(a, channelSoA.portamento_target_l[x]);
+            }
+            goto WritePitchRegisters if carry;
+
+        Underflowed:
+            // pitch < target
+
+            // Disable portamento
+            a = 0;
+            channelSoA.portamento_velocity[x] = a as i8;
+
+            a = channelSoA.portamento_target_l[x];
+            y = channelSoA.portamento_target_h[x];
+        }
+        else {
+            // portamento up
+
+            // Save target_h for later (no `cpy dp,x` instruction)
+            _target_h = a = channelSoA.portamento_target_h[x];
+
+            // Read pitch from DSP
+            smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.PITCH_H as u8;
+            y = smp.dsp_data;
+            smp.dsp_addr--;
+            a = smp.dsp_data;
+
+            // Add velocity to pitch
+            a += channelSoA.portamento_velocity[x] as u8;
+            if carry {
+                y++;
+                // PITCH is 14 bits long, no overflow test required.
+            }
+
+            // Test pitch against target
+            cmp(y, _target_h);
+            if zero {
+                cmp(a, channelSoA.portamento_target_l[x]);
+            }
+
+            if carry {
+                // Pitch >= target
+
+                // Disable portamento
+                a = 0;
+                channelSoA.portamento_velocity[x] = a as i8;
+
+                a = channelSoA.portamento_target_l[x];
+                y = channelSoA.portamento_target_h[x];
+            }
+        }
+
+
+    WritePitchRegisters:
+        // ya = new pitch
+
+        // dsp_addr is PITCH_L
+        smp.dsp_data = a;
+        smp.dsp_addr++;
+        smp.dsp_data = y;
+    }
+}
 
 
 // KEEP: X
@@ -734,7 +834,7 @@ inline func _play_note__inline(channelIndex : u8 in x, noteAndKeyOffBit : u8 in 
     // carry = key-off after note ends bit
     a >>>= 1;
 
-    // Set MSB of nextEventIsKeyOff to carry
+    // Set MSB of nextEventIsKeyOff from carry
     channelSoA.nextEventIsKeyOff[x] >>>>#= 1;
 
     // calculate pitch table index
@@ -758,7 +858,48 @@ inline func _play_note__inline(channelIndex : u8 in x, noteAndKeyOffBit : u8 in 
     a = instructionPtr[y];
     instructionPtr++;
 
+    // Y = 0
+    // disable portamento
+    channelSoA.portamento_velocity[x] = y as i8;
+
     channelSoA.countdownTimer[x] = a;
+}
+
+
+
+// IN: Y = 0
+// KEEP: X
+func portamento(channelIndex : u8 in x, velocity : u8 in a) {
+    channelSoA.portamento_velocity[x] = a as i8;
+
+
+    // Wait length
+    // Y = 0
+    a = instructionPtr[y];
+    instructionPtr++;
+
+    channelSoA.countdownTimer[x] = a;
+
+
+    // Read note target and key-off bit
+    // Y = 0
+    a = instructionPtr[y];
+    instructionPtr++;
+
+    // carry = key-off after note ends bit
+    a >>>= 1;
+    // Set MSB of nextEventIsKeyOff from carry
+    channelSoA.nextEventIsKeyOff[x] >>>>#= 1;
+
+    // calculate pitch table index
+    y = a = a + channelSoA.instPitchOffset[x];
+
+    channelSoA.portamento_target_l[x] = a = external_data.pitchTable_l[y];
+    channelSoA.portamento_target_h[x] = a = external_data.pitchTable_h[y];
+
+
+    // return (do not execute the next bytecode and sleep)
+    return;
 }
 
 
@@ -766,9 +907,15 @@ inline func _play_note__inline(channelIndex : u8 in x, noteAndKeyOffBit : u8 in 
 // KEEP: X
 func disable_channel(channelIndex : u8 in x) {
     // countdownTimer value of 0 means wait 256 ticks
-    channelSoA.countdownTimer[x] = a = 0;
+    a = 0;
+    channelSoA.countdownTimer[x] = a;
+
+    // Disable portamento
+    channelSoA.portamento_velocity[x] = a as i8;
+
 
     channelSoA.disabled[x] = a = 1;
+
 
     a = <:&ChannelDisabledBytecode;
     y = >:&ChannelDisabledBytecode;
