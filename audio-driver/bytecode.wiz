@@ -67,11 +67,12 @@ let INSTRUCTIONS_WITH_ARGUMENTS = [
     // NOTE: There is no bounds checking
     call_subroutine,
 
-    // parameter = number of times to loop - 2
-    end_loop_0,
 
-    // parameter = number of times to loop - 2
-    end_loop_1,
+    // parameter = u8 number of times to loop
+    start_loop_0,
+
+    // parameter = u8 number of times to loop
+    start_loop_1,
 
 
     // parameter = u16 value to send to the ADSR register
@@ -122,8 +123,10 @@ let NO_ARGUMENT_INSTRUCTIONS = [
     // Return from a call instruction
     return_from_subroutine,
 
-    start_loop_0,
-    start_loop_1,
+
+    // Jump to `start_loop_*` until --loop_count == 0
+    end_loop_0,
+    end_loop_1,
 
 
     // padding

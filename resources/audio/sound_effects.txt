@@ -24,10 +24,10 @@
     set_instrument      square
     set_volume          127
 
-    start_loop
+    start_loop  6
         play_note    41, no_keyoff,  8
         play_note    46, slur_next, 12
-    end_loop    6
+    end_loop
 
     rest_keyoff 24
 
@@ -139,17 +139,17 @@
 
     play_note       d4  no_keyoff  16
 
-    start_loop
+    start_loop      68
         inc_pan         2
         rest            1
-    end_loop        68
+    end_loop
 
     rest 16
 
-    start_loop
+    start_loop      68
         dec_pan         2
         rest            1
-    end_loop        68
+    end_loop
 
     rest_keyoff     16
 
@@ -165,15 +165,15 @@
 
     play_note       d4  no_keyoff  1
 
-    start_loop
+    start_loop      38
         rest            4
         inc_volume      7
-    end_loop        38
+    end_loop
 
-    start_loop
+    start_loop      38
         rest            4
         dec_volume      7
-    end_loop        38
+    end_loop
 
     rest_keyoff     8
 
@@ -191,4 +191,20 @@
     portamento      c2 keyoff    -40 64
 
     disable_channel
+
+
+
+=== loop_test ===
+    set_instrument  sawtooth
+
+    start_loop  3
+        start_loop  5
+            play_note   c3  16
+        end_loop
+
+        rest    64
+    end_loop
+
+    disable_channel
+
 

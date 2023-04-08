@@ -23,8 +23,8 @@ SET_INSTRUMENT: Final = 0xC2
 REST: Final = 0xC4
 REST_KEYOFF: Final = 0xC6
 CALL_SUBROUTINE: Final = 0xC8
-END_LOOP_0: Final = 0xCA
-END_LOOP_1: Final = 0xCC
+START_LOOP_0: Final = 0xCA
+START_LOOP_1: Final = 0xCC
 SET_ADSR: Final = 0xCE
 SET_GAIN: Final = 0xD0
 
@@ -38,8 +38,8 @@ SET_PAN_AND_VOLUME: Final = 0xDE
 
 END: Final = 0xE0
 RETURN_FROM_SUBROUTINE: Final = 0xE2
-START_LOOP_0: Final = 0xE4
-START_LOOP_1: Final = 0xE6
+END_LOOP_0: Final = 0xE4
+END_LOOP_1: Final = 0xE6
 
 
 assert PORTAMENTO == N_NOTES * 2
@@ -326,29 +326,33 @@ class Bytecode:
         self.bytecode.append(REST_KEYOFF)
         self.bytecode.append(length)
 
-    @_instruction(no_argument)
-    def start_loop(self) -> None:
+    @_instruction(integer_argument)
+    def start_loop(self, loop_count: int) -> None:
         if self.n_nested_loops >= MAX_N_LOOPS:
             raise BytecodeError(f"Too many loops.  The maximum number of nested loops is { MAX_N_LOOPS}.")
+
+        if loop_count < 1 or loop_count > 256:
+            raise BytecodeError("Loop count out of range (1-256)")
+
+        if loop_count == 256:
+            loop_count = 0
+
         opcode = START_LOOP_0 + self.n_nested_loops * 2
         self.n_nested_loops += 1
         self.bytecode.append(opcode)
+        self.bytecode.append(loop_count)
 
-    @_instruction(integer_argument)
-    def end_loop(self, loop_count: int) -> None:
-        if loop_count < 2:
-            raise BytecodeError("Loop count is too low (minimum is 2)")
-        if loop_count > 257:
-            raise BytecodeError("Loop count is too high (maximum is 257)")
+    @_instruction(no_argument)
+    def end_loop(self) -> None:
         if self.n_nested_loops == 0:
             raise BytecodeError("There is no loop to end")
+
         self.n_nested_loops -= 1
         assert self.n_nested_loops >= 0
 
         opcode = END_LOOP_0 + self.n_nested_loops * 2
 
         self.bytecode.append(opcode)
-        self.bytecode.append(loop_count - 2)
 
     @_instruction(adsr_argument)
     def set_adsr(self, a: int, d: int, sl: int, sr: int) -> None:

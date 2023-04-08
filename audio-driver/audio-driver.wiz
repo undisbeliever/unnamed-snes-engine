@@ -226,6 +226,7 @@ in zeropage {
 
 
         struct LoopState {
+            // Number of remaining loops
             counter : [u8 ; N_CHANNELS],
 
             // Instruction pointer at the start of the loop.
@@ -969,23 +970,22 @@ func return_from_subroutine(channelIndex : u8 in x) {
 
 
 // KEEP: X
-inline func __start_loop(channelIndex : u8 in x, let LOOP_ID : u8) {
+inline func __start_loop(channelIndex : u8 in x, loopCount : u8 in a, let LOOP_ID : u8) {
+    channelSoA.loopState[LOOP_ID].counter[x] = a;
+
     ya = instructionPtr as u16;
 
     channelSoA.loopState[LOOP_ID].loopPoint_l[x] = a;
     channelSoA.loopState[LOOP_ID].loopPoint_h[x] = y;
-
-    channelSoA.loopState[LOOP_ID].counter[x] = a = 0;
 
     ^return process_next_bytecode(x);
 }
 
 
 // KEEP: X
-inline func __end_loop(channelIndex : u8 in x, loopCount : u8 in a, let LOOP_ID : u8) {
-    if a >= channelSoA.loopState[LOOP_ID].counter[x] {
-        channelSoA.loopState[LOOP_ID].counter[x]++;
-
+inline func __end_loop(channelIndex : u8 in x, let LOOP_ID : u8) {
+    channelSoA.loopState[LOOP_ID].counter[x]--;
+    if !zero {
         a = channelSoA.loopState[LOOP_ID].loopPoint_l[x];
         y = channelSoA.loopState[LOOP_ID].loopPoint_h[x];
 
@@ -996,24 +996,24 @@ inline func __end_loop(channelIndex : u8 in x, loopCount : u8 in a, let LOOP_ID 
 
 
 // KEEP: X
-func start_loop_0(channelIndex : u8 in x) {
-    return __start_loop(x, 0);
+func start_loop_0(channelIndex : u8 in x, loopCount : u8 in a) {
+    return __start_loop(x, a, 0);
 }
 
 // KEEP: X
-func start_loop_1(channelIndex : u8 in x) {
-    return __start_loop(x, 1);
+func start_loop_1(channelIndex : u8 in x, loopCount : u8 in a) {
+    return __start_loop(x, a, 1);
 }
 
 
 // KEEP: X
-func end_loop_0(channelIndex : u8 in x, loopCount : u8 in a) {
-    return __end_loop(x, a, 0);
+func end_loop_0(channelIndex : u8 in x) {
+    return __end_loop(x, 0);
 }
 
 // KEEP: X
-func end_loop_1(channelIndex : u8 in x, loopCount : u8 in a) {
-    return __end_loop(x, a, 1);
+func end_loop_1(channelIndex : u8 in x) {
+    return __end_loop(x, 1);
 }
 
 

@@ -38,7 +38,8 @@
    "pan_test",
    "inc_dec_pan_test",
    "inc_dec_volume_test",
-   "portamento_test"
+   "portamento_test",
+   "loop_test"
  ],
 
  "interactive_tile_functions": [
