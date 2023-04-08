@@ -130,6 +130,56 @@
 
 
 
+=== inc_dec_pan_test ===
+
+    set_instrument  square
+    set_gain        0x7f
+
+    set_pan         0
+
+    play_note       d4  no_keyoff  16
+
+    start_loop
+        inc_pan         2
+        rest            1
+    end_loop        68
+
+    rest 16
+
+    start_loop
+        dec_pan         2
+        rest            1
+    end_loop        68
+
+    rest_keyoff     16
+
+    disable_channel
+
+
+
+=== inc_dec_volume_test ===
+
+    set_instrument  square
+    set_volume      0
+    set_gain        0x7f
+
+    play_note       d4  no_keyoff  1
+
+    start_loop
+        rest            4
+        inc_volume      7
+    end_loop        38
+
+    start_loop
+        rest            4
+        dec_volume      7
+    end_loop        38
+
+    rest_keyoff     8
+
+    disable_channel
+
+
 === portamento_test ===
     set_instrument  square
     set_volume      128

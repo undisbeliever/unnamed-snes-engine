@@ -1080,7 +1080,34 @@ func set_gain(channelIndex: u8 in x, gain : u8 in a) {
 
 
 // KEEP: X
-func set_pan(channelIndex : u8 in x, volume : u8 in a) {
+func inc_pan(channelIndex : u8 in x, to_add : u8 in a) {
+    a += channelSoA.pan[x];
+    if carry || a >= MAX_PAN + 1 {
+        a = MAX_PAN;
+    }
+
+    ^return set_pan(x, a);
+}
+
+
+// KEEP: X
+#[fallthrough]
+func dec_pan(channelIndex : u8 in x, to_remove : u8 in a) {
+    // Reverse Subtract
+    a ^= 0xff;
+    carry = true;
+    a +#= channelSoA.pan[x];
+
+    if !carry {
+        a = 0;
+    }
+
+// Fallthrough
+}
+
+
+// KEEP: X
+func set_pan(channelIndex : u8 in x, pan : u8 in a) {
 
     channelSoA.pan[x] = a;
 
@@ -1091,10 +1118,36 @@ func set_pan(channelIndex : u8 in x, volume : u8 in a) {
 
 
 
+// KEEP:X
+func inc_volume(channelIndex : u8 in x, to_add: u8 in a) {
+    a += channelSoA.volume[x];
+    if carry {
+        a = 255;
+    }
+    ^return set_volume(x, a);
+}
+
+
+
+// KEEP:X
+func dec_volume(channelIndex : u8 in x, to_add: u8 in a) {
+    // Reverse Subtract
+    a ^= 0xff;
+    carry = true;
+    a +#= channelSoA.volume[x];
+
+    if !carry {
+        a = 0;
+    }
+    ^return set_volume(x, a);
+}
+
+
+
 // REQUIRES: Y = 0
 // KEEP: X
 #[fallthrough]
-func set_pan_and_volume(channelIndex : u8 in x, volume : u8 in a) {
+func set_pan_and_volume(channelIndex : u8 in x, pan : u8 in a) {
     // Y is 0
 
     channelSoA.pan[x] = a;

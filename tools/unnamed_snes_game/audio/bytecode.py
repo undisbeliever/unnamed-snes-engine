@@ -29,13 +29,17 @@ SET_ADSR: Final = 0xCE
 SET_GAIN: Final = 0xD0
 
 SET_VOLUME: Final = 0xD2
-SET_PAN: Final = 0xD4
-SET_PAN_AND_VOLUME: Final = 0xD6
+INC_VOLUME: Final = 0xD4
+DEC_VOLUME: Final = 0xD6
+SET_PAN: Final = 0xD8
+INC_PAN: Final = 0xDA
+DEC_PAN: Final = 0xDC
+SET_PAN_AND_VOLUME: Final = 0xDE
 
-END: Final = 0xD8
-RETURN_FROM_SUBROUTINE: Final = 0xDA
-START_LOOP_0: Final = 0xDC
-START_LOOP_1: Final = 0xDE
+END: Final = 0xE0
+RETURN_FROM_SUBROUTINE: Final = 0xE2
+START_LOOP_0: Final = 0xE4
+START_LOOP_1: Final = 0xE6
 
 
 assert PORTAMENTO == N_NOTES * 2
@@ -377,10 +381,38 @@ class Bytecode:
         self.bytecode.append(v)
 
     @_instruction(integer_argument)
+    def inc_volume(self, v: int) -> None:
+        if v < 1 or v > 255:
+            raise BytecodeError(f"Volume out of range (1-255)")
+        self.bytecode.append(INC_VOLUME)
+        self.bytecode.append(v)
+
+    @_instruction(integer_argument)
+    def dec_volume(self, v: int) -> None:
+        if v < 1 or v > 255:
+            raise BytecodeError(f"Volume out of range (1-255)")
+        self.bytecode.append(DEC_VOLUME)
+        self.bytecode.append(v)
+
+    @_instruction(integer_argument)
     def set_pan(self, p: int) -> None:
         if p < 0 or p > MAX_PAN:
             raise BytecodeError(f"Pan out of range (0 - {MAX_PAN})")
         self.bytecode.append(SET_PAN)
+        self.bytecode.append(p)
+
+    @_instruction(integer_argument)
+    def inc_pan(self, p: int) -> None:
+        if p < 1 or p > MAX_PAN:
+            raise BytecodeError(f"Pan out of range (1 - {MAX_PAN})")
+        self.bytecode.append(INC_PAN)
+        self.bytecode.append(p)
+
+    @_instruction(integer_argument)
+    def dec_pan(self, p: int) -> None:
+        if p < 1 or p > MAX_PAN:
+            raise BytecodeError(f"Pan out of range (1 - {MAX_PAN})")
+        self.bytecode.append(DEC_PAN)
         self.bytecode.append(p)
 
     @_instruction(two_integer_arguments)

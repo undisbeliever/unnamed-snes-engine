@@ -85,8 +85,20 @@ let INSTRUCTIONS_WITH_ARGUMENTS = [
     // parameter = u8 volume (0-255)
     set_volume,
 
+    // parameter = u8 volume to increment
+    inc_volume,
+
+    // parameter = u8 volume to decrement
+    dec_volume,
+
     // parameter = pan (0-MAX_PAN, MAX_PAN/2 is centered)
     set_pan,
+
+    // parameter = u8 pan to increment
+    inc_pan,
+
+    // parameter = u8 pan to decrement
+    dec_pan,
 
     // parameter: pppppppp vvvvvvvv
     //      pppppppp = pan (0 - MAX_PAN, MAX_PAN/2 is centered)
@@ -115,10 +127,6 @@ let NO_ARGUMENT_INSTRUCTIONS = [
 
 
     // padding
-    disable_channel,
-    disable_channel,
-    disable_channel,
-    disable_channel,
     disable_channel,
     disable_channel,
     disable_channel,
