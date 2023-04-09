@@ -208,3 +208,32 @@
     disable_channel
 
 
+
+=== skip_last_loop_test ===
+    set_instrument  sawtooth
+
+    start_loop  2
+        start_loop  3
+            play_note   a4  16
+            play_note   b4  16
+            play_note   c4  16
+
+            skip_last_loop
+
+            play_note   d4  16
+            play_note   e4  16
+
+            rest    32
+        end_loop
+
+        skip_last_loop
+
+        rest    96
+    end_loop
+
+    rest        8
+    play_note   g4  32
+
+    disable_channel
+
+

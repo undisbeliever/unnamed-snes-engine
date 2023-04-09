@@ -23,23 +23,27 @@ SET_INSTRUMENT: Final = 0xC2
 REST: Final = 0xC4
 REST_KEYOFF: Final = 0xC6
 CALL_SUBROUTINE: Final = 0xC8
+
 START_LOOP_0: Final = 0xCA
 START_LOOP_1: Final = 0xCC
-SET_ADSR: Final = 0xCE
-SET_GAIN: Final = 0xD0
+SKIP_LAST_LOOP_0: Final = 0xCE
+SKIP_LAST_LOOP_1: Final = 0xD0
 
-SET_VOLUME: Final = 0xD2
-INC_VOLUME: Final = 0xD4
-DEC_VOLUME: Final = 0xD6
-SET_PAN: Final = 0xD8
-INC_PAN: Final = 0xDA
-DEC_PAN: Final = 0xDC
-SET_PAN_AND_VOLUME: Final = 0xDE
+SET_ADSR: Final = 0xD2
+SET_GAIN: Final = 0xD4
 
-END: Final = 0xE0
-RETURN_FROM_SUBROUTINE: Final = 0xE2
-END_LOOP_0: Final = 0xE4
-END_LOOP_1: Final = 0xE6
+SET_VOLUME: Final = 0xD6
+INC_VOLUME: Final = 0xD8
+DEC_VOLUME: Final = 0xDA
+SET_PAN: Final = 0xDC
+INC_PAN: Final = 0xDE
+DEC_PAN: Final = 0xE0
+SET_PAN_AND_VOLUME: Final = 0xE2
+
+END: Final = 0xE4
+RETURN_FROM_SUBROUTINE: Final = 0xE6
+END_LOOP_0: Final = 0xE8
+END_LOOP_1: Final = 0xEA
 
 
 assert PORTAMENTO == N_NOTES * 2
@@ -47,6 +51,7 @@ assert PORTAMENTO == N_NOTES * 2
 MAX_N_LOOPS: Final = 2
 
 assert START_LOOP_1 == START_LOOP_0 + 2
+assert SKIP_LAST_LOOP_1 == SKIP_LAST_LOOP_0 + 2
 assert END_LOOP_1 == END_LOOP_0 + 2
 
 
@@ -269,7 +274,10 @@ class Bytecode:
         self.mappings: Final = mappings
         self.is_subroutine: Final = is_subroutine
         self.bytecode = bytearray()
-        self.n_nested_loops = 0
+
+        # Location of the parameter of the `skip_last_loop` instruction (if any) for each loop.
+        # Also used to determine the number of nested loops
+        self.skip_last_loop_pos: list[Optional[int]] = list()
 
     # NOTE: line must not contain any comments
     def parse_line(self, line: str) -> None:
@@ -328,7 +336,10 @@ class Bytecode:
 
     @_instruction(integer_argument)
     def start_loop(self, loop_count: int) -> None:
-        if self.n_nested_loops >= MAX_N_LOOPS:
+        loop_id: Final = len(self.skip_last_loop_pos)
+        self.skip_last_loop_pos.append(None)
+
+        if loop_id >= MAX_N_LOOPS:
             raise BytecodeError(f"Too many loops.  The maximum number of nested loops is { MAX_N_LOOPS}.")
 
         if loop_count < 1 or loop_count > 256:
@@ -337,21 +348,45 @@ class Bytecode:
         if loop_count == 256:
             loop_count = 0
 
-        opcode = START_LOOP_0 + self.n_nested_loops * 2
-        self.n_nested_loops += 1
+        opcode: Final = START_LOOP_0 + loop_id * 2
         self.bytecode.append(opcode)
         self.bytecode.append(loop_count)
 
     @_instruction(no_argument)
+    def skip_last_loop(self) -> None:
+        if not self.skip_last_loop_pos:
+            raise BytecodeError("Not in a loop")
+
+        if self.skip_last_loop_pos[-1] is not None:
+            raise BytecodeError("Only one `skip_last_loop` instruction is allowed per loop")
+
+        loop_id: Final = len(self.skip_last_loop_pos) - 1
+
+        # Save location of instruction argument for the `end_loop` instruction
+        self.skip_last_loop_pos[-1] = len(self.bytecode) + 1
+
+        opcode: Final = SKIP_LAST_LOOP_0 + loop_id * 2
+        self.bytecode.append(opcode)
+        self.bytecode.append(0)  # Will be added later in the `end_loop` instruction
+
+    @_instruction(no_argument)
     def end_loop(self) -> None:
-        if self.n_nested_loops == 0:
+        if not self.skip_last_loop_pos:
             raise BytecodeError("There is no loop to end")
 
-        self.n_nested_loops -= 1
-        assert self.n_nested_loops >= 0
+        skip_last_loop_pos = self.skip_last_loop_pos.pop()
+        loop_id: Final = len(self.skip_last_loop_pos)
 
-        opcode = END_LOOP_0 + self.n_nested_loops * 2
+        # Write the parameter of the `skip_last_loop` instruction (if required)
+        if skip_last_loop_pos is not None:
+            assert self.bytecode[skip_last_loop_pos - 1] == SKIP_LAST_LOOP_0 + loop_id * 2
+            to_skip = len(self.bytecode) - skip_last_loop_pos
+            if to_skip < 1 or to_skip > 256:
+                raise BytecodeError(f"skip_last_loop parameter out of bounds: {to_skip}")
+            self.bytecode[skip_last_loop_pos] = to_skip
 
+        assert loop_id >= 0
+        opcode: Final = END_LOOP_0 + loop_id * 2
         self.bytecode.append(opcode)
 
     @_instruction(adsr_argument)

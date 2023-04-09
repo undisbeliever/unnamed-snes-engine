@@ -70,9 +70,17 @@ let INSTRUCTIONS_WITH_ARGUMENTS = [
 
     // parameter = u8 number of times to loop
     start_loop_0,
-
-    // parameter = u8 number of times to loop
     start_loop_1,
+
+
+    // Breaks a loop early if the loop is on the last cycle
+    //  Used to implement the `:` token in a MML loop.
+    //
+    // ie. Allows for `[ abc : de ]3` loops, which will play `abc de abc de abc`.
+    //
+    // parameter = number of bytes in the bytecode to skip if loop counter == 1.
+    skip_last_loop_0,
+    skip_last_loop_1,
 
 
     // parameter = u16 value to send to the ADSR register
@@ -130,8 +138,6 @@ let NO_ARGUMENT_INSTRUCTIONS = [
 
 
     // padding
-    disable_channel,
-    disable_channel,
     disable_channel,
     disable_channel,
     disable_channel,

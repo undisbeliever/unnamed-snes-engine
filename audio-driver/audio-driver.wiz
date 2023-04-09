@@ -983,6 +983,22 @@ inline func __start_loop(channelIndex : u8 in x, loopCount : u8 in a, let LOOP_I
 
 
 // KEEP: X
+inline func __skip_last_loop(channelIndex : u8 in x, bytesToSkip : u8 in a, let LOOP_ID : u8) {
+    // Add `bytesToSkip` to `instructionPtr` if counter == 1
+    y = channelSoA.loopState[LOOP_ID].counter[x];
+    y--;
+    if zero {
+        <:instructionPtr = a = a + <:instructionPtr;
+        if carry {
+            (>:instructionPtr)++;
+        }
+    }
+
+    ^return process_next_bytecode(x);
+}
+
+
+// KEEP: X
 inline func __end_loop(channelIndex : u8 in x, let LOOP_ID : u8) {
     channelSoA.loopState[LOOP_ID].counter[x]--;
     if !zero {
@@ -1005,6 +1021,15 @@ func start_loop_1(channelIndex : u8 in x, loopCount : u8 in a) {
     return __start_loop(x, a, 1);
 }
 
+// KEEP: X
+func skip_last_loop_0(channelIndex : u8 in x, loopCount : u8 in a) {
+    return __skip_last_loop(x, a, 0);
+}
+
+// KEEP: X
+func skip_last_loop_1(channelIndex : u8 in x, loopCount : u8 in a) {
+    return __skip_last_loop(x, a, 1);
+}
 
 // KEEP: X
 func end_loop_0(channelIndex : u8 in x) {
