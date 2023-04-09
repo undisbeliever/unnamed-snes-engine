@@ -19,6 +19,7 @@ let FIRST_INSTRUCTION_WITH_ARGUMENT_OPCODE = N_PLAY_NOTE_INSTRUCTIONS;
 let FIRST_NO_ARGUMENT_INSTRUCTION_OPCODE = FIRST_INSTRUCTION_WITH_ARGUMENT_OPCODE + bytecode.INSTRUCTIONS_WITH_ARGUMENTS.len * 2;
 
 // Last instruction is the `disable_channel` instruction
+// `disable_channel` will also send a KEY-OFF event.
 let DISABLE_CHANNEL_BYTECODE = 0xfe;
 
 

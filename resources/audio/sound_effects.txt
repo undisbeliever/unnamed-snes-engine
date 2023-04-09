@@ -65,9 +65,10 @@
 
 == gain_test ==
     set_instrument      sine
-
     set_gain 0x7f
-    play_note c5 255
+
+    ; Also tests that `disable_channel` emits a KEY OFF event
+    play_note c5 no_keyoff 255
 
     disable_channel
 

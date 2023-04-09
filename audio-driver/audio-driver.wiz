@@ -917,6 +917,10 @@ func disable_channel(channelIndex : u8 in x) {
 
     channelSoA.disabled[x] = a = 1;
 
+    // Send key-off event
+    a = ChannelVoiceBit[x];
+    test_and_set(a, keyOffShadow);
+
 
     a = <:&ChannelDisabledBytecode;
     y = >:&ChannelDisabledBytecode;
