@@ -197,9 +197,15 @@
 === loop_test ===
     set_instrument  sawtooth
 
-    start_loop  3
-        start_loop  5
-            play_note   c3  16
+    start_loop  2
+        start_loop  3
+            start_loop  4
+                play_note   c3  16
+            end_loop
+
+            rest    8
+            play_note   c4  16
+            rest    32
         end_loop
 
         rest    64

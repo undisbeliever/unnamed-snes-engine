@@ -26,33 +26,40 @@ CALL_SUBROUTINE: Final = 0xC8
 
 START_LOOP_0: Final = 0xCA
 START_LOOP_1: Final = 0xCC
-SKIP_LAST_LOOP_0: Final = 0xCE
-SKIP_LAST_LOOP_1: Final = 0xD0
+START_LOOP_2: Final = 0xCE
+SKIP_LAST_LOOP_0: Final = 0xD0
+SKIP_LAST_LOOP_1: Final = 0xD2
+SKIP_LAST_LOOP_2: Final = 0xD4
 
-SET_ADSR: Final = 0xD2
-SET_GAIN: Final = 0xD4
+SET_ADSR: Final = 0xD6
+SET_GAIN: Final = 0xD8
 
-SET_VOLUME: Final = 0xD6
-INC_VOLUME: Final = 0xD8
-DEC_VOLUME: Final = 0xDA
-SET_PAN: Final = 0xDC
-INC_PAN: Final = 0xDE
-DEC_PAN: Final = 0xE0
-SET_PAN_AND_VOLUME: Final = 0xE2
+SET_VOLUME: Final = 0xDA
+INC_VOLUME: Final = 0xDC
+DEC_VOLUME: Final = 0xDE
+SET_PAN: Final = 0xE0
+INC_PAN: Final = 0xE2
+DEC_PAN: Final = 0xE4
+SET_PAN_AND_VOLUME: Final = 0xE6
 
-END: Final = 0xE4
-RETURN_FROM_SUBROUTINE: Final = 0xE6
-END_LOOP_0: Final = 0xE8
-END_LOOP_1: Final = 0xEA
+END: Final = 0xE8
+RETURN_FROM_SUBROUTINE: Final = 0xEA
+END_LOOP_0: Final = 0xEC
+END_LOOP_1: Final = 0xEE
+END_LOOP_2: Final = 0xF0
 
 
 assert PORTAMENTO == N_NOTES * 2
 
-MAX_N_LOOPS: Final = 2
+MAX_NESTED_LOOPS: Final = 3
 
 assert START_LOOP_1 == START_LOOP_0 + 2
 assert SKIP_LAST_LOOP_1 == SKIP_LAST_LOOP_0 + 2
 assert END_LOOP_1 == END_LOOP_0 + 2
+
+assert START_LOOP_2 == START_LOOP_1 + 2
+assert SKIP_LAST_LOOP_2 == SKIP_LAST_LOOP_1 + 2
+assert END_LOOP_2 == END_LOOP_1 + 2
 
 
 # Number of ticks between key-off and the next instruction
@@ -339,8 +346,8 @@ class Bytecode:
         loop_id: Final = len(self.skip_last_loop_pos)
         self.skip_last_loop_pos.append(None)
 
-        if loop_id >= MAX_N_LOOPS:
-            raise BytecodeError(f"Too many loops.  The maximum number of nested loops is { MAX_N_LOOPS}.")
+        if loop_id >= MAX_NESTED_LOOPS:
+            raise BytecodeError(f"Too many loops.  The maximum number of nested loops is { MAX_NESTED_LOOPS}.")
 
         if loop_count < 1 or loop_count > 256:
             raise BytecodeError("Loop count out of range (1-256)")
