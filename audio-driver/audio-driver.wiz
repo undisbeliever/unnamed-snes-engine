@@ -160,6 +160,14 @@ in zeropage {
     var maxTimerCounter : u8;
 
 
+    // For each bit: set if the channel is active.
+    //  * Set in `__reset_channel()`
+    //  * Cleared in `disable_channel()`
+    // Used to determine the next available sound effect channel.
+    // (8x bitfield)
+    var activeChannels : u8;
+
+
     // Shadow variables for KON and KOFF DSP registers
     var keyOffShadow : u8;
     var keyOnShadow : u8;
@@ -197,11 +205,6 @@ in zeropage {
 
 
     namespace channelSoA {
-        // If non-zero, the channel is disabled.
-        // (Used to determine which channel to play a sound effect on)
-        var disabled : [u8 ; N_CHANNELS];
-
-
         // Counter (in ticks) until the event
         var countdownTimer : [u8 ; N_CHANNELS];
 
@@ -336,9 +339,6 @@ var _loopEnd : u8 in zpTmp;
     inline for let i in N_MUSIC_CHANNELS..7 {
         channelSoA.instructionPtr_l[i] = a;
         channelSoA.instructionPtr_h[i] = y;
-
-        // y is non-zero
-        channelSoA.disabled[i] = y;
     }
 
 
@@ -557,38 +557,37 @@ inline func process_io_ports__inline() {
 
 
 // ASSUMES: sfx_id < N_SOUND_EFFECTS (128)
-inline func play_sound_effect__inline(sfx_id : u8 in x) {
+inline func play_sound_effect__inline(sfx_id : u8 in y) {
     // ::TODO add panning to play sound effect commands::
 
-    y = a = external_data.soundEffects_h[x];
-    if !zero {
-        a = external_data.soundEffects_l[x];
-
-        inline for let i in N_MUSIC_CHANNELS..7 {
-            x = channelSoA.disabled[i];
-            if !zero {
-                x = i;
-                __play_sfx_on_channel(x, ya);
-                return;
-            }
+    a = activeChannels;
+    inline for let i in 0..(N_SFX_CHANNELS - 1) {
+        a <<<= 1;
+        if !carry {
+            x = 7 - i;
+            __play_sfx_on_channel(x, y);
+            return;
         }
     }
 }
 
 
+
+// ASSUMES: sfx_id < N_SOUND_EFFECTS (128)
 // KEEP: X
 #[fallthrough]
-func __play_sfx_on_channel(channelIndex : u8 in x, sfxBytecode : u16 in ya) {
-    channelSoA.instructionPtr_l[x] = a;
-    channelSoA.instructionPtr_h[x] = y;
+func __play_sfx_on_channel(channelIndex : u8 in x, sfx_id : u8 in y) {
+    channelSoA.instructionPtr_l[x] = a = external_data.soundEffects_l[y];
+    channelSoA.instructionPtr_h[x] = a = external_data.soundEffects_h[y];
 
 // Fallthrough
 }
 
+
 // NOTE: Does not set:
 //  * channelSoA.instructionPtr
 //
-// NOTE: Also disables looping.
+// NOTE: Also disables `end` looping (instructionPtrAfterEnd).
 //
 // KEEP: X
 func __reset_channel(channelIndex : u8 in x) {
@@ -599,7 +598,6 @@ func __reset_channel(channelIndex : u8 in x) {
     a = 0;
     channelSoA.instructionPtrAfterEnd_h[x] = a;     // don't loop SFX
 
-    channelSoA.disabled[x] = a;
     channelSoA.nextEventIsKeyOff[x] = a;
     channelSoA.instPitchOffset[x] = a;
 
@@ -609,6 +607,9 @@ func __reset_channel(channelIndex : u8 in x) {
     // Set keyOnMask.  The next play-note instruction will queue a KON event.
     a = ChannelVoiceBit[x];
     test_and_set(a, keyOnMask);
+
+    // Mark channel as active
+    test_and_set(a, activeChannels);
 
 
     // Reset channel volume
@@ -915,11 +916,12 @@ func disable_channel(channelIndex : u8 in x) {
     channelSoA.portamento_velocity[x] = a as i8;
 
 
-    channelSoA.disabled[x] = a = 1;
-
     // Send key-off event
     a = ChannelVoiceBit[x];
     test_and_set(a, keyOffShadow);
+
+    // Mark channel as not active
+    test_and_clear(a, activeChannels);
 
 
     a = <:&ChannelDisabledBytecode;
