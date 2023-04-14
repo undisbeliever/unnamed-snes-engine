@@ -8,8 +8,7 @@
       "dupe_block_hack": 3,
       "first_octave": 1,
       "last_octave": 4,
-      "adsr": "E 12 1 1 16",
-      "gain": 0
+      "adsr": "12 1 1 16"
     },
     {
       "name": "square",
@@ -18,8 +17,7 @@
       "looping": true,
       "first_octave": 2,
       "last_octave": 5,
-      "adsr": "E 12 1 1 16",
-      "gain": 0
+      "adsr": "12 1 1 16"
     },
     {
       "name": "sawtooth",
@@ -29,8 +27,7 @@
       "dupe_block_hack": 2,
       "first_octave": 2,
       "last_octave": 5,
-      "adsr": "E 12 1 1 16",
-      "gain": 0
+      "adsr": "12 1 1 16"
     },
     {
       "name": "triangle",
@@ -40,8 +37,7 @@
       "dupe_block_hack": 4,
       "first_octave": 2,
       "last_octave": 5,
-      "adsr": "E 12 1 1 16",
-      "gain": 0
+      "adsr": "12 1 1 16"
     }
   ]
 }

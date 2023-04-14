@@ -57,8 +57,11 @@ struct DirItem {
 struct InstrumentsSoA {
     scrn            : [u8 ; N_INSTRUMENTS],
     adsr1           : [u8 ; N_INSTRUMENTS],
-    adsr2           : [u8 ; N_INSTRUMENTS],
-    gain            : [u8 ; N_INSTRUMENTS],
+
+    // This variable is either:
+    //   * ADSR2 if bit 7 of `adsr1` is set
+    //   * GAIN if bit 7 of `adsr1` is clear
+    adsr2OrGain     : [u8 ; N_INSTRUMENTS],
 
     // offset between note c0 and `ExternalData.pitchTable[0]`
     // (pitchOffset + note is allowed to overflow and underflow)
@@ -1077,11 +1080,14 @@ func set_instrument(channelIndex : u8 in x, instrumentId : u8 in a) {
     smp.dsp_addr++;
     smp.dsp_data = a = external_data.instruments.adsr1[y];
 
+    // Increment dsp_addr by 1 (ADSR2) if bit7 of `adsr1` is set
+    // Increment dsp_addr by 2 (GAIN)  if bit7 of `adsr1` is clear
+    if !negative {
+        smp.dsp_addr++;
+    }
     smp.dsp_addr++;
-    smp.dsp_data = a = external_data.instruments.adsr2[y];
 
-    smp.dsp_addr++;
-    smp.dsp_data = a = external_data.instruments.gain[y];
+    smp.dsp_data = a = external_data.instruments.adsr2OrGain[y];
 
     ^return process_next_bytecode(x);
 }

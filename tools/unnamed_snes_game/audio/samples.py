@@ -282,11 +282,20 @@ def validate_instrument_input(instruments: list[Instrument]) -> None:
         # loop-point tested when building sample directory
         test_value("first_octave", inst.first_octave, MIN_OCTAVE, MAX_OCTAVE)
         test_value("last_octave", inst.last_octave, inst.first_octave, MAX_OCTAVE)
-        test_value("ADSR attack", inst.adsr.attack, 0, 0b01111)
-        test_value("ADSR decay", inst.adsr.decay, 0, 0b00111)
-        test_value("ADSR sustain", inst.adsr.sustain_level, 0, 0b00111)
-        test_value("ADSR release", inst.adsr.sustain_rate, 0, 0b11111)
-        test_value("gain", inst.gain, 0, 0xFF)
+
+        if inst.adsr is not None:
+            test_value("ADSR attack", inst.adsr.attack, 0, 0b01111)
+            test_value("ADSR decay", inst.adsr.decay, 0, 0b00111)
+            test_value("ADSR sustain", inst.adsr.sustain_level, 0, 0b00111)
+            test_value("ADSR release", inst.adsr.sustain_rate, 0, 0b11111)
+
+            if inst.gain is not None:
+                errors.append(f"Instrument {i} {inst.name}: Instrument cannot have an ADSR and GAIN value at the same time")
+
+        elif inst.gain is not None:
+            test_value("gain", inst.gain, 0, 0xFF)
+        else:
+            errors.append(f"Instrument {i} {inst.name}: Must have an adsr or gain")
 
     if errors:
         error_string = "\n    ".join(errors)
@@ -319,15 +328,21 @@ def _instruments_soa_data(instruments: list[Instrument], instrument_scrn: bytes,
     out += padding
 
     # adsr1
-    out += bytes((bool(i.adsr.enabled) << 7) | (i.adsr.decay << 4) | (i.adsr.attack) for i in instruments)
+    for i in instruments:
+        if i.adsr is not None:
+            out.append((1 << 7) | (i.adsr.decay << 4) | (i.adsr.attack))
+        else:
+            out.append(0)
     out += padding
 
-    # adsr2
-    out += bytes((i.adsr.sustain_level << 5) | (i.adsr.sustain_rate) for i in instruments)
-    out += padding
-
-    # gain
-    out += bytes(i.gain for i in instruments)
+    # adsr2OrGain
+    for i in instruments:
+        if i.adsr is not None:
+            out.append((i.adsr.sustain_level << 5) | (i.adsr.sustain_rate))
+        elif i.gain is not None:
+            out.append(i.gain)
+        else:
+            out.append(0)
     out += padding
 
     # pitch_offset

@@ -64,7 +64,6 @@ def _read_optional_int(v: Union[str, int, float, None]) -> Optional[int]:
 
 @dataclass
 class Adsr:
-    enabled: bool
     attack: int
     decay: int
     # Names taken from Anonie's S-DSP Doc
@@ -90,9 +89,9 @@ class Instrument:
     first_octave: int
     last_octave: int
 
-    adsr: Adsr
+    adsr: Optional[Adsr]
     # ::TODO figure out how the gain byte works::
-    gain: int
+    gain: Optional[int]
 
 
 @dataclass
@@ -100,25 +99,20 @@ class SamplesJson:
     instruments: list[Instrument]
 
 
-def _read_adsr(s: str) -> Adsr:
+def _read_optional_adsr(s: Optional[str]) -> Optional[Adsr]:
+    if s is None:
+        return None
+
     if type(s) != str:
         raise ValueError("Expected a string containing 4 values (and optionally prepended with D or E)")
 
     values = s.strip().upper().split()
 
-    enabled = True
-
-    if len(values) == 5:
-        e = values.pop(0)
-        if e == "D":
-            enabled = False
-        elif e == "E":
-            enabled = True
-        else:
-            raise ValueError(f"ADSR: Unknown value: {e}")
+    if len(values) != 4:
+        raise ValueError("ADSR: Expected 4 integers")
 
     try:
-        return Adsr(enabled, int(values[0], 0), int(values[1], 0), int(values[2], 0), int(values[3], 0))
+        return Adsr(int(values[0], 0), int(values[1], 0), int(values[2], 0), int(values[3], 0))
     except ValueError as e:
         raise ValueError(f"ADSR: {e}")
 
@@ -148,8 +142,8 @@ def _read_instruments(json_input: dict[str, list[dict[str, Any]]], filename: Fil
                 loop_point=_read_optional_int(ji.get("loop_point")),
                 first_octave=_read_int(ji["first_octave"]),
                 last_octave=_read_int(ji["last_octave"]),
-                adsr=_read_adsr(ji["adsr"]),
-                gain=_read_int(ji["gain"]),
+                adsr=_read_optional_adsr(ji.get("adsr")),
+                gain=_read_optional_int(ji.get("gain")),
             )
             out.append(inst)
 

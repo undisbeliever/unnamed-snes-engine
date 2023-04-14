@@ -13,7 +13,7 @@ SFX_TICK_TIMER: Final = 64
 
 
 BYTES_PER_SAMPLE_DIRECTORY_ITEM: Final = 4
-N_FIELDS_IN_INSTRUMENTS_SOA: Final = 5
+N_FIELDS_IN_INSTRUMENTS_SOA: Final = 4
 
 
 # These values MUST match `src/audio-driver.wiz`
