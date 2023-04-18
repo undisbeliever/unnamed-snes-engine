@@ -3,6 +3,7 @@
 
 import math
 import struct
+import os.path
 from collections import OrderedDict
 
 from dataclasses import dataclass
@@ -24,76 +25,124 @@ class BrrData(NamedTuple):
     brr_data: bytes
 
 
+# Returns data, loop_offset
+def _load_brr_sample(filename: Filename, loop_flag: bool, loop_offset: Optional[int]) -> tuple[bytes, int]:
+    with open(filename, "rb") as fp:
+        data = fp.read(16 * 1024)
+
+        if fp.read(1) != b"":
+            raise ValueError(f"File is too large: {filename}")
+
+    if len(data) % BYTES_PER_BRR_BLOCK == 2:
+        # BRR file includes u16 loop offset
+        if loop_offset is not None:
+            raise ValueError(f"BRR file has a loop point header, cannot use loop_point in JSON file: {filename}")
+
+        loop_offset = data[0] | (data[1] << 8)
+        data = data[2:]
+    else:
+        # No loop_offset in BRR file
+        if loop_offset is None:
+            loop_offset = 0
+
+    if len(data) == 0:
+        raise ValueError(f"BRR file is empty: {filename}")
+
+    if len(data) % BYTES_PER_BRR_BLOCK != 0:
+        raise ValueError(f"Invalid File size: {filename}")
+
+    last_block_header = data[len(data) - BYTES_PER_BRR_BLOCK]
+    if (last_block_header & 1) != 1:
+        raise ValueError(f"End bit not set in the last BRR block: {filename}")
+
+    if loop_flag:
+        if (last_block_header & 2) != 2:
+            raise ValueError(f"Loop flag not set in BBR file: {filename}")
+    else:
+        if (last_block_header & 2) != 0:
+            raise ValueError(f"Loop flag is set in BBR file: {filename}")
+
+    return data, loop_offset
+
+
+# Returns data, loop_offset
+def _encode_wav(filename: Filename, loop_flag: bool, dupe_block_hack: Optional[int], loop_offset: Optional[int]) -> tuple[bytes, int]:
+    if dupe_block_hack is not None:
+        loop_offset = dupe_block_hack * BYTES_PER_BRR_BLOCK
+    else:
+        if loop_offset is None:
+            loop_offset = 0
+
+    w = load_wav_file(filename)
+    b = encode_brr(w, loop_flag, dupe_block_hack)
+
+    return b, loop_offset
+
+
+def _load_sample(filename: Filename, loop_flag: bool, loop_point: Optional[int], dupe_block_hack: Optional[int]) -> tuple[bytes, int]:
+    if loop_point is not None:
+        if loop_point < 0 or loop_point % SAMPLES_PER_BLOCK != 0:
+            raise ValueError(f"Loop point must be a positive multiple of {SAMPLES_PER_BLOCK}")
+        loop_offset = (loop_point // SAMPLES_PER_BLOCK) * BYTES_PER_BRR_BLOCK
+    else:
+        loop_offset = None
+
+    extension = os.path.splitext(filename)[1]
+    if extension == ".wav":
+        if dupe_block_hack is not None:
+            if loop_point is not None:
+                raise ValueError("Cannot use `loop_point` and `dupe_block_hack` at the same time")
+        data, lo = _encode_wav(filename, loop_flag, dupe_block_hack, loop_offset)
+
+    elif extension == ".brr":
+        if dupe_block_hack is not None:
+            raise ValueError("Cannot use `dupe_block_hack` on a BRR file: {filename}")
+
+        data, lo = _load_brr_sample(filename, loop_flag, loop_offset)
+    else:
+        raise ValueError("Unknown file type: {filename}")
+
+    # This should not happen here
+    if lo < 0 or lo % BYTES_PER_BRR_BLOCK != 0:
+        raise ValueError("Invalid loop_offset")
+
+    if lo >= len(data):
+        raise ValueError("loop_offset too large: {filename}")
+
+    return data, lo
+
+
 def _compile_brr_samples(instruments: list[Instrument]) -> BrrData:
     instrument_scrn_table = bytearray()
     brr_directory = bytearray()
     brr_data = bytearray()
 
-    # Mapping of wave files to the address of BRR data
-    # filename, loop flag => brr address, brr size
-    brr_data_map: dict[tuple[Filename, bool, Optional[int]], tuple[Addr, int]] = dict()
-
     # Mapping of wave files and loop points to sample directory ids
     # filename, loop flag, loop_point => sample directory id
-    scrn_map: dict[tuple[Filename, bool, int, Optional[int]], int] = dict()
-
-    def encode_wave_file(filename: Filename, loop_flag: bool, dupe_block_hack: Optional[int]) -> tuple[Addr, int]:
-        nonlocal brr_data, brr_data_map
-
-        key: Final = filename, loop_flag, dupe_block_hack
-
-        out = brr_data_map.get(key)
-        if out is None:
-            w = load_wav_file(filename)
-            b = encode_brr(w, loop_flag, dupe_block_hack)
-
-            addr = len(brr_data) + BRR_DATA_ADDRESS
-            size = len(b)
-
-            brr_data += b
-
-            brr_data_map[key] = out = addr, size
-        return out
-
-    def add_sample(filename: Filename, loop_flag: bool, loop_point: Optional[int], dupe_block_hack: Optional[int]) -> int:
-        nonlocal scrn_map
-
-        if dupe_block_hack is not None:
-            if loop_point is not None:
-                raise ValueError("Cannot use `loop_point` and `dupe_block_hack` at the same time")
-            loop_point = dupe_block_hack * SAMPLES_PER_BLOCK
-        else:
-            if loop_point is None:
-                loop_point = 0
-
-        key: Final = filename, loop_flag, loop_point, dupe_block_hack
-        sample_id = scrn_map.get(key)
-        if sample_id is None:
-            brr_addr, brr_size = encode_wave_file(filename, loop_flag, dupe_block_hack)
-
-            if loop_point < 0 or loop_point % SAMPLES_PER_BLOCK != 0:
-                raise ValueError(f"Loop point must be a multiple of {SAMPLES_PER_BLOCK}")
-
-            loop_offset = (loop_point // SAMPLES_PER_BLOCK) * BYTES_PER_BRR_BLOCK
-
-            if loop_offset >= brr_size:
-                raise ValueError("Loop point must be < number of samples in the wave file")
-
-            dir_item = struct.pack("<2H", brr_addr, brr_addr + loop_offset)
-
-            assert len(dir_item) == BYTES_PER_SAMPLE_DIRECTORY_ITEM
-            brr_directory.extend(dir_item)
-
-            sample_id = len(brr_directory) // BYTES_PER_SAMPLE_DIRECTORY_ITEM - 1
-
-            scrn_map[key] = sample_id
-        return sample_id
+    scrn_map: dict[tuple[Filename, bool, Optional[int], Optional[int]], int] = dict()
 
     errors: list[str] = list()
 
     for i, inst in enumerate(instruments):
         try:
-            instrument_scrn_table.append(add_sample(inst.source, inst.looping, inst.loop_point, inst.dupe_block_hack))
+            key = inst.source, inst.looping, inst.loop_point, inst.dupe_block_hack
+            sample_id = scrn_map.get(key)
+            if sample_id is None:
+                sample_data, loop_offset = _load_sample(*key)
+
+                brr_addr = len(brr_data) + BRR_DATA_ADDRESS
+
+                brr_data.extend(sample_data)
+
+                dir_item = struct.pack("<2H", brr_addr, brr_addr + loop_offset)
+                assert len(dir_item) == BYTES_PER_SAMPLE_DIRECTORY_ITEM
+                brr_directory.extend(dir_item)
+
+                sample_id = len(brr_directory) // BYTES_PER_SAMPLE_DIRECTORY_ITEM - 1
+
+                scrn_map[key] = sample_id
+
+            instrument_scrn_table.append(sample_id)
         except Exception as e:
             errors.append(f"ERROR in Instrument {i} {inst.name}: {e}")
 
