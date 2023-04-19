@@ -20,6 +20,24 @@
 
 
 
+== noise_test ==
+    set_instrument      noise
+    set_volume          255
+
+    play_note           c5 128
+    rest 32
+
+    play_note           c1 64
+    play_note           c2 64
+    play_note           c3 64
+    play_note           c4 64
+    play_note           c5 64
+    play_note           c6 64
+
+    disable_channel
+
+
+
 == slur_loop_test ==
     set_instrument      square
     set_volume          127

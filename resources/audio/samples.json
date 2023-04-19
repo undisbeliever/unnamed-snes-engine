@@ -1,6 +1,16 @@
 {
   "instruments": [
     {
+      "name": "noise",
+      "source": "samples/noise.brr",
+      "comment": "This sample creates noise by BRR overflow",
+      "freq": 500,
+      "looping": true,
+      "first_octave": 1,
+      "last_octave": 6,
+      "gain": "127"
+    },
+    {
       "name": "sine",
       "source": "samples/sine.wav",
       "freq": 500,
