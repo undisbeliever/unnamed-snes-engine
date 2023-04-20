@@ -21,9 +21,12 @@ enum LoaderDataType : u8 {
     // These values cannot be 0 or negative.
     CODE             = 'C',
     COMMON_DATA      = 'D',
-    STEREO_SONG_DATA = 'S',
-    MONO_SONG_DATA   = 'M', // Value MUST BE < STEREO_SONG_DATA
+
+    MONO_SONG_DATA   = 'M', // Value MUST BE > CODE & COMMON_DATA
+    STEREO_SONG_DATA = 'S', // Value MUST BE > MONO_SONG_DATA
 };
+
+let MIN_SONG_DATA_LOADER_DATA_TYPE = LoaderDataType.MONO_SONG_DATA as u8;
 
 
 in loader_code {
@@ -127,33 +130,17 @@ EndLoop:
 
     x = pop();
 
-    goto start_loader if x == LoaderDataType.CODE as u8;
-
     if x == LoaderDataType.COMMON_DATA as u8 {
         // Save current data address in `songPtr`
         a = y;
         y = (&STA_1 as *u8)[2];
 
         _songPtr = ya as *u8;
-
-
-        // Build a dummy song header
-        y = SONG_HEADER_SIZE - 1;
-
-        // Set SongHeader.nSubroutines to 0
-        _songPtr[y] = a = 0;
-        y--;
-
-        // Disable all song channels.
-        a = 0xff;
-        do {
-            _songPtr[y] = a;
-        } while --y != 0;
-
-        // Do not worry about resetting byte 0 of the header,
-        // only the high-bytes of the song channel offsets need to be 0xff to disable (silence) the channel.
     }
 
+    goto start_loader if x < MIN_SONG_DATA_LOADER_DATA_TYPE;
+
+    // If data type was a song.  Execute audio engine.
     goto (CODE_ADDR as func);
 }
 

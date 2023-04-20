@@ -132,7 +132,7 @@ func null() {
 // DB = 0x7e
 #[mem8, idx16]
 func common_audio_data_changed() {
-    audio.common_audio_data_changed();
+    audio.mark_common_audio_data_changed();
 }
 
 
@@ -146,7 +146,7 @@ var _res : resources.ResourceEntry in resources.res;
     data_bank = pop8();
     // DB = 0x80
 
-    audio.load_common_data_if_required__inline();
+    audio._load_common_data_if_required__inline();
 
     #:_res.farPtr = a = #:far &Command.data;
     *(&_res.farPtr as *u16) = xx = &Command.data as u16;

@@ -28,6 +28,7 @@ RESOURCES_SRC := $(wildcard $(RESOURCES_DIR)/*.json $(RESOURCES_DIR)/* $(RESOURC
 
 AUDIO_DRIVER_SRC := $(wildcard audio-driver/*.wiz)
 AUDIO_DRIVER_BINARIES := gen/audio-loader.bin gen/audio-driver.bin
+AUDIO_DRIVER_DATA     := gen/audio-blank-song.bin
 
 MLB_FILE  := $(patsubst %.sfc,%.mlb,$(BINARY))
 SYM_FILES := $(patsubst %.sfc,%.sym,$(INTERMEDIATE_BINARY)) $(patsubst %.bin,%.sym,$(AUDIO_DRIVER_BINARIES))
@@ -51,7 +52,7 @@ $(MLB_FILE): $(INTERMEDIATE_BINARY) $(AUDIO_DRIVER_BINARIES) tools/sym_to_mlb.py
 	$(PYTHON3) tools/sym_to_mlb.py -o '$@' --hirom $(SYM_FILES)
 
 
-$(INTERMEDIATE_BINARY): wiz/bin/wiz $(SOURCES) $(GEN_SOURCES) $(AUDIO_DRIVER_BINARIES)
+$(INTERMEDIATE_BINARY): wiz/bin/wiz $(SOURCES) $(GEN_SOURCES) $(AUDIO_DRIVER_BINARIES) $(AUDIO_DRIVER_DATA)
 	wiz/bin/wiz -s wla -I src src/main.wiz -o $(INTERMEDIATE_BINARY)
 
 
@@ -59,8 +60,11 @@ $(INTERMEDIATE_BINARY): wiz/bin/wiz $(SOURCES) $(GEN_SOURCES) $(AUDIO_DRIVER_BIN
 .PHONY: audio-driver
 audio-driver: $(AUDIO_DRIVER_BINARIES)
 
-gen/audio-loader.bin: audio-driver/loader.wiz audio-driver/common_memmap.wiz
+gen/audio-loader.bin: audio-driver/loader.wiz audio-driver/common_memmap.wiz audio-driver/io-commands.wiz
 	wiz/bin/wiz --system=spc700 -s wla audio-driver/loader.wiz -o '$@'
+
+gen/audio-blank-song.bin: audio-driver/blank-song.wiz audio-driver/data-formats.wiz
+	wiz/bin/wiz --system=spc700 audio-driver/blank-song.wiz -o '$@'
 
 gen/audio-driver.bin: $(AUDIO_DRIVER_SRC)
 	wiz/bin/wiz --system=spc700 -s wla audio-driver/audio-driver.wiz -o '$@'
@@ -116,7 +120,7 @@ gen/:
 
 .PHONY: clean
 clean:
-	$(RM) $(BINARY) $(INTERMEDIATE_BINARY) $(AUDIO_DRIVER_BINARIES)
+	$(RM) $(BINARY) $(INTERMEDIATE_BINARY) $(AUDIO_DRIVER_BINARIES) $(AUDIO_DRIVER_DATA)
 	$(RM) $(MLB_FILE) $(SYM_FILES)
 	$(RM) $(GEN_SOURCES)
 
