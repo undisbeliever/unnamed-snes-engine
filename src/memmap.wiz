@@ -65,7 +65,7 @@ const @ 0x80ffee = irq_handler;     // native irq
 const @ 0x80FFF4 = invalid_handler; // emu cop
 const @ 0x80FFF8 = invalid_handler; // emu abort
 const @ 0x80FFFA = invalid_handler; // emu nmi
-const @ 0x80FFFC = reset;           // emu reset
+const @ 0x80FFFC = __reset;         // emu reset
 const @ 0x80FFFE = invalid_handler; // emu irq
 
 }

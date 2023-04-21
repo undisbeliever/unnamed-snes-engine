@@ -13,14 +13,18 @@ const @ 0x80ffb6 : u8 = 0;
 extern const empty_byte @ 0x80ffb6 : u8;
 
 
+// Reset handler MUST NOT be called by this code
+// (The S-SMP cannot be reset by S-CPU code)
 #[fallthrough]
-func reset() {
-    goto reset_far;
+func __reset() {
+    goto __reset_far;
 }
 
 
+// Reset handler MUST NOT be called by this code
+// (The S-SMP cannot be reset by S-CPU code)
 #[fallthrough]
-far func reset_far() {
+far func __reset_far() {
     nointerrupt = true;
     decimal = false;
     carry = false;
@@ -67,7 +71,7 @@ far func reset_far() {
         reset_registers();
 
 
-        ^goto main;
+        main__inline();
     }
 }
 

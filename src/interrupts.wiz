@@ -63,24 +63,19 @@ func break_handler() {
         snes.ppu.cgram_write_data = 0;
         snes.ppu.cgram_write_data = a = 12 << 2;
 
+        // ::TODO display a message::
+
         // Enable the screen
         snes.ppu.brightness = a = 0x0f;
 
 
-        // Wait two-third of a second
-        x = 40;
-        do {
-            do {
-            } while snes.ppu.hvbjoy_status $ snes.ppu.HVBJOY_STATUS_VBLANK_BIT;
-            do {
-            } while !snes.ppu.hvbjoy_status $ snes.ppu.HVBJOY_STATUS_VBLANK_BIT;
-
-            x--;
-        } while !zero;
-
-
-        // Reset the game
-        goto reset_far;
+        // Wait forever.
+        //
+        // I cannot jump to `__reset` as I do not know the state of the audio driver
+        // and there is no way for the S-CPU to reset the S-SMP.
+        while true {
+            wait_until_interrupt();
+        }
     }
 }
 

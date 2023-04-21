@@ -38,9 +38,11 @@ import "src/entities/test--calc-angle";
 in code {
 
 
+// Must only be called once.
+//
 // DB = 0x80
 #[fallthrough, mem8, idx16]
-func main() {
+inline func main__inline() {
     mem8_idx8();
     #[mem8, idx8] {
         snes.ppu.brightness = a = snes.ppu.BRIGHTNESS_FORCE_BLANK;
