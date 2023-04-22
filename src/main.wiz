@@ -51,7 +51,7 @@ inline func main__inline() {
     }
     idx16();
 
-    audio.setup();
+    audio.setup__inline();
 
     metasprites.setup__forceblank();
 

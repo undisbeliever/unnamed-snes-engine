@@ -94,9 +94,11 @@ in code {
 //
 // This function MUST only be called once.
 //
+// This function MUST be called after `resources_over_usb2snes` init.
+//
 // DB = 0x80
 #[mem8, idx16]
-func setup() {
+inline func setup__inline() {
 var _res : resources.ResourceEntry in resources.res;
 
     // ::TODO add a first-call check::
@@ -116,7 +118,7 @@ var _res : resources.ResourceEntry in resources.res;
 
 
     // Will also transfer common data to the Loader
-    return load_blank_song();
+    load_blank_song();
 }
 
 
