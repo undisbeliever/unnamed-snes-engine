@@ -37,9 +37,9 @@ def example_sound_effect(s: SamplesJson) -> str:
 
     return f"""
     set_instrument {first_instrument}
-    set_channel_volume 96
+    set_volume 96
 
-    play_note c
+    play_note c4 48
 
     disable_channel
 """
