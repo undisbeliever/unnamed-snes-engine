@@ -31,8 +31,9 @@ in zeropage {
     var previousCommandId : u8;
 
 
-    // The table of subroutine addresses
-    var subroutineTable : **const u8;
+    // The table of subroutine offsets
+    // (equal to `songPtr + sizeof(SongHeader)`)
+    var subroutineTable : **const u16;
 
     // Maximum value of the timer counter_0 or counter_1 register.
     var maxTimerCounter : u8;
@@ -220,25 +221,11 @@ var _loopEnd : u8 in zpTmp;
     }
 
 
-    // Calculate the subroutineTable address.
+    // Calculate `subroutineTable` address.
     a = sizeof(SongHeader);
     y = 0;
     ya += songPtr as u16;
-    subroutineTable = ya as **const u8;
-
-    // Add songPtr to each element in the subroutine table, turning an offset into an address.
-    y = offsetof(SongHeader, nSubroutines);
-    a = songPtr[y];
-    if !zero {
-        _loopEnd = a = a << 1;
-        y = 0;
-        do {
-            (subroutineTable as *u8)[y] = a = (subroutineTable as *u8)[y] + <:songPtr;
-            y++;
-            (subroutineTable as *u8)[y] = a = (subroutineTable as *u8)[y] +# >:songPtr;
-            y++;
-        } while y != _loopEnd;
-    }
+    subroutineTable = ya as **const u16;
 
 
     // Reset all music channels
@@ -835,9 +822,11 @@ var _subroutineId : u8 in zpTmp;
 
     y = a = _subroutineId <<< 1;
 
-    <:instructionPtr = a = (subroutineTable as *u8)[y];
+    // Add songPtr to subroutineTable[y] to get the subroutine address
+
+    <:instructionPtr = a = (subroutineTable as *u8)[y] + <:songPtr;
     y++;
-    >:instructionPtr = a = (subroutineTable as *u8)[y];
+    >:instructionPtr = a = (subroutineTable as *u8)[y] +# >:songPtr;
 
     ^return process_next_bytecode(x);
 }
