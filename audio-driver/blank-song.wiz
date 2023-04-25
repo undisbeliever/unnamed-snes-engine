@@ -11,7 +11,7 @@ bank rodata @ 0x0000 : [constdata;  0x40];
 in rodata {
 
 const BlankSong = SongHeader{
-    channels = [ MusicChannelHeader{ starting = 0, loop = 0 } ; N_MUSIC_CHANNELS ],
+    channels = [ MusicChannelHeader{ starting = 0xffff, loop = 0xffff } ; N_MUSIC_CHANNELS ],
 
     // Maximum tick timer
     tickTimer = 255,

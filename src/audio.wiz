@@ -281,7 +281,9 @@ var _res : resources.ResourceEntry in resources.res;
     }
 
     a = pop8();
-    if !zero {
+    if zero {
+        // Resource 0 is Common Audio Data
+        // Load BlankSong instead
         *(&_res.farPtr as *u16) = xx = &BlankSong as u16;
         #:_res.farPtr = a = #:far &BlankSong;
         _res.size = yy = sizeof(typeof(BlankSong));
