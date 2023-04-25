@@ -37,6 +37,11 @@ func start_loader() {
     sp = x = 0xff;
     direct_page = false;
 
+    // Soft reset the DSP
+    smp.dsp_addr = GlobalDspAddr.FLG as u8;
+    smp.dsp_data = dsp.FLG__SOFT_RESET | dsp.FLG__MUTE_ALL | dsp.FLG__ECHO_DISABLE;
+
+
     // Clear IO ports
     smp.control = a = smp.CONTROL__RESET_PORTS_01 | smp.CONTROL__RESET_PORTS_23;
     smp.control = a = 0;
