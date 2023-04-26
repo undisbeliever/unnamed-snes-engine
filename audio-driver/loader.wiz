@@ -43,8 +43,8 @@ func start_loader() {
 
 
     // Clear IO ports
-    smp.control = a = smp.CONTROL__RESET_PORTS_01 | smp.CONTROL__RESET_PORTS_23;
-    smp.control = a = 0;
+    smp.control = smp.CONTROL__RESET_PORTS_01 | smp.CONTROL__RESET_PORTS_23;
+    smp.control = 0;
 
     // Send 'ready' signal
     a = 'R';
@@ -85,7 +85,7 @@ func start_loader() {
 
         // Acknowledge LoaderDataType
         // And override the `RD` ready signal.
-        smp.io_port_out_2 = a = 0;
+        smp.io_port_out_2 = 0;
 
         x = 'D';
 
