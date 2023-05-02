@@ -25,8 +25,8 @@
       "source": "samples/square.wav",
       "freq": 500,
       "looping": true,
-      "first_octave": 2,
-      "last_octave": 5,
+      "first_octave": 1,
+      "last_octave": 6,
       "adsr": "12 1 1 16"
     },
     {
@@ -35,8 +35,8 @@
       "freq": 500,
       "looping": true,
       "dupe_block_hack": 2,
-      "first_octave": 2,
-      "last_octave": 5,
+      "first_octave": 1,
+      "last_octave": 6,
       "adsr": "12 1 1 16"
     },
     {
@@ -45,8 +45,8 @@
       "freq": 500,
       "looping": true,
       "dupe_block_hack": 4,
-      "first_octave": 2,
-      "last_octave": 5,
+      "first_octave": 1,
+      "last_octave": 6,
       "adsr": "12 1 1 16"
     }
   ]
