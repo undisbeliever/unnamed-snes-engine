@@ -7,6 +7,9 @@ import "_variables";
 import "../player";
 import "../gamestate";
 
+import "../audio";
+import "../../gen/resources";
+
 namespace entities {
 
 // NOTE: The key entity uses the tile hitbox to preform an aabb-point player-key collision test
@@ -62,6 +65,9 @@ func process(entityId : u8 in y) {
             // Drop key until it hits the ground
             a--;
             SoA.zPos[y] = a;
+            if zero {
+                audio.queue_sound_effect(sound_effects.key_hits_ground);
+            }
         }
         else {
             // Key is on the ground (and can be collected)
@@ -92,7 +98,8 @@ func process(entityId : u8 in y) {
                             // Y is not entityId.
                             gamestate.increment_key_count();
 
-                            // ::TODO collected key sound effect::
+                            audio.queue_sound_effect(sound_effects.collect_item);
+
                             // ::TODO spawn collected key particle::
 
                             return;

@@ -141,6 +141,8 @@ inline func _reset_sfx_queue__inline() {
 // NOTE: Only 1 sound effect can be played at a time
 // NOTE: Lower sound effect IDs take priority over higher sound effect IDs.
 //
+// KEEP: X and Y
+//
 // DB access zero-page
 #[mem8, idx8]
 func queue_sound_effect(effect_id : sound_effects in a) {

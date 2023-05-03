@@ -10,6 +10,9 @@ import "player";
 import "gamestate";
 import "common/dma";
 
+import "audio";
+import "../gen/resources";
+
 
 namespace ui {
 
@@ -226,6 +229,9 @@ inline func process() {
             if carry {
                 a--;
             } else {
+                audio.queue_sound_effect(sound_effects.player_heal);
+
+                a = healthBarValue;
                 a++;
             }
 

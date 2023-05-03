@@ -10,6 +10,9 @@ import "../gamestate";
 import "../entities/_common";
 import "../interactive-tiles";
 
+import "../audio";
+import "../../gen/resources";
+
 import "gen/room-events";
 
 
@@ -118,7 +121,7 @@ func process__wait_a_bit() {
 // DB = 0x7e
 #[mem8, idx8]
 func set_state__lock_doors() {
-    // ::TODO play lock door sound effect::
+    audio.queue_sound_effect(sound_effects.door_slam);
 
     x = State.LOCK_DOORS as u8;
     state = x as State;
@@ -150,7 +153,7 @@ func process__lock_doors() {
 
     // No more doors to unlock, start spawning smoke
 
-    // ::TODO play smoke sound effect::
+    audio.queue_sound_effect(sound_effects.spawn_enemy_with_smoke);
 
     x = State.SPAWN_SMOKE as u8;
     state = x as State;
@@ -202,7 +205,7 @@ func process__wait_until_enemies_defeated() {
     if zero {
         // No more smoke to spawn, start spawning enemies
 
-        // ::TODO play open doors sound effect::
+        audio.queue_sound_effect(sound_effects.door_open);
 
         x = State.UNLOCK_DOORS as u8;
         state = x as State;

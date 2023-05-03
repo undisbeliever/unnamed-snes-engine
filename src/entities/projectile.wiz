@@ -6,8 +6,8 @@ import "../memmap";
 import "_variables";
 import "_base";
 
-
 import "../../gen/entities";
+
 
 namespace entities {
 namespace projectile {
@@ -93,6 +93,8 @@ func process(entityId : u8 in y) {
         // ::TODO animate projectile's fall to ground ::
         SoA.zPos[y] = a = 0;
         SoA_despawnTimer[y] = a = N_FRAMES_IN_SWORD;
+
+        // ::TODO play bolt hit sword sound effect::
     }
     else if collisionState $ CollisionState.PLAYER_HURTBOX_BIT {
         base.hurt_player__collision(y);
@@ -104,6 +106,8 @@ func process(entityId : u8 in y) {
         if !zero {
             SoA_despawnTimer[y] = a = N_FRAMES_IN_WALL;
         }
+
+        // ::TODO play bolt collided with wall sound effect::
     }
 }
 

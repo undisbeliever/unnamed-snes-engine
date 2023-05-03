@@ -32,31 +32,42 @@
  "sound_effects": [
    "menu_cursor",
    "menu_select",
-   "explosion_hurt_player",
-   "explosion_hurt_enemy",
-   "explosion",
-   "player_hurt_low_health",
-   "player_hurt",
-   "player_heal",
+
+   "key_spawns",
+   "collect_item",
+
    "door_slam",
    "door_open_with_key",
    "door_open",
-   "key_spawns",
-   "key_hits_ground",
-   "collect_item",
+
+   "player_hurt_low_health",
+   "explosion_hurt_player",
+   "player_hurt",
+   "explosion_hurt_enemy",
+
+   "explosion",
+
+   "player_heal",
+
    "pickup_bomb",
    "throw_bomb",
-   "statue_spawns_enemy",
-   "spawn_enemy_with_smoke",
    "enemy_poof",
    "enemy_hurt",
-   "sword_swing",
    "sword_hit_shield",
    "sword_hit_rook",
-   "arrow_hit_shield",
+
    "rook_hits_ground",
-   "crossbow_fires_bolt",
-   "jump_or_bounce"
+
+   "sword_swing",
+
+   "statue_spawns_enemy",
+   "spawn_enemy_with_smoke",
+
+   "key_hits_ground",
+
+   "arrow_hit_shield",
+   "jump_or_bounce",
+   "crossbow_fires_bolt"
  ],
 
  "interactive_tile_functions": [

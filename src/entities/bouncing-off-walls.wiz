@@ -7,6 +7,9 @@ import "_variables";
 import "_base";
 import "../common/math";
 
+import "../audio";
+import "../../gen/resources";
+
 import "../../gen/entities";
 
 
@@ -103,6 +106,8 @@ func process(entityId : u8 in y) {
 
     // Change velocity on a tile collision
 
+    // ::TODO add collided with wall sound effect::
+
     a = SoA.movementState[y];
     if a & MovementState.X_AXIS_COLLISION != 0 {
         mem16();
@@ -135,6 +140,8 @@ func process(entityId : u8 in y) {
 // DB = 0x7e
 #[mem8, idx8]
 inline func collided_with_player_hitbox(entityId : u8 in y) {
+
+    audio.queue_sound_effect(sound_effects.enemy_hurt);
 
     x = SoA_hurtSpeed[y];
     if x < MAX_SWORD_SPEED {

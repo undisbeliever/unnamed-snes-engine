@@ -9,6 +9,9 @@ import "_common";
 import "../gamestate";
 import "../metatiles";
 
+import "../audio";
+import "../../gen/resources";
+
 import "../../gen/entities";
 
 
@@ -100,6 +103,8 @@ func init(entityId : u8 in y, parameter : u8 in x) {
 // DB = 0x7e
 #[mem8, idx8]
 func process(entityId : u8 in y) {
+    // ::TODO add a sword collision test (without a tile test).  Play sword_hit_rook sound effect::
+
     carry = base.test_player_bomb_collision(y);
     if carry {
         set_state__dead__inline(y);
@@ -237,7 +242,7 @@ func process__falling(entityId : u8 in y) {
 
         // ::TODO repel player from rook if player is close to the rook::
 
-        // ::TODO landing sound effect::
+        audio.queue_sound_effect(sound_effects.rook_hits_ground);
 
         ^return entities.spawn_entity(a = SoA.xPos_px[y],
                                       a = SoA.yPos_px[y] + 4,

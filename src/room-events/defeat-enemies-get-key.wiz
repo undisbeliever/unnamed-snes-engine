@@ -7,6 +7,9 @@ import "_common";
 import "../gamestate";
 import "../entities/_common";
 
+import "../audio";
+import "../../gen/resources";
+
 import "gen/room-events";
 
 
@@ -60,9 +63,11 @@ func process() {
             y = parameter__keyPos.yPos;
             y++;
 
-            ^return entities.spawn_entity(x, y,
-                                          a = entities.EntityTypes.smoke_particles as u8,
-                                          y = entities.smoke_particles.init_parameter.small as u8);
+            entities.spawn_entity(x, y,
+                                  a = entities.EntityTypes.smoke_particles as u8,
+                                  y = entities.smoke_particles.init_parameter.small as u8);
+
+            ^return audio.queue_sound_effect(sound_effects.key_spawns);
         }
     }
 }

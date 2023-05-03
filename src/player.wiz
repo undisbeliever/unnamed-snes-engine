@@ -14,6 +14,9 @@ import "metatiles";
 import "metasprites";
 import "common/math";
 
+import "audio";
+import "../gen/resources";
+
 import "../gen/entities";
 import "../gen/cosine-tables";
 
@@ -50,6 +53,10 @@ let InitialPlayerState = gamestate.PlayerState{
 };
 
 }
+
+
+// If the player health is below this value, sound a different 'player hurt' sound effect.
+let LOW_HEALTH_ALARM = 4;
 
 
 // How far the player can enter a doorway before the game prevents the player from
@@ -1046,6 +1053,8 @@ func set_state__attacking() {
     <:yVelocity = 0;
     >:yVelocity = 0;
 
+    audio.queue_sound_effect(sound_effects.sword_swing);
+
     ^return _set_ms_animation(facingDirection | ATTACKING_MS_ANIMATION_OFFSET);
 }
 
@@ -1110,6 +1119,10 @@ func _set_state__hurt__enemy_collision(enemyEntityId : u8 in y, _previousState :
     iframeCounter = a = N_IFRAMES_AFTER_ATTACKED;
     hurtTimer = a = N_HURT_FRAMES__ENEMY;
 
+
+    player_hurt_sound_effect();
+
+
     ^return _set_ms_animation(facingDirection | HURT_MS_ANIMATION_OFFSET);
 }
 
@@ -1123,7 +1136,7 @@ func take_environmental_damage(damage : u8 in a) : bool in carry {
 var _damage : u8 in zpTmp_byte_0;
 
     x = iframeCounter;
-    if zero {
+    ^if zero {
         x = state as u8;
         if x != State.HURT as u8 {
             previousState = x;
@@ -1182,11 +1195,28 @@ var _damage : u8 in zpTmp_byte_0;
             }
             player.health = a;
 
+            player_hurt_sound_effect();
+
             return true;
         }
     }
 
     return false;
+}
+
+
+
+#[mem8, idx8]
+func player_hurt_sound_effect() {
+    // Hurt sound effect
+    a = health;
+    if !zero && a < player.LOW_HEALTH_ALARM + 1 {
+        a = sound_effects.player_hurt_low_health as u8;
+    }
+    else {
+        a = sound_effects.player_hurt as u8;
+    }
+    ^return audio.queue_sound_effect(a as sound_effects);
 }
 
 
@@ -1553,6 +1583,8 @@ func set_state__attacking_in_doorway() {
     }
     mem8_idx8();
 
+    audio.queue_sound_effect(sound_effects.sword_swing);
+
     ^return _set_ms_animation(facingDirection | ATTACKING_MS_ANIMATION_OFFSET);
 }
 
@@ -1615,6 +1647,8 @@ inline func pickup_bomb__inline(bomb_entityId : u8 in y) {
     if zero {
         player.state = a = State.HOLDING_BOMB as u8;
 
+        audio.queue_sound_effect(sound_effects.pickup_bomb);
+
         mem16();
         #[mem16] {
             itemAboveHead_msFrameAddr = aa = entities.SoA.msFrameAddr[unaligned y];
@@ -1653,6 +1687,8 @@ func process__holding_bomb() {
                               a = yPos.px,
                               a = entities.EntityTypes.player_bomb as u8,
                               y = entities.player_bomb.DROP_ACTIVE_BOMB_PARAMETER);
+
+        audio.queue_sound_effect(sound_effects.throw_bomb);
 
         ^return set_state__walking();
     }

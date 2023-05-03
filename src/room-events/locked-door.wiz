@@ -8,6 +8,9 @@ import "../room";
 import "../gamestate";
 import "../interactive-tiles";
 
+import "../audio";
+import "../../gen/resources";
+
 import "gen/room-events";
 
 
@@ -82,7 +85,7 @@ func _process__unlock_door() {
     if carry {
         // Door successfully unlocked.
 
-        // ::TODO play door unlocked SFX::
+        audio.queue_sound_effect(sound_effects.door_open_with_key);
 
         a = State.DOOR_UNLOCKED as u8;
         state = a as State;

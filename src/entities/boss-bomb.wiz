@@ -14,6 +14,9 @@ import "player-bomb";
 import "../gamestate";
 import "../player";
 
+import "../audio";
+import "../../gen/resources";
+
 import "../../gen/cosine-tables";
 
 import "../../gen/entities";
@@ -166,9 +169,13 @@ func process__active(entityId : u8 in y) {
         a = base.manhattan_distance_to_player(y);
         if a < BOMB_EXPLOSION_DISTANCE {
             base.hurt_player__collision(y);
-        }
 
-        // ::TODO play sound effect::
+            a = sound_effects.explosion_hurt_player as u8;
+        }
+        else {
+            a = sound_effects.explosion as u8;
+        }
+        audio.queue_sound_effect(a as sound_effects);
 
         ^return entities.smoke_particles.change_to_smoke_entity(y, smoke_particles.init_parameter.explosion as u8);
     }
@@ -197,6 +204,8 @@ func set_state__disarmed(entityId : u8 in y) {
 
     SoA_timer_l[y] = a = <:DESPAWN_TIMER;
     SoA_timer_h[y] = a = >:DESPAWN_TIMER;
+
+    // ::TODO disarmed bomb sound effect (with a higher priority then swing sword)::
 
     set_ms_animation(y, ms_animations.stationary);
 }

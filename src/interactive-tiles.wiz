@@ -99,7 +99,6 @@ let player_tile_collision = tile_collision_null_function;
 #[mem8, idx8]
 func player_touches_tile(tileIndex : u8 in y) {
 
-    // ::TODO play sound effect::
     // ::TODO spawn a particle effect::
 
     // Heal 1HP every 8 frames
@@ -138,10 +137,7 @@ func player_touches_tile(tileIndex : u8 in y) {
     // ::TODO (important) confirm this is a good damage counter::
     a = frameCounter_lobyte;
     if a & 0xf == 0 {
-        carry = player.take_environmental_damage(1);
-        if carry {
-            // ::TODO play sound effect::
-        }
+        player.take_environmental_damage(1);
     }
 }
 

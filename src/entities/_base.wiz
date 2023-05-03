@@ -17,6 +17,8 @@ import "../metatiles";
 import "../metasprites";
 import "../common/math";
 
+import "../audio";
+import "../../gen/resources";
 
 import "../../gen/cosine-tables";
 
@@ -253,6 +255,8 @@ func test_player_bomb_collision(entityId : u8 in y) : bool in carry {
             // The player bomb exploded
             a = __player_bomb_manhattan_distance__inline(y, a);
             if a < player_bomb.BOMB_EXPLOSION_DISTANCE {
+                audio.queue_sound_effect(sound_effects.explosion_hurt_enemy);
+
                 return true;
             }
         }
