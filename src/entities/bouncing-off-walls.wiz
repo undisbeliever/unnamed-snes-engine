@@ -106,24 +106,26 @@ func process(entityId : u8 in y) {
 
     // Change velocity on a tile collision
 
-    // ::TODO add collided with wall sound effect::
-
     a = SoA.movementState[y];
-    if a & MovementState.X_AXIS_COLLISION != 0 {
-        mem16();
-        #[mem16] {
-            SoA.xVelocity[unaligned y] = aa = 0 - SoA.xVelocity[unaligned y];
+    if a & MovementState.TILE_COLLISION != 0 {
+        if a & MovementState.X_AXIS_COLLISION != 0 {
+            mem16();
+            #[mem16] {
+                SoA.xVelocity[unaligned y] = aa = 0 - SoA.xVelocity[unaligned y];
+            }
+            mem8();
         }
-        mem8();
-    }
 
-    a = SoA.movementState[y];
-    if a & MovementState.Y_AXIS_COLLISION != 0 {
-        mem16();
-        #[mem16] {
-            SoA.yVelocity[unaligned y] = aa = 0 - SoA.yVelocity[unaligned y];
+        a = SoA.movementState[y];
+        if a & MovementState.Y_AXIS_COLLISION != 0 {
+            mem16();
+            #[mem16] {
+                SoA.yVelocity[unaligned y] = aa = 0 - SoA.yVelocity[unaligned y];
+            }
+            mem8();
         }
-        mem8();
+
+        ^return audio.queue_sound_effect(sound_effects.bounce_off_wall);
     }
 }
 

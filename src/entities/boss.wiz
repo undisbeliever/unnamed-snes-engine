@@ -334,7 +334,7 @@ func set_state__rising(entityId : u8 in y) {
     a = State.RISING as u8;
     SoA_state[y] = a as State;
 
-    // ::TODO rising sound effect::
+    audio.queue_sound_effect(sound_effects.boss_rising);
 
     zero_velocities(y);
 
@@ -441,8 +441,6 @@ func set_state__falling(entityId : u8 in y) {
     a = State.FALLING as u8;
     SoA_state[y] = a as State;
 
-    // ::TODO shake side to side sound effect::
-
     SoA_timer[y] = a = N_FALLING_ANTICIPATION_FRAMES;
 
     ^return zero_velocities(y);
@@ -518,7 +516,6 @@ func set_state__landed(entityId : u8 in y) {
         base.hurt_player__collision(y);
     }
 
-    // ::TODO separate sound effect if boss hits player::
     audio.queue_sound_effect(sound_effects.rook_hits_ground);
 
 
@@ -554,8 +551,6 @@ func set_state__on_ground_target_player(entityId : u8 in y) {
     a = State.ON_GROUND_TARGET_PLAYER as u8;
     SoA_state[y] = a as State;
 
-    // ::TODO shake side to side sound effect::
-
     SoA_timer[y] = a = N_ON_GROUND_SHAKING_FRAMES;
 
     // Boss is on the ground.
@@ -589,7 +584,6 @@ func process__on_ground_target_player(entityId : u8 in y) {
     if a & MovementState.TILE_COLLISION != 0 {
         zero_velocities(y);
 
-        // ::TODO different sound effect for colliding with walls::
         audio.queue_sound_effect(sound_effects.rook_hits_ground);
 
         ^return set_state__waiting_on_ground(y);
@@ -959,6 +953,8 @@ func _shake_boss(entityId : u8 in y, timer : u8 in a) {
             SoA.yVelocity[unaligned x] = 0;
         }
         mem8();
+
+        ^return audio.queue_sound_effect(sound_effects.boss_shake);
     }
 }
 

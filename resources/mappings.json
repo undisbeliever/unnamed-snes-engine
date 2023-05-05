@@ -53,19 +53,25 @@
    "throw_bomb",
    "enemy_poof",
    "enemy_hurt",
+   "sword_hit_bolt",
    "sword_hit_shield",
    "sword_hit_rook",
 
+   "boss_bomb_disabled",
+   "boss_rising",
+   "boss_shake",
    "rook_hits_ground",
 
    "sword_swing",
+
+   "bolt_hits_wall",
+   "bounce_off_wall",
 
    "statue_spawns_enemy",
    "spawn_enemy_with_smoke",
 
    "key_hits_ground",
 
-   "arrow_hit_shield",
    "jump_or_bounce",
    "crossbow_fires_bolt"
  ],

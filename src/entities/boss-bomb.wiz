@@ -205,9 +205,9 @@ func set_state__disarmed(entityId : u8 in y) {
     SoA_timer_l[y] = a = <:DESPAWN_TIMER;
     SoA_timer_h[y] = a = >:DESPAWN_TIMER;
 
-    // ::TODO disarmed bomb sound effect (with a higher priority then swing sword)::
-
     set_ms_animation(y, ms_animations.stationary);
+
+    ^return audio.queue_sound_effect(sound_effects.boss_bomb_disabled);
 }
 
 

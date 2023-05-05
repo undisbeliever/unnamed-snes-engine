@@ -6,6 +6,9 @@ import "../memmap";
 import "_variables";
 import "_base";
 
+import "../audio";
+import "../../gen/resources";
+
 import "../../gen/entities";
 
 
@@ -94,7 +97,7 @@ func process(entityId : u8 in y) {
         SoA.zPos[y] = a = 0;
         SoA_despawnTimer[y] = a = N_FRAMES_IN_SWORD;
 
-        // ::TODO play bolt hit sword sound effect::
+        ^return audio.queue_sound_effect(sound_effects.sword_hit_bolt);
     }
     else if collisionState $ CollisionState.PLAYER_HURTBOX_BIT {
         base.hurt_player__collision(y);
@@ -105,9 +108,9 @@ func process(entityId : u8 in y) {
         a = SoA.movementState[y];
         if !zero {
             SoA_despawnTimer[y] = a = N_FRAMES_IN_WALL;
-        }
 
-        // ::TODO play bolt collided with wall sound effect::
+            ^return audio.queue_sound_effect(sound_effects.bolt_hits_wall);
+        }
     }
 }
 

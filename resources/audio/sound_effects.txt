@@ -442,6 +442,21 @@
     disable_channel
 
 
+
+=== sword_hit_bolt ===
+
+    set_volume 80
+
+    set_instrument square
+    set_adsr 12 6 3 28
+
+    play_note c6 no_keyoff 2
+    portamento c4 keyoff -50 8
+
+    disable_channel
+
+
+
 === sword_hit_rook ===
 
     ; Sounds like a "invalid" combined with a high pitch ting.
@@ -477,7 +492,7 @@
 
 
 === rook_hits_ground ===
-set_volume 255
+    set_volume 255
 
     set_instrument square
     set_gain 127
@@ -509,6 +524,82 @@ set_volume 255
     play_note  e1 2
 
     disable_channel
+
+
+
+=== boss_shake ===
+    set_volume 96
+
+    set_instrument sine
+    set_adsr 13 7 5 10
+
+    play_note  c5 no_keyoff 4
+    play_note  e4 no_keyoff 4
+    play_note  c5 no_keyoff 8
+
+    disable_channel
+
+
+=== boss_rising ===
+    set_volume 96
+
+    set_instrument sine
+    set_adsr 7 3 0 0
+
+    start_loop 12
+        play_note  b4 no_keyoff 3
+        play_note  c5 no_keyoff 3
+    end_loop
+
+    disable_channel
+
+
+
+=== boss_bomb_disabled ===
+
+    set_volume 50
+    set_instrument triangle
+    set_adsr 10 3 5 30
+
+    play_note  d6 3
+    play_note  b5 3
+    rest 2
+
+    ; fuse hiss (imagine a cartoon character extinguishing a lit fuse with their fingers)
+    set_volume 192
+    set_instrument noise
+    set_adsr 14 6 0 18
+
+    play_note  c4 keyoff 16
+
+    disable_channel
+
+
+
+=== bounce_off_wall ===
+    set_volume 80
+
+    set_instrument square
+    set_adsr 13 3 6 28
+
+    play_note  b-2 no_keyoff 2
+    play_note  e3 4
+
+    disable_channel
+
+
+
+=== bolt_hits_wall ===
+    set_volume 92
+
+    set_instrument square
+    set_adsr 13 2 4 30
+
+    play_note  c3 no_keyoff 8
+    play_note  e2 4
+
+    disable_channel
+
 
 
 === crossbow_fires_bolt ===
