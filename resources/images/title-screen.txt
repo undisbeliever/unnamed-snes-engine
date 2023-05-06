@@ -1,5 +1,7 @@
 
 Title Font: DejaVuSans, size 16
 
+Subtitle Font: DejaVuSans, size 13, parenthesis manually tweaked
+
 Copyright and Press Start Font: DejaVuSans, size 11, manually tweaked
 
