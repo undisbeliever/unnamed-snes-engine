@@ -165,79 +165,37 @@
     set_adsr 15 1 0 21
 
     play_note  b2  2
-    play_note  c+2 4
+    play_note  c+2 8
     play_note  e1  8
-
-    rest 6
-
-
-    ; echo sounds good
-    set_volume 64
-    set_instrument noise
-    set_adsr 10 3 3 20
-
-    play_note  g+1 no_keyoff 8
-    portamento c1 keyoff -2 42
 
     disable_channel
 
 
 
 === door_open_with_key ===
-    set_volume 192
+    set_volume 255
 
     ; key unlock
     set_instrument noise
     set_adsr 15 7 3 28
-    play_note  a5 2
-    rest 4
-    play_note  f5 4
-    rest 32
-
-    ; ::SHOULDDO add a delay in opening the door::
-
-    ; ::TODO Find a better door creaking on stone sound::
-    set_instrument sawtooth
-    set_adsr 13 1 2 28
-    play_note  e1 no_keyoff 2
-    portamento c3 no_keyoff +8 8
-    portamento c3 keyoff +40 8
-
-    rest 12
-
-
-    ; echo sounds good
-    set_volume 64
-    set_instrument noise
-    set_adsr 13 3 3 20
-
-    play_note  g+1 no_keyoff 8
-    portamento c2 keyoff +2 64
+    play_note  a5 6
+    rest 2
+    play_note  f5 8
 
     disable_channel
 
 
 
 === door_open ===
+
     set_volume 192
 
     ; ::TODO Find a better door creaking on stone sound::
     set_instrument sawtooth
     set_adsr 6 2 7 5
     play_note  e1 no_keyoff 4
-    portamento c3 no_keyoff +8 16
+    portamento c3 no_keyoff +4 16
     portamento c3 keyoff +40 8
-
-    rest 12
-
-
-    ; echo sounds good
-    set_volume 64
-    set_instrument noise
-    set_adsr 13 3 3 20
-
-    play_note  g+1 no_keyoff 8
-    portamento c2 keyoff +2 64
 
     disable_channel
 
