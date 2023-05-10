@@ -2,7 +2,8 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "memmap";
-import "../wiz/common/snes/snes";
+import "registers";
+import "registers_math";
 import "common/dma";
 
 import "audio";
@@ -253,11 +254,11 @@ func setup_ppu__forceblank() {
 
 
     // Reset BG3 scroll
-    snes.ppu.bg3_scroll_x = a = <:X_BG_OFFSET;
-    snes.ppu.bg3_scroll_x = a = >:X_BG_OFFSET;
+    BG3HOFS = a = <:X_BG_OFFSET;
+    BG3HOFS = a = >:X_BG_OFFSET;
     // Set Y scroll to -1;
-    snes.ppu.bg3_scroll_y = a = <:(Y_BG_OFFSET - 1);
-    snes.ppu.bg3_scroll_y = a = >:(Y_BG_OFFSET - 1);
+    BG3VOFS = a = <:(Y_BG_OFFSET - 1);
+    BG3VOFS = a = >:(Y_BG_OFFSET - 1);
 
 
     // Do not transfer the buffer to VRAM on the next VBlank
@@ -289,30 +290,30 @@ inline func transfer_buffer__vblank() {
     if !zero {
         if negative {
             // Erase textbox
-            snes.dma0.control = a = snes.dma.CONTROL_MODE_AB | snes.dma.CONTROL_MDMA_NO_INCREMENT;
+            DMAP0 = a = DMAP_TO_PPU | DMAP_FIXED | DMAP_TRANSFER_TWO;
 
             xx = &empty_byte as u16;
             a = #:far &empty_byte;
         }
         else {
             // Copy textbox
-            snes.dma0.control = a = snes.dma.CONTROL_MODE_AB;
+            DMAP0 = a = DMAP_TO_PPU | DMAP_TRANSFER_TWO;
 
             xx = &buffer as u16;
             a = #:far &buffer;
         }
 
-        snes.dma0.src_address_hl = xx;
-        snes.dma0.src_address_bank = a;
+        A1T0 = xx;
+        A1B0 = a;
 
-        snes.dma0.mdma_size_hl = xx = bufferSizeInBytes;
+        DAS0 = xx = bufferSizeInBytes;
 
-        snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
+        BBAD0 = a = <:&VMDATA;
 
-        snes.ppu.vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
-        snes.ppu.vram_address_hl = xx = bufferVramWaddr;
+        VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+        VMADD = xx = bufferVramWaddr;
 
-        snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+        MDMAEN = a = MDMAEN_DMA0;
 
         nextVBlankAction = VBlankAction.NOTHING;
     }
@@ -482,29 +483,30 @@ inline func __decode_string__u16__inline(decodedStringPos : u8 in x, isSecondPar
         y = -1 as u8;
 
         // Set DP so we can access the division registers
-        push16(&snes.divider.left_hl as u16 & 0xff00);
+        push16(&WRDIV as u16 & 0xff00);
         direct_page = pop16();
         {
         // DP = 0x4200
         // MUST NOT USE zeropage variables
             do {
-                *((&snes.divider.left_hl as u16 & 0xff) as *u16) = aa;
-                *((&snes.divider.right as u16 & 0xff) as *u8) = x;
+                *((&WRDIV as u16 & 0xff) as *u16) = aa;
+                *((&WRDIVB as u16 & 0xff) as *u8) = x;
 
                 // Must wait 16 cycles before reading result.
 
-                swap_bytes(aa);                                                 // 3
-                nop();                                                          // 2
-                nop();                                                          // 2
+                swap_bytes(aa);                            // 3
+                nop();                                     // 2
+                nop();                                     // 2
 
-                y++;                                                            // 2
-                aa = '0' as u16;                                                // 3
-                carry = false;                                                  // 2
-                aa +#= *((&snes.divider.mod_result_hl as u16 & 0xff) as *u16);  // +2 instruction fetch
+                y++;                                       // 2
+                aa = '0' as u16;                           // 3
+                carry = false;                             // 2
+                // RDMPY contains the remainder
+                aa +#= *((&RDMPY as u16 & 0xff) as *u16);  // +2 instruction fetch
 
                 (&u16Buffer as *u16)[unaligned y] = aa;
 
-                aa = *((&snes.divider.div_result_hl as u16 & 0xff) as *u16);
+                aa = *((&RDDIV as u16 & 0xff) as *u16);
             } while !zero;
         }
         direct_page = aa = 0;

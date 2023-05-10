@@ -2,12 +2,12 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "memmap";
+import "registers";
 import "room";
 import "common/dma";
 
 import "gen/resources";
 
-import "../wiz/common/snes/snes";
 
 
 namespace resources {
@@ -234,7 +234,7 @@ func load_room(roomId : u8 in a) : bool in carry {
 #[mem8, idx16]
 func load_tiles_resource_into_vram(resourceId : resources.tiles in a, vramWordAddr : u16 in xx) {
 
-    snes.ppu.vram_address_hl = xx;
+    VMADD = xx;
 
     res = __load_resource(ResourceType.tiles as u16, a);
 
@@ -270,7 +270,7 @@ var _tileMapByteSize   : u16 in zpTmp_word_1;
     // ::TODO Add palette resource type, remove palette from BgImage::
     // ::TODO Lookup VRAM word addresses from a table in memory::
 
-    snes.ppu.vram_address_hl = xx;
+    VMADD = xx;
     _vramTilesWaddr = yy;
 
     res = __load_resource(ResourceType.bg_image as u16, a);
@@ -295,7 +295,7 @@ var _tileMapByteSize   : u16 in zpTmp_word_1;
     mem8();
 
     // Transfer palette to CGRAM
-    snes.ppu.cgram_address = 0;
+    CGADD = 0;
     dma.continue_transfer_to_cgram__forceblank(yy);
 
     // Transfer tilemap to VRAM
@@ -303,7 +303,7 @@ var _tileMapByteSize   : u16 in zpTmp_word_1;
     dma.continue_transfer_to_vram__forceblank(_tileMapByteSize);
 
     // Transfer tiles to VRAM
-    snes.ppu.vram_address_hl = xx = _vramTilesWaddr;
+    VMADD = xx = _vramTilesWaddr;
     dma.transfer_remaining_res_data_to_vram__forceblank(res);
 }
 
@@ -325,17 +325,19 @@ func transfer_resource_header_to_wram7e(_resourceData : ResourceEntry in res, pt
     // Assumes res.farPtr is not Work-RAM.
     // ::TODO slow path if `res.farPtr` bank is a Work-RAM address::
 
-    snes.wram.address_hl = xx;
-    snes.wram.address_bank = a = 0x7e;
+    WMADDML = xx;
+    WMADDH = a = 0x7e;
 
-    snes.dma0.control = a = snes.dma.CONTROL_MODE_A;
-    snes.dma0.mdma_dest = a = <:&snes.wram.data;
-    snes.dma0.mdma_size_hl = yy;
+    DMAP0 = a = DMAP_TO_PPU | DMAP_TRANSFER_ONE;
+    BBAD0 = a = <:&WMDATA;
+    // DMA size
+    DAS0 = yy;
 
-    snes.dma0.src_address_hl = xx = *(&res.farPtr as *u16);
-    snes.dma0.src_address_bank = a = #:res.farPtr;
+    // DMA A-Bus address
+    A1T0 = xx = *(&res.farPtr as *u16);
+    A1B0 = a = #:res.farPtr;
 
-    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+    MDMAEN = a = MDMAEN_DMA0;
 }
 
 }

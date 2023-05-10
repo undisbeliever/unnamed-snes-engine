@@ -2,9 +2,8 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "../memmap";
+import "../registers";
 import "../common/reset";
-
-import "../../wiz/common/snes/snes";
 
 import "../audio";
 import "../gamemodes";
@@ -81,10 +80,10 @@ inline func setup_ppu() {
     }
     mem8();
 
-    snes.ppu.bg_mode = a = 0;
-    snes.ppu.bg1_tilemap = a = (VRAM_BG1_MAP_WADDR >> snes.ppu.BG_TILEMAP_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT) | snes.ppu.BG_TILEMAP_MIRROR_X;
-    snes.ppu.bg12_tileset = a = (VRAM_BG1_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG1_SHIFT);
-    snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_BG1;
+    BGMODE = a = BGMODE_MODE_0;
+    BG1SC = a = ((VRAM_BG1_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_64x32;
+    BG12NBA = a = ((VRAM_BG1_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG1_SHIFT);
+    TM = a = TM_BG1;
 
     resources.load_bg_image_resource_into_vram(resources.bg_images.title_screen, VRAM_BG1_MAP_WADDR, VRAM_BG1_TILES_WADDR);
 }

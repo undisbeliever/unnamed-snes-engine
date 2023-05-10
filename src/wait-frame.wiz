@@ -2,6 +2,8 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "memmap";
+import "registers";
+
 import "audio";
 import "joypad";
 import "metasprites";
@@ -11,7 +13,6 @@ import "textbox";
 import "rng";
 import "interrupts";
 import "gamestate";
-import "../wiz/common/snes/snes";
 
 
 let FRAMES_PER_SECOND = 60;
@@ -82,12 +83,12 @@ func wait_frame() {
     }
     mem8();
     #[mem8, idx16] {
-        a = _brightness_buffer | snes.ppu.BRIGHTNESS_FORCE_BLANK;
+        a = _brightness_buffer | INIDISP_FORCE_BLANK;
 
         wait_until_interrupt();
 
         // Force-blank screen to prevent corrupt graphics on VBlank overrun
-        snes.ppu.brightness = a;
+        INIDISP = a;
 
 
         metasprites.update_oam__vblank();
@@ -100,18 +101,18 @@ func wait_frame() {
 
         // Update scroll registers
 
-        snes.ppu.bg1_scroll_x = a = *(&<:bg1_scrollX as *u8);
-        snes.ppu.bg1_scroll_x = a = *(&>:bg1_scrollX as *u8);
-        snes.ppu.bg1_scroll_y = a = *(&<:bg1_scrollY as *u8);
-        snes.ppu.bg1_scroll_y = a = *(&>:bg1_scrollY as *u8);
+        BG1HOFS = a = *(&<:bg1_scrollX as *u8);
+        BG1HOFS = a = *(&>:bg1_scrollX as *u8);
+        BG1VOFS = a = *(&<:bg1_scrollY as *u8);
+        BG1VOFS = a = *(&>:bg1_scrollY as *u8);
 
-        snes.ppu.bg2_scroll_x = a = *(&<:bg2_scrollX as *u8);
-        snes.ppu.bg2_scroll_x = a = *(&>:bg2_scrollX as *u8);
-        snes.ppu.bg2_scroll_y = a = *(&<:bg2_scrollY as *u8);
-        snes.ppu.bg2_scroll_y = a = *(&>:bg2_scrollY as *u8);
+        BG2HOFS = a = *(&<:bg2_scrollX as *u8);
+        BG2HOFS = a = *(&>:bg2_scrollX as *u8);
+        BG2VOFS = a = *(&<:bg2_scrollY as *u8);
+        BG2VOFS = a = *(&>:bg2_scrollY as *u8);
 
 
-        snes.ppu.brightness = a = _brightness_buffer;
+        INIDISP = a = _brightness_buffer;
     }
 
     idx8();

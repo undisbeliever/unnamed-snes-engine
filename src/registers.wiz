@@ -1,0 +1,926 @@
+// SNES Registers (excluding S-CPU math registers)
+//
+// Register descriptions taken from the SNESdev wiki https://snes.nesdev.org/.
+// Register timings are my personal suggestions to prevent glitches.
+//
+// Copyright (c) 2023, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+
+// Screen display
+//
+// write, any
+extern writeonly INIDISP @ 0x2100 : u8;
+    let INIDISP_FORCE_BLANK = 0x80;
+    let INIDISP_BRIGHTNESS_MASK = 0b00001111;
+
+
+// Object size and character address
+//
+// write, v-blank
+// ::TODO check if OBJSEL is safe to write to during h-blank::
+extern writeonly OBJSEL @ 0x2101 : u8;
+    let OBJSEL_SIZE_MASK  = 0b11100000;
+    let OBJSEL_SIZE_8_16  = 0 << 5;
+    let OBJSEL_SIZE_8_32  = 1 << 5;
+    let OBJSEL_SIZE_8_64  = 2 << 5;
+    let OBJSEL_SIZE_16_32 = 3 << 5;
+    let OBJSEL_SIZE_16_64 = 4 << 5;
+    let OBJSEL_SIZE_32_64 = 5 << 5;
+
+    let OBJSEL_NAME_MASK  = 0b00011000;
+    let OBJSEL_NAME_SHIFT = 3;
+    let OBJSEL_NAME_WALIGN = 4096;
+
+    let OBJSEL_BASE_MASK  = 0b00000111;
+    let OBJSEL_BASE_SHIFT = 0;
+    let OBJSEL_BASE_WALIGN = 8192;
+
+
+// OAM address
+//
+// word write, v-blank
+extern writeonly OAMADD  @ 0x2102 : u16;
+    let OAMADD_ADDR_MASK = 0x01ff;
+    let OAMADD_HI_TABLE = 1 << 8;
+    let OAMADD_PRIORITY = 1 << 15;
+
+// word write, v-blank
+extern writeonly OAMADDL @ 0x2102 : u8;
+extern writeonly OAMADDH @ 0x2103 : u8;
+    let OAMADDH_HI_TABLE = 0b00000001;
+    let OAMADDH_PRIORITY = 0b10000000;
+
+
+// OAM data
+//
+// write twice, v-blank
+extern writeonly OAMDATA @ 0x2104 : u8;
+
+
+// BG mode and character size
+//
+// write, h-blank, v-blank
+extern writeonly BGMODE @ 0x2105 : u8;
+    let BGMODE_MODE_MASK = 0b00000111;
+    let BGMODE_MODE_0 = 0;
+    let BGMODE_MODE_1 = 1;
+    let BGMODE_MODE_2 = 2;
+    let BGMODE_MODE_3 = 3;
+    let BGMODE_MODE_4 = 4;
+    let BGMODE_MODE_5 = 5;
+    let BGMODE_MODE_6 = 6;
+    let BGMODE_MODE_7 = 7;
+
+    // Mode 1 with BG3 priority
+    let BGMODE_MODE_1_BG3_PRIORITY = 0x08 | 1;
+
+    let BGMODE_SIZE_MASK = 0b11100000;
+    let BGMODE_SIZE_BG1  = 0x10;
+    let BGMODE_SIZE_BG2  = 0x20;
+    let BGMODE_SIZE_BG3  = 0x40;
+    let BGMODE_SIZE_BG4  = 0x80;
+
+
+// Screen pixelation
+//
+// write, h-blank, v-blank
+extern writeonly MOSAIC @ 0x2106 : u8;
+    let MOSAIC_BG_MASK = 0b00001111;
+    let MOSAIC_BG1 = 0x01;
+    let MOSAIC_BG2 = 0x02;
+    let MOSAIC_BG3 = 0x04;
+    let MOSAIC_BG4 = 0x08;
+
+    let MOSAIC_SIZE_MASK = 0b11110000;
+    let MOSAIC_SIZE_SHIFT = 4;
+
+
+// BG tilemap address and size
+//
+// write, v-blank
+// ::TODO check if BGxSC is safe to write during h-blank::
+extern writeonly BG1SC @ 0x2107 : u8;
+extern writeonly BG2SC @ 0x2108 : u8;
+extern writeonly BG3SC @ 0x2109 : u8;
+extern writeonly BG4SC @ 0x210a : u8;
+    let BGxSC_BASE_MASK = 0b11111100;
+    let BGxSC_BASE_SHIFT = 2;
+
+    let BGxSC_BASE_WALIGN = 1024;
+
+    let BGxSC_MAP_MASK  = 0b00000011;
+    let BGxSC_MAP_32x32 = 0;
+    let BGxSC_MAP_64x32 = 1;
+    let BGxSC_MAP_32x64 = 2;
+    let BGxSC_MAP_64x64 = 3;
+
+
+// BG1 & BG2 character address
+//
+// write, v-blank
+// ::TODO check if BGxxNBA is safe to write during h-blank::
+extern writeonly BG12NBA @ 0x210b : u8;
+    let BG12NBA_BG1_MASK = 0b00001111;
+    let BG12NBA_BG1_SHIFT = 0;
+
+    let BG12NBA_BG2_MASK = 0b11110000;
+    let BG12NBA_BG2_SHIFT = 4;
+
+    let BG12NBA_WALIGN = 4096;
+
+
+// BG3 & BG4 character address
+//
+// write, v-blank
+extern writeonly BG34NBA @ 0x210c : u8;
+    let BG34NBA_BG3_MASK = 0b00001111;
+    let BG34NBA_BG3_SHIFT = 0;
+
+    let BG34NBA_BG4_MASK = 0b11110000;
+    let BG34NBA_BG4_SHIFT = 4;
+
+    let BG34NBA_WALIGN = 4096;
+
+
+// BG scroll offset
+//
+// write twice, h-blank, v-blank
+extern writeonly BG1HOFS @ 0x210d : u8;
+extern writeonly BG1VOFS @ 0x210e : u8;
+extern writeonly BG2HOFS @ 0x210f : u8;
+extern writeonly BG2VOFS @ 0x2110 : u8;
+extern writeonly BG3HOFS @ 0x2111 : u8;
+extern writeonly BG3VOFS @ 0x2112 : u8;
+extern writeonly BG4HOFS @ 0x2113 : u8;
+extern writeonly BG4VOFS @ 0x2114 : u8;
+
+// write twice, h-blank, v-blank
+extern writeonly M7HOFS @ 0x210d : u8;
+extern writeonly M7VOFS @ 0x210e : u8;
+
+
+// Video port control
+//
+// write, v-blank
+extern writeonly VMAIN @ 0x2115 : u8;
+    let VMAIN_INCREMENT_MASK = 0b00000011;
+    let VMAIN_INCREMENT_1    = 0;
+    let VMAIN_INCREMENT_32   = 1;
+    let VMAIN_INCREMENT_128  = 2;
+
+    let VMAIN_REMAP_MASK = 0b00001100;
+    let VMAIN_REMAP_2BPP = 0b00000100;
+    let VMAIN_REMAP_4BPP = 0b00001000;
+    let VMAIN_REMAP_8BPP = 0b00001100;
+
+    let VMAIN_INCREMENT_LOW  = 0;
+    let VMAIN_INCREMENT_HIGH = 0x80;
+
+
+// VRAM word address
+//
+// write, word, v-blank
+extern writeonly VMADD @ 0x2116 : u16;
+extern writeonly VMADDL @ 0x2116 : u8;
+extern writeonly VMADDH @ 0x2117 : u8;
+
+
+// VRAM data
+//
+// write, v-blank
+// VMDATA is not a word register
+extern writeonly VMDATA @ 0x2118 : u16;
+extern writeonly VMDATAL @ 0x2118 : u8;
+extern writeonly VMDATAH @ 0x2119 : u8;
+
+
+// Mode 7 settings
+//
+// write, v-blank
+// ::TODO check if M7SEL is safe to write during h-blank::
+extern writeonly M7SEL @ 0x211a : u8;
+    let M7SEL_H_FLIP = 0x01;
+    let M7SEL_V_FLIP = 0x02;
+
+    // Out of screen settings
+    let M7SEL_OOS_MASK   = 0b11000000;
+    let M7SEL_OOS_REPEAT = 0x00;
+    let M7SEL_OOS_COLOR0 = 0x80;
+    let M7SEL_OOS_TILE0  = 0xc0;
+
+
+// Mode 7 matrix
+//
+// write twice, h-blank, v-blank
+extern writeonly M7A @ 0x211b : u8;
+extern writeonly M7B @ 0x211c : u8;
+extern writeonly M7C @ 0x211d : u8;
+extern writeonly M7D @ 0x211e : u8;
+
+
+// Mode 7 center
+//
+// write twice, h-blank, v-blank
+extern writeonly M7X @ 0x211f : u8;
+extern writeonly M7Y @ 0x2120 : u8;
+
+
+// CGRAM word address
+//
+// write, h-blank, v-blank
+extern writeonly CGADD @ 0x2121 : u8;
+    // Starting color of the OBJ palette
+    let CGADD_OBJ_PALETTE = 128;
+
+
+// CGRAM data
+//
+// write twice, h-blank, v-blank
+extern writeonly CGDATA @ 0x2122 : u8;
+
+
+// Window mask settings
+//
+// write, h-blank, v-blank
+extern writeonly W12SEL  @ 0x2123 : u8;
+extern writeonly W34SEL  @ 0x2124 : u8;
+extern writeonly WOBJSEL @ 0x2125 : u8;
+    let WSEL_W1_ENABLE  = 0b0010;
+    let WSEL_W1_INSIDE  = 0b0000;
+    let WSEL_W1_OUTSIDE = 0b0001;
+
+    let WSEL_W2_ENABLE  = 0b1000;
+    let WSEL_W2_INSIDE  = 0b0000;
+    let WSEL_W2_OUTSIDE = 0b0100;
+
+    let W12SEL_BG1_MASK = 0b00001111;
+    let W12SEL_BG1_SHIFT = 0;
+
+    let W12SEL_BG2_MASK = 0b11110000;
+    let W12SEL_BG2_SHIFT = 4;
+
+    let W34SEL_BG3_MASK = 0b00001111;
+    let W34SEL_BG3_SHIFT = 0;
+
+    let W34SEL_BG4_MASK = 0b11110000;
+    let W34SEL_BG4_SHIFT = 4;
+
+    let WOBJSEL_OBJ_MASK = 0b00001111;
+    let WOBJSEL_OBJ_SHIFT = 0;
+
+    let WOBJSEL_COLOR_MASK = 0b11110000;
+    let WOBJSEL_COLOR_SHIFT = 4;
+
+
+// Window positions
+//
+// write, h-blank, v-blank
+extern writeonly WH0 @ 0x2126 : u8;
+extern writeonly WH1 @ 0x2127 : u8;
+extern writeonly WH2 @ 0x2128 : u8;
+extern writeonly WH3 @ 0x2129 : u8;
+
+
+// Window BG mask logic
+//
+// write, h-blank, v-blank
+extern writeonly WBGLOG @ 0x212a : u8;
+    let WBGLOG_BG1_MASK = 0b00000011;
+    let WBGLOG_BG1_SHIFT = 0;
+
+    let WBGLOG_BG2_MASK = 0b00001100;
+    let WBGLOG_BG2_SHIFT = 2;
+
+    let WBGLOG_BG3_MASK = 0b00110000;
+    let WBGLOG_BG3_SHIFT = 4;
+
+    let WBGLOG_BG4_MASK = 0b11000000;
+    let WBGLOG_BG4_SHIFT = 6;
+
+    let WBGLOG_LOGIC_OR   = 0;
+    let WBGLOG_LOGIC_AND  = 1;
+    let WBGLOG_LOGIC_XOR  = 2;
+    let WBGLOG_LOGIC_XNOR = 3;
+
+
+// Window OBJ and color math mask logic
+//
+// write, h-blank, v-blank
+extern writeonly WOBJLOG @ 0x212b : u8;
+    let WOBJLOG_OBJ_MASK = 0b00000011;
+    let WOBJLOG_OBJ_SHIFT = 0;
+
+    let WOBJLOG_COLOR_MASK = 0b00001100;
+    let WOBJLOG_COLOR_SHIFT = 2;
+
+    let WOBJLOG_LOGIC_OR   = 0;
+    let WOBJLOG_LOGIC_AND  = 1;
+    let WOBJLOG_LOGIC_XOR  = 2;
+    let WOBJLOG_LOGIC_XNOR = 3;
+
+
+// Main screen layer enable
+//
+// write, h-blank, v-blank
+extern writeonly TM @ 0x212c : u8;
+    let TM_BG1 = 0x01;
+    let TM_BG2 = 0x02;
+    let TM_BG3 = 0x04;
+    let TM_BG4 = 0x08;
+    let TM_OBJ = 0x10;
+
+
+// Subscreen layer enable
+//
+// write, h-blank, v-blank
+extern writeonly TS @ 0x212d : u8;
+    let TS_BG1 = 0x01;
+    let TS_BG2 = 0x02;
+    let TS_BG3 = 0x04;
+    let TS_BG4 = 0x08;
+    let TS_OBJ = 0x10;
+
+
+// Main screen layer window enable
+//
+// write, h-blank, v-blank
+extern writeonly TMW @ 0x212e : u8;
+    let TMW_BG1 = 0x01;
+    let TMW_BG2 = 0x02;
+    let TMW_BG3 = 0x04;
+    let TMW_BG4 = 0x08;
+    let TMW_OBJ = 0x10;
+
+
+// Subscreen layer window enable
+//
+// write, h-blank, v-blank
+extern writeonly TSW @ 0x212f : u8;
+    let TSW_BG1 = 0x01;
+    let TSW_BG2 = 0x02;
+    let TSW_BG3 = 0x04;
+    let TSW_BG4 = 0x08;
+    let TSW_OBJ = 0x10;
+
+
+// Color addition select
+//
+// write, h-blank, v-blank
+extern writeonly CGWSEL @ 0x2130 : u8;
+    // Replace main-screen color with black
+    let CGWSEL_MSB_MASK = 0b11000000;
+    let CGWSEL_MSB_SHIFT = 6;
+        let CGWSEL_MSB_NOWHERE = 0 << 6;
+        let CGWSEL_MSB_OUTSIDE = 1 << 6;
+        let CGWSEL_MSB_INSIDE  = 2 << 6;
+        let CGWSEL_MSB_ALWAYS  = 3 << 6;
+
+    // Replace sub-screen with transparent
+    let CGWSEL_SST_MASK = 0b00110000;
+    let CGWSEL_SST_SHIFT = 4;
+        let CGWSEL_SST_NOWHERE = 0 << 4;
+        let CGWSEL_SST_OUTSIDE = 1 << 4;
+        let CGWSEL_SST_INSIDE  = 2 << 4;
+        let CGWSEL_SST_ALWAYS  = 3 << 4;
+
+    let CGWSEL_ADD_SUBSCREEN = 0b00000010;
+    let CGWSEL_DIRECT_COLOR  = 0b00000001;
+
+
+// Color math designation
+//
+// write h-blank, v-blank
+extern writeonly CGADSUB @ 0x2131 : u8;
+    let CGADSUB_COLOR_ADD       = 0b00000000;
+    let CGADSUB_COLOR_SUBTRACT  = 0b10000000;
+
+    let CGADSUB_HALFCOLOR       = 0b01000000;
+
+    let CGADSUB_ENABLE_MASK     = 0b00111111;
+    let CGADSUB_ENABLE_BG1      = 0x01;
+    let CGADSUB_ENABLE_BG2      = 0x02;
+    let CGADSUB_ENABLE_BG3      = 0x04;
+    let CGADSUB_ENABLE_BG4      = 0x08;
+    let CGADSUB_ENABLE_OBJ      = 0x10;
+    let CGADSUB_ENABLE_BACKDROP = 0x20;
+
+
+// Fixed color data
+//
+// write, h-blank, v-blank
+extern writeonly COLDATA @ 0x2132 : u8;
+    let COLDATA_PLANE_ALL  = 0b11100000;
+    let COLDATA_PLANE_B    = 0b10000000;
+    let COLDATA_PLANE_G    = 0b01000000;
+    let COLDATA_PLANE_R    = 0b00100000;
+
+    let COLDATA_VALUE_MASK = 0b00011111;
+
+
+// Screen mode/video select
+//
+// write, h-blank, v-blank
+extern writeonly SETINI @ 0x2133 : u8;
+    let SETINI_EXTSYNC          = 0b10000000;
+    let SETINI_EXTBG            = 0b01000000;
+    let SETINI_PSUDEO_HIRES     = 0b00001000;
+    let SETINI_OVERSCAN         = 0b00000100;
+    let SETINI_OBJ_INTERLACE    = 0b00000010;
+    let SETINI_SCREEN_INTERLACE = 0b00000001;
+
+
+// Multiplication result
+//
+// MPY : i24 = {i16 `M7A`} * {i8 `M7B`}
+//
+// read, not mode 7
+extern const MPY @ 0x2134 : i24;
+extern const MPYMH @ 0x2135 : i16;
+
+extern const MPYL @ 0x2134 : u8;
+extern const MPYM @ 0x2135 : u8;
+extern const MPYH @ 0x2136 : u8;
+
+
+// Software latch for H/V counters
+//
+// read, any
+extern const SLHV @ 0x2137 : u8;
+
+
+// OAM data read
+//
+// read twice, v-blank
+extern const OAMDATAREAD @ 0x2138 : u8;
+
+
+// VRAM data read
+//
+// read, v-blank
+extern const VMDATAREAD @ 0x2139 : u16;
+extern const VMDATALREAD @ 0x2139 : u8;
+extern const VMDATAHREAD @ 0x213a : u8;
+
+
+// CGRAM data read
+//
+// read twice, v-blank, h-blank
+extern const CGDATAREAD @ 0x213b : u8;
+
+
+// Output horizontal counter
+//
+// read twice, any
+extern const OPHCT @ 0x213c : u8;
+    let OPHCT_READ_TWICE_MASK = 0x1ff;
+
+
+// Output vertical counter
+//
+// read twice, any
+extern const OPVCT @ 0x213d : u8;
+    let OPVCT_READ_TWICE_MASK = 0x1ff;
+
+
+// PPU1 status flags and version
+//
+// read, any
+extern const STAT77 @ 0x213e : u8;
+    let STAT77_TIME_OVER         = 0b10000000;
+    let STAT77_RANGE_OVER        = 0b01000000;
+    let STAT77_PPU1_VERSION_MASK = 0b00001111;
+
+
+// PPU2 status flags and version
+//
+// read, any
+extern const STAT78 @ 0x213f : u8;
+    let STAT78_INTERLACE         = 0b10000000;
+    let STAT78_EXTERNAL_LATCH    = 0b01000000;
+    let STAT78_50HZ              = 0b00010000;
+    let STAT78_PPU2_VERSION_MASK = 0b00001111;
+
+
+// Data to APU
+//
+// write, any
+extern writeonly APUIO_OUT_0 @ 0x2140 : u8;
+extern writeonly APUIO_OUT_1 @ 0x2141 : u8;
+extern writeonly APUIO_OUT_2 @ 0x2142 : u8;
+extern writeonly APUIO_OUT_3 @ 0x2143 : u8;
+
+extern writeonly APUIO_OUT_10 @ 0x2140 : u16;
+extern writeonly APUIO_OUT_21 @ 0x2141 : u16;
+extern writeonly APUIO_OUT_32 @ 0x2142 : u16;
+
+
+// Data from APU
+//
+// read, any
+extern const APUIO_IN_0 @ 0x2140 : u8;
+extern const APUIO_IN_1 @ 0x2141 : u8;
+extern const APUIO_IN_2 @ 0x2142 : u8;
+extern const APUIO_IN_3 @ 0x2143 : u8;
+
+extern const APUIO_IN_10 @ 0x2140 : u16;
+extern const APUIO_IN_21 @ 0x2141 : u16;
+extern const APUIO_IN_32 @ 0x2142 : u16;
+
+
+// WRAM data read/write
+//
+// read/write, any
+extern var WMDATA @ 0x2180 : u8;
+
+
+// WRAM address
+//
+// write, any
+extern writeonly WMADD   @ 0x2181 : u24;
+extern writeonly WMADDML @ 0x2181 : u16;
+extern writeonly WMADDL @ 0x2181 : u8;
+extern writeonly WMADDM @ 0x2182 : u8;
+extern writeonly WMADDH @ 0x2183 : u8;
+
+
+// Joypad output
+//
+// write, not auto-joy
+extern writeonly JOYOUT @ 0x4016 : u8;
+    let JOYOUT_LATCH = 0b00000001;
+
+
+// Joypad serial data port 1
+//
+// read, not auto-joy
+extern const JOYSER0 @ 0x4016 : u8;
+    let JOYSER0_DATA1 = 0b00000001;
+    let JOYSER0_DATA2 = 0b00000010;
+
+
+// Joypad serial data port 2
+//
+// read, not auto‑joy
+extern const JOYSER1 @ 0x4017 : u8;
+    let JOYSER1_DATA1 = 0b00000001;
+    let JOYSER1_DATA2 = 0b00000010;
+
+
+// Interrupts and auto-joypad reading
+//
+// write, any
+extern writeonly NMITIMEN @ 0x4200 : u8;
+    let NMITIMEN_V_BLANK   = 0b10000000;
+    let NMITIMEN_V_COUNTER = 0b01000000;
+    let NMITIMEN_H_COUNTER = 0b00100000;
+    let NMITIMEN_AUTO_JOY  = 0b00000001;
+
+
+// Write I/O pins
+//
+// write, any
+extern writeonly WRIO @ 0x4201 : u8;
+    let WRIO_PORT2 = 0b10000000;
+    let WRIO_PORT1 = 0b01000000;
+    let WRIO_PPU_LATCH = WRIO_PORT2;
+
+
+// H timer target
+//
+// write, any
+extern writeonly HTIME @ 0x4207 : u16;
+extern writeonly HTIMEL @ 0x4207 : u8;
+extern writeonly HTIMEH @ 0x4208 : u8;
+    let HTIME_MAX = 339;
+
+
+// V timer target
+//
+// write, any
+extern writeonly VTIME @ 0x4209 : u16;
+extern writeonly VTIMEL @ 0x4209 : u8;
+extern writeonly VTIMEH @ 0x420a : u8;
+    // +1 if interlacing every other frame
+    let VTIME_MAX_NTSC = 261;
+    let VTIME_MAX_PAL  = 311;
+
+
+// Start DMA transfer
+//
+// write, v-blank, any if HDMA is not enabled
+extern writeonly MDMAEN @ 0x420b : u8;
+    let MDMAEN_DMA0 = 0b00000001;
+    let MDMAEN_DMA1 = 0b00000010;
+    let MDMAEN_DMA2 = 0b00000100;
+    let MDMAEN_DMA3 = 0b00001000;
+    let MDMAEN_DMA4 = 0b00010000;
+    let MDMAEN_DMA5 = 0b00100000;
+    let MDMAEN_DMA6 = 0b01000000;
+    let MDMAEN_DMA7 = 0b10000000;
+
+
+// Enable HDMA transfers
+//
+// write, any
+extern writeonly HDMAEN @ 0x420c : u8;
+    let HDMAEN_DMA0 = 0b00000001;
+    let HDMAEN_DMA1 = 0b00000010;
+    let HDMAEN_DMA2 = 0b00000100;
+    let HDMAEN_DMA3 = 0b00001000;
+    let HDMAEN_DMA4 = 0b00010000;
+    let HDMAEN_DMA5 = 0b00100000;
+    let HDMAEN_DMA6 = 0b01000000;
+    let HDMAEN_DMA7 = 0b10000000;
+
+
+// ROM access speed
+//
+// write, any
+extern writeonly MEMSEL @ 0x420d : u8;
+    let MEMSEL_FASTROM = 1;
+    let MEMSEL_SLOWROM = 0;
+
+
+// VBlank flag and CPU version
+//
+// read, any
+extern const RDNMI @ 0x4210 : u8;
+    let RDNMI_NMI              = 0b10000000;
+    let RDNMI_CPU_VERSION_MASK = 0b00001111;
+
+
+// IRQ timer flag
+//
+// read, any
+extern const TIMEUP @ 0x4211 : u8;
+    let TIMEUP_IRQ_FLAG = 0b10000000;
+
+
+// Screen and auto-joypad read status
+//
+// read, any
+extern const HVBJOY @ 0x4212 : u8;
+    let HVBJOY_V_BLANK  = 0b10000000;
+    let HVBJOY_H_BLANK  = 0b01000000;
+    let HVBJOY_AUTO_JOY = 0b00000001;
+
+
+// Read I/O pins
+//
+// read, any
+extern const RDIO @ 0x4213 : u8;
+    let RDIO_PORT2 = 0b10000000;
+    let RDIO_PORT1 = 0b01000000;
+
+
+// Auto joypad read data
+//
+// read, not auto-joy
+extern const JOY1 @ 0x4218 : u16;
+extern const JOY2 @ 0x421a : u16;
+extern const JOY3 @ 0x421c : u16;
+extern const JOY4 @ 0x421e : u16;
+    let JOY_B         = 0x8000;
+    let JOY_Y         = 0x4000;
+    let JOY_SELECT    = 0x2000;
+    let JOY_START     = 0x1000;
+    let JOY_UP        = 0x0800;
+    let JOY_DOWN      = 0x0400;
+    let JOY_LEFT      = 0x0200;
+    let JOY_RIGHT     = 0x0100;
+    let JOY_A         = 0x0080;
+    let JOY_X         = 0x0040;
+    let JOY_L         = 0x0020;
+    let JOY_R         = 0x0010;
+
+    let JOY_DPAD      = 0x0f00;
+    let JOY_BUTTONS   = 0xc0c0;
+    let JOY_SHOULDER  = 0x0030;
+
+    let JOY_TYPE_MASK       = 0x000f;
+    let JOY_TYPE_CONTROLLER = 0;
+    let JOY_TYPE_MOUSE      = 1;
+
+// read, not-autojoy
+extern const JOY1L @ 0x4218 : u8;
+extern const JOY2L @ 0x421a : u8;
+extern const JOY3L @ 0x421c : u8;
+extern const JOY4L @ 0x421e : u8;
+    let JOYL_A          = 0x80;
+    let JOYL_X          = 0x40;
+    let JOYL_L          = 0x20;
+    let JOYL_R          = 0x10;
+
+    let JOYL_TYPE_MASK       = 0x0f;
+    let JOYL_TYPE_CONTROLLER = 0;
+    let JOYL_TYPE_MOUSE      = 1;
+
+// read, not-autojoy
+extern const JOY1H @ 0x4218 : u8;
+extern const JOY2H @ 0x421a : u8;
+extern const JOY3H @ 0x421c : u8;
+extern const JOY4H @ 0x421e : u8;
+    let JOYH_B         = 0x80;
+    let JOYH_Y         = 0x40;
+    let JOYH_SELECT    = 0x20;
+    let JOYH_START     = 0x10;
+    let JOYH_UP        = 0x08;
+    let JOYH_DOWN      = 0x04;
+    let JOYH_LEFT      = 0x02;
+    let JOYH_RIGHT     = 0x01;
+
+    let JOYH_DPAD      = 0x0f;
+
+
+// DMA/HDMA parameters
+//
+// read/write, any
+extern writeonly DMAP0 @ 0x4300 : u8;
+extern writeonly DMAP1 @ 0x4310 : u8;
+extern writeonly DMAP2 @ 0x4320 : u8;
+extern writeonly DMAP3 @ 0x4330 : u8;
+extern writeonly DMAP4 @ 0x4340 : u8;
+extern writeonly DMAP5 @ 0x4350 : u8;
+extern writeonly DMAP6 @ 0x4360 : u8;
+extern writeonly DMAP7 @ 0x4370 : u8;
+    let DMAP_TRANSFER_MASK            = 0b00000111;
+    let DMAP_TRANSFER_ONE             = 0;
+    let DMAP_TRANSFER_TWO             = 1;
+    let DMAP_TRANSFER_WRITE_TWICE     = 2;
+    let DMAP_TRANSFER_READ_TWICE      = 2;
+    let DMAP_TRANSFER_TWO_WRITE_TWICE = 3;
+    let DMAP_TRANSFER_TWO_READ_TWICE  = 3;
+    let DMAP_TRANSFER_FOUR            = 4;
+
+    let DMAP_FIXED                    = 0b00001000;
+
+    let DMAP_DIRECTION_INCREMENT      = 0;
+    let DMAP_DIRECTION_DECREMENT      = 0b00010000;
+
+    let DMAP_ADDRESSING_ABSOLUTE      = 0;
+    let DMAP_ADDRESSING_INDIRECT      = 0b01000000;
+
+    let DMAP_TO_PPU                   = 0;
+    let DMAP_TO_CPU                   = 0b10000000;
+
+
+// DMA B-Bus address
+//
+// read/write, any
+extern writeonly BBAD0 @ 0x4301 : u8;
+extern writeonly BBAD1 @ 0x4311 : u8;
+extern writeonly BBAD2 @ 0x4321 : u8;
+extern writeonly BBAD3 @ 0x4331 : u8;
+extern writeonly BBAD4 @ 0x4341 : u8;
+extern writeonly BBAD5 @ 0x4351 : u8;
+extern writeonly BBAD6 @ 0x4361 : u8;
+extern writeonly BBAD7 @ 0x4371 : u8;
+
+
+// DMA A-Bus address
+//
+// read/write, any
+extern writeonly A1T0 @ 0x4302 : u16;
+extern writeonly A1T1 @ 0x4312 : u16;
+extern writeonly A1T2 @ 0x4322 : u16;
+extern writeonly A1T3 @ 0x4332 : u16;
+extern writeonly A1T4 @ 0x4342 : u16;
+extern writeonly A1T5 @ 0x4352 : u16;
+extern writeonly A1T6 @ 0x4362 : u16;
+extern writeonly A1T7 @ 0x4372 : u16;
+
+extern writeonly A1T0L @ 0x4302 : u8;
+extern writeonly A1T1L @ 0x4312 : u8;
+extern writeonly A1T2L @ 0x4322 : u8;
+extern writeonly A1T3L @ 0x4332 : u8;
+extern writeonly A1T4L @ 0x4342 : u8;
+extern writeonly A1T5L @ 0x4352 : u8;
+extern writeonly A1T6L @ 0x4362 : u8;
+extern writeonly A1T7L @ 0x4372 : u8;
+
+extern writeonly A1T0H @ 0x4303 : u8;
+extern writeonly A1T1H @ 0x4313 : u8;
+extern writeonly A1T2H @ 0x4323 : u8;
+extern writeonly A1T3H @ 0x4333 : u8;
+extern writeonly A1T4H @ 0x4343 : u8;
+extern writeonly A1T5H @ 0x4353 : u8;
+extern writeonly A1T6H @ 0x4363 : u8;
+extern writeonly A1T7H @ 0x4373 : u8;
+
+
+// DMA A-Bus bank
+//
+// read/write, any
+extern writeonly A1B0 @ 0x4304 : u8;
+extern writeonly A1B1 @ 0x4314 : u8;
+extern writeonly A1B2 @ 0x4324 : u8;
+extern writeonly A1B3 @ 0x4334 : u8;
+extern writeonly A1B4 @ 0x4344 : u8;
+extern writeonly A1B5 @ 0x4354 : u8;
+extern writeonly A1B6 @ 0x4364 : u8;
+extern writeonly A1B7 @ 0x4374 : u8;
+
+
+// DMA size / HDMA indirect address
+//
+// DMA: Number of bytes to transfer.
+// HDMA: Current HDMA indirect address.  Only modify this register if starting HDMA mid-frame.
+//
+// read/write, any
+extern writeonly DAS0 @ 0x4305 : u16;
+extern writeonly DAS1 @ 0x4315 : u16;
+extern writeonly DAS2 @ 0x4325 : u16;
+extern writeonly DAS3 @ 0x4335 : u16;
+extern writeonly DAS4 @ 0x4345 : u16;
+extern writeonly DAS5 @ 0x4355 : u16;
+extern writeonly DAS6 @ 0x4365 : u16;
+extern writeonly DAS7 @ 0x4375 : u16;
+
+extern writeonly DAS0L @ 0x4305 : u8;
+extern writeonly DAS1L @ 0x4315 : u8;
+extern writeonly DAS2L @ 0x4325 : u8;
+extern writeonly DAS3L @ 0x4335 : u8;
+extern writeonly DAS4L @ 0x4345 : u8;
+extern writeonly DAS5L @ 0x4355 : u8;
+extern writeonly DAS6L @ 0x4365 : u8;
+extern writeonly DAS7L @ 0x4375 : u8;
+
+extern writeonly DAS0H @ 0x4306 : u8;
+extern writeonly DAS1H @ 0x4316 : u8;
+extern writeonly DAS2H @ 0x4326 : u8;
+extern writeonly DAS3H @ 0x4336 : u8;
+extern writeonly DAS4H @ 0x4346 : u8;
+extern writeonly DAS5H @ 0x4356 : u8;
+extern writeonly DAS6H @ 0x4366 : u8;
+extern writeonly DAS7H @ 0x4376 : u8;
+
+
+// HDMA indirect address bank
+//
+// Used with indirect HDMA only.
+// Combined with `DASn` to form the effective address.
+//
+// read/write, any
+extern writeonly DASB0 @ 0x4307 : u8;
+extern writeonly DASB1 @ 0x4317 : u8;
+extern writeonly DASB2 @ 0x4327 : u8;
+extern writeonly DASB3 @ 0x4337 : u8;
+extern writeonly DASB4 @ 0x4347 : u8;
+extern writeonly DASB5 @ 0x4357 : u8;
+extern writeonly DASB6 @ 0x4367 : u8;
+extern writeonly DASB7 @ 0x4377 : u8;
+
+
+// HDMA table address
+//
+// Used with HDMA only.
+// Only modify this register if starting HDMA mid-frame.
+//
+// read/write, any
+extern writeonly A2A0 @ 0x4308 : u16;
+extern writeonly A2A1 @ 0x4318 : u16;
+extern writeonly A2A2 @ 0x4328 : u16;
+extern writeonly A2A3 @ 0x4338 : u16;
+extern writeonly A2A4 @ 0x4348 : u16;
+extern writeonly A2A5 @ 0x4358 : u16;
+extern writeonly A2A6 @ 0x4368 : u16;
+extern writeonly A2A7 @ 0x4378 : u16;
+
+extern writeonly A2A0L @ 0x4308 : u8;
+extern writeonly A2A1L @ 0x4318 : u8;
+extern writeonly A2A2L @ 0x4328 : u8;
+extern writeonly A2A3L @ 0x4338 : u8;
+extern writeonly A2A4L @ 0x4348 : u8;
+extern writeonly A2A5L @ 0x4358 : u8;
+extern writeonly A2A6L @ 0x4368 : u8;
+extern writeonly A2A7L @ 0x4378 : u8;
+
+extern writeonly A2A0H @ 0x4309 : u8;
+extern writeonly A2A1H @ 0x4319 : u8;
+extern writeonly A2A2H @ 0x4329 : u8;
+extern writeonly A2A3H @ 0x4339 : u8;
+extern writeonly A2A4H @ 0x4349 : u8;
+extern writeonly A2A5H @ 0x4359 : u8;
+extern writeonly A2A6H @ 0x4369 : u8;
+extern writeonly A2A7H @ 0x4379 : u8;
+
+
+// HDMA line counter
+//
+// Used with HDMA only.
+// Only modify this register if starting a HDMA mid-frame.
+//
+// read/write, any
+extern writeonly NLTR0 @ 0x430a : u8;
+extern writeonly NLTR1 @ 0x431a : u8;
+extern writeonly NLTR2 @ 0x432a : u8;
+extern writeonly NLTR3 @ 0x433a : u8;
+extern writeonly NLTR4 @ 0x434a : u8;
+extern writeonly NLTR5 @ 0x435a : u8;
+extern writeonly NLTR6 @ 0x436a : u8;
+extern writeonly NLTR7 @ 0x437a : u8;
+    let NLTRx_REPEAT_FLAG     = 0b10000000;
+    let NLTRx_LINE_COUNT_MASK = 0b01111111;
+
+

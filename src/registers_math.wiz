@@ -1,0 +1,38 @@
+// Copyright (c) 2023, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+
+// Multiplication
+//
+// write, no active multiplication or division
+extern writeonly WRMPYA @ 0x4202 : u8;
+extern writeonly WRMPYB @ 0x4203 : u8;
+
+
+// Division
+//
+// write, no active multiplication or division
+extern writeonly WRDIV @ 0x4204 : u16;
+extern writeonly WRDIVL @ 0x4204 : u8;
+extern writeonly WRDIVH @ 0x4205 : u8;
+
+extern writeonly WRDIVB @ 0x4206 : u8;
+
+
+
+// Quotient of division
+//
+// read, no active multiplication or division
+extern const RDDIV @ 0x4214 : u16;
+extern const RDDIVL @ 0x4214 : u8;
+extern const RDDIVH @ 0x4215 : u8;
+
+
+// Multiplication product or division remainder
+//
+// read, no active multiplication or division
+extern const RDMPY @ 0x4216 : u16;
+extern const RDMPYL @ 0x4216 : u8;
+extern const RDMPYH @ 0x4217 : u8;
+
+

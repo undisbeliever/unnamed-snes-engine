@@ -2,6 +2,7 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "memmap";
+import "registers";
 
 import "rou2s-commands";
 
@@ -10,8 +11,6 @@ import "room";
 import "common/reset";
 
 import "gen/resources";
-
-import "../wiz/common/snes/snes";
 
 namespace resources_over_usb2snes {
 

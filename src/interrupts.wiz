@@ -2,9 +2,8 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "memmap";
+import "registers";
 import "common/reset";
-import "../wiz/common/snes/snes";
-
 
 
 in lowram {
@@ -59,14 +58,14 @@ func break_handler() {
         reset_registers();
 
         // Change BG colour to dark BLUE
-        snes.ppu.cgram_address = 0;
-        snes.ppu.cgram_write_data = 0;
-        snes.ppu.cgram_write_data = a = 12 << 2;
+        CGADD = 0;
+        CGDATA = 0;
+        CGDATA = a = 12 << 2;
 
         // ::TODO display a message::
 
         // Enable the screen
-        snes.ppu.brightness = a = 0x0f;
+        INIDISP = a = INIDISP_BRIGHTNESS_MASK;
 
 
         // Wait forever.

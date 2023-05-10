@@ -2,9 +2,8 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "../memmap";
+import "../registers";
 import "../common/reset";
-
-import "../../wiz/common/snes/snes";
 
 import "../gamemodes";
 import "../joypad";
@@ -100,10 +99,10 @@ inline func setup_ppu__credits() {
     }
     mem8();
 
-    snes.ppu.bg_mode = a = 0;
-    snes.ppu.bg1_tilemap = a = (VRAM_BG1_MAP_WADDR >> snes.ppu.BG_TILEMAP_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT) | snes.ppu.BG_TILEMAP_MIRROR_X;
-    snes.ppu.bg12_tileset = a = (VRAM_BG1_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG1_SHIFT);
-    snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_BG1;
+    BGMODE = a = BGMODE_MODE_0;
+    BG1SC = a = ((VRAM_BG1_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_64x32;
+    BG12NBA = a = ((VRAM_BG1_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG1_SHIFT);
+    TM = a = TM_BG1;
 
     resources.load_bg_image_resource_into_vram(resources.bg_images.credits, VRAM_BG1_MAP_WADDR, VRAM_BG1_TILES_WADDR);
 }
@@ -150,37 +149,37 @@ inline func setup_ppu__licenses() {
     }
     mem8();
 
-    snes.ppu.bg_mode = 0;
-    snes.ppu.bg12_tileset = a = (VRAM_BG1_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG1_SHIFT)
-                                | (VRAM_BG2_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG2_SHIFT);
-    snes.ppu.bg1_tilemap = a = (VRAM_BG1_MAP_WADDR >> snes.ppu.BG_TILEMAP_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT);
-    snes.ppu.bg2_tilemap = a = (VRAM_BG2_MAP_WADDR >> snes.ppu.BG_TILEMAP_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT) | snes.ppu.BG_TILEMAP_MIRROR_Y;
-    snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_BG1 | snes.ppu.SCREEN_ENABLE_BG2;
+    BGMODE = BGMODE_MODE_0;
+    BG12NBA = a = ((VRAM_BG1_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG1_SHIFT)
+                  | ((VRAM_BG2_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG2_SHIFT);
+    BG1SC = a = ((VRAM_BG1_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT);
+    BG2SC = a = ((VRAM_BG2_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_32x64;
+    TM = a = TM_BG1 | TM_BG2;
 
     resources.load_bg_image_resource_into_vram(resources.bg_images.licenses_bg1, VRAM_BG1_MAP_WADDR, VRAM_BG1_TILES_WADDR);
     resources.load_bg_image_resource_into_vram(resources.bg_images.licenses_bg2, VRAM_BG2_MAP_WADDR, VRAM_BG2_TILES_WADDR);
 
     // Set BG2 palette
-    snes.ppu.cgram_address = a = 32 + 1;
-    snes.ppu.cgram_write_data = a = 0xff;
-    snes.ppu.cgram_write_data = a = 0xff;
+    CGADD = a = 32 + 1;
+    CGDATA = a = 0xff;
+    CGDATA = a = 0xff;
 
 
     // Setup a HDMA to hide the second half of BG1
-    snes.dma7.control = a = snes.dma.CONTROL_MODE_A;
-    snes.dma7.mdma_dest = a = <:&snes.ppu.screen_enable_mask;
-    snes.dma7.src_address_hl = xx = &HdmaTable as u16;
-    snes.dma7.src_address_bank = a = #:far &HdmaTable;
+    DMAP7 = a = DMAP_TO_PPU | DMAP_TRANSFER_ONE;
+    BBAD7 = a = <:&TM;
+    A1T7 = xx = &HdmaTable as u16;
+    A1B7 = a = #:far &HdmaTable;
 
-    snes.dma.hdma_enable = a = snes.dma.ENABLE_7;
+    HDMAEN = a = HDMAEN_DMA7;
 }
 
 
 in rodata0 {
 
 const HdmaTable : [ u8 ] = [
-    88, snes.ppu.SCREEN_ENABLE_BG1,
-    1, snes.ppu.SCREEN_ENABLE_BG2,
+    88, TM_BG1,
+    1,  TM_BG2,
     0,
 ];
 

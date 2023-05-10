@@ -2,7 +2,7 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "../memmap";
-import "../../wiz/common/snes/snes";
+import "../registers";
 import "../resources";
 import "reset"; // for `empty_byte`
 
@@ -20,23 +20,25 @@ in code {
 // DB = 0x80
 #[mem8, idx16]
 func clear_vram__forceblank(vramWaddr : u16 in xx, byteCount : u16 in yy) {
-    snes.dma.hdma_enable = 0;
+    HDMAEN = 0;
 
-    snes.ppu.vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
+    VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
 
-    snes.ppu.vram_address_hl = xx;
-    snes.dma0.mdma_size_hl = yy;
+    VMADD = xx;
+
+    // DMA size
+    DAS0 = yy;
 
     // Ensure we are in force blank;
-    snes.ppu.brightness = a = snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK;
+    INIDISP = a = INIDISP_FORCE_BLANK | INIDISP_BRIGHTNESS_MASK;
 
-    snes.dma0.control = a = snes.dma.CONTROL_MODE_AB | snes.dma.CONTROL_MDMA_NO_INCREMENT;
-    snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
+    DMAP0 = a = DMAP_TO_PPU | DMAP_FIXED | DMAP_TRANSFER_TWO;
+    BBAD0 = a = <:&VMDATA;
 
-    snes.dma0.src_address_hl = xx = &empty_byte as u16;
-    snes.dma0.src_address_bank = a = #:far &empty_byte;
+    A1T0 = xx = &empty_byte as u16;
+    A1B0 = a = #:far &empty_byte;
 
-    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+    MDMAEN = a = MDMAEN_DMA0;
 }
 
 
@@ -57,36 +59,35 @@ var _tmp : u16 in zpTmp_word_0;
     _tmp = yy;
 
 
-    snes.dma.hdma_enable = 0;
+    HDMAEN = 0;
 
     // Ensure we are in force blank;
-    snes.ppu.brightness = a = snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK;
+    INIDISP = a = INIDISP_FORCE_BLANK | INIDISP_BRIGHTNESS_MASK;
 
-
-    snes.dma0.control = a = snes.dma.CONTROL_MODE_A | snes.dma.CONTROL_MDMA_NO_INCREMENT;
-    snes.dma0.src_address_bank = #:far &_tmp;
-    snes.dma0.src_address_h = >:&_tmp;
+    DMAP0 = a = DMAP_TO_PPU | DMAP_FIXED | DMAP_TRANSFER_ONE;
+    A1B0 = #:far &_tmp;
+    A1T0H = >:&_tmp;
 
     // Transfer low byte
-    snes.ppu.vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_1;
-    snes.ppu.vram_address_hl = xx;
+    VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_LOW;
+    VMADD = xx;
 
-    snes.dma0.src_address_l = a = <:&_tmp;
-    snes.dma0.mdma_size_hl = yy = 32 * 32;
-    snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
+    A1T0L = a = <:&_tmp;
+    DAS0 = yy = 32 * 32;
+    BBAD0 = a = <:&VMDATAL;
 
-    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+    MDMAEN = a = MDMAEN_DMA0;
 
 
     // Transfer high byte
-    snes.ppu.vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
-    snes.ppu.vram_address_hl = xx;
+    VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+    VMADD = xx;
 
-    snes.dma0.src_address_l = a = &_tmp as u8 + 1;
-    snes.dma0.mdma_size_hl = yy = 32 * 32;
-    snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_h;
+    A1T0L = a = <:&_tmp + 1;
+    DAS0 = yy = 32 * 32;
+    BBAD0 = a = <:&VMDATAH;
 
-    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+    MDMAEN = a = MDMAEN_DMA0;
 }
 
 
@@ -99,10 +100,10 @@ var _tmp : u16 in zpTmp_word_0;
 func set_dma0_source__res_plus_offset(res : resources.ResourceEntry in resources.res, offset : u16 in yy) {
     mem16();
     #[mem16] {
-        snes.dma0.src_address_hl = aa = yy + *(&res.farPtr as *u16);
+        A1T0 = aa = yy + *(&res.farPtr as *u16);
     }
     mem8();
-    snes.dma0.src_address_bank = a = #:res.farPtr;
+    A1B0 = a = #:res.farPtr;
 }
 
 
@@ -114,10 +115,11 @@ func set_dma0_source__res_plus_offset(res : resources.ResourceEntry in resources
 #[mem8, idx16, fallthrough]
 func transfer_to_vram__forceblank(data_bank : u8 in a, data_addr : u16 in xx, size : u16 in yy) {
 
-    snes.dma.hdma_enable = 0;
+    HDMAEN = 0;
 
-    snes.dma0.src_address_bank = a;
-    snes.dma0.src_address_hl = xx;
+    // Set DMA A-Bus address
+    A1B0 = a;
+    A1T0 = xx;
 
 // fallthrough
 }
@@ -134,19 +136,20 @@ func transfer_to_vram__forceblank(data_bank : u8 in a, data_addr : u16 in xx, si
 #[mem8, idx16]
 func continue_transfer_to_vram__forceblank(size : u16 in yy) {
 
-    snes.dma.hdma_enable = 0;
+    HDMAEN = 0;
 
-    snes.dma0.mdma_size_hl = yy;
+    // DMA size
+    DAS0 = yy;
 
     // Ensure we are in force blank;
-    snes.ppu.brightness = a = snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK;
+    INIDISP = a = INIDISP_FORCE_BLANK | INIDISP_BRIGHTNESS_MASK;
 
-    snes.ppu.vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
+    VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
 
-    snes.dma0.control = a = snes.dma.CONTROL_MODE_AB;
-    snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
+    DMAP0 = a = DMAP_TO_PPU | DMAP_TRANSFER_TWO;
+    BBAD0 = a = <:&VMDATA;
 
-    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+    MDMAEN = a = MDMAEN_DMA0;
 }
 
 
@@ -164,7 +167,7 @@ func transfer_remaining_res_data_to_vram__forceblank(res : resources.ResourceEnt
     mem16();
     #[mem16 ] {
         // Calculate number of bytes remaining in resource data
-        yy = aa = *(&res.farPtr as *u16) + res.size - (snes.dma0.src_address_hl as u16);
+        yy = aa = *(&res.farPtr as *u16) + res.size - (A1T0 as u16);
     }
     mem8();
 
@@ -184,10 +187,11 @@ func transfer_remaining_res_data_to_vram__forceblank(res : resources.ResourceEnt
 #[mem8, idx16, fallthrough]
 func transfer_to_cgram__forceblank(data_bank : u8 in a, data_addr : u16 in xx, size : u16 in yy) {
 
-    snes.dma.hdma_enable = 0;
+    HDMAEN = 0;
 
-    snes.dma0.src_address_bank = a;
-    snes.dma0.src_address_hl = xx;
+    // Set DMA A-Bus address
+    A1B0 = a;
+    A1T0 = xx;
 
 // fallthrough
 }
@@ -204,18 +208,19 @@ func transfer_to_cgram__forceblank(data_bank : u8 in a, data_addr : u16 in xx, s
 #[mem8, idx16]
 func continue_transfer_to_cgram__forceblank(size : u16 in yy) {
 
-    snes.dma.hdma_enable = 0;
+    HDMAEN = 0;
 
-    snes.dma0.mdma_size_hl = yy;
+    // DMA size
+    DAS0 = yy;
 
     // Ensure we are in force blank;
-    snes.ppu.brightness = a = snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK;
+    INIDISP = a = INIDISP_FORCE_BLANK | INIDISP_BRIGHTNESS_MASK;
 
 
-    snes.dma0.control = a = snes.dma.CONTROL_MODE_A;
-    snes.dma0.mdma_dest = a = <:&snes.ppu.cgram_write_data;
+    DMAP0 = a = DMAP_TO_PPU | DMAP_TRANSFER_ONE;
+    BBAD0 = a = <:&CGDATA;
 
-    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+    MDMAEN = a = MDMAEN_DMA0;
 }
 
 

@@ -2,6 +2,7 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "memmap";
+import "registers";
 
 import "room";
 import "resources";
@@ -12,8 +13,6 @@ import "common/dma";
 import "player";
 
 import "entities/_variables";
-
-import "../wiz/common/snes/snes";
 
 import "../gen/interactive-tiles.wiz";
 
@@ -159,11 +158,11 @@ var _res : resources.ResourceEntry in resources.res;
     dma.set_dma0_source__res_plus_offset(_res, offsetof(_DataFormat, palette_data));
 
     // Transfer palette to CGRAM
-    snes.ppu.cgram_address = 0;
+    CGADD = 0;
     dma.continue_transfer_to_cgram__forceblank(256);
 
     // Transfer tiles to VRAM
-    snes.ppu.vram_address_hl = xx = VRAM_BG1_TILES_WADDR;
+    VMADD = xx = VRAM_BG1_TILES_WADDR;
     dma.transfer_remaining_res_data_to_vram__forceblank(_res);
 }
 
@@ -180,11 +179,11 @@ var _rowsLeft    : u8 in zpTmp_byte_0;
 var _columnsLeft : u8 in zpTmp_byte_1;
 
 
-    snes.ppu.brightness = a = snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK;
+    INIDISP = a = INIDISP_FORCE_BLANK | INIDISP_BRIGHTNESS_MASK;
 
-    snes.ppu.vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
-    snes.ppu.vram_address_l = <:VRAM_BG1_MAP_WADDR;
-    snes.ppu.vram_address_h = >:VRAM_BG1_MAP_WADDR;
+    VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+    VMADDL = <:VRAM_BG1_MAP_WADDR;
+    VMADDH = >:VRAM_BG1_MAP_WADDR;
 
 
 
@@ -207,10 +206,10 @@ var _columnsLeft : u8 in zpTmp_byte_1;
         do {
             y = map[x];
 
-            *(far &snes.ppu.vram_write_data_l) = a = tileset.topLeft_low[y];
-            *(far &snes.ppu.vram_write_data_h) = a = tileset.topLeft_high[y];
-            *(far &snes.ppu.vram_write_data_l) = a = tileset.topRight_low[y];
-            *(far &snes.ppu.vram_write_data_h) = a = tileset.topRight_high[y];
+            *(far &VMDATAL) = a = tileset.topLeft_low[y];
+            *(far &VMDATAH) = a = tileset.topLeft_high[y];
+            *(far &VMDATAL) = a = tileset.topRight_low[y];
+            *(far &VMDATAH) = a = tileset.topRight_high[y];
 
             x++;
             _columnsLeft--;
@@ -222,10 +221,10 @@ var _columnsLeft : u8 in zpTmp_byte_1;
         do {
             y = map[x];
 
-            *(far &snes.ppu.vram_write_data_l) = a = tileset.bottomLeft_low[y];
-            *(far &snes.ppu.vram_write_data_h) = a = tileset.bottomLeft_high[y];
-            *(far &snes.ppu.vram_write_data_l) = a = tileset.bottomRight_low[y];
-            *(far &snes.ppu.vram_write_data_h) = a = tileset.bottomRight_high[y];
+            *(far &VMDATAL) = a = tileset.bottomLeft_low[y];
+            *(far &VMDATAH) = a = tileset.bottomLeft_high[y];
+            *(far &VMDATAL) = a = tileset.bottomRight_low[y];
+            *(far &VMDATAH) = a = tileset.bottomRight_high[y];
 
             x++;
             _columnsLeft--;
@@ -373,22 +372,22 @@ inline func process_draw_tile_buffer__vblank() {
 
     x = drawTileBufferIndex;
     if !zero {
-        snes.ppu.vram_control = y = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
+        VMAIN = y = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
 
         x--;
         x--;
 
         do {
-            snes.ppu.vram_address_hl = aa = DrawTileBuffer.vramWordAddr[unaligned x];
+            VMADD = aa = DrawTileBuffer.vramWordAddr[unaligned x];
 
-            snes.ppu.vram_write_data_hl = aa = DrawTileBuffer.topLeft[unaligned x];
-            snes.ppu.vram_write_data_hl = aa = DrawTileBuffer.topRight[unaligned x];
+            VMDATA = aa = DrawTileBuffer.topLeft[unaligned x];
+            VMDATA = aa = DrawTileBuffer.topRight[unaligned x];
 
 
-            snes.ppu.vram_address_hl = aa = DrawTileBuffer.vramWordAddr[unaligned x] | 32;
+            VMADD = aa = DrawTileBuffer.vramWordAddr[unaligned x] | 32;
 
-            snes.ppu.vram_write_data_hl = aa = DrawTileBuffer.bottomLeft[unaligned x];
-            snes.ppu.vram_write_data_hl = aa = DrawTileBuffer.bottomRight[unaligned x];
+            VMDATA = aa = DrawTileBuffer.bottomLeft[unaligned x];
+            VMDATA = aa = DrawTileBuffer.bottomRight[unaligned x];
 
             x--;
             x--;
@@ -1384,7 +1383,7 @@ in lowram {
     // NOTE: If this value is 0 then no buffer will be transferred.
     //
     // (byte)
-    var buffer_vram_control : u8;
+    var buffer_vmain : u8;
 
 
     // VRAM word position to store the buffer to.
@@ -1416,25 +1415,25 @@ in code {
 func transfer_buffer__vblank() {
     // MUST NOT modify zpTmp variables.
 
-    a = buffer_vram_control;
+    a = buffer_vmain;
     if !zero {
-        snes.ppu.vram_control = a;
+        VMAIN = a;
 
-        snes.ppu.vram_address_hl = xx = buffer_vramWordPos;
+        VMADD = xx = buffer_vramWordPos;
 
-        snes.dma0.control = a = snes.dma.CONTROL_MODE_AB;
-        snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
+        DMAP0 = a = DMAP_TO_PPU | DMAP_TRANSFER_TWO;
+        BBAD0 = a = <:&VMDATA;
 
-        snes.dma0.src_address_hl = xx = &buffer as u16;
-        snes.dma0.src_address_bank = a = #:far &buffer;
+        A1T0 = xx = &buffer as u16;
+        A1B0 = a = #:far &buffer;
 
-        snes.dma0.mdma_size_hl = xx = sizeof(typeof(buffer));
+        DAS0 = xx = sizeof(typeof(buffer));
 
-        snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+        MDMAEN = a = MDMAEN_DMA0;
 
 
         // Do not transfer buffer on the next frame
-        buffer_vram_control = 0;
+        buffer_vmain = 0;
     }
 }
 
@@ -1515,7 +1514,7 @@ var _tmp : u8 in zpTmp_byte_0;
     while a < MAP_HEIGHT * MAP_WIDTH;
 
 
-    buffer_vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_32 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
+    buffer_vmain = a = VMAIN_INCREMENT_32 | VMAIN_INCREMENT_HIGH;
 }
 
 
@@ -1552,7 +1551,7 @@ var _tmp : u8 in zpTmp_byte_0;
     while a < MAP_HEIGHT * MAP_WIDTH;
 
 
-    buffer_vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_32 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
+    buffer_vmain = a = VMAIN_INCREMENT_32 | VMAIN_INCREMENT_HIGH;
 }
 
 
@@ -1783,7 +1782,7 @@ var _tmp : u8 in zpTmp_byte_0;
     while y < sizeof(typeof(buffer));
 
 
-    buffer_vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
+    buffer_vmain = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
 }
 
 
@@ -1817,7 +1816,7 @@ var _tmp : u8 in zpTmp_byte_0;
     while y < sizeof(typeof(buffer));
 
 
-    buffer_vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
+    buffer_vmain = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
 }
 
 

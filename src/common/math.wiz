@@ -2,7 +2,7 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "../memmap";
-import "../../wiz/common/snes/snes";
+import "../registers_math";
 
 import "../../gen/arctan-table";
 
@@ -85,11 +85,11 @@ EndIf:
             }
         }
 
-        *(far &snes.divider.left_hl) = aa;
+        *(far &WRDIV) = aa;
     }
     mem8();
 
-    *(far &snes.divider.right) = a = x;
+    *(far &WRDIVB) = a = x;
 
     // Must wait 16 cycles before reading result.
     x = y;                                                      // 2
@@ -126,7 +126,7 @@ let QUADRANT_3_INDEX = 6;
 func _quadrant_0() : u8 in x {
     mem16_idx16();
     #[mem16, idx16]{
-        aa = *(far &snes.divider.div_result_hl);
+        aa = *(far &RDDIV);
 
         // This comparison saves over 8000 bytes of ROM data
         cmp(aa, math.ARCTAN_32x2_TABLE_SIZE);
@@ -151,7 +151,7 @@ func _quadrant_0() : u8 in x {
 func _quadrant_1() : u8 in x {
     mem16_idx16();
     #[mem16, idx16]{
-        aa = *(far &snes.divider.div_result_hl);
+        aa = *(far &RDDIV);
 
         cmp(aa, math.ARCTAN_32x2_TABLE_SIZE);
     }
@@ -176,7 +176,7 @@ func _quadrant_1() : u8 in x {
 func _quadrant_2() : u8 in x {
     mem16_idx16();
     #[mem16, idx16]{
-        aa = *(far &snes.divider.div_result_hl);
+        aa = *(far &RDDIV);
 
         cmp(aa, math.ARCTAN_32x2_TABLE_SIZE);
     }
@@ -201,7 +201,7 @@ func _quadrant_2() : u8 in x {
 func _quadrant_3() : u8 in x {
     mem16_idx16();
     #[mem16, idx16]{
-        aa = *(far &snes.divider.div_result_hl);
+        aa = *(far &RDDIV);
 
         cmp(aa, math.ARCTAN_32x2_TABLE_SIZE);
     }

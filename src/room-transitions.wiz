@@ -2,7 +2,7 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "memmap";
-import "../wiz/common/snes/snes";
+import "registers";
 
 import "room";
 import "gameloop";
@@ -438,7 +438,7 @@ inline func __clear_room_memory() {
 inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
 
 
-    wait_frame_and_change_brightness(snes.ppu.BRIGHTNESS_FORCE_BLANK | snes.ppu.BRIGHTNESS_MASK);
+    wait_frame_and_change_brightness(INIDISP_FORCE_BLANK | INIDISP_BRIGHTNESS_MASK);
 
 
     push8(program_bank);
@@ -449,15 +449,14 @@ inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
 
         reset_registers();
 
-        snes.ppu.bg_mode = a = 1 | snes.ppu.BG_MODE_MODE1_BG3_PRIORITY;
-        snes.ppu.bg1_tilemap = a = (VRAM_BG1_MAP_WADDR >> snes.ppu.BG_TILEMAP_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT) | snes.ppu.BG_TILEMAP_MIRROR_X;
-        snes.ppu.bg3_tilemap = a = (VRAM_BG3_MAP_WADDR >> snes.ppu.BG_TILEMAP_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT);
+        BGMODE = a = BGMODE_MODE_1_BG3_PRIORITY;
+        BG1SC = a = ((VRAM_BG1_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_64x32;
+        BG3SC = a = ((VRAM_BG3_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_32x32;
 
-        snes.ppu.bg12_tileset = a = (VRAM_BG1_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG1_SHIFT);
-        snes.ppu.bg34_tileset = a = (VRAM_BG3_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG1_SHIFT);
+        BG12NBA = a = ((VRAM_BG1_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG1_SHIFT);
+        BG34NBA = a = ((VRAM_BG3_TILES_WADDR / BG34NBA_WALIGN) << BG34NBA_BG3_SHIFT);
 
-
-        snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_BG1 | snes.ppu.SCREEN_ENABLE_BG3 | snes.ppu.SCREEN_ENABLE_OBJ;
+        TM = a = TM_BG1 | TM_BG3 | TM_OBJ;
 
 
 

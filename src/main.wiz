@@ -2,7 +2,7 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "memmap";
-import "../wiz/common/snes/snes";
+import "registers";
 
 import "common/reset";
 import "common/dma";
@@ -45,7 +45,7 @@ in code {
 inline func main__inline() {
     mem8_idx8();
     #[mem8, idx8] {
-        snes.ppu.brightness = a = snes.ppu.BRIGHTNESS_FORCE_BLANK;
+        INIDISP = a = INIDISP_FORCE_BLANK;
 
         resources_over_usb2snes.init();
     }
@@ -55,7 +55,8 @@ inline func main__inline() {
 
     metasprites.setup__forceblank();
 
-    snes.ppu.irq_enable = a = snes.ppu.IRQ_ENABLE_AUTOJOY | snes.ppu.IRQ_ENABLE_NMI;
+    // Enable VBlank interrupts and auto-joypad
+    NMITIMEN = a = NMITIMEN_V_BLANK | NMITIMEN_AUTO_JOY;
 
 
     push8(a = 0x7e);

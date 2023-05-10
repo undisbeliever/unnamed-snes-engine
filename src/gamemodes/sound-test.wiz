@@ -2,9 +2,8 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "../memmap";
+import "../registers";
 import "../common/reset";
-
-import "../../wiz/common/snes/snes";
 
 import "../audio";
 import "../gamemodes";
@@ -158,35 +157,35 @@ inline func setup_ppu__inline() {
     reset_registers();
     textbox.setup_ppu__forceblank();
 
-    snes.ppu.bg_mode = a = 0;
-    snes.ppu.bg3_tilemap = a = (VRAM_BG3_MAP_WADDR >> snes.ppu.BG_TILEMAP_ADDRESS_BIT_ALIGN << snes.ppu.BG_TILEMAP_ADDRESS_SHIFT_LEFT);
-    snes.ppu.bg34_tileset = a = (VRAM_BG3_TILES_WADDR >> snes.ppu.BG_TILESET_ADDRESS_BIT_ALIGN << snes.ppu.BG12_TILESET_ADDRESS_BG1_SHIFT);
-    snes.ppu.screen_enable_mask = a = snes.ppu.SCREEN_ENABLE_BG3;
+    BGMODE = a = BGMODE_MODE_0;
+    BG3SC = a = ((VRAM_BG3_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_32x32;
+    BG34NBA = a = ((VRAM_BG3_TILES_WADDR / BG34NBA_WALIGN) << BG34NBA_BG3_SHIFT);
+    TM = a = TM_BG3;
 
     resources.load_bg_image_resource_into_vram(resources.bg_images.game_over, VRAM_BG1_MAP_WADDR, VRAM_BG1_TILES_WADDR);
 
     // Manually load textbox palette
     // ::TODO add palettes to the resources subsystem::
-    snes.ppu.cgram_address = a = 64;
+    CGADD = a = 64;
 
     a = 32 * 2;
     do {
-        snes.ppu.cgram_write_data = 0;
+        CGDATA = 0;
         a--;
     } while !zero;
 
-    snes.ppu.cgram_address = a = 69;
-    snes.ppu.cgram_write_data = 0;
-    snes.ppu.cgram_write_data = a = 16 << 2;
+    CGADD = a = 69;
+    CGDATA = 0;
+    CGDATA = a = 16 << 2;
 
-    snes.ppu.cgram_address = a = 71;
+    CGADD = a = 71;
     a = 0xff;
-    snes.ppu.cgram_write_data = a;
-    snes.ppu.cgram_write_data = a;
+    CGDATA = a;
+    CGDATA = a;
 
-    snes.ppu.cgram_address = a = 75;
-    snes.ppu.cgram_write_data = a = 8;
-    snes.ppu.cgram_write_data = a = 31 << 2 | 1;
+    CGADD = a = 75;
+    CGDATA = a = 8;
+    CGDATA = a = 31 << 2 | 1;
 }
 
 }

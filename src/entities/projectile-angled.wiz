@@ -2,6 +2,7 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "../memmap";
+import "../registers_math";
 
 import "_variables";
 import "_base";
@@ -10,7 +11,6 @@ import "projectile";
 import "../player";
 
 import "../common/math";
-import "../../wiz/common/snes/snes";
 
 import "../../gen/entities";
 
@@ -85,7 +85,7 @@ func __init__calc_horizontal_velocity(entityId : u8 in y) {
         if !carry {
             aa = negate16(aa);
         }
-        *(far &snes.divider.left_hl) = aa;
+        *(far &WRDIV) = aa;
 
         mem8();
 
@@ -94,7 +94,7 @@ func __init__calc_horizontal_velocity(entityId : u8 in y) {
             if !carry {
                 a = negate8(a);
             }
-            *(far &snes.divider.right) = a;
+            *(far &WRDIVB) = a;
 
             // Must wait 16 cycles before reading result.
             // Comparison used to determine sign of velocity and waste CPU cycles.
@@ -104,7 +104,7 @@ func __init__calc_horizontal_velocity(entityId : u8 in y) {
             if a < player.xPos.px {         // 3 + 2
                 mem16();                    // 3
                 #[mem16] {                  // +2 from `lda.l RDDIV` below == 16 cycles
-                    aa = *(far &snes.divider.div_result_hl);
+                    aa = *(far &RDDIV);
                     aa <<<= 1;
                     if aa >= MAX_ALT_AXIS_SPEED + 1 {
                         aa = MAX_ALT_AXIS_SPEED;
@@ -114,7 +114,7 @@ func __init__calc_horizontal_velocity(entityId : u8 in y) {
             else {                          // 2 + 4 + 3 + 3
                 mem16();                    // 3
                 #[mem16] {                  // +1 from `lda.l RDDIV` below == 16 cycles
-                    aa = *(far &snes.divider.div_result_hl);
+                    aa = *(far &RDDIV);
                     aa <<<= 1;
                     if aa >= MAX_ALT_AXIS_SPEED + 1 {
                         aa = MAX_ALT_AXIS_SPEED;
@@ -146,7 +146,7 @@ func __init__calc_vertical_velocity(entityId : u8 in y) {
         if !carry {
             aa = negate16(aa);
         }
-        *(far &snes.divider.left_hl) = aa;
+        *(far &WRDIV) = aa;
 
         mem8();
 
@@ -155,7 +155,7 @@ func __init__calc_vertical_velocity(entityId : u8 in y) {
             if !carry {
                 a = negate8(a);
             }
-            *(far &snes.divider.right) = a;
+            *(far &WRDIVB) = a;
 
             // Must wait 16 cycles before reading result
             // Comparison used to determine sign of velocity and waste CPU cycles.
@@ -165,7 +165,7 @@ func __init__calc_vertical_velocity(entityId : u8 in y) {
             if a < player.yPos.px {         // 3 + 2
                 mem16();                    // 3
                 #[mem16] {                  // +2 from `lda.l RDDIV` below == 16 cycles
-                    aa = *(far &snes.divider.div_result_hl);
+                    aa = *(far &RDDIV);
                     aa <<<= 1;
                     if aa >= MAX_ALT_AXIS_SPEED + 1 {
                         aa = MAX_ALT_AXIS_SPEED;
@@ -175,7 +175,7 @@ func __init__calc_vertical_velocity(entityId : u8 in y) {
             else {                          // 2 + 4 + 3 + 3
                 mem16();                    // 3
                 #[mem16] {                  // +1 from `lda.l RDDIV` below == 16 cycles
-                    aa = *(far &snes.divider.div_result_hl);
+                    aa = *(far &RDDIV);
                     aa <<<= 1;
                     if aa >= MAX_ALT_AXIS_SPEED + 1 {
                         aa = MAX_ALT_AXIS_SPEED;

@@ -2,10 +2,11 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "memmap";
+import "registers";
+
 import "resources";
 import "gen/resources";
 
-import "../wiz/common/snes/snes";
 
 
 namespace audio {
@@ -21,10 +22,10 @@ let LOADER_ARAM_ADDR = 0x160;
 
 // MUST match `audio-driver/io-commands.wiz`
 namespace IO {
-    extern writeonly command_id @ &snes.apu.output0 : u8;
-    extern const command_id_ack @ &snes.apu.input0 : u8;
+    extern writeonly command_id @ &APUIO_OUT_0 : u8;
+    extern const command_id_ack @ &APUIO_IN_0 : u8;
 
-    extern writeonly command @ &snes.apu.output1 : u8;
+    extern writeonly command @ &APUIO_OUT_1 : u8;
 }
 
 // MUST match `audio-driver/loader.wiz`
@@ -338,13 +339,13 @@ func __transfer_data_to_loader(_res : resources.ResourceEntry in resources.res, 
     // Wait until loader is ready
     xx = ('R' as u16) | ('D' as u16 << 8);
     do {
-    } while xx != snes.apu.input32;
+    } while xx != APUIO_IN_32;
 
 
     // Send the ready signal and the LoaderDataType.
-    snes.apu.output0 = a;
-    snes.apu.output2 = a = 'R';
-    snes.apu.output3 = a = 'D';
+    APUIO_OUT_0 = a;
+    APUIO_OUT_2 = a = 'R';
+    APUIO_OUT_3 = a = 'D';
 
 
     // Calculate the number of words to transfer
@@ -360,36 +361,36 @@ func __transfer_data_to_loader(_res : resources.ResourceEntry in resources.res, 
 
     // Wait for acknowledgement from the LoaderDataType
     do {
-        a = snes.apu.input2;
+        a = APUIO_IN_2;
     } while !zero;
 
     yy = 0;
     do {
-        snes.apu.output0 = a = _res.farPtr[yy];
+        APUIO_OUT_0 = a = _res.farPtr[yy];
         yy++;
-        snes.apu.output1 = a = _res.farPtr[yy];
+        APUIO_OUT_1 = a = _res.farPtr[yy];
 
         // Tell S-SMP the data is ready
-        // `snes.apu.output3` cannot be negative.  A negative value on port-3 means end-of-data.
+        // `APUIO_OUT_3` cannot be negative.  A negative value on port-3 means end-of-data.
         // Also cannot be 'D'.
         a = y & 0xf;
-        snes.apu.output3 = a;
+        APUIO_OUT_3 = a;
 
         yy++;
 
         do {
-        } while a != snes.apu.input3;
+        } while a != APUIO_IN_3;
 
         xx--;
     } while !zero;
 
 
     // End of data transfer
-    snes.apu.output3 = a = 0xff;
+    APUIO_OUT_3 = a = 0xff;
 
     // Must wait for the end of the input as `_reset_sfx_queue__inline()` writes to IO port 0.
     do {
-    } while a != snes.apu.input3;
+    } while a != APUIO_IN_3;
 
     _reset_sfx_queue__inline();
 }
@@ -407,22 +408,22 @@ inline func __transfer_loader_via_ipl__inline() {
 
     // Initialize the transfer
     yy = 0xbbaa;
-    snes.apu.output10 = yy;
+    APUIO_OUT_10 = yy;
 
     // Wait for a response from the IPL
     do {
-    } while yy != snes.apu.input10;
+    } while yy != APUIO_IN_10;
 
     xx = LOADER_ARAM_ADDR;
     a = 0xcc;
-    snes.apu.output32 = xx;     // destination ARAM address
-    snes.apu.output1 = a;       // non-zero = write data to address
-    snes.apu.output0 = a;       // New data command (non-zero and APUIO0 + more than 2, or 0xcc on the first transfer)
+    APUIO_OUT_32 = xx;     // destination ARAM address
+    APUIO_OUT_1 = a;       // non-zero = write data to address
+    APUIO_OUT_0 = a;       // New data command (non-zero and APUIO0 + more than 2, or 0xcc on the first transfer)
 
 
     // Wait for a response form the IPL
     do {
-    } while a != snes.apu.input0;
+    } while a != APUIO_IN_0;
 
 
     // Transfer the data
@@ -431,23 +432,23 @@ inline func __transfer_loader_via_ipl__inline() {
         x = 0;
         do {
             // Send the next byte to the IPL
-            snes.apu.output1 = a = Loader[x];
+            APUIO_OUT_1 = a = Loader[x];
 
             // Tell the IPL the next data is ready
-            snes.apu.output0 = x;
+            APUIO_OUT_0 = x;
 
             // Wait for a response from the IPL
             do {
-            } while x != snes.apu.input0;
+            } while x != APUIO_IN_0;
 
             x++;
         } while x < LOADER_SIZE;
     }
     idx16();
 
-    snes.apu.output32 = xx = LOADER_ARAM_ADDR;  // A-RAM address
-    snes.apu.output1 = 0;                       // zero = execute program at A-RAM address
-    snes.apu.output0 = a = LOADER_SIZE + 2;     // New data command (must be at least +2 the previous snes.apu.output0 write)
+    APUIO_OUT_32 = xx = LOADER_ARAM_ADDR;  // A-RAM address
+    APUIO_OUT_1 = 0;                       // zero = execute program at A-RAM address
+    APUIO_OUT_0 = a = LOADER_SIZE + 2;     // New data command (must be at least +2 the previous APUIO_OUT_0 write)
 }
 
 }

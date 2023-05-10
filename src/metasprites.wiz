@@ -2,10 +2,11 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "memmap";
+import "registers";
+
 import "resources";
 import "common/dma";
 import "common/math";
-import "../wiz/common/snes/snes";
 
 import "../gen/resources";
 
@@ -265,7 +266,7 @@ var _res : resources.ResourceEntry in resources.res;
     push8(a);
 
     // Set OBJ Registers
-    snes.ppu.obj_control = a = (VRAM_OBJ_WADDR / 8192) | (snes.ppu.OBJ_CONTROL_8x8_16x16 << 4);
+    OBJSEL = a = (VRAM_OBJ_WADDR / OBJSEL_BASE_WALIGN) | OBJSEL_SIZE_8_16;
 
 
     // Transfer shadow data to VRAM
@@ -304,7 +305,7 @@ var _secondRowVramWaddr : u16 in zpTmp_word_0;
 
     dma.set_dma0_source__res_plus_offset(_res, offsetof(_PpuDataFormat, palette_data));
 
-    snes.ppu.cgram_address = a = 128;
+    CGADD = a = 128;
     dma.continue_transfer_to_cgram__forceblank(256);
 
     mem16();
@@ -315,7 +316,7 @@ var _secondRowVramWaddr : u16 in zpTmp_word_0;
         aa = **(&_res.farPtr as *far *u16);
 
         // +# safe, carry will never be set
-        snes.ppu.vram_address_hl = aa = ((aa & 0x1ff) << 4) +# VRAM_OBJ_WADDR;
+        VMADD = aa = ((aa & 0x1ff) << 4) +# VRAM_OBJ_WADDR;
 
         // Calculate the start of the second row of small tiles
         _secondRowVramWaddr = aa = aa + 0x10 * SMALL_TILE_DATA_SIZE / 2;
@@ -337,7 +338,7 @@ var _secondRowVramWaddr : u16 in zpTmp_word_0;
     dma.continue_transfer_to_vram__forceblank(yy);
 
     // Transfer the remaining tiles to VRAM
-    snes.ppu.vram_address_hl = xx = _secondRowVramWaddr;
+    VMADD = xx = _secondRowVramWaddr;
     dma.transfer_remaining_res_data_to_vram__forceblank(_res);
 }
 
@@ -351,16 +352,16 @@ var _secondRowVramWaddr : u16 in zpTmp_word_0;
 inline func update_oam__vblank() {
     // MUST NOT modify zpTmp variables.
 
-    // ::ANNOY snes.ppu.oam_address_hl address is wrong (should be 0x2102)
-    *(&snes.ppu.oam_address_l as *u16) = xx = 0;
+    OAMADD = xx = 0;
 
-    snes.dma0.control = a = snes.dma.CONTROL_MODE_A;
-    snes.dma0.mdma_dest = a = <:&snes.ppu.oam_write_data;
-    snes.dma0.src_address_hl = xx = &buffer as u16;
-    snes.dma0.src_address_bank = a = #:far &buffer;
-    snes.dma0.mdma_size_hl = xx = sizeof(typeof(buffer)) + sizeof(typeof(hiTableBuffer));
+    // DMA buffer and hiTableBuffer to OAM
+    DMAP0 = a = DMAP_TO_PPU | DMAP_TRANSFER_ONE;
+    BBAD0 = a = <:&OAMDATA;
+    A1T0 = xx = &buffer as u16;
+    A1B0 = a = a = #:far &buffer;
+    DAS0 = xx = sizeof(typeof(buffer)) + sizeof(typeof(hiTableBuffer));
 
-    snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+    MDMAEN = a = MDMAEN_DMA0;
 }
 
 

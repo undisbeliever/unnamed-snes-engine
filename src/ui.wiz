@@ -2,7 +2,7 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "memmap";
-import "../wiz/common/snes/snes";
+import "registers";
 
 import "resources";
 
@@ -125,13 +125,14 @@ inline func setup_ppu__forceblank() {
 
     // Set palette and order bits for Key UI
     {
-        snes.ppu.vram_control = a = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_2;
-        snes.ppu.vram_address_hl = xx = VRAM_BG3_MAP_WADDR + KEYS_TILE_Y * 32 + KEYS_TILE_X;
+        // Only writing to the high-byte of VRAM
+        VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+        VMADD = xx = VRAM_BG3_MAP_WADDR + KEYS_TILE_Y * 32 + KEYS_TILE_X;
 
         a = 0x20 | KEY_TILE_PALETTE << 2;
         xx = MAX_UI_KEYS;
         do {
-            snes.ppu.vram_write_data_h = a;
+            VMDATAH = a;
             xx--;
         } while !zero;
     }
@@ -157,38 +158,38 @@ inline func transfer_buffer__vblank() {
 
     a = healthBarBufferFlag;
     if zero {
-        snes.ppu.vram_control = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_1;
+        VMAIN = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_LOW;
 
-        snes.ppu.vram_address_hl = xx = VRAM_BG3_MAP_WADDR + HEALTH_BAR_TILE_Y * 32 + HEALTH_BAR_TILE_X;
+        VMADD = xx = VRAM_BG3_MAP_WADDR + HEALTH_BAR_TILE_Y * 32 + HEALTH_BAR_TILE_X;
 
-        snes.dma0.control = a = snes.dma.CONTROL_MODE_A;
-        snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
+        DMAP0 = a = DMAP_TO_PPU | DMAP_TRANSFER_ONE;
+        BBAD0 = a = <:&VMDATAL;
 
-        snes.dma0.src_address_hl = xx = &healthBarBuffer as u16;
-        snes.dma0.src_address_bank = a = #:far &__far_healthBarBuffer;
+        A1T0 = xx = &healthBarBuffer as u16;
+        A1B0 = a = #:far &__far_healthBarBuffer;
 
-        snes.dma0.mdma_size_hl = xx = sizeof(HealthBarBuffer);
+        DAS0 = xx = sizeof(HealthBarBuffer);
 
-        snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+        MDMAEN = a = MDMAEN_DMA0;
 
         healthBarBufferFlag = a;
     }
 
     a = keyBufferFlag;
     if zero {
-        snes.ppu.vram_control = snes.ppu.VRAM_CONTROL_INCREMENT_1 | snes.ppu.VRAM_CONTROL_REMAP_MODE_0 | snes.ppu.VRAM_CONTROL_SIZE_1;
+        VMAIN = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_LOW;
 
-        snes.ppu.vram_address_hl = xx = VRAM_BG3_MAP_WADDR + KEYS_TILE_Y * 32 + KEYS_TILE_X;
+        VMADD = xx = VRAM_BG3_MAP_WADDR + KEYS_TILE_Y * 32 + KEYS_TILE_X;
 
-        snes.dma0.control = a = snes.dma.CONTROL_MODE_A;
-        snes.dma0.mdma_dest = a = <:&snes.ppu.vram_write_data_l;
+        DMAP0 = a = DMAP_TO_PPU | DMAP_TRANSFER_ONE;
+        BBAD0 = a = <:&VMDATAL;
 
-        snes.dma0.src_address_hl = xx = &keyBuffer as u16;
-        snes.dma0.src_address_bank = a = #:far &keyBuffer;
+        A1T0 = xx = &keyBuffer as u16;
+        A1B0 = a = #:far &keyBuffer;
 
-        snes.dma0.mdma_size_hl = xx = sizeof(typeof(keyBuffer));
+        DAS0 = xx = sizeof(typeof(keyBuffer));
 
-        snes.dma.mdma_enable = a = snes.dma.ENABLE_0;
+        MDMAEN = a = MDMAEN_DMA0;
 
         keyBufferFlag = a;
     }

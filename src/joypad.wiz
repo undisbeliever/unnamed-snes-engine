@@ -6,7 +6,7 @@
 
 
 import "memmap";
-import "../wiz/common/snes/snes";
+import "registers";
 
 
 namespace joypad {
@@ -99,14 +99,14 @@ in lowram {
 inline func update_state__inline() {
 
     // Wait until AutoJoy is completed
-    a = snes.ppu.HVBJOY_STATUS_AUTOJOY_MASK;
+    a = HVBJOY_AUTO_JOY;
     do {
-    } while a & snes.ppu.hvbjoy_status != 0;
+    } while a & HVBJOY != 0;
 
 
     mem16_idx16();
     #[mem16, idx16] {
-        aa = snes.joy.pad1_hl;
+        aa = JOY1;
         if aa & JOY.TYPE_MASK != TYPE__CONTROLLER {
             aa = 0;
         }
