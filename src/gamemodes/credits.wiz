@@ -24,7 +24,6 @@ let VRAM_BG1_TILES_WADDR = 0x1000;
 let VRAM_BG2_TILES_WADDR = 0x2000;
 
 
-let N_MIT_LICENSES = 2;
 let MIT_LICENSE_TEXT_MAX_YPOS = 202;
 
 
@@ -178,7 +177,7 @@ inline func setup_ppu__licenses() {
 in rodata0 {
 
 const HdmaTable : [ u8 ] = [
-    88, TM_BG1,
+    80, TM_BG1,
     1,  TM_BG2,
     0,
 ];
@@ -195,11 +194,11 @@ inline func process__licenses() {
 
     idx16();
     #[idx16] {
-        xx = 0;
+        bg1_scrollY = xx = 0;
+
         yy = 0;
 
         do {
-            bg1_scrollY = xx;
             bg2_scrollY = yy;
 
             wait_frame();
@@ -233,19 +232,9 @@ inline func process__licenses() {
                 }
             }
 
+            // Loop until start is pressed
             a = joypad.pressed_h;
-            if a & joypad.JOYH.START != 0 {
-                // Show the next license
-                mem16();
-                #[mem16] {
-                    xx = aa = bg1_scrollY + 128;
-                    yy = 0;
-                }
-                mem8();
-            }
-
-            // Must break the loop before writing to bg/bg scroll shadows to prevent a screen glitch on fadeout.
-        } while xx < N_MIT_LICENSES * 128;
+        } while a & joypad.JOYH.START == 0;
     }
     mem8_idx8();
 }
