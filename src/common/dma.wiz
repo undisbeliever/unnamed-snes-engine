@@ -115,8 +115,6 @@ func set_dma0_source__res_plus_offset(res : resources.ResourceEntry in resources
 #[mem8, idx16, fallthrough]
 func transfer_to_vram__forceblank(data_bank : u8 in a, data_addr : u16 in xx, size : u16 in yy) {
 
-    HDMAEN = 0;
-
     // Set DMA A-Bus address
     A1B0 = a;
     A1T0 = xx;
@@ -186,8 +184,6 @@ func transfer_remaining_res_data_to_vram__forceblank(res : resources.ResourceEnt
 // DB = 0x80
 #[mem8, idx16, fallthrough]
 func transfer_to_cgram__forceblank(data_bank : u8 in a, data_addr : u16 in xx, size : u16 in yy) {
-
-    HDMAEN = 0;
 
     // Set DMA A-Bus address
     A1B0 = a;
