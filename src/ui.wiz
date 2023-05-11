@@ -162,8 +162,7 @@ inline func transfer_buffer__vblank() {
 
         VMADD = xx = VRAM_BG3_MAP_WADDR + HEALTH_BAR_TILE_Y * 32 + HEALTH_BAR_TILE_X;
 
-        DMAP0 = a = DMAP_TO_PPU | DMAP_TRANSFER_ONE;
-        BBAD0 = a = <:&VMDATAL;
+        dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_ONE, <:&VMDATAL);
 
         A1T0 = xx = &healthBarBuffer as u16;
         A1B0 = a = #:far &__far_healthBarBuffer;
@@ -181,8 +180,7 @@ inline func transfer_buffer__vblank() {
 
         VMADD = xx = VRAM_BG3_MAP_WADDR + KEYS_TILE_Y * 32 + KEYS_TILE_X;
 
-        DMAP0 = a = DMAP_TO_PPU | DMAP_TRANSFER_ONE;
-        BBAD0 = a = <:&VMDATAL;
+        dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_ONE, <:&VMDATAL);
 
         A1T0 = xx = &keyBuffer as u16;
         A1B0 = a = #:far &keyBuffer;

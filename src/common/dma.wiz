@@ -13,6 +13,16 @@ namespace dma {
 in code {
 
 
+// Sets DMAP0 and BBAD0 registers with a 16-bit Y register.
+//
+// Uses DMA channel 0
+// DB = 0x80
+#[idx16]
+inline func set_dmap0_and_bbad0__yy(let dmap : u8, let bbad : u8) {
+    *(&DMAP0 as *u16) = yy = (dmap as u16) | ((bbad as u16) << 8);
+}
+
+
 // Fill a block of VRAM with zeros.
 //
 // Uses DMA channel 0
@@ -32,8 +42,7 @@ func clear_vram__forceblank(vramWaddr : u16 in xx, byteCount : u16 in yy) {
     // Ensure we are in force blank;
     INIDISP = a = INIDISP_FORCE_BLANK | INIDISP_BRIGHTNESS_MASK;
 
-    DMAP0 = a = DMAP_TO_PPU | DMAP_FIXED | DMAP_TRANSFER_TWO;
-    BBAD0 = a = <:&VMDATA;
+    set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_FIXED | DMAP_TRANSFER_TWO, <:&VMDATA);
 
     A1T0 = xx = &empty_byte as u16;
     A1B0 = a = #:far &empty_byte;
@@ -53,8 +62,7 @@ func set_tilemap__forceblank(vramWaddr : u16 in xx, tilemapEntry : u16 in yy) {
 
 var _tmp : u16 in zpTmp_word_0;
 
-    // MUST NOT USE xx
-
+    // MUST not modify xx
 
     _tmp = yy;
 
@@ -64,28 +72,31 @@ var _tmp : u16 in zpTmp_word_0;
     // Ensure we are in force blank;
     INIDISP = a = INIDISP_FORCE_BLANK | INIDISP_BRIGHTNESS_MASK;
 
-    DMAP0 = a = DMAP_TO_PPU | DMAP_FIXED | DMAP_TRANSFER_ONE;
+    set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_FIXED | DMAP_TRANSFER_ONE, <:&VMDATAL);
     A1B0 = #:far &_tmp;
-    A1T0H = >:&_tmp;
+    A1T0 = yy = &_tmp as u16;
 
     // Transfer low byte
     VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_LOW;
     VMADD = xx;
 
-    A1T0L = a = <:&_tmp;
     DAS0 = yy = 32 * 32;
-    BBAD0 = a = <:&VMDATAL;
 
     MDMAEN = a = MDMAEN_DMA0;
+
+    // MUST not modify yy
 
 
     // Transfer high byte
     VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
     VMADD = xx;
 
-    A1T0L = a = <:&_tmp + 1;
-    DAS0 = yy = 32 * 32;
-    BBAD0 = a = <:&VMDATAH;
+    // Switch to high byte
+    // (DMA registers are read/write)
+    (*(&A1T0L as *u8))++;
+    (*(&BBAD0 as *u8))++;
+
+    DAS0 = yy;
 
     MDMAEN = a = MDMAEN_DMA0;
 }
@@ -144,8 +155,7 @@ func continue_transfer_to_vram__forceblank(size : u16 in yy) {
 
     VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
 
-    DMAP0 = a = DMAP_TO_PPU | DMAP_TRANSFER_TWO;
-    BBAD0 = a = <:&VMDATA;
+    set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_TWO, <:&VMDATA);
 
     MDMAEN = a = MDMAEN_DMA0;
 }
@@ -212,9 +222,7 @@ func continue_transfer_to_cgram__forceblank(size : u16 in yy) {
     // Ensure we are in force blank;
     INIDISP = a = INIDISP_FORCE_BLANK | INIDISP_BRIGHTNESS_MASK;
 
-
-    DMAP0 = a = DMAP_TO_PPU | DMAP_TRANSFER_ONE;
-    BBAD0 = a = <:&CGDATA;
+    set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_ONE, <:&CGDATA);
 
     MDMAEN = a = MDMAEN_DMA0;
 }

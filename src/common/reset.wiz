@@ -52,10 +52,11 @@ far func __reset_far() {
         WMADDM = 0;
         WMADDH = 0;
 
-        DMAP0 = a = DMAP_TO_PPU | DMAP_FIXED | DMAP_TRANSFER_ONE;
+        // Also sets BBAD0
+        *(&DMAP0 as *u16) = yy = (DMAP_TO_PPU | DMAP_FIXED | DMAP_TRANSFER_ONE) | ((<:&WMDATA as u16) << 8);
+
         A1T0 = xx = &empty_byte as u16;
         A1B0 = a = #:far &empty_byte;
-        BBAD0 = a = <:&WMDATA;
 
         // DMA size
         DAS0 = xx = 0;

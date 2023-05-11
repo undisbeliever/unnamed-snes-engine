@@ -328,14 +328,14 @@ func transfer_resource_header_to_wram7e(_resourceData : ResourceEntry in res, pt
     WMADDML = xx;
     WMADDH = a = 0x7e;
 
-    DMAP0 = a = DMAP_TO_PPU | DMAP_TRANSFER_ONE;
-    BBAD0 = a = <:&WMDATA;
     // DMA size
     DAS0 = yy;
 
     // DMA A-Bus address
     A1T0 = xx = *(&res.farPtr as *u16);
     A1B0 = a = #:res.farPtr;
+
+    dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_ONE, <:&WMDATA);
 
     MDMAEN = a = MDMAEN_DMA0;
 }

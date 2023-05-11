@@ -1421,8 +1421,7 @@ func transfer_buffer__vblank() {
 
         VMADD = xx = buffer_vramWordPos;
 
-        DMAP0 = a = DMAP_TO_PPU | DMAP_TRANSFER_TWO;
-        BBAD0 = a = <:&VMDATA;
+        dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_TWO, <:&VMDATA);
 
         A1T0 = xx = &buffer as u16;
         A1B0 = a = #:far &buffer;

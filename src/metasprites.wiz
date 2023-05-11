@@ -355,8 +355,7 @@ inline func update_oam__vblank() {
     OAMADD = xx = 0;
 
     // DMA buffer and hiTableBuffer to OAM
-    DMAP0 = a = DMAP_TO_PPU | DMAP_TRANSFER_ONE;
-    BBAD0 = a = <:&OAMDATA;
+    dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_ONE, <:&OAMDATA);
     A1T0 = xx = &buffer as u16;
     A1B0 = a = a = #:far &buffer;
     DAS0 = xx = sizeof(typeof(buffer)) + sizeof(typeof(hiTableBuffer));

@@ -290,25 +290,22 @@ inline func transfer_buffer__vblank() {
     if !zero {
         if negative {
             // Erase textbox
-            DMAP0 = a = DMAP_TO_PPU | DMAP_FIXED | DMAP_TRANSFER_TWO;
-
+            yy = DMAP_TO_PPU | DMAP_FIXED | DMAP_TRANSFER_TWO | ((<:&VMDATA as u16) << 8);
             xx = &empty_byte as u16;
             a = #:far &empty_byte;
         }
         else {
             // Copy textbox
-            DMAP0 = a = DMAP_TO_PPU | DMAP_TRANSFER_TWO;
-
+            yy = DMAP_TO_PPU | DMAP_TRANSFER_TWO | ((<:&VMDATA as u16) << 8);
             xx = &buffer as u16;
             a = #:far &buffer;
         }
+        *(&DMAP0 as *u16) = yy; // also sets BBAD0
 
         A1T0 = xx;
         A1B0 = a;
 
         DAS0 = xx = bufferSizeInBytes;
-
-        BBAD0 = a = <:&VMDATA;
 
         VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
         VMADD = xx = bufferVramWaddr;
