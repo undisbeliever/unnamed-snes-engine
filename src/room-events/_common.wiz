@@ -5,7 +5,8 @@ import "../memmap";
 
 import "../room";
 import "../metatiles";
-import "../entities/_common";
+import "../entityloop";
+import "gen/entities";
 
 namespace room_events {
 
@@ -16,6 +17,12 @@ in wram7e_roomstate {
     var state_3 : u16;
     var state_4 : u16;
 }
+
+
+// Functions that are allowed to be called in this context.
+let spawn_entity = entityloop.spawn_entity;
+let is_all_enemies_defeated = entityloop.is_all_enemies_defeated;
+let get_enemy_count_a = entityloop.get_enemy_count_a;
 
 
 in code {
@@ -35,10 +42,10 @@ func spawn_room_entities() {
     do {
         push8(x);
 
-        entities.spawn_entity(a = room.entity_xPos[x],
-                              a = room.entity_yPos[x],
-                              a = room.entity_type[x],
-                              y = room.entity_parameter[x]);
+        spawn_entity(a = room.entity_xPos[x],
+                     a = room.entity_yPos[x],
+                     a = room.entity_type[x],
+                     y = room.entity_parameter[x]);
 
         x = pop8();
 
@@ -55,10 +62,10 @@ func spawn_room_entities() {
 // DB = 0x7e
 #[mem8, idx8]
 func spawn_room_enemy(enemyIndex : u8 in x) {
-    ^return entities.spawn_entity(a = room.entity_xPos[x],
-                                 a = room.entity_yPos[x],
-                                 a = room.entity_type[x],
-                                 y = room.entity_parameter[x]);
+    ^return spawn_entity(a = room.entity_xPos[x],
+                         a = room.entity_yPos[x],
+                         a = room.entity_type[x],
+                         y = room.entity_parameter[x]);
 }
 
 
@@ -132,10 +139,10 @@ func unlock_door(doorLocation : u8 in y) : bool in carry {
 // DB = 0x7e
 #[mem8, idx8]
 func spawn_small_smoke_at_room_enemy_position(enemyIndex : u8 in x) {
-    ^return entities.spawn_entity(a = room.entity_xPos[x],
-                                 a = room.entity_yPos[x],
-                                 a = entities.EntityTypes.smoke_particles as u8,
-                                 y = entities.smoke_particles.init_parameter.small as u8);
+    ^return spawn_entity(a = room.entity_xPos[x],
+                         a = room.entity_yPos[x],
+                         a = entities.EntityTypes.smoke_particles as u8,
+                         y = entities.smoke_particles.init_parameter.small as u8);
 }
 
 

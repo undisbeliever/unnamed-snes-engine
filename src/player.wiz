@@ -4,9 +4,11 @@
 import "memmap";
 
 import "entities/_variables";
-import "entities/_common";
 import "entities/_base";
 import "entities/player-bomb";
+
+// ::TODO remove this import::
+import "entityloop";
 
 import "gamestate";
 import "joypad";
@@ -490,10 +492,10 @@ inline func hitbox_collided_with_entity__inline(enemyEntityId : u8 in y) {
 
     // ::TODO add a has-sword-particle flag to entity::
 
-    entities.spawn_entity(a = entities.base.collisionCentre_x,
-                          a = entities.base.collisionCentre_y,
-                          a = entities.EntityTypes.sword_particles as u8,
-                          y = 0);
+    entityloop.spawn_entity(a = entities.base.collisionCentre_x,
+                            a = entities.base.collisionCentre_y,
+                            a = entities.EntityTypes.sword_particles as u8,
+                            y = 0);
 }
 
 
@@ -1683,10 +1685,10 @@ func process__holding_bomb() {
         >:itemAboveHead_msFrameAddr = 0;
 
         // Spawn active bomb
-        entities.spawn_entity(a = xPos.px,
-                              a = yPos.px,
-                              a = entities.EntityTypes.player_bomb as u8,
-                              y = entities.player_bomb.DROP_ACTIVE_BOMB_PARAMETER);
+        entityloop.spawn_entity(a = xPos.px,
+                                a = yPos.px,
+                                a = entities.EntityTypes.player_bomb as u8,
+                                y = entities.player_bomb.DROP_ACTIVE_BOMB_PARAMETER);
 
         audio.queue_sound_effect(sound_effects.throw_bomb);
 

@@ -4,7 +4,6 @@
 import "../memmap";
 
 import "_variables";
-import "_common";
 
 import "../metatiles";
 import "../metasprites";
@@ -87,7 +86,7 @@ func process(entityId : u8 in y) {
     // 3 random primes, should make the spawning/deleting more unpredictable
     if a == 79 || a == 149 || a == 211 {
         push8(y);
-        entities.spawn_entity(a = 128, a = 112, a = 0);
+        spawn_entity(a = 128, a = 112, a = 0);
         y = pop8();
     }
     else if a == 251 {

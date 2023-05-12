@@ -268,41 +268,6 @@ namespace entities {
                 var state_3_h @ &>:state_3[0] : [u8 ; BA_SIZE];
         }
     }
-
-
-    in wram7e_roomstate {
-        // Mapping of active and unused entities (including player).
-        //
-        // indexes 0 to `numberOfActiveEntities - 1` (inclusive) are active entityIds.
-        // indexes `numberOfActiveEntities` to `ACTIVE_ENTITIES_TABLE__LAST_POS` (inclusive) are unused entities.
-        //
-        // (list of SoA indexes)
-        var activeEntitiesTable : [u8 ; N_ENTITIES];
-
-
-        // The number of active entities.
-        //
-        // This variable is used as the mid-point separating active and unused entities in `activeEntitiesTable`.
-        //
-        // This variable is set to 1 if only the player entity is active.
-        // This variable is set to `ACTIVE_ENTITIES_TABLE__LAST_POS` when no more entities can be created.
-        //
-        // This variable MUST NEVER BE zero.
-        //
-        // (byte counter)
-        var numberOfActiveEntities : u8;
-
-
-        // The number of active enemies.
-        //
-        // Incremented on entity spawn, decremented when an enemy entity is deactivated.
-        //
-        // (byte counter)
-        var _enemyCount : i8;
-
-
-        let ACTIVE_ENTITIES_TABLE__LAST_POS = sizeof(typeof(activeEntitiesTable)) - 1;
-    }
 }
 
 

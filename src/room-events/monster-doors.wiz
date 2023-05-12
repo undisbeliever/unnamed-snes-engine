@@ -7,7 +7,6 @@ import "_common";
 import "../player";
 import "../room";
 import "../gamestate";
-import "../entities/_common";
 import "../interactive-tiles";
 
 import "../audio";
@@ -201,7 +200,7 @@ func process__spawn_enemies() {
 // DB = 0x7e
 #[mem8, idx8]
 func process__wait_until_enemies_defeated() {
-    zero = entities.is_all_enemies_defeated();
+    zero = is_all_enemies_defeated();
     if zero {
         // No more smoke to spawn, start spawning enemies
 

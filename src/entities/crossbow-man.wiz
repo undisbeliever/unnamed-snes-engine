@@ -4,7 +4,6 @@
 import "../memmap";
 
 import "_variables";
-import "_common";
 import "_base";
 import "_vision_cone";
 
@@ -454,10 +453,10 @@ func process__attacking(entityId : u8 in y) {
         if a < N_DIRECTIONS * 2 {
             x = a = a >>> 1;
 
-            entities.spawn_entity(a = SoA.xPos_px[y],
-                                  a = SoA.yPos_px[y],
-                                  a = EntityTypes.bolt_angled as u8,
-                                  x);
+            spawn_entity(a = SoA.xPos_px[y],
+                         a = SoA.yPos_px[y],
+                         a = EntityTypes.bolt_angled as u8,
+                         x);
 
             audio.queue_sound_effect(sound_effects.crossbow_fires_bolt);
 

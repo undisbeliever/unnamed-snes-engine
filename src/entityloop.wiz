@@ -1,22 +1,59 @@
 // Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
 // Distributed under The MIT License, see the LICENSE file for more details.
 
-import "../memmap";
+import "memmap";
 
-import "../../gen/entities";
-import "../../gen/death-functions-table.wiz";
+import "../gen/entities";
+import "../gen/death-functions-table.wiz";
 
-import "_variables";
+import "entities/_variables";
 
-import "../player";
-import "../metasprites";
+import "player";
+import "metasprites";
 
 
-namespace entities {
+namespace entityloop {
 
 
 in zeropage {
     var __currentEntityTablePos : u8;
+
+    var currentEntityId : u8 in entities.currentEntityId;
+}
+
+
+in wram7e_roomstate {
+    // Mapping of active and unused entities (including player).
+    //
+    // indexes 0 to `numberOfActiveEntities - 1` (inclusive) are active entityIds.
+    // indexes `numberOfActiveEntities` to `ACTIVE_ENTITIES_TABLE__LAST_POS` (inclusive) are unused entities.
+    //
+    // (list of SoA indexes)
+    var activeEntitiesTable : [u8 ; entities.N_ENTITIES];
+
+
+    // The number of active entities.
+    //
+    // This variable is used as the mid-point separating active and unused entities in `activeEntitiesTable`.
+    //
+    // This variable is set to 1 if only the player entity is active.
+    // This variable is set to `ACTIVE_ENTITIES_TABLE__LAST_POS` when no more entities can be created.
+    //
+    // This variable MUST NEVER BE zero.
+    //
+    // (byte counter)
+    var numberOfActiveEntities : u8;
+
+
+    // The number of active enemies.
+    //
+    // Incremented on entity spawn, decremented when an enemy entity is deactivated.
+    //
+    // (byte counter)
+    var _enemyCount : i8;
+
+
+    let ACTIVE_ENTITIES_TABLE__LAST_POS = sizeof(typeof(activeEntitiesTable)) - 1;
 }
 
 
@@ -32,17 +69,17 @@ func init() {
     #[mem16] {
         // Set player's process function to a blank function.
         // Required as the player is processed before `process_active_entities()` is called.
-        aa = _blank_player_function as u16;
+        aa = entities._blank_player_function as u16;
         entities.SoA.process_function[0] = aa as func(u8 in x);
 
 
         x = entities.SoA.LAST_INDEX;
         do {
             // Reset entity functions
-            aa = _blank_entity_function as u16;
+            aa = entities._blank_entity_function as u16;
             entities.SoA.process_function[unaligned x] = aa as func(u8 in x);
 
-            aa = _blank_ms_draw_function as u16;
+            aa = entities._blank_ms_draw_function as u16;
             entities.SoA.ms_draw_function[unaligned x] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
 
             // Clear entity shadow
@@ -59,7 +96,7 @@ func init() {
     {
         numberOfActiveEntities = a = 1;
 
-        a = SoA.LAST_INDEX;
+        a = entities.SoA.LAST_INDEX;
         x = ACTIVE_ENTITIES_TABLE__LAST_POS;
 
         do {
@@ -87,7 +124,7 @@ func init() {
 func spawn_entity(xPos : u8 in zpTmp_byte_0, yPos : u8 in zpTmp_byte_1, entityType : u8 in a, initParameter : u8 in y) {
 var _init_function_u16 : u16 in zpTmp_word_0;
 
-    ^if a < N_ENTITY_TYPES {
+    ^if a < entities.N_ENTITY_TYPES {
 
         // Retrieve the next unused entity from the `activeEntitiesTable` (if one is available)
         x = numberOfActiveEntities;
@@ -194,10 +231,10 @@ var _init_function_u16 : u16 in zpTmp_word_0;
                 // We may also need to decrement the `_enemyCount` (if the entity is an enemy), which is done in `process_active_entities()`.
                 mem16();
                 #[mem16] {
-                    aa = _blank_entity_function as u16;
+                    aa = entities._blank_entity_function as u16;
                     entities.SoA.process_function[unaligned y] = aa as func(u8 in x);
 
-                    aa = _blank_ms_draw_function as u16;
+                    aa = entities._blank_ms_draw_function as u16;
                     entities.SoA.ms_draw_function[unaligned y] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
                 }
                 mem8();
@@ -214,6 +251,7 @@ var _init_function_u16 : u16 in zpTmp_word_0;
 
 // Retrieve the enemy count
 //
+// KEEP: X & Y
 // DB = 0x7e
 #[mem8]
 inline func get_enemy_count_a() : u8 in a {
@@ -224,6 +262,7 @@ inline func get_enemy_count_a() : u8 in a {
 
 // Return true if there are no enemies alive
 //
+// KEEP: X & Y
 // DB = 0x7e
 #[mem8]
 inline func is_all_enemies_defeated() : bool in zero {
@@ -269,22 +308,22 @@ inline func process_active_entities()
                 entities.SoA.process_function[unaligned x](y);
 
                 y = currentEntityId;
-                a = SoA.health[y];
+                a = entities.SoA.health[y];
                 if zero {
                     // Entity's health is 0, call the entity's death function
-                    a = SoA.deathFunction[y] << 1;
-                    if a >= N_DEATH_FUNCTIONS * 2{
+                    a = entities.SoA.deathFunction[y] << 1;
+                    if a >= entities.N_DEATH_FUNCTIONS * 2{
                         a = 0;
                     }
                     x = a;
 
-                    carry = DeathFunctionsTable[unaligned x](y);
+                    carry = entities.DeathFunctionsTable[unaligned x](y);
                     if carry {
                         // Entity is still active
                         y = currentEntityId;
 
                         // Do not call the death function the next time this entity dies.
-                        SoA.deathFunction[y] = a = 0;
+                        entities.SoA.deathFunction[y] = a = 0;
                         metasprites.process_entity_animation(y);
                     }
                     else {
@@ -292,7 +331,7 @@ inline func process_active_entities()
                         y = currentEntityId;
 
                         // Decrement enemy count (if the entity is an enemy)
-                        a = SoA._isEnemy[unaligned y];
+                        a = entities.SoA._isEnemy[unaligned y];
                         if !zero {
                             _enemyCount--;
                             if negative {
@@ -325,10 +364,10 @@ inline func process_active_entities()
                             }
 
                             // Set process_function and ms_draw_function to a blank function (just in case they are accidentally called)
-                            aa = _blank_entity_function as u16;
+                            aa = entities._blank_entity_function as u16;
                             entities.SoA.process_function[unaligned y] = aa as func(u8 in x);
 
-                            aa = _blank_ms_draw_function as u16;
+                            aa = entities._blank_ms_draw_function as u16;
                             entities.SoA.ms_draw_function[unaligned y] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
                         }
                         mem8();
@@ -338,7 +377,7 @@ inline func process_active_entities()
                         //
                         // Y is currentEntityId;
                         a = metasprites.ShadowSize.NONE as u8;
-                        SoA.shadowSize[unaligned y] = a as metasprites.ShadowSize;
+                        entities.SoA.shadowSize[unaligned y] = a as metasprites.ShadowSize;
                     }
                 }
                 else {
@@ -439,6 +478,12 @@ var _yPosToCompare : u8 in zpTmp_byte_1;
     }
 }
 
+}
+}
+
+
+namespace entities {
+in code {
 
 // A blank init process function that does nothing
 //
@@ -454,7 +499,7 @@ func _blank_init_function(entityId : u8 in y, parameter : u8 in x) {
 // DB = 0x7e
 #[mem8, idx8]
 func _blank_entity_function(entityId : u8 in y) {
-    SoA.health[unaligned y] = a = 0;
+    entities.SoA.health[unaligned y] = a = 0;
 }
 
 

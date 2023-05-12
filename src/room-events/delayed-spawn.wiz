@@ -5,7 +5,6 @@ import "../memmap";
 
 import "_common";
 import "../room";
-import "../entities/_common";
 
 import "../audio";
 import "../../gen/resources";
@@ -55,16 +54,16 @@ func process() {
     x = spawnIndex;
     if x < N_ENTITIES_IN_ROOM_DATA {
         // Spawn smoke particle
-        entities.spawn_entity(a = room.entity_xPos[x],
-                              a = room.entity_yPos[x] - 1,
-                              a = entities.EntityTypes.smoke_particles as u8,
-                              y = entities.smoke_particles.init_parameter.ground as u8);
+        spawn_entity(a = room.entity_xPos[x],
+                     a = room.entity_yPos[x] - 1,
+                     a = entities.EntityTypes.smoke_particles as u8,
+                     y = entities.smoke_particles.init_parameter.ground as u8);
 
         x = spawnIndex;
-        entities.spawn_entity(a = room.entity_xPos[x],
-                              a = room.entity_yPos[x],
-                              a = room.entity_type[x],
-                              y = room.entity_parameter[x]);
+        spawn_entity(a = room.entity_xPos[x],
+                     a = room.entity_yPos[x],
+                     a = room.entity_type[x],
+                     y = room.entity_parameter[x]);
         spawnIndex++;
 
         // Restart spawn timer

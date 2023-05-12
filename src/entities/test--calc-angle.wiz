@@ -4,8 +4,8 @@
 
 import "../memmap";
 
+import "_base";
 import "_variables";
-import "_common";
 
 import "../player";
 
@@ -51,10 +51,10 @@ func init(entityId : u8 in y, parameter : u8 in x) {
     a = x;
     SoA_parameter[y] = a;
     if zero {
-        entities.spawn_entity(a = SoA.xPos_px[y],
-                              a = SoA.yPos_px[y],
-                              a = EntityTypes.test__calc_angle as u8,
-                              y = 1);
+        spawn_entity(a = SoA.xPos_px[y],
+                     a = SoA.yPos_px[y],
+                     a = EntityTypes.test__calc_angle as u8,
+                     y = 1);
     }
 }
 

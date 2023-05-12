@@ -5,7 +5,6 @@ import "../memmap";
 
 import "_common";
 import "../room";
-import "../entities/_common";
 
 import "../audio";
 import "../../gen/resources";
@@ -55,7 +54,7 @@ func process() {
     if zero {
         spawnTimer = a = parameter__delay;
 
-        a = entities.get_enemy_count_a();
+        a = get_enemy_count_a();
         if a < parameter__maxEnemies {
 
             x = spawnIndex;

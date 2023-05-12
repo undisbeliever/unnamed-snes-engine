@@ -9,8 +9,9 @@ import "common/dma";
 
 import "gameloop";
 import "audio";
-import "gamestate";
+import "entityloop";
 import "gamemodes";
+import "gamestate";
 import "metatiles";
 import "metasprites";
 import "resources";

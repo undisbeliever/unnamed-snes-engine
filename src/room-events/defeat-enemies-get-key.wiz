@@ -5,12 +5,12 @@ import "../memmap";
 
 import "_common";
 import "../gamestate";
-import "../entities/_common";
 
 import "../audio";
 import "../../gen/resources";
 
 import "gen/room-events";
+import "gen/entities";
 
 
 // Spawns a key when all the enemies are defeated
@@ -47,15 +47,15 @@ func init() {
 func process() {
     a = keyHidden;
     if !zero {
-        zero = entities.is_all_enemies_defeated();
+        zero = is_all_enemies_defeated();
         if zero {
             // All enemies defeated, spawn the key and smoke particles
             keyHidden = 0;
 
-            entities.spawn_entity(a = parameter__keyPos.xPos,
-                                  a = parameter__keyPos.yPos,
-                                  a = entities.EntityTypes.key as u8,
-                                  y = parameter__flag);
+            spawn_entity(a = parameter__keyPos.xPos,
+                         a = parameter__keyPos.yPos,
+                         a = entities.EntityTypes.key as u8,
+                         y = parameter__flag);
 
 
             // Spawn smoke 1px below key so the smoke particle's sprites are above the key
@@ -63,9 +63,9 @@ func process() {
             y = parameter__keyPos.yPos;
             y++;
 
-            entities.spawn_entity(x, y,
-                                  a = entities.EntityTypes.smoke_particles as u8,
-                                  y = entities.smoke_particles.init_parameter.small as u8);
+            spawn_entity(x, y,
+                         a = entities.EntityTypes.smoke_particles as u8,
+                         y = entities.smoke_particles.init_parameter.small as u8);
 
             ^return audio.queue_sound_effect(sound_effects.key_spawns);
         }

@@ -5,7 +5,6 @@ import "../memmap";
 
 import "_variables";
 import "_base";
-import "_common";
 import "../gamestate";
 import "../metatiles";
 
@@ -242,10 +241,10 @@ func process__falling(entityId : u8 in y) {
 
         audio.queue_sound_effect(sound_effects.rook_hits_ground);
 
-        ^return entities.spawn_entity(a = SoA.xPos_px[y],
-                                      a = SoA.yPos_px[y] + 4,
-                                      a = EntityTypes.smoke_particles as u8,
-                                      entities.smoke_particles.init_parameter.ground as u8);
+        ^return spawn_entity(a = SoA.xPos_px[y],
+                             a = SoA.yPos_px[y] + 4,
+                             a = EntityTypes.smoke_particles as u8,
+                             entities.smoke_particles.init_parameter.ground as u8);
     }
     SoA.zPos[y] = a;
 }

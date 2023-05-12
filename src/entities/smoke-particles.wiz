@@ -4,7 +4,6 @@
 import "../memmap";
 
 import "_variables";
-import "_common";
 import "_base";
 import "../metasprites";
 
@@ -12,6 +11,9 @@ import "../audio";
 import "../../gen/resources";
 
 import "../../gen/entities";
+
+// ::TODO remove this import::
+import "../entityloop";
 
 
 // ::TODO add a generic particle entity::

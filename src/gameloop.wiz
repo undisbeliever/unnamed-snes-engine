@@ -14,8 +14,8 @@ import "ui";
 import "wait-frame";
 
 import "player";
+import "entityloop";
 import "entities/_variables";
-import "entities/_common";
 import "entities/player-bomb";
 import "room-events/_callers";
 
@@ -54,9 +54,9 @@ func run_game {
         mem8_idx8();
 
 
-        entities.process_active_entities();
+        entityloop.process_active_entities();
 
-        entities.sort_active_entities();
+        entityloop.sort_active_entities();
 
         draw_entities();
 
@@ -102,7 +102,7 @@ func draw_entities() {
     }
     idx8();
 
-    entities.draw_active_entities();
+    entityloop.draw_active_entities();
 
     idx16();
     #[idx16] {

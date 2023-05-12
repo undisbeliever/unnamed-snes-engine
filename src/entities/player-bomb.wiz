@@ -5,7 +5,6 @@ import "../memmap";
 
 import "_variables";
 import "_base";
-import "_common";
 import "smoke-particles";
 import "../player";
 import "../metasprites";

@@ -17,8 +17,8 @@ import "wait-frame";
 import "common/reset";
 
 import "player";
+import "entityloop";
 import "entities/_variables";
-import "entities/_common";
 import "room-events/_callers";
 
 
@@ -247,7 +247,7 @@ var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u1
 func _finish_loading_room() {
 
     // Reset entity subsystem
-    entities.init();
+    entityloop.init();
 
     // Only process room events and map-tile properties if the room exists
     // A tileset of 0xff means the room is the empty dummy room.
@@ -260,7 +260,7 @@ func _finish_loading_room() {
         metatiles.populate_map_tile_properties();
     }
 
-    entities.sort_active_entities();
+    entityloop.sort_active_entities();
 
     _add_entities_to_sprite_list_with_offset(scrollDirection);
     _sprite_list_set_player_with_offset(scrollDirection);
@@ -335,7 +335,7 @@ func _load_room_from_backup(playerXpos : u8 in x, playerYpos : u8 in y) {
     player.yPos.px = y;
 
 
-    entities.sort_active_entities();
+    entityloop.sort_active_entities();
 
     _add_entities_to_sprite_list_with_offset(scrollDirection);
     _sprite_list_set_player_with_offset(scrollDirection);
@@ -989,13 +989,13 @@ var _activeEntitiesTablePos : u8 in zpTmp_byte_0;
 
     x = spriteListEnd;
 
-    y = entities.numberOfActiveEntities;
+    y = entityloop.numberOfActiveEntities;
     if !zero {
         do {
             y--;
             _activeEntitiesTablePos = y;
 
-            y = a = entities.activeEntitiesTable[y];
+            y = a = entityloop.activeEntitiesTable[y];
             if !zero {
                 mem16();
                 #[mem16] {
