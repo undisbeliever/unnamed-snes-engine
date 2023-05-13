@@ -55,6 +55,30 @@ func spawn_room_entities() {
 
 
 
+// Spawn a room enemy with a smoke particle
+//
+// NOTE: `enemyIndex` MUST BE < N_ENTITIES_IN_ROOM_DATA
+//
+// DB = 0x7e
+#[mem8, idx8, fallthrough]
+func spawn_enemy_with_smoke(enemyIndex : u8 in x,
+                            particle_type : entities.smoke_particles.init_parameter in y) {
+
+    push8(x);
+    {
+        // Spawn smoke particle
+        spawn_entity(a = room.entity_xPos[x],
+                     a = room.entity_yPos[x] - 1,
+                     a = entities.EntityTypes.smoke_particles as u8,
+                     y);
+    }
+    x = pop8();
+
+// Fallthrough
+}
+
+
+
 // Spawn a room enemy
 //
 // NOTE: `enemyIndex` MUST BE < N_ENTITIES_IN_ROOM_DATA
