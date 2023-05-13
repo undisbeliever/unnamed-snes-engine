@@ -4,11 +4,17 @@
 import "../memmap";
 
 import "../room";
+import "../audio";
+import "../gamestate";
 import "../metatiles";
 import "../entityloop";
 import "gen/entities";
 
 namespace room_events {
+
+
+let N_ENTITIES_IN_ROOM_DATA = room.entity_xPos.len;
+
 
 in wram7e_roomstate {
     var state_0 : u16;
@@ -17,12 +23,6 @@ in wram7e_roomstate {
     var state_3 : u16;
     var state_4 : u16;
 }
-
-
-// Functions that are allowed to be called in this context.
-let spawn_entity = entityloop.spawn_entity;
-let is_all_enemies_defeated = entityloop.is_all_enemies_defeated;
-let get_enemy_count_a = entityloop.get_enemy_count_a;
 
 
 in code {
@@ -169,6 +169,25 @@ func spawn_small_smoke_at_room_enemy_position(enemyIndex : u8 in x) {
                          y = entities.smoke_particles.init_parameter.small as u8);
 }
 
+
+// Functions that can be called in this context
+// ============================================
+
+
+// Audio functions
+let queue_sound_effect = audio.queue_sound_effect;
+
+
+// Entity-loop
+let spawn_entity            = entityloop.spawn_entity;
+let is_all_enemies_defeated = entityloop.is_all_enemies_defeated;
+let get_enemy_count_a       = entityloop.get_enemy_count_a;
+
+
+// Gamestate functions
+let is_gs_flag_clear             = gamestate.is_flag_clear;
+let set_gs_flag                  = gamestate.set_game_flag;
+let test_and_decrement_key_count = gamestate.test_and_decrement_key_count;
 
 }
 }

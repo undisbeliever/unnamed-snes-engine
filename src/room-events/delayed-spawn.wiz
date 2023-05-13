@@ -4,11 +4,8 @@
 import "../memmap";
 
 import "_common";
-import "../room";
 
-import "../audio";
-import "../../gen/resources";
-
+import "gen/resources";
 import "gen/room-events";
 import "gen/entities";
 
@@ -44,7 +41,7 @@ func process() {
         a--;
         spawnTimer = a;
         if zero {
-            audio.queue_sound_effect(sound_effects.spawn_enemy_with_smoke);
+            queue_sound_effect(sound_effects.spawn_enemy_with_smoke);
         }
         return;
     }

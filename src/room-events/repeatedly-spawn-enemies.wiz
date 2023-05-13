@@ -4,11 +4,8 @@
 import "../memmap";
 
 import "_common";
-import "../room";
 
-import "../audio";
-import "../../gen/resources";
-
+import "gen/resources";
 import "gen/room-events";
 import "gen/entities";
 
@@ -67,7 +64,7 @@ func process() {
             if x < N_ENTITIES_IN_ROOM_DATA {
                 spawn_room_enemy(x);
 
-                ^return audio.queue_sound_effect(sound_effects.statue_spawns_enemy);
+                ^return queue_sound_effect(sound_effects.statue_spawns_enemy);
             }
         }
     }
