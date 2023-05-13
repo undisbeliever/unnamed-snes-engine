@@ -7,7 +7,6 @@ import "_variables";
 import "_base";
 import "_vision_cone";
 
-import "../audio";
 import "../../gen/resources";
 
 import "../player";
@@ -458,7 +457,7 @@ func process__attacking(entityId : u8 in y) {
                          a = EntityTypes.bolt_angled as u8,
                          x);
 
-            audio.queue_sound_effect(sound_effects.crossbow_fires_bolt);
+            queue_sound_effect(sound_effects.crossbow_fires_bolt);
 
             y = currentEntityId;
         }
@@ -605,7 +604,7 @@ func set_state__hurt(entityId : u8 in y) {
     a = State.HURT as u8;
     SoA_state[y] = a as State;
 
-    audio.queue_sound_effect(sound_effects.enemy_hurt);
+    queue_sound_effect(sound_effects.enemy_hurt);
 
     SoA_countdownTimer[y] = a = HURT_KNOCKBACK_TIME_IN_FRAMES;
 
@@ -645,7 +644,7 @@ func set_state__blocking(entityId : u8 in y) {
     a = State.BLOCKING as u8;
     SoA_state[y] = a as State;
 
-    audio.queue_sound_effect(sound_effects.sword_hit_shield);
+    queue_sound_effect(sound_effects.sword_hit_shield);
 
     set_ms_animation(y, a = (SoA_facingDirection[y] as u8 >>> 1) | BLOCKING_MS_ANIMATION_OFFSET);
 

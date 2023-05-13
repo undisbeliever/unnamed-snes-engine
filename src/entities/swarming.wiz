@@ -10,7 +10,6 @@ import "../player";
 
 import "../common/math";
 
-import "../audio";
 import "../../gen/resources";
 
 import "../../gen/entities";
@@ -613,7 +612,7 @@ func set_state__hurt(entityId : u8 in y) {
     }
     set_ms_animation(y, a = a | HURT_MS_ANIMATION_OFFSET);
 
-    audio.queue_sound_effect(sound_effects.enemy_hurt);
+    queue_sound_effect(sound_effects.enemy_hurt);
 
     a = State.HURT as u8;
     SoA_state[y] = a as State;

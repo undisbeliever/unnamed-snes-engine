@@ -12,12 +12,13 @@ import "player-bomb";
 import "../entityloop";
 import "../player";
 
+import "../audio";
+import "../gamestate";
 import "../ui";
 import "../metatiles";
 import "../metasprites";
 import "../common/math";
 
-import "../audio";
 import "../../gen/resources";
 
 import "../../gen/cosine-tables";
@@ -255,7 +256,7 @@ func test_player_bomb_collision(entityId : u8 in y) : bool in carry {
             // The player bomb exploded
             a = __player_bomb_manhattan_distance__inline(y, a);
             if a < player_bomb.BOMB_EXPLOSION_DISTANCE {
-                audio.queue_sound_effect(sound_effects.explosion_hurt_enemy);
+                queue_sound_effect(sound_effects.explosion_hurt_enemy);
 
                 return true;
             }
@@ -282,7 +283,7 @@ func test_player_bomb_collision(entityId : u8 in y) : bool in carry {
 // DB = 0x7e
 #[mem8, idx8]
 func process_collisions__projectile(entityId : u8 in y) {
-    metatiles.move_entity_and_collision_test__projectile_bounded(y);
+    move_entity_and_tile_collision_test__projectile_bounded(y);
 
     return __process_collisions__after_metatile_checks(y);
 }
@@ -308,7 +309,7 @@ func process_collisions__projectile(entityId : u8 in y) {
 #[mem8, idx8, fallthrough]
 func process_collisions(entityId : u8 in y) {
 
-    metatiles.move_entity_and_collision_test__bounded(y);
+    move_entity_and_tile_collision_test__bounded(y);
 
 // fallthrough
 }
@@ -730,6 +731,18 @@ func calc_angle_to_player_32x2(entityId : u8 in y) : u8 in x {
 
 namespace entities {
 
+// Audio functions
+let queue_sound_effect = audio.queue_sound_effect;
+
+
+// Gamestate functions
+let is_gs_flag_clear = gamestate.is_flag_clear__keep_y;
+let set_gs_flag      = gamestate.set_game_flag__keep_y;
+
+// NOTE: clobbers Y
+let gs_increment_key_count__clobber_y = gamestate.increment_key_count;
+
+
 // MetaSprite functions
 import "../metasprites";
 
@@ -740,6 +753,16 @@ let set_ms_animation_if_changed      = metasprites.set_entity_animation_if_chang
 let stop_ms_animation = metasprites.stop_entity_animation;
 
 let is_ms_non_looping_animation_running = metasprites.is_entity_non_looping_animation_running;
+
+
+// MetaTile functions
+let move_entity_and_tile_collision_test                     = metatiles.move_entity_and_collision_test;
+let move_entity_and_tile_collision_test__projectile_bounded = metatiles.move_entity_and_collision_test__projectile_bounded;
+let move_entity_and_tile_collision_test__bounded            = metatiles.move_entity_and_collision_test__bounded;
+
+let get_tile_index_under_entity = metatiles.get_tile_index_under_entity;
+let set_tile_solid              = metatiles.set_tile_solid;
+let reset_tile_properties       = metatiles.reset_tile_properties;
 
 
 // Entityloop functions

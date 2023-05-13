@@ -8,7 +8,6 @@ import "_base";
 
 import "../rng";
 
-import "../audio";
 import "../../gen/resources";
 
 import "../../gen/entities";
@@ -225,7 +224,7 @@ func set_state__hurt(entityId : u8 in y) {
     a = State.HURT as u8;
     SoA_state[y] = a as State;
 
-    audio.queue_sound_effect(sound_effects.enemy_hurt);
+    queue_sound_effect(sound_effects.enemy_hurt);
 
     a = HURT_KNOCKBACK_TIME_IN_FRAMES;
     SoA_hurtTimer[y] = a;

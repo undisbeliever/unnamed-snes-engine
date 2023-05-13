@@ -10,10 +10,8 @@ import "smoke-particles";
 import "boss";
 import "player-bomb";
 
-import "../gamestate";
 import "../player";
 
-import "../audio";
 import "../../gen/resources";
 
 import "../../gen/cosine-tables";
@@ -174,7 +172,7 @@ func process__active(entityId : u8 in y) {
         else {
             a = sound_effects.explosion as u8;
         }
-        audio.queue_sound_effect(a as sound_effects);
+        queue_sound_effect(a as sound_effects);
 
         ^return entities.smoke_particles.change_to_smoke_entity(y, smoke_particles.init_parameter.explosion as u8);
     }
@@ -206,7 +204,7 @@ func set_state__disarmed(entityId : u8 in y) {
 
     set_ms_animation(y, ms_animations.stationary);
 
-    ^return audio.queue_sound_effect(sound_effects.boss_bomb_disabled);
+    ^return queue_sound_effect(sound_effects.boss_bomb_disabled);
 }
 
 

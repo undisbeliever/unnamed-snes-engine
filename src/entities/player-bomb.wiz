@@ -12,7 +12,6 @@ import "../metasprites";
 import "../../gen/entities";
 import "../../gen/ms-drawing-functions";
 
-import "../audio";
 import "../../gen/resources";
 
 
@@ -309,7 +308,7 @@ inline func prepare_explosion_variables__inline() {
     if !zero {
         // bomb exploded
         // If the bomb hurt an enemy, the queued SFX will be overridden
-        audio.queue_sound_effect(sound_effects.explosion);
+        entities.queue_sound_effect(sound_effects.explosion);
     }
 
     // explosion_yPos is set by `__set_explosion_position__inline()`

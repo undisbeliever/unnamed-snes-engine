@@ -7,7 +7,6 @@ import "_variables";
 import "_base";
 import "../metasprites";
 
-import "../audio";
 import "../../gen/resources";
 
 import "../../gen/entities";
@@ -44,7 +43,7 @@ func change_to_smoke_entity(entityId : u8 in y, animation : u8 in x) {
     else {
         entities.set_ms_animation_x(y, x);
 
-        audio.queue_sound_effect(sound_effects.enemy_poof);
+        entities.queue_sound_effect(sound_effects.enemy_poof);
     }
 
     // Do not kill the entity on the next frame

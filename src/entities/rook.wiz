@@ -5,10 +5,7 @@ import "../memmap";
 
 import "_variables";
 import "_base";
-import "../gamestate";
-import "../metatiles";
 
-import "../audio";
 import "../../gen/resources";
 
 import "../../gen/entities";
@@ -76,7 +73,7 @@ in code {
 func init(entityId : u8 in y, parameter : u8 in x) {
     SoA_gameStateFlag[y] = a = x;
 
-    zero = gamestate.is_flag_clear__keep_y(x);
+    zero = is_gs_flag_clear(x);
     if !zero {
         // The rook was destroyed up by a bomb on a previous visit.
         // Do not show the 'entity dead' smoke particle.
@@ -92,7 +89,7 @@ func init(entityId : u8 in y, parameter : u8 in x) {
 
     set_ms_animation(y, ms_animations.standing);
 
-    SoA_tileIndex[y] = a = x = metatiles.get_tile_index_under_entity(y);
+    SoA_tileIndex[y] = a = x = get_tile_index_under_entity(y);
 
     return set_state__wait(y);
 }
@@ -152,7 +149,7 @@ func process__wait(entityId : u8 in y) {
     // Set tile under the entity solid.
     // This must be here as room_transitions will reset tile properties after room event init
     // (ie, entities are spawned).
-    ^return metatiles.set_tile_solid(SoA_tileIndex[y]);
+    ^return set_tile_solid(SoA_tileIndex[y]);
 }
 
 
@@ -239,7 +236,7 @@ func process__falling(entityId : u8 in y) {
 
         // ::TODO repel player from rook if player is close to the rook::
 
-        audio.queue_sound_effect(sound_effects.rook_hits_ground);
+        queue_sound_effect(sound_effects.rook_hits_ground);
 
         ^return spawn_entity(a = SoA.xPos_px[y],
                              a = SoA.yPos_px[y] + 4,
@@ -261,10 +258,10 @@ func set_state__dead__inline(entityId : u8 in y) {
 
     set_ms_animation(y, ms_animations.dead);
 
-    gamestate.set_game_flag__keep_y(SoA_gameStateFlag[y]);
+    set_gs_flag(SoA_gameStateFlag[y]);
 
     // Remove tile solid flag
-    ^return metatiles.reset_tile_properties(SoA_tileIndex[y]);
+    ^return reset_tile_properties(SoA_tileIndex[y]);
 }
 
 

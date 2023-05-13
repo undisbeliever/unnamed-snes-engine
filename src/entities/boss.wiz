@@ -5,13 +5,10 @@ import "../memmap";
 
 import "_variables";
 import "_base";
-import "../gamestate";
-import "../metatiles";
 import "../rng";
 import "../player";
 import "../common/math";
 
-import "../audio";
 import "../../gen/resources";
 
 import "../../gen/cosine-tables";
@@ -140,7 +137,7 @@ in code {
 func init(entityId : u8 in y, parameter : u8 in x) {
 
     SoA_gameStateFlag[y] = a = x;
-    zero = gamestate.is_flag_clear__keep_y(x);
+    zero = is_gs_flag_clear(x);
     if !zero {
         // The boss has already been defeated, do not show it.
         x = y;
@@ -167,7 +164,7 @@ func process(entityId : u8 in y) {
     a = SoA.zPos[y];
     if a >= MIN_ZPOS_TO_HURT_PLAYER {
         // Boss above the player, neither can hurt the other
-        metatiles.move_entity_and_collision_test__bounded(y);
+        move_entity_and_tile_collision_test__bounded(y);
         collisionState = 0;
 
         a = SoA.zPos[y];
@@ -333,7 +330,7 @@ func set_state__rising(entityId : u8 in y) {
     a = State.RISING as u8;
     SoA_state[y] = a as State;
 
-    audio.queue_sound_effect(sound_effects.boss_rising);
+    queue_sound_effect(sound_effects.boss_rising);
 
     zero_velocities(y);
 
@@ -515,7 +512,7 @@ func set_state__landed(entityId : u8 in y) {
         base.hurt_player__collision(y);
     }
 
-    audio.queue_sound_effect(sound_effects.rook_hits_ground);
+    queue_sound_effect(sound_effects.rook_hits_ground);
 
 
     spawn_entity(a = SoA.xPos_px[y],
@@ -583,7 +580,7 @@ func process__on_ground_target_player(entityId : u8 in y) {
     if a & MovementState.TILE_COLLISION != 0 {
         zero_velocities(y);
 
-        audio.queue_sound_effect(sound_effects.rook_hits_ground);
+        queue_sound_effect(sound_effects.rook_hits_ground);
 
         ^return set_state__waiting_on_ground(y);
     }
@@ -662,7 +659,7 @@ func __process__throw_bombs(entityId : u8 in y) {
                 spawn_bomb(y, 28);
             }
 
-            audio.queue_sound_effect(sound_effects.throw_bomb);
+            queue_sound_effect(sound_effects.throw_bomb);
         }
     }
 }
@@ -694,7 +691,7 @@ func set_state__hurt__inline(entityId: u8 in y) {
     a = State.HURT as u8;
     SoA_state[y] = a as State;
 
-    audio.queue_sound_effect(sound_effects.enemy_hurt);
+    queue_sound_effect(sound_effects.enemy_hurt);
 
     zero_velocities(y);
 
@@ -728,7 +725,7 @@ func set_state__dead(entityId: u8 in y) {
     SoA_state[y] = a as State;
 
     // Mark boss defeated
-    gamestate.set_game_flag__keep_y(SoA_gameStateFlag[y]);
+    set_gs_flag(SoA_gameStateFlag[y]);
 
     // Dead boss must still have health to be visible
     SoA.health[y] = a = 0xff;
@@ -754,7 +751,7 @@ func process__dead(entityId : u8 in y) {
         spawn_explosion(y,  5 as u8,  -33 as u8);
         spawn_explosion(y, -5 as u8,  -33 as u8);
 
-        audio.queue_sound_effect(sound_effects.explosion);
+        queue_sound_effect(sound_effects.explosion);
 
         // Despawn entity
         x = y;
@@ -816,7 +813,7 @@ func collided_with_player_bomb(entityId : u8 in y) {
 // DB = 0x7e
 #[mem8, idx8]
 inline func collided_with_player_weapon__inline(entityId : u8 in y) {
-    audio.queue_sound_effect(sound_effects.sword_hit_rook);
+    queue_sound_effect(sound_effects.sword_hit_rook);
 }
 
 
@@ -953,7 +950,7 @@ func _shake_boss(entityId : u8 in y, timer : u8 in a) {
         }
         mem8();
 
-        ^return audio.queue_sound_effect(sound_effects.boss_shake);
+        ^return queue_sound_effect(sound_effects.boss_shake);
     }
 }
 
