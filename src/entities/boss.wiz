@@ -515,10 +515,10 @@ func set_state__landed(entityId : u8 in y) {
     queue_sound_effect(sound_effects.rook_hits_ground);
 
 
-    spawn_entity(a = SoA.xPos_px[y],
-                 a = SoA.yPos_px[y] + 4,
-                 a = EntityTypes.smoke_particles as u8,
-                 entities.smoke_particles.init_parameter.ground as u8);
+    spawn_entity__clobbers_y(a = SoA.xPos_px[y],
+                             a = SoA.yPos_px[y] + 4,
+                             a = EntityTypes.smoke_particles as u8,
+                             entities.smoke_particles.init_parameter.ground as u8);
     y = currentEntityId;
 }
 
@@ -671,10 +671,10 @@ func __process__throw_bombs(entityId : u8 in y) {
 #[mem8, idx8]
 func spawn_bomb(entityId : u8 in y, angle_32 : u8 in x) {
 
-    spawn_entity(a = SoA.xPos_px[y],
-                 a = SoA.yPos_px[y],
-                 a = EntityTypes.boss_bomb as u8,
-                 x);
+    spawn_entity__clobbers_y(a = SoA.xPos_px[y],
+                             a = SoA.yPos_px[y],
+                             a = EntityTypes.boss_bomb as u8,
+                             x);
     y = currentEntityId;
 }
 
@@ -770,9 +770,9 @@ func spawn_explosion(entityId : u8 in y, xOffset : u8 in a, yOffset : u8 in x)
     zpTmp_byte_0 = a = a + SoA.xPos_px[y];
     zpTmp_byte_1 = a = x + SoA.yPos_px[y];
 
-    spawn_entity(zpTmp_byte_0, zpTmp_byte_1,
-                 a = EntityTypes.smoke_particles as u8,
-                 x = entities.smoke_particles.init_parameter.explosion as u8);
+    spawn_entity__clobbers_y(zpTmp_byte_0, zpTmp_byte_1,
+                             a = EntityTypes.smoke_particles as u8,
+                             x = entities.smoke_particles.init_parameter.explosion as u8);
     y = currentEntityId;
 }
 

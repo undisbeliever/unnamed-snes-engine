@@ -51,10 +51,10 @@ func init(entityId : u8 in y, parameter : u8 in x) {
     a = x;
     SoA_parameter[y] = a;
     if zero {
-        spawn_entity(a = SoA.xPos_px[y],
-                     a = SoA.yPos_px[y],
-                     a = EntityTypes.test__calc_angle as u8,
-                     y = 1);
+        spawn_entity__clobbers_y(a = SoA.xPos_px[y],
+                                 a = SoA.yPos_px[y],
+                                 a = EntityTypes.test__calc_angle as u8,
+                                 y = 1);
     }
 }
 

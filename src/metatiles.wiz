@@ -330,6 +330,7 @@ var _tmp : u8 in zpTmp_byte_0;
 // NOTE: This function MUST not be called in the room-event init() or entity init() routines.
 //       Room transition code calls `populate_map_tile_properties()` after entity/room init.
 //
+// KEEP: Y
 // DB = 0x80
 #[mem8, idx8]
 func set_tile_solid(tileIndex : u8 in x) {

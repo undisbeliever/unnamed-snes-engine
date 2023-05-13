@@ -52,6 +52,15 @@ The Data Bank (`DB`) and Direct Page (`DP`) registers are callee-saved.
 
 
 
+Entity Loop
+-----------
+
+Functions that are intended to be called inside the entity-loop should be aliased in the `entities`
+namespace.  All aliased functions in the `entities` namespace that do not preserve (clobber) the
+Y-register must be suffixed with `__clobbers_y`.
+
+
+
 Register Sizes
 --------------
 

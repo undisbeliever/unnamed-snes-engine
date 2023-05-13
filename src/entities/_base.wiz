@@ -740,7 +740,7 @@ let is_gs_flag_clear = gamestate.is_flag_clear__keep_y;
 let set_gs_flag      = gamestate.set_game_flag__keep_y;
 
 // NOTE: clobbers Y
-let gs_increment_key_count__clobber_y = gamestate.increment_key_count;
+let gs_increment_key_count__clobbers_y = gamestate.increment_key_count;
 
 
 // MetaSprite functions
@@ -760,9 +760,9 @@ let move_entity_and_tile_collision_test                     = metatiles.move_ent
 let move_entity_and_tile_collision_test__projectile_bounded = metatiles.move_entity_and_collision_test__projectile_bounded;
 let move_entity_and_tile_collision_test__bounded            = metatiles.move_entity_and_collision_test__bounded;
 
-let get_tile_index_under_entity = metatiles.get_tile_index_under_entity;
-let set_tile_solid              = metatiles.set_tile_solid;
-let reset_tile_properties       = metatiles.reset_tile_properties;
+let get_tile_index_under_entity      = metatiles.get_tile_index_under_entity;
+let set_tile_solid                   = metatiles.set_tile_solid;
+let reset_tile_properties__clobbers_y = metatiles.reset_tile_properties;
 
 
 // Entityloop functions
@@ -770,7 +770,7 @@ let is_all_enemies_defeated = entityloop.is_all_enemies_defeated;
 let get_enemy_count_a = entityloop.get_enemy_count_a;
 
 // NOTE: clobbers Y
-let spawn_entity = entityloop.spawn_entity;
+let spawn_entity__clobbers_y = entityloop.spawn_entity;
 
 }
 
