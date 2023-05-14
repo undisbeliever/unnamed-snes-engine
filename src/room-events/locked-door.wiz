@@ -6,7 +6,7 @@ import "../memmap";
 import "_common";
 import "../interactive-tiles";
 
-import "gen/resources";
+import "gen/enums";
 import "gen/room-events";
 
 

@@ -17,8 +17,8 @@ import "metasprites";
 import "common/math";
 
 import "audio";
-import "../gen/resources";
 
+import "gen/enums";
 import "../gen/entities";
 import "../gen/cosine-tables";
 

@@ -10,8 +10,7 @@ import "../player";
 
 import "../common/math";
 
-import "../../gen/resources";
-
+import "gen/enums";
 import "../../gen/entities";
 
 

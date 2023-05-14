@@ -5,7 +5,7 @@ import "../memmap";
 
 import "_common";
 
-import "gen/resources";
+import "gen/enums";
 import "gen/room-events";
 import "gen/entities";
 

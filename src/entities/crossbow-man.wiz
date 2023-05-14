@@ -7,10 +7,9 @@ import "_variables";
 import "_base";
 import "_vision_cone";
 
-import "../../gen/resources";
-
 import "../player";
 
+import "gen/enums";
 import "../../gen/entities";
 
 

@@ -6,8 +6,7 @@ import "../memmap";
 import "_variables";
 import "_base";
 
-import "../../gen/resources";
-
+import "gen/enums";
 import "../../gen/entities";
 
 

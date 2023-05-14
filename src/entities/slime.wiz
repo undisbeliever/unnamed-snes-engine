@@ -8,8 +8,7 @@ import "_base";
 
 import "../rng";
 
-import "../../gen/resources";
-
+import "gen/enums";
 import "../../gen/entities";
 
 

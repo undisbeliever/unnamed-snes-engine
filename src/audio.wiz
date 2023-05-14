@@ -5,7 +5,8 @@ import "memmap";
 import "registers";
 
 import "resources";
-import "gen/resources";
+
+import "gen/enums";
 
 
 

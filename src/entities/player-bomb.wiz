@@ -9,10 +9,9 @@ import "smoke-particles";
 import "../player";
 import "../metasprites";
 
+import "gen/enums";
 import "../../gen/entities";
 import "../../gen/ms-drawing-functions";
-
-import "../../gen/resources";
 
 
 namespace entities {

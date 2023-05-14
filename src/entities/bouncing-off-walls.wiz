@@ -7,8 +7,7 @@ import "_variables";
 import "_base";
 import "../common/math";
 
-import "../../gen/resources";
-
+import "gen/enums";
 import "../../gen/entities";
 
 

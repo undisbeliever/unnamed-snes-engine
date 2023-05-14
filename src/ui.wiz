@@ -11,7 +11,8 @@ import "gamestate";
 import "common/dma";
 
 import "audio";
-import "../gen/resources";
+
+import "gen/enums";
 
 
 namespace ui {

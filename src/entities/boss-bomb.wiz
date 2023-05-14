@@ -12,10 +12,8 @@ import "player-bomb";
 
 import "../player";
 
-import "../../gen/resources";
-
+import "gen/enums";
 import "../../gen/cosine-tables";
-
 import "../../gen/entities";
 
 

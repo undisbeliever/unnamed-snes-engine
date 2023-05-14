@@ -9,10 +9,8 @@ import "../rng";
 import "../player";
 import "../common/math";
 
-import "../../gen/resources";
-
+import "gen/enums";
 import "../../gen/cosine-tables";
-
 import "../../gen/entities";
 
 

@@ -6,7 +6,7 @@ import "registers";
 import "room";
 import "common/dma";
 
-import "gen/resources";
+import "gen/enums";
 
 
 

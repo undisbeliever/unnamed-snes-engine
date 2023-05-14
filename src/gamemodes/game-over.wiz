@@ -12,7 +12,8 @@ import "../resources";
 import "../textbox";
 import "../wait-frame";
 import "../common/reset";
-import "gen/resources";
+
+import "gen/enums";
 
 
 namespace gamemodes {

@@ -10,7 +10,8 @@ import "../gamemodes";
 import "../joypad";
 import "../resources";
 import "../wait-frame";
-import "gen/resources";
+
+import "gen/enums";
 
 
 namespace gamemodes {

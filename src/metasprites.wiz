@@ -8,7 +8,7 @@ import "resources";
 import "common/dma";
 import "common/math";
 
-import "../gen/resources";
+import "gen/enums";
 
 
 let DISPLAY_WIDTH = 256;

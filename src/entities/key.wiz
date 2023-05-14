@@ -7,7 +7,8 @@ import "_variables";
 import "_base";
 import "../player";
 
-import "../../gen/resources";
+import "gen/enums";
+
 
 namespace entities {
 

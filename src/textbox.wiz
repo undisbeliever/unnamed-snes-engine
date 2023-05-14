@@ -10,10 +10,10 @@ import "audio";
 import "joypad";
 import "resources";
 import "wait-frame";
-import "gen/resources";
-
 // For `empty_byte`
 import "common/reset";
+
+import "gen/enums";
 
 
 namespace textbox {

@@ -13,7 +13,7 @@ MAKEFLAGS += --no-builtin-rules
 
 SOURCES	  := $(wildcard src/*.wiz src/*/*.wiz)
 
-GEN_SOURCES  := gen/resources.wiz
+GEN_SOURCES  := gen/enums.wiz
 GEN_SOURCES  += gen/function-tables.wiz
 GEN_SOURCES  += gen/room-events.wiz
 GEN_SOURCES  += gen/entities.wiz
@@ -82,14 +82,14 @@ ifneq ($(.SHELLSTATUS), 0)
 endif
 
 
+gen/enums.wiz: resources/mappings.json tools/generate_enums_wiz.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) tools/generate_enums_wiz.py -o '$@' 'resources/mappings.json'
+
 gen/function-tables.wiz: resources/mappings.json resources/entities.json tools/generate_function_tables_wiz.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate_function_tables_wiz.py -o '$@' 'resources/mappings.json' 'resources/entities.json'
 
 gen/room-events.wiz: resources/mappings.json tools/generate_room_events_wiz.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate_room_events_wiz.py -o '$@' 'resources/mappings.json'
-
-gen/resources.wiz: resources/mappings.json tools/generate_resources_wiz.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) tools/generate_resources_wiz.py -o '$@' 'resources/mappings.json'
 
 gen/ms-drawing-functions.wiz: resources/ms-export-order.json tools/generate_ms_drawing_functions.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) tools/generate_ms_drawing_functions.py -o '$@' 'resources/ms-export-order.json'

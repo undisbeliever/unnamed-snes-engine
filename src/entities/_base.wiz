@@ -19,8 +19,7 @@ import "../metatiles";
 import "../metasprites";
 import "../common/math";
 
-import "../../gen/resources";
-
+import "gen/enums";
 import "../../gen/cosine-tables";
 
 

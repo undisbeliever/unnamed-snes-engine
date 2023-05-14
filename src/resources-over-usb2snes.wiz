@@ -10,7 +10,7 @@ import "resources";
 import "room";
 import "common/reset";
 
-import "gen/resources";
+import "gen/enums";
 
 namespace resources_over_usb2snes {
 
