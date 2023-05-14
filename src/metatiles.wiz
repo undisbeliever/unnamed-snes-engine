@@ -14,7 +14,7 @@ import "player";
 
 import "entities/_variables";
 
-import "../gen/interactive-tiles.wiz";
+import "gen/function-tables";
 
 
 namespace metatiles {
@@ -585,7 +585,7 @@ var _tmp : u16 in zpTmp_word_0;
 // DB = 0x7e
 #[mem8, idx8]
 inline func __get_interactive_tile_ft_index(tileId : u8 in y) : u8 in x {
-    return x = a = (mapTileProperties[y] << 1) & interactive_tiles.FUNCTION_TABLE_MASK;
+    return x = a = (mapTileProperties[y] << 1) & metatiles.interactive_tiles.FUNCTION_TABLE_MASK;
 }
 
 
@@ -603,7 +603,7 @@ var _tmp : u8 in zpTmp_byte_0;
 
     x = __get_interactive_tile_ft_index(y);
 
-    interactive_tiles.player_touches_tile_function_table[unaligned x](y);
+    metatiles.interactive_tiles.player_touches_tile_function_table[unaligned x](y);
 
 
     // Interactions with solid tiles are only preformed on the tile at the player's
@@ -625,7 +625,7 @@ var _tmp : u8 in zpTmp_byte_0;
         y = a = (player.yPos.px & 0xf0) | _tmp;
 
         x = __get_interactive_tile_ft_index(y);
-        return interactive_tiles.player_tile_collision_function_table[unaligned x](y, CollisionDirection.LEFT);
+        return metatiles.interactive_tiles.player_tile_collision_function_table[unaligned x](y, CollisionDirection.LEFT);
 
         a = player.movementState;
 
@@ -647,7 +647,7 @@ var _tmp : u8 in zpTmp_byte_0;
         y = a = (player.yPos.px & 0xf0) | _tmp;
 
         x = __get_interactive_tile_ft_index(y);
-        return interactive_tiles.player_tile_collision_function_table[unaligned x](y, CollisionDirection.RIGHT);
+        return metatiles.interactive_tiles.player_tile_collision_function_table[unaligned x](y, CollisionDirection.RIGHT);
 
         a = player.movementState;
     }
@@ -668,7 +668,7 @@ var _tmp : u8 in zpTmp_byte_0;
         y = a = (a & 0xf0) | _tmp;
 
         x = __get_interactive_tile_ft_index(y);
-        return interactive_tiles.player_tile_collision_function_table[unaligned x](y, CollisionDirection.UP);
+        return metatiles.interactive_tiles.player_tile_collision_function_table[unaligned x](y, CollisionDirection.UP);
 
     }
     else if a & entities.MovementState.DOWN_COLLISION != 0 {
@@ -688,7 +688,7 @@ var _tmp : u8 in zpTmp_byte_0;
         y = a = (a & 0xf0) | _tmp;
 
         x = __get_interactive_tile_ft_index(y);
-        return interactive_tiles.player_tile_collision_function_table[unaligned x](y, CollisionDirection.DOWN);
+        return metatiles.interactive_tiles.player_tile_collision_function_table[unaligned x](y, CollisionDirection.DOWN);
     }
 }
 
@@ -787,7 +787,7 @@ Return:
 func test_if_player_touches_a_doorway_tile() : bool in zero {
 var _tmp : u8 in zpTmp_byte_0;
 
-let _DOORWAY_TP = interactive_tiles.DOORWAY_FUNCTION_TABLE_UNALIGNED_INDEX >> 1;
+let _DOORWAY_TP = metatiles.interactive_tiles.DOORWAY_FUNCTION_TABLE_UNALIGNED_INDEX >> 1;
 
     _tmp = a = player.xPos.px >>> 4;
     y = a = (player.yPos.px & 0xf0) | _tmp;

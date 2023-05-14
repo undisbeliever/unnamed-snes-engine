@@ -4,12 +4,13 @@
 import "memmap";
 
 import "../gen/entities";
-import "../gen/death-functions-table.wiz";
 
 import "entities/_variables";
 
 import "player";
 import "metasprites";
+
+import "gen/function-tables";
 
 
 namespace entityloop {
@@ -312,7 +313,7 @@ inline func process_active_entities()
                 if zero {
                     // Entity's health is 0, call the entity's death function
                     a = entities.SoA.deathFunction[y] << 1;
-                    if a >= entities.N_DEATH_FUNCTIONS * 2{
+                    if a >= sizeof(typeof(entities.DeathFunctionsTable)) {
                         a = 0;
                     }
                     x = a;

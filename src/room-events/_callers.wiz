@@ -5,7 +5,8 @@ import "../memmap";
 
 import "_common";
 import "../room";
-import "gen/room-events-function-tables";
+
+import "gen/function-tables";
 
 namespace room_events {
 
