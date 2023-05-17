@@ -6,7 +6,6 @@ import "registers";
 
 import "room";
 import "resources";
-import "gameloop";
 import "wait-frame";
 import "common/dma";
 

@@ -7,7 +7,8 @@ import "registers";
 import "common/reset";
 import "common/dma";
 
-import "gameloop";
+import "gamemodes/gameloop";
+
 import "audio";
 import "entityloop";
 import "gamemodes";

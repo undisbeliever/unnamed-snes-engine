@@ -4,7 +4,7 @@
 import "memmap";
 
 
-import "gameloop";
+import "gamemodes/gameloop";
 import "gamemodes/title-screen";
 import "gamemodes/game-over";
 import "gamemodes/credits";
@@ -63,7 +63,7 @@ in code {
 // MUST MATCH GameModes enum
 #[mem8, idx8]
 const gamemode_function_table : [func()] = [
-    gameloop.run_game,
+    gamemodes.gameloop.exec,
     gamemodes.title_screen.exec,
     gamemodes.game_over.exec,
     gamemodes.credits.exec,
