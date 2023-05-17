@@ -5,7 +5,6 @@ import "memmap";
 import "registers";
 
 import "room";
-import "gameloop";
 import "gamemodes";
 import "gamestate";
 import "metasprites";
@@ -594,7 +593,7 @@ func __fadein__(partiallyLoadedRoom : u8 in a) {
         // This is a new room and some subsystems are still uninitialised.
         _finish_loading_room();
     }
-    gameloop.draw_entities();
+    entityloop.draw_entities();
 
 
     // Draw the MetaTile map to VRAM

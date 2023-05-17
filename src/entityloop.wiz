@@ -479,6 +479,28 @@ var _yPosToCompare : u8 in zpTmp_byte_1;
     }
 }
 
+
+
+// Draw entities
+//
+// DB = 0x7e
+#[mem8, idx8]
+func draw_entities() {
+    idx16();
+    #[idx16] {
+        metasprites.reset_buffer_and_draw_entity_shadows();
+    }
+    idx8();
+
+    entityloop.draw_active_entities();
+
+    idx16();
+    #[idx16] {
+        metasprites.finalize_buffer();
+    }
+    idx8();
+}
+
 }
 }
 

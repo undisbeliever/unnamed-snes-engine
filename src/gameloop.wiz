@@ -57,8 +57,7 @@ func run_game {
         entityloop.process_active_entities();
 
         entityloop.sort_active_entities();
-
-        draw_entities();
+        entityloop.draw_entities();
 
 
         ui.process();
@@ -87,28 +86,6 @@ func run_game {
         // ASSERT: GameModes.RUN_GAME == 0
         a = gameMode as u8;
     } while zero;
-}
-
-
-
-// Process the game loop
-//
-// DB = 0x7e
-#[mem8, idx8]
-func draw_entities() {
-    idx16();
-    #[idx16] {
-        metasprites.reset_buffer_and_draw_entity_shadows();
-    }
-    idx8();
-
-    entityloop.draw_active_entities();
-
-    idx16();
-    #[idx16] {
-        metasprites.finalize_buffer();
-    }
-    idx8();
 }
 
 
