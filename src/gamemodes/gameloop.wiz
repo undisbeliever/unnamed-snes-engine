@@ -71,9 +71,7 @@ func exec {
 
         a = ui.healthBarValue;
         if zero {
-            a = GameModes.GAME_OVER as u8;
-            gameMode = a as GameModes;
-
+            set_next_game_mode(GameModes.GAME_OVER);
             break;
         }
 
@@ -86,9 +84,8 @@ func exec {
 
         // loop until gameMode changes
 
-        // ASSERT: GameModes.GAME_LOOP == 0
-        a = gameMode as u8;
-    } while zero;
+        negative = is_next_game_mode_unchanged();
+    } while negative;
 }
 
 
@@ -104,7 +101,7 @@ inline func _check_for_room_transition() {
         // Check if there is a room above this one
         a = gamestate.data.currentRoom - 0x10;
         if carry {
-            set_gamemode_room_transition(RoomTransitions.scroll_up);
+            set_next_game_mode_to_room_transition(RoomTransitions.scroll_up);
         }
 
         // Do not check x axis after loading next room
@@ -114,7 +111,7 @@ inline func _check_for_room_transition() {
         // Check if there is a room below this one
         a = gamestate.data.currentRoom + 0x10;
         if !carry {
-            set_gamemode_room_transition(RoomTransitions.scroll_down);
+            set_next_game_mode_to_room_transition(RoomTransitions.scroll_down);
         }
 
         // Do not check x axis after loading next room
@@ -126,14 +123,14 @@ inline func _check_for_room_transition() {
         // Check if there is a room to the left of this one
         a = gamestate.data.currentRoom & 0x0f;
         if !zero {
-            set_gamemode_room_transition(RoomTransitions.scroll_left);
+            set_next_game_mode_to_room_transition(RoomTransitions.scroll_left);
         }
     }
     else if a >= DISPLAY_WIDTH - 1 {
         // Check if there is a room to the right of this one
         a = gamestate.data.currentRoom & 0x0f;
         if a != 0x0f {
-            set_gamemode_room_transition(RoomTransitions.scroll_right);
+            set_next_game_mode_to_room_transition(RoomTransitions.scroll_right);
         }
     }
 }

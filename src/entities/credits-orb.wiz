@@ -40,8 +40,7 @@ func process(entityId : u8 in y) {
     base.process_collisions(y);
 
     if collisionState $ CollisionState.PLAYER_HURTBOX_BIT {
-        a = GameModes.CREDITS as u8;
-        gameMode = a as GameModes;
+        set_next_game_mode(GameModes.CREDITS);
     }
 
 

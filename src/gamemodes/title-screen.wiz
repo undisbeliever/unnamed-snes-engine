@@ -60,7 +60,7 @@ func exec() {
     gamestate.new_game();
 
 
-    set_gamemode_room_transition(RoomTransitions.fadein_reset_player);
+    set_next_game_mode_to_room_transition(RoomTransitions.fadein_reset_player);
 }
 
 

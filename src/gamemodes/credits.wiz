@@ -78,8 +78,7 @@ func exec() {
     process__licenses();
 
 
-    a = GameModes.TITLE_SCREEN as u8;
-    gameMode = a as GameModes;
+    set_next_game_mode(GameModes.TITLE_SCREEN);
 }
 
 

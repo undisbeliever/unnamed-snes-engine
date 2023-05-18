@@ -93,19 +93,18 @@ func exec() {
             gamestate.continue_game();
         }
 
-        set_gamemode_room_transition(RoomTransitions.fadein_reset_player);
+        set_next_game_mode_to_room_transition(RoomTransitions.fadein_reset_player);
     }
     else {
         // Switch game mode
         if a == MenuItem.SHOW_CREDITS as u8 {
             a = GameModes.CREDITS as u8;
-            gameMode = a as GameModes;
         }
         else {
             a = GameModes.TITLE_SCREEN as u8;
         }
-        // A = gamemode
-        gameMode = a as GameModes;
+        // A = GameModes
+        set_next_game_mode(a as GameModes);
     }
 
     ^return audio.queue_sound_effect(sound_effects.menu_select);

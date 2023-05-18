@@ -555,6 +555,8 @@ def load_ms_export_order_json(filename: Filename) -> MsExportOrder:
 
 MAX_ROOM_EVENTS = 128
 MAX_ROOM_EVENT_PARAMETERS = 4
+
+# GAME_MODES > 128 mean the next game mode is unchanged.
 MAX_GAME_MODES = 128
 
 

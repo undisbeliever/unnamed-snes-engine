@@ -60,10 +60,6 @@ inline func main__inline() {
 
     metasprites.setup__forceblank();
 
-    // Enable VBlank interrupts and auto-joypad
-    NMITIMEN = a = NMITIMEN_V_BLANK | NMITIMEN_AUTO_JOY;
-
-
     push8(a = 0x7e);
     data_bank = pop8();
 // DB = 0x7e
@@ -73,23 +69,13 @@ inline func main__inline() {
         carry = gamestate.init();
         if carry {
             // Gamestate backup exists, load that instead of the title screen.
-            set_gamemode_room_transition(RoomTransitions.fadein_reset_player);
+            set_next_game_mode_to_room_transition(RoomTransitions.fadein_reset_player);
         } else {
             // No gamestate backup, show the title screen
-            a = GameModes.TITLE_SCREEN as u8;
-            gameMode = a as GameModes;
+            set_next_game_mode(GameModes.TITLE_SCREEN);
         }
 
-        while true {
-            a = gameMode as u8;
-            if a >= gamemodes.N_GAME_MODES {
-                // Break
-                irqcall(0);
-            }
-
-            x = a = a << 1;
-            gamemodes.exec_function_table[unaligned x]();
-        }
+        execute_game_mode__inline();
     }
 }
 

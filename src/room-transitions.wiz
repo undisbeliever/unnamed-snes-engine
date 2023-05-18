@@ -550,7 +550,7 @@ func load_room__fadein() {
 
 
 
-// Blank the screen, load graphics to PPU, fade in the screen, set gameMode to GAME_LOOP.
+// Blank the screen, load graphics to PPU, fade in the screen, set next game mode to GAME_LOOP.
 //
 // ASSUMES: room is completely loaded into memory and the room was previously active.
 //
@@ -562,7 +562,7 @@ func _fadein__room_completly_loaded() {
 
 
 
-// Blank the screen, load graphics to PPU, fade in the screen, set gameMode to GAME_LOOP.
+// Blank the screen, load graphics to PPU, fade in the screen, set next game mode to GAME_LOOP.
 //
 // ASSUMES: room is partially loaded into memory.
 //
@@ -574,7 +574,7 @@ func _fadein__room_partially_loaded() {
 
 
 
-// Blank the screen, load graphics to PPU, fade in the screen, set gameMode to GAME_LOOP.
+// Blank the screen, load graphics to PPU, fade in the screen, set next game mode to GAME_LOOP.
 //
 // ASSUMES: room is partially or completely loaded in memory
 //
@@ -644,7 +644,7 @@ func __fadein__(partiallyLoadedRoom : u8 in a) {
     // The player is in a valid position.  Make a backup of the game state.
     gamestate.backup_gamestate();
 
-    gameMode = GameModes.GAME_LOOP;
+    set_next_game_mode(GameModes.GAME_LOOP);
 }
 
 
@@ -792,7 +792,7 @@ func _scrolling_room_transition__loop() : bool in carry {
     // Room transition was successful.  Make a backup of the game state.
     gamestate.backup_gamestate();
 
-    gameMode = GameModes.GAME_LOOP;
+    set_next_game_mode(GameModes.GAME_LOOP);
 
     return true;
 }

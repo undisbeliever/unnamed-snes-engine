@@ -68,8 +68,7 @@ func exec() {
     process__inline();
 
 
-    a = GameModes.TITLE_SCREEN as u8;
-    gameMode = a as GameModes;
+    set_next_game_mode(GameModes.TITLE_SCREEN);
 }
 
 
