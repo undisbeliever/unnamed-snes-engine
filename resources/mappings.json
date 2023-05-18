@@ -97,6 +97,14 @@
    "key_guarding_rook_2",
    "boss_defeated"
  ],
+ "room_transitions": [
+   "fadein_reset_player",
+   "fadein",
+   "scroll_left",
+   "scroll_right",
+   "scroll_up",
+   "scroll_down"
+ ],
  "room_events": [
    {
      "name": "normal",

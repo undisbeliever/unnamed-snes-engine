@@ -36,6 +36,8 @@ import "src/entities/projectile";
 import "src/entities/projectile-angled";
 import "src/entities/test--calc-angle";
 
+import "gen/enums";
+
 
 in code {
 
@@ -70,13 +72,12 @@ inline func main__inline() {
         carry = gamestate.init();
         if carry {
             // Gamestate backup exists, load that instead of the title screen.
-            a = GameModes.START_GAMELOOP as u8;
+            set_gamemode_room_transition(RoomTransitions.fadein_reset_player);
         } else {
             // No gamestate backup, show the title screen
             a = GameModes.TITLE_SCREEN as u8;
+            gameMode = a as GameModes;
         }
-        gameMode = a as GameModes;
-
 
         while true {
             a = gameMode as u8;

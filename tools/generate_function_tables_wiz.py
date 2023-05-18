@@ -27,14 +27,19 @@ def next_power_of_two(n: int) -> int:
 def function_table(
     out: StringIO, namespace: str, comment: Optional[str], name: Name, func_signature: str, prefix: str, function_list: list[str]
 ) -> None:
-    out.write(f"namespace {namespace} {{\n")
+    namespaces = namespace.split(".")
+
+    for ns in namespaces:
+        out.write(f"namespace {ns} {{\n")
+
     if comment:
         out.write(f"// {comment}\n")
     out.write(f"const {name} : [{func_signature} ; {len(function_list)}] = [\n")
     for f in function_list:
         out.write(f"  {prefix}.{f},\n")
     out.write("];\n\n")
-    out.write("}\n\n")
+
+    out.write("}\n" * len(namespaces))
 
 
 def interactive_tiles_table(out: StringIO, interactive_tile_functions: list[str]) -> None:
@@ -127,6 +132,7 @@ import "../src/memmap";
 
 import "../src/entities/_death_functions";
 import "../src/interactive-tiles";
+import "../src/gamemodes/room-transition.wiz";
 import "../src/metatiles";
 """
         )
@@ -146,6 +152,16 @@ import "../src/metatiles";
         )
         interactive_tiles_table(out, mappings.interactive_tile_functions)
         room_events_table(out, mappings.room_events)
+
+        function_table(
+            out,
+            "gamemodes.room_transition",
+            "Room transition functions load the next room and switch to the gameloop",
+            "RoomTransitionsTable",
+            "func()",
+            "gamemodes.room_transition",
+            mappings.room_transitions,
+        )
 
         out.write("}\n")
 

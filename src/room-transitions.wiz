@@ -510,7 +510,7 @@ inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func start_gameloop() {
+func fadein_reset_player() {
     wait_multiple_frames_and_fadeout();
 
     // Player cannot be initialised in a normal room transition.

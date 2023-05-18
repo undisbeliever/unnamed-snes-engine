@@ -22,6 +22,8 @@ import "../player";
 // ::TODO find a better place to call `rou2s_commands.process_commands()`::
 import "../rou2s-commands";
 
+import "gen/enums";
+
 
 namespace gamemodes {
 namespace gameloop {
@@ -102,8 +104,7 @@ inline func _check_for_room_transition() {
         // Check if there is a room above this one
         a = gamestate.data.currentRoom - 0x10;
         if carry {
-            a = GameModes.ROOM_TRANSITION_SCROLL_UP as u8;
-            gameMode = a as GameModes;
+            set_gamemode_room_transition(RoomTransitions.scroll_up);
         }
 
         // Do not check x axis after loading next room
@@ -113,8 +114,7 @@ inline func _check_for_room_transition() {
         // Check if there is a room below this one
         a = gamestate.data.currentRoom + 0x10;
         if !carry {
-            a = GameModes.ROOM_TRANSITION_SCROLL_DOWN as u8;
-            gameMode = a as GameModes;
+            set_gamemode_room_transition(RoomTransitions.scroll_down);
         }
 
         // Do not check x axis after loading next room
@@ -126,16 +126,14 @@ inline func _check_for_room_transition() {
         // Check if there is a room to the left of this one
         a = gamestate.data.currentRoom & 0x0f;
         if !zero {
-            a = GameModes.ROOM_TRANSITION_SCROLL_LEFT as u8;
-            gameMode = a as GameModes;
+            set_gamemode_room_transition(RoomTransitions.scroll_left);
         }
     }
     else if a >= DISPLAY_WIDTH - 1 {
         // Check if there is a room to the right of this one
         a = gamestate.data.currentRoom & 0x0f;
         if a != 0x0f {
-            a = GameModes.ROOM_TRANSITION_SCROLL_RIGHT as u8;
-            gameMode = a as GameModes;
+            set_gamemode_room_transition(RoomTransitions.scroll_right);
         }
     }
 }

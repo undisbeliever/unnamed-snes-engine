@@ -76,31 +76,37 @@ func exec() {
     }
     mem8_idx8();
 
-    if a == MenuItem.TITLE_SCREEN as u8{
-        a = GameModes.TITLE_SCREEN as u8;
-    }
-    else if a == MenuItem.RESTART_ROOM as u8 {
-        // Restart gamestate (which will load the gamestate backup if it exists)
-        gamestate.init();
+    if a < MenuItem.TITLE_SCREEN as u8 {
+        // restarts the gameloop
 
-        // Increment health (if it is too low)
-        a = gamestate.data.playerState.health;
-        if a < MIN_HEALTH_ON_RESTART_ROOM {
-            gamestate.data.playerState.health = a = MIN_HEALTH_ON_RESTART_ROOM;
+        if a == MenuItem.RESTART_ROOM as u8 {
+            // Restart gamestate (which will load the gamestate backup if it exists)
+            gamestate.init();
+
+            // Increment health (if it is too low)
+            a = gamestate.data.playerState.health;
+            if a < MIN_HEALTH_ON_RESTART_ROOM {
+                gamestate.data.playerState.health = a = MIN_HEALTH_ON_RESTART_ROOM;
+            }
+        }
+        else {
+            gamestate.continue_game();
         }
 
-        a = GameModes.START_GAMELOOP as u8;
-    }
-    else if a == MenuItem.SHOW_CREDITS as u8 {
-        a = GameModes.CREDITS as u8;
+        set_gamemode_room_transition(RoomTransitions.fadein_reset_player);
     }
     else {
-        gamestate.continue_game();
-        a = GameModes.START_GAMELOOP as u8;
+        // Switch game mode
+        if a == MenuItem.SHOW_CREDITS as u8 {
+            a = GameModes.CREDITS as u8;
+            gameMode = a as GameModes;
+        }
+        else {
+            a = GameModes.TITLE_SCREEN as u8;
+        }
+        // A = gamemode
+        gameMode = a as GameModes;
     }
-
-    // A = new gamemode
-    gameMode = a as GameModes;
 
     ^return audio.queue_sound_effect(sound_effects.menu_select);
 }

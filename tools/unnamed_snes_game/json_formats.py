@@ -588,6 +588,7 @@ class Mappings(NamedTuple):
     sound_effects: list[Name]
     interactive_tile_functions: list[Name]
     gamestate_flags: list[Name]
+    room_transitions: list[Name]
     room_events: OrderedDict[Name, RoomEvent]
     memory_map: MemoryMap
 
@@ -652,6 +653,7 @@ def load_mappings_json(filename: Filename) -> Mappings:
         sound_effects=jh.get_name_list("sound_effects"),
         interactive_tile_functions=jh.get_name_list("interactive_tile_functions"),
         gamestate_flags=jh.get_name_list("gamestate_flags"),
+        room_transitions=jh.get_name_list("room_transitions"),
         room_events=room_events,
         memory_map=jh.get_memory_map("memory_map"),
     )

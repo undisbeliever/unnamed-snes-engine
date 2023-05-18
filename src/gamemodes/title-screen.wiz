@@ -59,8 +59,8 @@ func exec() {
 
     gamestate.new_game();
 
-    a = GameModes.START_GAMELOOP as u8;
-    gameMode = a as GameModes;
+
+    set_gamemode_room_transition(RoomTransitions.fadein_reset_player);
 }
 
 

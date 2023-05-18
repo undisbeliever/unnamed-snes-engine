@@ -5,15 +5,19 @@ import "memmap";
 
 
 import "gamemodes/gameloop";
+import "gamemodes/room-transition";
 import "gamemodes/title-screen";
 import "gamemodes/game-over";
 import "gamemodes/credits";
 import "gamemodes/sound-test";
 import "room-transitions";
 
+import "gen/enums";
+
 
 enum GameModes : u8 {
     RUN_GAME,
+    ROOM_TRANSITION,
 
     TITLE_SCREEN,
 
@@ -22,37 +26,16 @@ enum GameModes : u8 {
     CREDITS,
 
     SOUND_TEST,
-
-
-    // Fadeout the screen, initialise the player and gameloop, and start the game.
-    //
-    // MUST BE used when the gamestate is loaded/reset, before any other room transitions occur.
-    //
-    // Assumes the current room/position is valid.  Will softlock if invalid.
-    START_GAMELOOP,
-
-    // Fadeout the screen, load a room, fadein the screen and start the gameloop.
-    // `currentRoom` contains room to load.
-    // To be used if the screen is blank.
-    LOAD_ROOM_FADEIN,
-
-    // Fadeout the screen, load a room, fadein the screen and start the gameloop.
-    //`currentRoom` contains room to load.
-    // To be used if the screen is active.
-    ROOM_TRANSITION_FADEOUT,
-
-    // Scroll transition to next room.
-    // Will do a fadeout room transition if the room graphics are different to the current room.
-    ROOM_TRANSITION_SCROLL_LEFT,
-    ROOM_TRANSITION_SCROLL_RIGHT,
-    ROOM_TRANSITION_SCROLL_UP,
-    ROOM_TRANSITION_SCROLL_DOWN,
 };
 
 
 
 in lowram {
+    // The current game mode.
     var     gameMode : GameModes;
+
+    // The room transition to execute when the game mode changes to ROOM_TRANSITION.
+    var nextRoomTransition : RoomTransitions;
 }
 
 
@@ -60,21 +43,28 @@ in lowram {
 in code {
 
 
+// Set the gamemode to room transition.
+//
+// DB access lowram
+#[mem8]
+func set_gamemode_room_transition(type : RoomTransitions in a) {
+    nextRoomTransition = a as RoomTransitions;
+
+    a = GameModes.ROOM_TRANSITION as u8;
+    gameMode = a as GameModes;
+}
+
+
+
 // MUST MATCH GameModes enum
 #[mem8, idx8]
 const gamemode_function_table : [func()] = [
     gamemodes.gameloop.exec,
+    gamemodes.room_transition.exec,
     gamemodes.title_screen.exec,
     gamemodes.game_over.exec,
     gamemodes.credits.exec,
     gamemodes.sound_test.exec,
-    room_transitions.start_gameloop,
-    room_transitions.load_room__fadein,
-    room_transitions.fadeout,
-    room_transitions.scroll_left,
-    room_transitions.scroll_right,
-    room_transitions.scroll_up,
-    room_transitions.scroll_down,
 ];
 
 let N_GAME_MODES = sizeof(typeof(gamemode_function_table)) / 2;

@@ -42,6 +42,15 @@ def write_enum(out: TextIO, name: Name, name_list: list[Name]) -> None:
     out.write("};\n\n")
 
 
+def write_enum_inc_by_2(out: TextIO, name: Name, name_list: list[Name]) -> None:
+    out.write(f"enum { name } : u8 {{\n")
+
+    for i, n in enumerate(name_list):
+        out.write(f"  { n } = {i * 2},\n")
+
+    out.write("};\n\n")
+
+
 def generate_wiz_code(mappings: Mappings) -> str:
     with StringIO() as out:
         out.write("namespace resources {\n\n")
@@ -67,6 +76,8 @@ def generate_wiz_code(mappings: Mappings) -> str:
 
         write_enum(out, "sound_effects", mappings.sound_effects)
         out.write(f"let N_SOUND_EFFECTS = { len(mappings.sound_effects) };\n\n")
+
+        write_enum_inc_by_2(out, "RoomTransitions", mappings.room_transitions)
 
         return out.getvalue()
 

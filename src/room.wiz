@@ -54,6 +54,9 @@ in wram7e_roomstate {
     //
     // This value is reset after a fadein room transition.
     //
+    // This variable is set by the resources-over-usb2snes subsystem if a non-room resource
+    // has been changed to ensure the MetaTiles and MetaSprites are loaded on the next room transition.
+    //
     // NOTE: This variable is declared in `room.wiz` to prevent an
     //       "encountered a reference to `var metasprites.xPos` before its type was known" error
     //
