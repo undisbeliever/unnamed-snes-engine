@@ -9,7 +9,7 @@ from io import StringIO
 
 from typing import Final, Optional
 
-from unnamed_snes_game.json_formats import load_mappings_json, load_entities_json, Name, Mappings, EntitiesJson, RoomEvent
+from unnamed_snes_game.json_formats import load_mappings_json, load_entities_json, Name, Mappings, EntitiesJson, RoomEvent, GameMode
 
 
 # NOTE: I cannot build these function tables in `gen/entities.wiz` or `gen/enums.wiz` as it causes a circular dependency
@@ -114,6 +114,34 @@ def room_events_table(out: StringIO, room_events: OrderedDict[Name, RoomEvent]) 
     out.write("}\n\n")
 
 
+def gamemodes_imports(out: StringIO, gamemodes: list[GameMode]) -> None:
+    for gm in gamemodes:
+        if '"' in gm.source:
+            raise ValueError(f"Invalid source value for game mode: {gm.name}")
+        if "/" not in gm.source:
+            out.write(f'import "src/gamemodes/{gm.source}";\n')
+        else:
+            out.write(f'import "../{gm.source}";\n')
+
+
+def gamemodes_table(out: StringIO, gamemodes: list[GameMode]) -> None:
+    n_functions: Final = len(gamemodes)
+
+    def generate_table(table_name: str, fn_type: str, fn_name: str) -> None:
+        out.write(f"const { table_name } : [ { fn_type } ; { n_functions } ] = [\n")
+        for gm in gamemodes:
+            out.write(f"  gamemodes.{ gm.name }.{ fn_name },\n")
+        out.write("];\n\n")
+
+    out.write("namespace gamemodes {\n\n")
+
+    out.write(f"let N_GAME_MODES = { n_functions };\n\n")
+
+    generate_table("exec_function_table", "func()", "exec")
+
+    out.write("}\n\n")
+
+
 def generate_wiz_code(mappings: Mappings, entities_json: EntitiesJson) -> str:
     death_functions = entities_json.death_functions
     if not death_functions:
@@ -137,6 +165,7 @@ import "../src/metatiles";
 """
         )
         room_events_imports(out, mappings.room_events)
+        gamemodes_imports(out, mappings.gamemodes)
 
         out.write("\n")
         out.write("in code {\n\n")
@@ -152,6 +181,7 @@ import "../src/metatiles";
         )
         interactive_tiles_table(out, mappings.interactive_tile_functions)
         room_events_table(out, mappings.room_events)
+        gamemodes_table(out, mappings.gamemodes)
 
         function_table(
             out,

@@ -7,6 +7,7 @@ import "_variables";
 import "_base";
 import "../gamemodes";
 
+import "gen/enums";
 import "../../gen/entities";
 
 

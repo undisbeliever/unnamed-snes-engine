@@ -105,6 +105,32 @@
    "scroll_up",
    "scroll_down"
  ],
+ "gamemodes": [
+   {
+     "name": "game_loop",
+     "source": "gameloop"
+   },
+   {
+     "name": "room_transition",
+     "source": "room-transition"
+   },
+   {
+     "name": "title_screen",
+     "source": "title-screen"
+   },
+   {
+     "name": "game_over",
+     "source": "game-over"
+   },
+   {
+     "name": "credits",
+     "source": "credits"
+   },
+   {
+     "name": "sound_test",
+     "source": "sound-test"
+   }
+ ],
  "room_events": [
    {
      "name": "normal",

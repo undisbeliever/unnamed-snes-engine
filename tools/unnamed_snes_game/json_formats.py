@@ -555,12 +555,18 @@ def load_ms_export_order_json(filename: Filename) -> MsExportOrder:
 
 MAX_ROOM_EVENTS = 128
 MAX_ROOM_EVENT_PARAMETERS = 4
+MAX_GAME_MODES = 128
 
 
 class MemoryMap(NamedTuple):
     mode: MemoryMapMode
     first_resource_bank: int
     n_resource_banks: int
+
+
+class GameMode(NamedTuple):
+    name: Name
+    source: str
 
 
 class RoomEventParameter(NamedTuple):
@@ -588,6 +594,7 @@ class Mappings(NamedTuple):
     sound_effects: list[Name]
     interactive_tile_functions: list[Name]
     gamestate_flags: list[Name]
+    gamemodes: list[GameMode]
     room_transitions: list[Name]
     room_events: OrderedDict[Name, RoomEvent]
     memory_map: MemoryMap
@@ -608,6 +615,21 @@ class _Mappings_Helper(_Helper):
             first_resource_bank=mm.get_hex_or_int("first_resource_bank"),
             n_resource_banks=mm.get_int("n_resource_banks"),
         )
+
+    def get_gamemodes(self, key: str) -> list[GameMode]:
+        out = list()
+
+        for p in self.iterate_list_of_dicts(key):
+            out.append(
+                GameMode(
+                    name=p.get_name("name"),
+                    source=p.get_string("source"),
+                )
+            )
+
+        if len(out) > MAX_GAME_MODES:
+            self._raise_error(f"Too many gamemodes, max: { MAX_GAME_MODES }", key)
+        return out
 
     def get_room_event_parameters(self, key: str) -> list[RoomEventParameter]:
         out = list()
@@ -656,6 +678,7 @@ def load_mappings_json(filename: Filename) -> Mappings:
         room_transitions=jh.get_name_list("room_transitions"),
         room_events=room_events,
         memory_map=jh.get_memory_map("memory_map"),
+        gamemodes=jh.get_gamemodes("gamemodes"),
     )
 
 

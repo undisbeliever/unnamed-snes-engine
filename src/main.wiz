@@ -37,6 +37,7 @@ import "src/entities/projectile-angled";
 import "src/entities/test--calc-angle";
 
 import "gen/enums";
+import "gen/function-tables";
 
 
 in code {
@@ -81,13 +82,13 @@ inline func main__inline() {
 
         while true {
             a = gameMode as u8;
-            if a >= N_GAME_MODES {
+            if a >= gamemodes.N_GAME_MODES {
                 // Break
                 irqcall(0);
             }
 
             x = a = a << 1;
-            gamemode_function_table[unaligned x]();
+            gamemodes.exec_function_table[unaligned x]();
         }
     }
 }

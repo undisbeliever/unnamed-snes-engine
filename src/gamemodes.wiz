@@ -15,21 +15,6 @@ import "room-transitions";
 import "gen/enums";
 
 
-enum GameModes : u8 {
-    RUN_GAME,
-    ROOM_TRANSITION,
-
-    TITLE_SCREEN,
-
-    GAME_OVER,
-
-    CREDITS,
-
-    SOUND_TEST,
-};
-
-
-
 in lowram {
     // The current game mode.
     var     gameMode : GameModes;
@@ -53,22 +38,6 @@ func set_gamemode_room_transition(type : RoomTransitions in a) {
     a = GameModes.ROOM_TRANSITION as u8;
     gameMode = a as GameModes;
 }
-
-
-
-// MUST MATCH GameModes enum
-#[mem8, idx8]
-const gamemode_function_table : [func()] = [
-    gamemodes.gameloop.exec,
-    gamemodes.room_transition.exec,
-    gamemodes.title_screen.exec,
-    gamemodes.game_over.exec,
-    gamemodes.credits.exec,
-    gamemodes.sound_test.exec,
-];
-
-let N_GAME_MODES = sizeof(typeof(gamemode_function_table)) / 2;
-
 
 }
 

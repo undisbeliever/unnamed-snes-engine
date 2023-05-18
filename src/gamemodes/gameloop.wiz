@@ -26,7 +26,7 @@ import "gen/enums";
 
 
 namespace gamemodes {
-namespace gameloop {
+namespace game_loop {
 
 
 in code {
@@ -86,7 +86,7 @@ func exec {
 
         // loop until gameMode changes
 
-        // ASSERT: GameModes.RUN_GAME == 0
+        // ASSERT: GameModes.GAME_LOOP == 0
         a = gameMode as u8;
     } while zero;
 }

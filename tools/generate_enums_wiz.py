@@ -16,6 +16,7 @@ from unnamed_snes_game.json_formats import (
     Mappings,
     AudioMappings,
     MemoryMap,
+    GameMode,
 )
 from unnamed_snes_game.common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET, USB2SNES_DATA_BANK_OFFSET, ResourceType
 
@@ -51,6 +52,15 @@ def write_enum_inc_by_2(out: TextIO, name: Name, name_list: list[Name]) -> None:
     out.write("};\n\n")
 
 
+def write_gamemodes_enum(out: TextIO, gamemodes: list[GameMode]) -> None:
+    out.write("enum GameModes : u8 {\n")
+
+    for gn in gamemodes:
+        out.write(f"  {gn.name.upper()},\n")
+
+    out.write("};\n\n")
+
+
 def generate_wiz_code(mappings: Mappings) -> str:
     with StringIO() as out:
         out.write("namespace resources {\n\n")
@@ -76,6 +86,8 @@ def generate_wiz_code(mappings: Mappings) -> str:
 
         write_enum(out, "sound_effects", mappings.sound_effects)
         out.write(f"let N_SOUND_EFFECTS = { len(mappings.sound_effects) };\n\n")
+
+        write_gamemodes_enum(out, mappings.gamemodes)
 
         write_enum_inc_by_2(out, "RoomTransitions", mappings.room_transitions)
 
