@@ -7,15 +7,13 @@ import "registers";
 import "common/reset";
 import "common/dma";
 
-import "gamemodes/gameloop";
+// This import is required to prevent a "could not resolve identifier" compile error
+import "entityloop";
 
 import "audio";
-import "entityloop";
 import "gamemodes";
-import "gamestate";
-import "metatiles";
 import "metasprites";
-import "resources";
+import "gamestate";
 import "resources-over-usb2snes";
 
 

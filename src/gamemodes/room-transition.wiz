@@ -21,7 +21,7 @@ in code {
 #[mem8, idx8]
 func exec() {
     x = get_next_room_transition();
-    return RoomTransitionsTable[unaligned x]();
+    return gamemodes.room_transition.RoomTransitionsTable[unaligned x]();
 }
 
 

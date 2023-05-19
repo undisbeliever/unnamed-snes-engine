@@ -20,7 +20,7 @@ namespace room_events {
 // DB = 0x7e
 #[mem8, idx8]
 inline func init__inline() {
-    let MAX_REF = (N_ROOM_EVENT_FUNCTIONS - 1) * 2;
+    let MAX_REF = (room_events.N_ROOM_EVENT_FUNCTIONS - 1) * 2;
 
 
     // Clear state variables

@@ -4,15 +4,8 @@
 import "memmap";
 import "registers";
 
-import "gamemodes/gameloop";
-import "gamemodes/room-transition";
-import "gamemodes/title-screen";
-import "gamemodes/game-over";
-import "gamemodes/credits";
-import "gamemodes/sound-test";
-import "room-transitions";
-
 import "gen/enums";
+import "gen/function-tables";
 
 
 in lowram {

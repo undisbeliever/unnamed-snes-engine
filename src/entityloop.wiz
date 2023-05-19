@@ -3,13 +3,12 @@
 
 import "memmap";
 
-import "../gen/entities";
-
+import "metasprites";
 import "entities/_variables";
 
 import "player";
-import "metasprites";
 
+import "gen/entities";
 import "gen/function-tables";
 
 
