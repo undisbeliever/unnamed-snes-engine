@@ -4,9 +4,7 @@
 import "memmap";
 
 import "metasprites";
-import "entities/_variables";
-
-import "player";
+import "entity_api";
 
 import "gen/entities";
 import "gen/function-tables";

@@ -3,8 +3,9 @@
 
 import "../memmap";
 
-import "_variables";
+import "../entity_api";
 import "_base";
+
 import "smoke-particles";
 import "../player";
 import "../metasprites";

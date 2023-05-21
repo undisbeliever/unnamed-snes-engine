@@ -15,10 +15,10 @@ import "ui";
 import "wait-frame";
 import "common/reset";
 
-import "player";
 import "entityloop";
-import "entities/_variables";
+import "entity_api";
 import "room-events/_callers";
+import "player";
 
 import "gen/enums";
 

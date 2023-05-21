@@ -3,9 +3,8 @@
 
 import "memmap";
 
-import "entities/_variables";
+import "entity_api";
 import "entities/_base";
-import "entities/player-bomb";
 
 // ::TODO remove this import::
 import "entityloop";
@@ -187,31 +186,6 @@ in wram7e_roomstate {
     var maxHealth : u8;
 
 
-var xVelocity @ &entities.SoA.xVelocity[0] : u16;
-var yVelocity @ &entities.SoA.yVelocity[0] : u16;
-
-var xPos      @ &entities.SoA.xPos[0] : entities.pos;
-var yPos      @ &entities.SoA.yPos[0] : entities.pos;
-
-
-var zPos                    : u8 in entities.SoA.zPos[0];
-
-var previousXpos            : u8 in entities.SoA.previousXpos[0];
-var previousYpos            : u8 in entities.SoA.previousYpos[0];
-
-var tileHitbox_halfWidth    : u8 in entities.SoA.tileHitbox_halfWidth[0];
-var tileHitbox_halfHeight   : u8 in entities.SoA.tileHitbox_halfHeight[0];
-
-var shadowSize              : metasprites.ShadowSize in entities.SoA.shadowSize[0];
-
-var movementState           : u8 in entities.SoA.movementState[0];
-var iframeCounter           : u8 in entities.SoA.iframeCounter[0];
-
-var health                  : u8 in entities.SoA.health[0];
-var swordAttackPower        : u8 in entities.SoA.attackPower[0];
-
-var visionA                 : u8 in entities.SoA.visionA[0];
-var visionB                 : u8 in entities.SoA.visionB[0];
 
 var state                   : u8 in entities.SoA.state_0_l[0];
 
@@ -220,7 +194,6 @@ var facingDirection         : u8 in entities.SoA.state_0_h[0];
 // Used by the hurt state
 var previousState           : u8 in entities.SoA.state_1_l[0];
 var hurtTimer               : u8 in entities.SoA.state_1_h[0];
-
 
 
 // Decremented once every frame.  If negative, player's state is reset.

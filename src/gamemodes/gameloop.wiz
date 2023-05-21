@@ -4,6 +4,7 @@
 import "../memmap";
 
 import "../room";
+import "../entity_api";
 import "../gamemodes";
 import "../gamestate";
 import "../metatiles";
@@ -14,7 +15,6 @@ import "../ui";
 import "../wait-frame";
 
 import "../entityloop";
-import "../entities/_variables";
 import "../entities/player-bomb";
 import "../room-events/_callers";
 import "../player";

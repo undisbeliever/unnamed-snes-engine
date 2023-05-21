@@ -1,22 +1,18 @@
 // Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
 // Distributed under The MIT License, see the LICENSE file for more details.
 
-
 import "../memmap";
 
-import "_variables";
+import "../entity_api";
 
 import "smoke-particles";
 import "player-bomb";
 
 import "../entityloop";
+import "../metasprites";
 import "../player";
 
-import "../audio";
-import "../gamestate";
 import "../ui";
-import "../metatiles";
-import "../metasprites";
 import "../common/math";
 
 import "gen/enums";
@@ -722,55 +718,3 @@ func calc_angle_to_player_32x2(entityId : u8 in y) : u8 in x {
 
 }
 }
-
-
-
-// Functions that can be called in this context
-// ============================================
-
-namespace entities {
-
-// Audio functions
-let queue_sound_effect = audio.queue_sound_effect;
-
-
-// Gamestate functions
-let is_gs_flag_clear = gamestate.is_flag_clear__keep_y;
-let set_gs_flag      = gamestate.set_game_flag__keep_y;
-
-// NOTE: clobbers Y
-let gs_increment_key_count__clobbers_y = gamestate.increment_key_count;
-
-
-// MetaSprite functions
-import "../metasprites";
-
-let set_ms_animation_x               = metasprites.set_entity_animation_x;
-let set_ms_animation                 = metasprites.set_entity_animation;
-let set_ms_animation_if_changed      = metasprites.set_entity_animation_if_changed;
-
-let stop_ms_animation = metasprites.stop_entity_animation;
-
-let is_ms_non_looping_animation_running = metasprites.is_entity_non_looping_animation_running;
-
-
-// MetaTile functions
-let move_entity_and_tile_collision_test                     = metatiles.move_entity_and_collision_test;
-let move_entity_and_tile_collision_test__projectile_bounded = metatiles.move_entity_and_collision_test__projectile_bounded;
-let move_entity_and_tile_collision_test__bounded            = metatiles.move_entity_and_collision_test__bounded;
-
-let get_tile_index_under_entity      = metatiles.get_tile_index_under_entity;
-let set_tile_solid                   = metatiles.set_tile_solid;
-let reset_tile_properties__clobbers_y = metatiles.reset_tile_properties;
-
-
-// Entityloop functions
-let is_all_enemies_defeated = entityloop.is_all_enemies_defeated;
-let get_enemy_count_a = entityloop.get_enemy_count_a;
-
-// NOTE: clobbers Y
-let spawn_entity__clobbers_y = entityloop.spawn_entity;
-
-}
-
-

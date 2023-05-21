@@ -1,11 +1,15 @@
 // Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
 // Distributed under The MIT License, see the LICENSE file for more details.
 
-import "../memmap";
-import "../metasprites";
+import "memmap";
+import "metasprites";
+
 
 let PLAYER_ENTITY_ID = 0;
 
+
+// Entity Variables
+// ================
 
 namespace entities {
     let N_ENTITIES = 21;
@@ -268,6 +272,97 @@ namespace entities {
                 var state_3_h @ &>:state_3[0] : [u8 ; BA_SIZE];
         }
     }
+}
+
+
+
+// Player variables from the entities SoA
+// ======================================
+
+namespace player {
+in wram7e_roomstate {
+
+    var xVelocity @ &entities.SoA.xVelocity[0] : u16;
+    var yVelocity @ &entities.SoA.yVelocity[0] : u16;
+
+    var xPos      @ &entities.SoA.xPos[0] : entities.pos;
+    var yPos      @ &entities.SoA.yPos[0] : entities.pos;
+
+    var zPos                    : u8 in entities.SoA.zPos[0];
+
+    var previousXpos            : u8 in entities.SoA.previousXpos[0];
+    var previousYpos            : u8 in entities.SoA.previousYpos[0];
+
+    // Skipping most of the MetaSprite variables.
+    var shadowSize              : metasprites.ShadowSize in entities.SoA.shadowSize[0];
+
+    var tileHitbox_halfWidth    : u8 in entities.SoA.tileHitbox_halfWidth[0];
+    var tileHitbox_halfHeight   : u8 in entities.SoA.tileHitbox_halfHeight[0];
+
+    var movementState           : u8 in entities.SoA.movementState[0];
+    var iframeCounter           : u8 in entities.SoA.iframeCounter[0];
+
+    var health                  : u8 in entities.SoA.health[0];
+    var swordAttackPower        : u8 in entities.SoA.attackPower[0];
+
+    var visionA                 : u8 in entities.SoA.visionA[0];
+    var visionB                 : u8 in entities.SoA.visionB[0];
+
+}
+}
+
+
+
+// Engine functions that can be called in the entity context
+// =========================================================
+
+namespace entities {
+
+    // Audio functions
+    import "audio";
+
+    let queue_sound_effect = audio.queue_sound_effect;
+
+
+    // Gamestate functions
+    import "gamestate";
+
+    let is_gs_flag_clear = gamestate.is_flag_clear__keep_y;
+    let set_gs_flag      = gamestate.set_game_flag__keep_y;
+
+    // NOTE: clobbers Y
+    let gs_increment_key_count__clobbers_y = gamestate.increment_key_count;
+
+
+    // MetaSprite functions
+    import "metasprites";
+
+    let set_ms_animation_x               = metasprites.set_entity_animation_x;
+    let set_ms_animation                 = metasprites.set_entity_animation;
+    let set_ms_animation_if_changed      = metasprites.set_entity_animation_if_changed;
+
+    let stop_ms_animation = metasprites.stop_entity_animation;
+
+    let is_ms_non_looping_animation_running = metasprites.is_entity_non_looping_animation_running;
+
+
+    // MetaTile functions
+    import "metatiles";
+    let move_entity_and_tile_collision_test                     = metatiles.move_entity_and_collision_test;
+    let move_entity_and_tile_collision_test__projectile_bounded = metatiles.move_entity_and_collision_test__projectile_bounded;
+    let move_entity_and_tile_collision_test__bounded            = metatiles.move_entity_and_collision_test__bounded;
+
+    let get_tile_index_under_entity      = metatiles.get_tile_index_under_entity;
+    let set_tile_solid                   = metatiles.set_tile_solid;
+    let reset_tile_properties__clobbers_y = metatiles.reset_tile_properties;
+
+
+    // Entityloop functions
+    import "entityloop";
+    let is_all_enemies_defeated = entityloop.is_all_enemies_defeated;
+    let get_enemy_count_a = entityloop.get_enemy_count_a;
+
+    let spawn_entity__clobbers_y = entityloop.spawn_entity;
 }
 
 

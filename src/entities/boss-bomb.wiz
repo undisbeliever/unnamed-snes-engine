@@ -3,10 +3,10 @@
 
 import "../memmap";
 
-import "_variables";
+import "../entity_api";
 import "_base";
-import "smoke-particles";
 
+import "smoke-particles";
 import "boss";
 import "player-bomb";
 

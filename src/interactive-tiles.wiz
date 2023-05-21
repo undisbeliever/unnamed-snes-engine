@@ -7,7 +7,7 @@ import "gamestate";
 
 import "player";
 import "metatiles";
-import "entities/_variables";
+import "entity_api";
 
 
 in code {

@@ -3,7 +3,7 @@
 
 import "../memmap";
 
-import "_variables";
+import "../entity_api";
 
 
 // Entity that constantly spawns and removes itself in a (hopefully) random manner.

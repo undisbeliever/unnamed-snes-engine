@@ -9,9 +9,7 @@ import "resources";
 import "wait-frame";
 import "common/dma";
 
-import "player";
-
-import "entities/_variables";
+import "entity_api";
 
 import "gen/function-tables";
 

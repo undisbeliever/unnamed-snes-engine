@@ -3,9 +3,8 @@
 
 import "../memmap";
 
-import "_variables";
+import "../entity_api";
 
-import "../player";
 import "../common/math";
 
 

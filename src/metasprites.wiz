@@ -1699,7 +1699,7 @@ func square_four_32(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos)
 
 // Moving this here prevents an
 // "encountered a reference to `var metasprites.xPos` before its type was known" error.
-import "entities/_variables";
+import "entity_api";
 import "room-transitions";
 
 import "../gen/ms-drawing-functions";

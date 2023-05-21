@@ -4,11 +4,10 @@
 import "../memmap";
 import "../registers_math";
 
-import "_variables";
+import "../entity_api";
 import "_base";
-import "projectile";
 
-import "../player";
+import "projectile";
 
 import "../common/math";
 
