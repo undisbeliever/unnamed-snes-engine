@@ -187,23 +187,23 @@ in wram7e_roomstate {
 
 
 
-var state                   : u8 in entities.SoA.state_0_l[0];
+var state                   : u8 in entities.SoA.var_0_l[0];
 
-var facingDirection         : u8 in entities.SoA.state_0_h[0];
+var facingDirection         : u8 in entities.SoA.var_0_h[0];
 
 // Used by the hurt state
-var previousState           : u8 in entities.SoA.state_1_l[0];
-var hurtTimer               : u8 in entities.SoA.state_1_h[0];
+var previousState           : u8 in entities.SoA.var_1_l[0];
+var hurtTimer               : u8 in entities.SoA.var_1_h[0];
 
 
 // Decremented once every frame.  If negative, player's state is reset.
-var watchdogTimer           : u8 in entities.SoA.state_2_l[0];
+var watchdogTimer           : u8 in entities.SoA.var_2_l[0];
 
 
 // MetaSprite to draw above the player's head.
 // Used by the `HOLDING_BOMB` state.
 // (word address pointing to a `metasprites.MsDataFormat` data structure)
-var itemAboveHead_msFrameAddr @ &entities.SoA.state_3[0] : u16;
+var itemAboveHead_msFrameAddr @ &entities.SoA.var_3[0] : u16;
 
 }
 

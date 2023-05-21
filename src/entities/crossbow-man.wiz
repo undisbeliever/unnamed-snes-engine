@@ -70,19 +70,19 @@ let HURT_MS_ANIMATION_OFFSET            = ms_animations.hurt_south;
 
 in wram7e {
 
-var SoA_state            : [ State     ; SoA.BA_SIZE ] in SoA.state_0_l;
-var SoA_walkingDirection : [ Direction ; SoA.BA_SIZE ] in SoA.state_0_h;
-var SoA_facingDirection  : [ Direction ; SoA.BA_SIZE ] in SoA.state_1_l;
+var SoA_state            : [ State     ; SoA.BA_SIZE ] in SoA.var_0_l;
+var SoA_walkingDirection : [ Direction ; SoA.BA_SIZE ] in SoA.var_0_h;
+var SoA_facingDirection  : [ Direction ; SoA.BA_SIZE ] in SoA.var_1_l;
 
 
 // Countdown timer until the next action when attacking
 // (display frame countdown timer)
-var SoA_boltTimer        : [u8 ; SoA.BA_SIZE] in SoA.state_2_l;
+var SoA_boltTimer        : [u8 ; SoA.BA_SIZE] in SoA.var_2_l;
 
 
 // Countdown timer (when not attacking)
 // (display frame countdown timer)
-var SoA_countdownTimer   : [u8 ; SoA.BA_SIZE] in SoA.state_2_h;
+var SoA_countdownTimer   : [u8 ; SoA.BA_SIZE] in SoA.var_2_h;
 
 }
 

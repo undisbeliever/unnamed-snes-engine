@@ -179,14 +179,14 @@ var _init_function_u16 : u16 in zpTmp_word_0;
 
                 (&entities.SoA._movementStateAndIframeCounter as *u16)[unaligned x] = 0;
 
-                entities.SoA.state_0[unaligned x] = 0;
-                entities.SoA.state_1[unaligned x] = 0;
-                entities.SoA.state_2[unaligned x] = 0;
-                entities.SoA.state_3[unaligned x] = 0;
-                entities.SoA.state_4[unaligned x] = 0;
-                entities.SoA.state_5[unaligned x] = 0;
-                entities.SoA.state_6[unaligned x] = 0;
-                entities.SoA.state_7[unaligned x] = 0;
+                entities.SoA.var_0[unaligned x] = 0;
+                entities.SoA.var_1[unaligned x] = 0;
+                entities.SoA.var_2[unaligned x] = 0;
+                entities.SoA.var_3[unaligned x] = 0;
+                entities.SoA.var_4[unaligned x] = 0;
+                entities.SoA.var_5[unaligned x] = 0;
+                entities.SoA.var_6[unaligned x] = 0;
+                entities.SoA.var_7[unaligned x] = 0;
             }
             mem8_idx8();
 

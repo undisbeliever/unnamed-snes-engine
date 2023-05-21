@@ -245,31 +245,31 @@ namespace entities {
             // ::: Currently small end of vision_cone is constant::
 
 
-            // Variables used to store the entity's state between `process_function` calls
+            // Custom entity variables.
             //
-            // NOTE: if I add more states here then I need to clear them in `spawn_entity`
-            var state_0 : [ u16 ; N_ENTITIES ];
-            var state_1 : [ u16 ; N_ENTITIES ];
-            var state_2 : [ u16 ; N_ENTITIES ];
-            var state_3 : [ u16 ; N_ENTITIES ];
-            var state_4 : [ u16 ; N_ENTITIES ];
-            var state_5 : [ u16 ; N_ENTITIES ];
-            var state_6 : [ u16 ; N_ENTITIES ];
-            var state_7 : [ u16 ; N_ENTITIES ];
+            // NOTE: if I add more vars here then I need to clear them in `spawn_entity`
+            var var_0 : [ u16 ; N_ENTITIES ];
+            var var_1 : [ u16 ; N_ENTITIES ];
+            var var_2 : [ u16 ; N_ENTITIES ];
+            var var_3 : [ u16 ; N_ENTITIES ];
+            var var_4 : [ u16 ; N_ENTITIES ];
+            var var_5 : [ u16 ; N_ENTITIES ];
+            var var_6 : [ u16 ; N_ENTITIES ];
+            var var_7 : [ u16 ; N_ENTITIES ];
 
 
-            // Split state variables into low/high pairs (to easily allocate a byte variable)
-                var state_0_l @ &<:state_0[0] : [u8 ; BA_SIZE];
-                var state_0_h @ &>:state_0[0] : [u8 ; BA_SIZE];
+            // Split vars into low/high pairs (to easily allocate a byte variable)
+                var var_0_l @ &<:var_0[0] : [u8 ; BA_SIZE];
+                var var_0_h @ &>:var_0[0] : [u8 ; BA_SIZE];
 
-                var state_1_l @ &<:state_1[0] : [u8 ; BA_SIZE];
-                var state_1_h @ &>:state_1[0] : [u8 ; BA_SIZE];
+                var var_1_l @ &<:var_1[0] : [u8 ; BA_SIZE];
+                var var_1_h @ &>:var_1[0] : [u8 ; BA_SIZE];
 
-                var state_2_l @ &<:state_2[0] : [u8 ; BA_SIZE];
-                var state_2_h @ &>:state_2[0] : [u8 ; BA_SIZE];
+                var var_2_l @ &<:var_2[0] : [u8 ; BA_SIZE];
+                var var_2_h @ &>:var_2[0] : [u8 ; BA_SIZE];
 
-                var state_3_l @ &<:state_3[0] : [u8 ; BA_SIZE];
-                var state_3_h @ &>:state_3[0] : [u8 ; BA_SIZE];
+                var var_3_l @ &<:var_3[0] : [u8 ; BA_SIZE];
+                var var_3_h @ &>:var_3[0] : [u8 ; BA_SIZE];
         }
     }
 }

@@ -17,13 +17,13 @@ namespace test__calc_angle {
 
 in wram7e {
 
-var SoA_startX      : [ u16 ; N_ENTITIES  ] in SoA.state_0;
-var SoA_startX_px   : [ u8  ; SoA.BA_SIZE ] in SoA.state_0_h;
+var SoA_startX      : [ u16 ; N_ENTITIES  ] in SoA.var_0;
+var SoA_startX_px   : [ u8  ; SoA.BA_SIZE ] in SoA.var_0_h;
 
-var SoA_startY      : [ u16 ; N_ENTITIES  ] in SoA.state_1;
-var SoA_startY_px   : [ u8  ; SoA.BA_SIZE ] in SoA.state_1_h;
+var SoA_startY      : [ u16 ; N_ENTITIES  ] in SoA.var_1;
+var SoA_startY_px   : [ u8  ; SoA.BA_SIZE ] in SoA.var_1_h;
 
-var SoA_parameter   : [ u8  ; SoA.BA_SIZE ] in SoA.state_2_l;
+var SoA_parameter   : [ u8  ; SoA.BA_SIZE ] in SoA.var_2_l;
 
 }
 

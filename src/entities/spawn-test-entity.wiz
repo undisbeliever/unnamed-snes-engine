@@ -16,7 +16,7 @@ in wram7e {
     var globalCounter : u8;
 
 
-var SoA_counter : [ u8 ; SoA.BA_SIZE ] in SoA.state_0_l;
+var SoA_counter : [ u8 ; SoA.BA_SIZE ] in SoA.var_0_l;
 
 }
 

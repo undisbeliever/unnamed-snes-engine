@@ -25,7 +25,7 @@ let N_FRAMES_IN_SWORD  = 10;
 in wram7e {
 
 // If non-zero then the projectile is inactive and will despawn when timer reaches 0.
-var SoA_despawnTimer : [ u8 ; SoA.BA_SIZE] in SoA.state_0_l;
+var SoA_despawnTimer : [ u8 ; SoA.BA_SIZE] in SoA.var_0_l;
 
 }
 

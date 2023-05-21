@@ -44,20 +44,20 @@ let FALLING_GRAVITY = RISING_GRAVITY * 9;
 
 in wram7e {
 
-var SoA_state            : [ State     ; SoA.BA_SIZE ] in SoA.state_0_l;
+var SoA_state            : [ State     ; SoA.BA_SIZE ] in SoA.var_0_l;
 
-var SoA_tileIndex        : [ u8        ; SoA.BA_SIZE ] in SoA.state_0_h;
+var SoA_tileIndex        : [ u8        ; SoA.BA_SIZE ] in SoA.var_0_h;
 
-var SoA_timer            : [ u8        ; SoA.BA_SIZE ] in SoA.state_1_l;
+var SoA_timer            : [ u8        ; SoA.BA_SIZE ] in SoA.var_1_l;
 
-var SoA_zPos_sx          : [ u8        ; SoA.BA_SIZE ] in SoA.state_1_h;
+var SoA_zPos_sx          : [ u8        ; SoA.BA_SIZE ] in SoA.var_1_h;
 
-var SoA_zVelocity        : [ u16       ; N_ENTITIES ]  in SoA.state_2;
-var SoA_zVelocity_sx     : [ u8        ; SoA.BA_SIZE ] in SoA.state_2_l;
-var SoA_zVelocity_px     : [ u8        ; SoA.BA_SIZE ] in SoA.state_2_h;
+var SoA_zVelocity        : [ u16       ; N_ENTITIES ]  in SoA.var_2;
+var SoA_zVelocity_sx     : [ u8        ; SoA.BA_SIZE ] in SoA.var_2_l;
+var SoA_zVelocity_px     : [ u8        ; SoA.BA_SIZE ] in SoA.var_2_h;
 
 // The gamestate flag for the rook enemy
-var SoA_gameStateFlag    : [ u8        ; SoA.BA_SIZE ] in SoA.state_3_l;
+var SoA_gameStateFlag    : [ u8        ; SoA.BA_SIZE ] in SoA.var_3_l;
 
 }
 

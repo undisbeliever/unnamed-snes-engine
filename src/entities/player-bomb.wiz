@@ -73,9 +73,9 @@ enum State : u8 {
 
 in wram7e_roomstate {
 
-var SoA_state            : [ State     ; SoA.BA_SIZE ] in SoA.state_0_l;
+var SoA_state            : [ State     ; SoA.BA_SIZE ] in SoA.var_0_l;
 
-var SoA_timer            : [ u8        ; SoA.BA_SIZE ] in SoA.state_0_h;
+var SoA_timer            : [ u8        ; SoA.BA_SIZE ] in SoA.var_0_h;
 
 }
 

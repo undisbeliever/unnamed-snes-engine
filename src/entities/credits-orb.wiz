@@ -17,7 +17,7 @@ namespace credits_orb {
 
 
 in wram7e_roomstate {
-    var SoA_zTableIndex : [ u8 ; SoA.BA_SIZE ] in SoA.state_0_l;
+    var SoA_zTableIndex : [ u8 ; SoA.BA_SIZE ] in SoA.var_0_l;
 }
 
 

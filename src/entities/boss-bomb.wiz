@@ -51,16 +51,16 @@ enum State : u8 {
 
 in wram7e_roomstate {
 
-var SoA_state            : [ State     ; SoA.BA_SIZE ] in SoA.state_0_l;
+var SoA_state            : [ State     ; SoA.BA_SIZE ] in SoA.var_0_l;
 
-var SoA_timer_l          : [ u8        ; SoA.BA_SIZE ] in SoA.state_1_l;
-var SoA_timer_h          : [ u8        ; SoA.BA_SIZE ] in SoA.state_1_h;
+var SoA_timer_l          : [ u8        ; SoA.BA_SIZE ] in SoA.var_1_l;
+var SoA_timer_h          : [ u8        ; SoA.BA_SIZE ] in SoA.var_1_h;
 
-var SoA_zPos_sx          : [ u8        ; SoA.BA_SIZE ] in SoA.state_2_l;
+var SoA_zPos_sx          : [ u8        ; SoA.BA_SIZE ] in SoA.var_2_l;
 
-var SoA_zVelocity        : [ u16       ; N_ENTITIES ]  in SoA.state_3;
-var SoA_zVelocity_sx     : [ u8        ; SoA.BA_SIZE ] in SoA.state_3_l;
-var SoA_zVelocity_px     : [ u8        ; SoA.BA_SIZE ] in SoA.state_3_h;
+var SoA_zVelocity        : [ u16       ; N_ENTITIES ]  in SoA.var_3;
+var SoA_zVelocity_sx     : [ u8        ; SoA.BA_SIZE ] in SoA.var_3_l;
+var SoA_zVelocity_px     : [ u8        ; SoA.BA_SIZE ] in SoA.var_3_h;
 
 }
 

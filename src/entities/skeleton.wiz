@@ -29,7 +29,7 @@ enum State : u8 {
 
 in wram7e {
 
-var SoA_state            : [ State     ; SoA.BA_SIZE ] in SoA.state_0_l;
+var SoA_state            : [ State     ; SoA.BA_SIZE ] in SoA.var_0_l;
 
 }
 

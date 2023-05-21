@@ -53,11 +53,11 @@ enum State : u8 {
 
 in wram7e {
 
-var SoA_state                   : [ State     ; SoA.BA_SIZE ] in SoA.state_0_l;
-var SoA_direction               : [ Direction ; SoA.BA_SIZE ] in SoA.state_0_h;
+var SoA_state                   : [ State     ; SoA.BA_SIZE ] in SoA.var_0_l;
+var SoA_direction               : [ Direction ; SoA.BA_SIZE ] in SoA.var_0_h;
 
-var SoA_changeDirectionTimer    : [ u8 ; SoA.BA_SIZE ] in SoA.state_1_l;
-var SoA_hurtTimer               : [ u8 ; SoA.BA_SIZE ] in SoA.state_1_h;
+var SoA_changeDirectionTimer    : [ u8 ; SoA.BA_SIZE ] in SoA.var_1_l;
+var SoA_hurtTimer               : [ u8 ; SoA.BA_SIZE ] in SoA.var_1_h;
 
 }
 

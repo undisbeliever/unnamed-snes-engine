@@ -17,7 +17,7 @@ namespace key {
 in wram7e {
 
 // The gamestate flag id for the key
-var SoA_gameFlag : [ u8 ; SoA.BA_SIZE ] in SoA.state_0_l;
+var SoA_gameFlag : [ u8 ; SoA.BA_SIZE ] in SoA.var_0_l;
 
 }
 
