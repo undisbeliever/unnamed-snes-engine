@@ -3,65 +3,25 @@
 
 import "../memmap";
 
+import "../room-events-api";
+
 import "../room";
-import "../audio";
-import "../gamestate";
 import "../metatiles";
-import "../entityloop";
 import "gen/entities";
 
 namespace room_events {
 
 
-let N_ENTITIES_IN_ROOM_DATA = room.entity_xPos.len;
-
-
-in wram7e_roomstate {
-    var state_0 : u16;
-    var state_1 : u16;
-    var state_2 : u16;
-    var state_3 : u16;
-    var state_4 : u16;
-}
-
-
 in code {
-
-// Spawn the room entities.
-//
-// This function MUST NOT be called more than once per room.
-//
-// ASSUMES: entities subsystem is initialised.
-// ASSUMES: room entities have not been spawned.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func spawn_room_entities() {
-
-    x = N_ENTITIES_IN_ROOM_DATA - 1;
-    do {
-        push8(x);
-
-        spawn_entity(a = room.entity_xPos[x],
-                     a = room.entity_yPos[x],
-                     a = room.entity_type[x],
-                     y = room.entity_parameter[x]);
-
-        x = pop8();
-
-        x--;
-    } while !negative;
-}
-
 
 
 // Spawn a room enemy with a smoke particle
 //
-// NOTE: `enemyIndex` MUST BE < N_ENTITIES_IN_ROOM_DATA
+// NOTE: `roomEntityIndex` MUST BE < N_ENTITIES_IN_ROOM_DATA
 //
 // DB = 0x7e
 #[mem8, idx8, fallthrough]
-func spawn_enemy_with_smoke(enemyIndex : u8 in x,
+func spawn_enemy_with_smoke(roomEntityIndex : u8 in x,
                             particle_type : entities.smoke_particles.init_parameter in y) {
 
     push8(x);
@@ -74,120 +34,23 @@ func spawn_enemy_with_smoke(enemyIndex : u8 in x,
     }
     x = pop8();
 
-// Fallthrough
-}
-
-
-
-// Spawn a room enemy
-//
-// NOTE: `enemyIndex` MUST BE < N_ENTITIES_IN_ROOM_DATA
-//
-// DB = 0x7e
-#[mem8, idx8]
-func spawn_room_enemy(enemyIndex : u8 in x) {
-    ^return spawn_entity(a = room.entity_xPos[x],
-                         a = room.entity_yPos[x],
-                         a = room.entity_type[x],
-                         y = room.entity_parameter[x]);
-}
-
-
-
-// Unlock a 2x2 door inside an `init()` function.
-//
-// MUST NOT be called in the `process()` function.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func init__unlock_door(doorLocation : u8 in y) {
-    // Get the top-left door tile and determine which door it is a part of.
-    a = metatiles.map[y] & (0x13 ^ 0xff);
-
-    // The unlocked door tiles are 2 tiles to the right of the locked door tile.
-    a |= 2;
-
-    // Set map tiles to the unlocked door tiles
-    (&room.map[0x00])[y] = a;
-    a++;
-    (&room.map[0x01])[y] = a;
-    a += 0x10 - 1;
-    (&room.map[0x10])[y] = a;
-    a++;
-    (&room.map[0x11])[y] = a;
-}
-
-
-
-// Lock a 2x2 door.
-//
-// MUST NOT be called in the `init()` function.
-//
-// Return true if the door was locked.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func lock_door(doorLocation : u8 in y) : bool in carry {
-    // Get the top-left door tile and determine which door it is a part of
-    a = metatiles.map[y] & (0x13 ^ 0xff);
-
-    ^return metatiles.set_2x2_tiles(y, a);
-}
-
-
-
-// Unlock a 2x2 door.
-//
-// MUST NOT be called in the `init()` function.
-//
-// Return true if the door was unlocked.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func unlock_door(doorLocation : u8 in y) : bool in carry {
-    // Get the top-left door tile and determine which door it is a part of
-    a = metatiles.map[y] & (0x13 ^ 0xff);
-
-    // The unlocked door tiles are 2 tiles to the right of the locked door tile.
-    a |= 2;
-
-    ^return metatiles.set_2x2_tiles(y, a);
+    ^return spawn_room_entity(x);
 }
 
 
 
 // Spawn small smoke at the location of a room enemy
 //
-// NOTE: `enemyIndex` MUST BE < N_ENTITIES_IN_ROOM_DATA
+// NOTE: `roomEntityIndex` MUST BE < N_ENTITIES_IN_ROOM_DATA
 //
 // DB = 0x7e
 #[mem8, idx8]
-func spawn_small_smoke_at_room_enemy_position(enemyIndex : u8 in x) {
+func spawn_small_smoke_at_room_enemy_position(roomEntityIndex : u8 in x) {
     ^return spawn_entity(a = room.entity_xPos[x],
                          a = room.entity_yPos[x],
                          a = entities.EntityTypes.smoke_particles as u8,
                          y = entities.smoke_particles.init_parameter.small as u8);
 }
-
-
-// Functions that can be called in this context
-// ============================================
-
-
-// Audio functions
-let queue_sound_effect = audio.queue_sound_effect;
-
-
-// Entity-loop
-let spawn_entity            = entityloop.spawn_entity;
-let is_all_enemies_defeated = entityloop.is_all_enemies_defeated;
-let get_enemy_count_a       = entityloop.get_enemy_count_a;
-
-
-// Gamestate functions
-let is_gs_flag_clear             = gamestate.is_flag_clear;
-let set_gs_flag                  = gamestate.set_game_flag;
-let test_and_decrement_key_count = gamestate.test_and_decrement_key_count;
 
 }
 }

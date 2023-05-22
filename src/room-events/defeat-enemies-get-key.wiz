@@ -3,6 +3,7 @@
 
 import "../memmap";
 
+import "../room-events-api";
 import "_common";
 
 import "gen/enums";
@@ -29,7 +30,7 @@ func init() {
     zero = is_gs_flag_clear(parameter__flag);
     if zero {
         keyHidden = a = 1;
-        ^return spawn_room_entities();
+        ^return spawn_all_room_entities();
     }
     else {
         // Key has been collected, do not spawn entities for check enemy count.

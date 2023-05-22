@@ -3,6 +3,7 @@
 
 import "../memmap";
 
+import "../room-events-api";
 import "_common";
 import "../player";
 
@@ -182,7 +183,7 @@ func process__spawn_enemies() {
     x = counter;
     if x < N_ENTITIES_IN_ROOM_DATA {
         counter++;
-        ^return spawn_room_enemy(x);
+        ^return spawn_room_entity(x);
     }
 
     // No more smoke to spawn, start spawning enemies

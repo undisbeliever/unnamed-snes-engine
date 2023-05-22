@@ -15,8 +15,8 @@ import "../ui";
 import "../wait-frame";
 
 import "../entityloop";
+import "../room-events-api";
 import "../entities/player-bomb";
-import "../room-events/_callers";
 import "../player";
 
 // ::TODO find a better place to call `rou2s_commands.process_commands()`::

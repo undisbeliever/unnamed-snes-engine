@@ -3,6 +3,7 @@
 
 import "../memmap";
 
+import "../room-events-api";
 import "_common";
 
 import "gen/enums";

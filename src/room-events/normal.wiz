@@ -3,7 +3,7 @@
 
 import "../memmap";
 
-import "_common";
+import "../room-events-api";
 
 namespace room_events {
 namespace normal {
@@ -11,7 +11,7 @@ namespace normal {
 in code {
 
 
-let init = spawn_room_entities;
+let init = spawn_all_room_entities;
 
 
 // DB = 0x7e

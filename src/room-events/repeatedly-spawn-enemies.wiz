@@ -4,6 +4,7 @@
 import "../memmap";
 
 import "_common";
+import "../room-events-api";
 
 import "gen/enums";
 import "gen/room-events";
@@ -38,7 +39,7 @@ func init() {
     spawnIndexEnd = x;
     spawnIndex = x;
 
-    ^return spawn_room_entities();
+    ^return spawn_all_room_entities();
 }
 
 
@@ -62,7 +63,7 @@ func process() {
             spawnIndex = x;
 
             if x < N_ENTITIES_IN_ROOM_DATA {
-                spawn_room_enemy(x);
+                spawn_room_entity(x);
 
                 ^return queue_sound_effect(sound_effects.statue_spawns_enemy);
             }

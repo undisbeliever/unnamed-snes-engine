@@ -3,7 +3,9 @@
 
 import "../memmap";
 
+import "../room-events-api";
 import "_common";
+
 import "../interactive-tiles";
 
 import "gen/enums";
@@ -45,7 +47,7 @@ func init() {
 
     // state has been reset to 0
 
-    ^return spawn_room_entities();
+    ^return spawn_all_room_entities();
 }
 
 
