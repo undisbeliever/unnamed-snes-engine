@@ -23,7 +23,7 @@ enum State : u8{
 };
 
 in wram7e_roomstate {
-    var state : State in <:state_0;
+    var state : State in <:var_0;
 }
 
 

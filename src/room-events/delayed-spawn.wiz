@@ -16,8 +16,8 @@ namespace delayed_spawn {
 
 in wram7e_roomstate {
 
-var spawnTimer   : u8 in <:state_0;
-var spawnIndex   : u8 in <:state_1;
+var spawnTimer   : u8 in <:var_0;
+var spawnIndex   : u8 in <:var_1;
 
 }
 

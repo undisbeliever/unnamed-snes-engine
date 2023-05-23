@@ -42,9 +42,9 @@ in wram7e_roomstate {
     var parameter__doorLocations @ &parameter__door0 : [u8 ; MAX_N_DOORS];
 
 
-    var state : State in <:state_0;
+    var state : State in <:var_0;
 
-    var counter : u8 in <:state_1;
+    var counter : u8 in <:var_1;
 }
 
 

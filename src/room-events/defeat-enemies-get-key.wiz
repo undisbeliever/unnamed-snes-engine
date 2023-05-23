@@ -17,7 +17,7 @@ namespace defeat_enemies_get_key {
 
 
 in wram7e_roomstate {
-    var keyHidden : u8 in <:state_0;
+    var keyHidden : u8 in <:var_0;
 }
 
 

@@ -16,13 +16,13 @@ namespace repeatedly_spawn_enemies {
 
 in wram7e_roomstate {
 
-var spawnTimer      : u8 in <:state_0;
+var spawnTimer      : u8 in <:var_0;
 
-var spawnIndex      : u8 in <:state_1;
+var spawnIndex      : u8 in <:var_1;
 
 // one past the end room enemy index
 // (SHOULD BE <= N_ENTITIES_IN_ROOM_DATA)
-var spawnIndexEnd   : u8 in <:state_2;
+var spawnIndexEnd   : u8 in <:var_2;
 
 }
 
