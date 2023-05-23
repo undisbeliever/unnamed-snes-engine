@@ -1,10 +1,11 @@
 // Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
 // Distributed under The MIT License, see the LICENSE file for more details.
 
-import "memmap";
-import "registers";
-import "game/room";
-import "common/dma";
+import "src/memmap";
+import "../registers";
+
+import "dma";
+import "../game/room";
 
 import "gen/enums";
 

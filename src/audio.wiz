@@ -4,7 +4,7 @@
 import "memmap";
 import "registers";
 
-import "resources";
+import "resources/resources";
 
 import "gen/enums";
 

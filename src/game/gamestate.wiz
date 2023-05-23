@@ -9,8 +9,8 @@ import "src/memmap";
 import "metasprites";
 
 import "../player";
-import "../resources";
 import "../ui";
+import "../resources/resources";
 
 
 in lowram {

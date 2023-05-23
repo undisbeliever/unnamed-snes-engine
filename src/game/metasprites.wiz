@@ -4,8 +4,8 @@
 import "src/memmap";
 import "../registers";
 
-import "../resources";
-import "../common/dma";
+import "../resources/dma";
+import "../resources/resources";
 import "../common/math";
 
 import "gen/enums";

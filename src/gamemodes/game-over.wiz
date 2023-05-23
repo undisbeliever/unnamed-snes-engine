@@ -7,11 +7,11 @@ import "../registers";
 import "../audio";
 import "../gamemodes";
 import "../joypad";
-import "../resources";
 import "../textbox";
 import "../wait-frame";
 import "../common/reset";
 import "../game/gamestate";
+import "../resources/resources";
 
 import "gen/enums";
 

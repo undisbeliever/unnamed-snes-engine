@@ -4,11 +4,10 @@
 import "memmap";
 import "registers";
 
-import "resources";
-
 import "player";
 import "game/gamestate";
-import "common/dma";
+import "resources/dma";
+import "resources/resources";
 
 import "audio";
 

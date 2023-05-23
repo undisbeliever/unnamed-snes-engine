@@ -5,9 +5,9 @@ import "src/memmap";
 import "../registers";
 
 import "room";
-import "../resources";
 import "../wait-frame";
-import "../common/dma";
+import "../resources/dma";
+import "../resources/resources";
 
 import "../entity_api";
 

@@ -1,10 +1,11 @@
 // Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
 // Distributed under The MIT License, see the LICENSE file for more details.
 
-import "../memmap";
+import "src/memmap";
 import "../registers";
-import "../resources";
-import "reset"; // for `empty_byte`
+
+import "resources";
+import "../common/reset"; // for `empty_byte`
 
 
 namespace dma {

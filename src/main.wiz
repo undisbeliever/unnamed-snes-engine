@@ -5,17 +5,15 @@ import "memmap";
 import "registers";
 
 import "common/reset";
-import "common/dma";
 
 // This import is required to prevent a "could not resolve identifier" compile error
 import "game/entityloop";
 
 import "audio";
 import "gamemodes";
-import "resources-over-usb2snes";
-
 import "game/metasprites";
 import "game/gamestate";
+import "resources/resources-over-usb2snes";
 
 
 import "src/entities/sword-particles";

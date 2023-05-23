@@ -10,11 +10,11 @@ import "metasprites";
 import "metatiles";
 
 import "../gamemodes";
-import "../resources";
 import "../textbox";
 import "../ui";
 import "../wait-frame";
 import "../common/reset";
+import "../resources/resources";
 
 import "entityloop";
 import "../entity_api";

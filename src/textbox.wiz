@@ -4,12 +4,13 @@
 import "memmap";
 import "registers";
 import "registers_math";
-import "common/dma";
 
 import "audio";
 import "joypad";
-import "resources";
 import "wait-frame";
+import "resources/dma";
+import "resources/resources";
+
 // For `empty_byte`
 import "common/reset";
 

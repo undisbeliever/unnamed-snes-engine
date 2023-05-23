@@ -5,7 +5,6 @@ import "../memmap";
 
 import "../entity_api";
 import "../gamemodes";
-import "../resources";
 import "../ui";
 import "../wait-frame";
 import "../game/room";
@@ -20,7 +19,7 @@ import "../entities/player-bomb";
 import "../player";
 
 // ::TODO find a better place to call `rou2s_commands.process_commands()`::
-import "../rou2s-commands";
+import "../resources/rou2s-commands";
 
 import "gen/enums";
 

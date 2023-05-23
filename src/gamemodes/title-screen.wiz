@@ -8,8 +8,8 @@ import "../common/reset";
 import "../audio";
 import "../gamemodes";
 import "../joypad";
-import "../resources";
 import "../wait-frame";
+import "../resources/resources";
 
 import "gen/enums";
 

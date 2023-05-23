@@ -1,14 +1,14 @@
 // Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
 // Distributed under The MIT License, see the LICENSE file for more details.
 
-import "memmap";
-import "registers";
+import "src/memmap";
+import "../registers";
 
 import "rou2s-commands";
 
 import "resources";
-import "game/room";
-import "common/reset";
+import "../game/room";
+import "../common/reset";
 
 import "gen/enums";
 
