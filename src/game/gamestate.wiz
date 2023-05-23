@@ -3,14 +3,12 @@
 // Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
 // Distributed under The MIT License, see the LICENSE file for more details.
 
-
 import "src/memmap";
 
-import "metasprites";
-
-import "../player";
 import "../ui";
 import "../resources/resources";
+
+import "src/engine-hooks";
 
 
 in lowram {
@@ -31,18 +29,7 @@ in lowram {
 
 namespace gamestate {
 
-struct PlayerState {
-    xPos                : u8,
-    yPos                : u8,
-    zPos                : u8,
-
-    health              : u8,
-    maxHealth           : u8,
-    swordAttackPower    : u8,
-
-    state               : u8,
-    facingDirection     : u8,
-};
+typealias PlayerState : engine_hooks.GameState__PlayerState;
 
 
 // unnamed snes game!
@@ -173,34 +160,10 @@ func new_game() {
 func continue_game() {
 
     // ::TODO create some kind of checkpoint system::
-    // ::HACK Hardcoded checkpoint (just before the boss)::
 
-    let LAST_HEALING_ROOM = 0x75;
+    engine_hooks.gamestate__continue_game__inline();
 
-    a = data.currentRoom;
-    if a >= LAST_HEALING_ROOM + 1 {
-        // Game over before the boss
-        a = resources.rooms.STARTING_ROOM;
-        x = player.InitialPlayerState.xPos;
-        y = player.InitialPlayerState.yPos;
-    }
-    else {
-        // Game over after the final healing room (at the boss)
-        a = LAST_HEALING_ROOM;
-        x = DISPLAY_WIDTH / 2;
-        y = DISPLAY_HEIGHT / 2;
-
-    }
-
-    data.currentRoom = a;
-    data.roomToLoad = a;
-
-    data.playerState.xPos = x;
-    data.playerState.yPos = y;
-    data.playerState.zPos = player.InitialPlayerState.zPos;
-
-
-    player.continue_player_gamestate__inline();
+    engine_hooks.gamestate__continue_player_gamestate__inline();
 }
 
 
@@ -259,7 +222,7 @@ var _oldChecksum : u16 in zpTmp_word_1;
 #[mem8, idx8]
 func backup_gamestate() {
 
-    player.save_player_state__inline();
+    engine_hooks.gamestate__save_player_state__inline();
 
 
     mem16_idx16();
@@ -425,7 +388,7 @@ const __BitTable : [ u8 ; 8 ] = [ 1 << i for let i in 0..7 ];
 let _BitTable = far &__BitTable as far *u8;
 
 
-const InitialPlayerState = player.InitialPlayerState;
+const InitialPlayerState : PlayerState = engine_hooks.GameState__InitialPlayerState;
 
 }
 

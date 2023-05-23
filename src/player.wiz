@@ -37,9 +37,22 @@ let _set_ms_animation_if_changed = metasprites.set_player_animation_if_changed;
 let _is_ms_non_looping_animation_running = metasprites.is_player_non_looping_animation_running;
 
 
-in rodata0 {
 
-let InitialPlayerState = gamestate.PlayerState{
+// The player state stored within the gamestate.
+struct GameState__PlayerState {
+    xPos                : u8,
+    yPos                : u8,
+    zPos                : u8,
+
+    health              : u8,
+    maxHealth           : u8,
+    swordAttackPower    : u8,
+
+    state               : u8,
+    facingDirection     : u8,
+};
+
+let InitialPlayerState = GameState__PlayerState{
 
     xPos                = DISPLAY_WIDTH / 2,
     yPos                = DISPLAY_HEIGHT * 2 / 3,
@@ -52,8 +65,6 @@ let InitialPlayerState = gamestate.PlayerState{
     state               = State.WALKING as u8,
     facingDirection     = FacingDirection.UP as u8,
 };
-
-}
 
 
 // If the player health is below this value, sound a different 'player hurt' sound effect.

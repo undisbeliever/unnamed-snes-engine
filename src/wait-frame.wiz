@@ -6,13 +6,13 @@ import "registers";
 
 import "audio";
 import "joypad";
-import "ui";
 import "textbox";
-import "rng";
 import "interrupts";
 import "game/metasprites";
 import "game/metatiles";
 import "game/gamestate";
+
+import "engine-hooks";
 
 
 let FRAMES_PER_SECOND = 60;
@@ -77,11 +77,8 @@ func wait_frame() {
 // DB = 0x80
 
 
-    mem16_idx16();
-    #[mem16, idx16] {
-        rng.increment_rng();
-    }
     mem8();
+    idx16();
     #[mem8, idx16] {
         a = _brightness_buffer | INIDISP_FORCE_BLANK;
 
@@ -96,7 +93,6 @@ func wait_frame() {
         metatiles.transitions.transfer_buffer__vblank();
 
         textbox.transfer_buffer__vblank();
-        ui.transfer_buffer__vblank();
 
 
         // Update scroll registers
@@ -110,6 +106,9 @@ func wait_frame() {
         BG2HOFS = a = *(&>:bg2_scrollX as *u8);
         BG2VOFS = a = *(&<:bg2_scrollY as *u8);
         BG2VOFS = a = *(&>:bg2_scrollY as *u8);
+
+
+        engine_hooks.wait_frame__vblank__inline();
 
 
         INIDISP = a = _brightness_buffer;
@@ -129,6 +128,8 @@ func wait_frame() {
         if zero {
             frameCounter_hiword++;
         }
+
+        engine_hooks.wait_frame__after_vblank__mem16_idx16__inline();
     }
 
     mem8_idx8();
@@ -138,6 +139,8 @@ func wait_frame() {
         joypad.update_state__inline();
 
         audio.process_sfx_queue__inline();
+
+        engine_hooks.wait_frame__after_vblank__mem8_idx8__inline();
     }
 
 

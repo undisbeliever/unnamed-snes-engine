@@ -19,7 +19,8 @@ import "../resources/resources";
 import "entityloop";
 import "../entity_api";
 import "../room-events-api";
-import "../player";
+
+import "src/engine-hooks";
 
 import "gen/enums";
 
@@ -495,7 +496,7 @@ inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
         //
         // This is only done if resources-over-usb2snes is active as resetting player animations
         // could cause glitches (ie, resetting the player's sword animation mid-swing).
-        player.init_metasprites();
+        engine_hooks.room_transitions__init_player_metasprites__inline();
     }
 }
 
@@ -520,7 +521,7 @@ func fadein_reset_player() {
     // No easy way to save/restore player gamestate when the Tileset or MetaSprites change
     // (especially if the fadein/fadeout room transition was invalid and had to be rolled back)
     // Also causes the player's MetaSprite frame to be reset in a scrolling room transition.
-    player.init();
+    engine_hooks.room_transitions__reset_player__inline();
 
     // Load the room the player was last in
     _load_room_and_check_if_ok_to_scroll(gamestate.data.currentRoom,
@@ -837,10 +838,7 @@ func _scrolling_room_transition__rollback(_scrollDirection_ : u8 in a, playerXpo
 
     _load_room_from_backup(x, y);
 
-    // Allow the player to escape any entity that may be in front of the player after a rollback.
-    // Minimises the odds of an entity knocking the player back into the invalid room (immediately after rollback)
-    player.zero_velocity();
-    player.set_iframes_after_room_transition_rollback();
+    engine_hooks.room_transitions__scrolling_room_transition_rollback__inline();
 
     mem16();
     #[mem16] {
