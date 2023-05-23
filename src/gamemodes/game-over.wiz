@@ -6,12 +6,12 @@ import "../registers";
 
 import "../audio";
 import "../gamemodes";
-import "../gamestate";
 import "../joypad";
 import "../resources";
 import "../textbox";
 import "../wait-frame";
 import "../common/reset";
+import "../game/gamestate";
 
 import "gen/enums";
 

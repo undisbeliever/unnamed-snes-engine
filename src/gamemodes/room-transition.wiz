@@ -4,7 +4,7 @@
 import "../memmap";
 import "../gamemodes";
 
-import "../room-transitions";
+import "../game/room-transitions";
 
 import "gen/enums";
 import "gen/function-tables";

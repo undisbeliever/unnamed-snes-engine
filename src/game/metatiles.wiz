@@ -1,15 +1,15 @@
 // Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
 // Distributed under The MIT License, see the LICENSE file for more details.
 
-import "memmap";
-import "registers";
+import "src/memmap";
+import "../registers";
 
 import "room";
-import "resources";
-import "wait-frame";
-import "common/dma";
+import "../resources";
+import "../wait-frame";
+import "../common/dma";
 
-import "entity_api";
+import "../entity_api";
 
 import "gen/function-tables";
 

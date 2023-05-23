@@ -3,8 +3,8 @@
 
 import "memmap";
 
-import "room";
-import "metatiles";
+import "game/room";
+import "game/metatiles";
 
 import "gen/function-tables";
 
@@ -209,14 +209,14 @@ let queue_sound_effect = audio.queue_sound_effect;
 
 
 // Entity-loop
-import "entityloop";
+import "game/entityloop";
 let spawn_entity            = entityloop.spawn_entity;
 let is_all_enemies_defeated = entityloop.is_all_enemies_defeated;
 let get_enemy_count_a       = entityloop.get_enemy_count_a;
 
 
 // Gamestate functions
-import "gamestate";
+import "game/gamestate";
 let is_gs_flag_clear             = gamestate.is_flag_clear;
 let set_gs_flag                  = gamestate.set_game_flag;
 let test_and_decrement_key_count = gamestate.test_and_decrement_key_count;

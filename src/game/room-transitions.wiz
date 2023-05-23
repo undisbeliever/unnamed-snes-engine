@@ -1,24 +1,25 @@
 // Copyright (c) 2021-2022, Marcus Rowe <undisbeliever@gmail.com>.
 // Distributed under The MIT License, see the LICENSE file for more details.
 
-import "memmap";
-import "registers";
+import "src/memmap";
+import "../registers";
 
 import "room";
-import "gamemodes";
 import "gamestate";
 import "metasprites";
 import "metatiles";
-import "resources";
-import "textbox";
-import "ui";
-import "wait-frame";
-import "common/reset";
+
+import "../gamemodes";
+import "../resources";
+import "../textbox";
+import "../ui";
+import "../wait-frame";
+import "../common/reset";
 
 import "entityloop";
-import "entity_api";
-import "room-events-api";
-import "player";
+import "../entity_api";
+import "../room-events-api";
+import "../player";
 
 import "gen/enums";
 

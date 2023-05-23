@@ -1,7 +1,7 @@
 // Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
 // Distributed under The MIT License, see the LICENSE file for more details.
 
-import "memmap";
+import "src/memmap";
 
 
 let N_ENTITIES_IN_ROOM_DATA = 8;

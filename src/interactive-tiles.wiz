@@ -3,11 +3,11 @@
 
 import "memmap";
 
-import "gamestate";
+import "entity_api";
+import "game/gamestate";
+import "game/metatiles";
 
 import "player";
-import "metatiles";
-import "entity_api";
 
 
 in code {

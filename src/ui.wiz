@@ -7,7 +7,7 @@ import "registers";
 import "resources";
 
 import "player";
-import "gamestate";
+import "game/gamestate";
 import "common/dma";
 
 import "audio";

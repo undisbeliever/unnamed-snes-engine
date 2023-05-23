@@ -4,12 +4,13 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 
-import "memmap";
+import "src/memmap";
 
-import "player";
 import "metasprites";
-import "resources";
-import "ui";
+
+import "../player";
+import "../resources";
+import "../ui";
 
 
 in lowram {

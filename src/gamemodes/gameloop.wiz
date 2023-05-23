@@ -3,18 +3,18 @@
 
 import "../memmap";
 
-import "../room";
 import "../entity_api";
 import "../gamemodes";
-import "../gamestate";
-import "../metatiles";
-import "../metasprites";
 import "../resources";
-import "../room-transitions";
 import "../ui";
 import "../wait-frame";
+import "../game/room";
+import "../game/gamestate";
+import "../game/metatiles";
+import "../game/metasprites";
+import "../game/room-transitions";
+import "../game/entityloop";
 
-import "../entityloop";
 import "../room-events-api";
 import "../entities/player-bomb";
 import "../player";

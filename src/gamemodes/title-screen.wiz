@@ -95,5 +95,5 @@ inline func setup_ppu() {
 }
 
 // Fixes a circular dependency
-import "../gamestate";
+import "../game/gamestate";
 

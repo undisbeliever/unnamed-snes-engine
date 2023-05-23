@@ -7,7 +7,7 @@ import "registers";
 import "rou2s-commands";
 
 import "resources";
-import "room";
+import "game/room";
 import "common/reset";
 
 import "gen/enums";

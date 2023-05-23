@@ -5,13 +5,13 @@ import "../memmap";
 
 import "../entity_api";
 import "_base";
-import "../metasprites";
+import "../game/metasprites";
 
 import "gen/enums";
 import "../../gen/entities";
 
 // ::TODO remove this import::
-import "../entityloop";
+import "../game/entityloop";
 
 
 // ::TODO add a generic particle entity::

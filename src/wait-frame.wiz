@@ -6,13 +6,13 @@ import "registers";
 
 import "audio";
 import "joypad";
-import "metasprites";
-import "metatiles";
 import "ui";
 import "textbox";
 import "rng";
 import "interrupts";
-import "gamestate";
+import "game/metasprites";
+import "game/metatiles";
+import "game/gamestate";
 
 
 let FRAMES_PER_SECOND = 60;

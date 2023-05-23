@@ -8,7 +8,7 @@ import "_base";
 
 import "smoke-particles";
 import "../player";
-import "../metasprites";
+import "../game/metasprites";
 
 import "gen/enums";
 import "../../gen/entities";

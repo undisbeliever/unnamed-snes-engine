@@ -1,12 +1,12 @@
 // Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
 // Distributed under The MIT License, see the LICENSE file for more details.
 
-import "memmap";
-import "registers";
+import "src/memmap";
+import "../registers";
 
-import "resources";
-import "common/dma";
-import "common/math";
+import "../resources";
+import "../common/dma";
+import "../common/math";
 
 import "gen/enums";
 
@@ -1699,8 +1699,8 @@ func square_four_32(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos)
 
 // Moving this here prevents an
 // "encountered a reference to `var metasprites.xPos` before its type was known" error.
-import "entity_api";
 import "room-transitions";
+import "../entity_api";
 
-import "../gen/ms-drawing-functions";
+import "gen/ms-drawing-functions";
 

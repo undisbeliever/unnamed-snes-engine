@@ -8,8 +8,8 @@ import "../entity_api";
 import "smoke-particles";
 import "player-bomb";
 
-import "../entityloop";
-import "../metasprites";
+import "../game/entityloop";
+import "../game/metasprites";
 import "../player";
 
 import "../ui";

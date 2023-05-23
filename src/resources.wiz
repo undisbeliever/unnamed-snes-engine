@@ -3,7 +3,7 @@
 
 import "memmap";
 import "registers";
-import "room";
+import "game/room";
 import "common/dma";
 
 import "gen/enums";

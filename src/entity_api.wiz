@@ -2,7 +2,7 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "memmap";
-import "metasprites";
+import "game/metasprites";
 
 
 let PLAYER_ENTITY_ID = 0;
@@ -325,7 +325,7 @@ namespace entities {
 
 
     // Gamestate functions
-    import "gamestate";
+    import "game/gamestate";
 
     let is_gs_flag_clear = gamestate.is_flag_clear__keep_y;
     let set_gs_flag      = gamestate.set_game_flag__keep_y;
@@ -335,7 +335,7 @@ namespace entities {
 
 
     // MetaSprite functions
-    import "metasprites";
+    import "game/metasprites";
 
     let set_ms_animation_x               = metasprites.set_entity_animation_x;
     let set_ms_animation                 = metasprites.set_entity_animation;
@@ -347,7 +347,7 @@ namespace entities {
 
 
     // MetaTile functions
-    import "metatiles";
+    import "game/metatiles";
     let move_entity_and_tile_collision_test                     = metatiles.move_entity_and_collision_test;
     let move_entity_and_tile_collision_test__projectile_bounded = metatiles.move_entity_and_collision_test__projectile_bounded;
     let move_entity_and_tile_collision_test__bounded            = metatiles.move_entity_and_collision_test__bounded;
@@ -358,7 +358,7 @@ namespace entities {
 
 
     // Entityloop functions
-    import "entityloop";
+    import "game/entityloop";
     let is_all_enemies_defeated = entityloop.is_all_enemies_defeated;
     let get_enemy_count_a = entityloop.get_enemy_count_a;
 

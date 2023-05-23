@@ -161,7 +161,7 @@ import "../src/memmap";
 import "../src/entities/_death_functions";
 import "../src/interactive-tiles";
 import "../src/gamemodes/room-transition.wiz";
-import "../src/metatiles";
+import "../src/game/metatiles";
 """
         )
         room_events_imports(out, mappings.room_events)

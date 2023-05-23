@@ -7,12 +7,12 @@ import "entity_api";
 import "entities/_base";
 
 // ::TODO remove this import::
-import "entityloop";
+import "game/entityloop";
 
-import "gamestate";
+import "game/gamestate";
+import "game/metatiles";
+import "game/metasprites";
 import "joypad";
-import "metatiles";
-import "metasprites";
 import "common/math";
 
 import "audio";

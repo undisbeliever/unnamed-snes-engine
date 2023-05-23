@@ -4,9 +4,8 @@
 import "../memmap";
 
 import "../room-events-api";
+import "../game/room";
 
-import "../room";
-import "../metatiles";
 import "gen/entities";
 
 namespace room_events {
