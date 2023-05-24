@@ -5,7 +5,6 @@
 
 import "src/memmap";
 
-import "../ui";
 import "../resources/resources";
 
 import "src/engine-hooks";
@@ -354,7 +353,7 @@ func increment_key_count() {
     }
     data._keyCount = x;
 
-    ^return ui.draw_key_bar(x);
+    ^return engine_hooks.gamestate__key_count_changed(x);
 }
 
 
@@ -371,7 +370,7 @@ func test_and_decrement_key_count() : bool in carry{
         x--;
         data._keyCount = x;
 
-        ui.draw_key_bar(x);
+        engine_hooks.gamestate__key_count_changed(x);
         return true;
     }
     return false;

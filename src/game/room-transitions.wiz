@@ -11,7 +11,6 @@ import "metatiles";
 
 import "../gamemodes";
 import "../textbox";
-import "../ui";
 import "../wait-frame";
 import "../common/reset";
 import "../resources/resources";
@@ -475,7 +474,8 @@ inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
             metasprites.load_ms_spritesheet_ppu_data__forceblank(1);
 
             textbox.setup_ppu__forceblank();
-            ui.setup_ppu__forceblank();
+
+            engine_hooks.room_transitions__setup_ppu__forceblank();
         }
         idx8();
     }
@@ -485,9 +485,7 @@ inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
     data_bank = pop8();
 // DB = 0x7e
 
-    // Reset and redraw the UI
-    ui.init();
-
+    engine_hooks.room_transitions__init();
 
     a = *far &resources.UseResourcesOverUsb2Snes;
     if !zero {
