@@ -1,0 +1,1936 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "../registers";
+
+import "room";
+import "../wait-frame";
+import "../resources/dma";
+import "../resources/resources";
+
+import "../entity_api";
+
+import "gen/function-tables";
+
+
+namespace metatiles {
+
+let METATILE_SIZE = 16;
+
+let MAP_WIDTH = ROOM_MAP_WIDTH;
+let MAP_HEIGHT = ROOM_MAP_HEIGHT;
+
+let MAP_WIDTH_PIXELS = MAP_WIDTH * METATILE_SIZE;
+let MAP_HEIGHT_PIXELS = MAP_HEIGHT * METATILE_SIZE;
+
+
+
+// If this bit is set the tile is solid to non-projectile entities
+let TILE_PROPERTY_SOLID_BIT              = 7;
+
+// If this bit is set the tile is solid to projectile entities
+let TILE_PROPERTY_PROJECTILE_SOLID_BIT   = 6;
+
+let TILE_PROPERTY_INTERACTIVE_TILES_MASK = 0b00111111;
+
+
+
+// Tileset data stored in RAM
+struct _Tileset {
+    // Mapping of each of the 4 tiles within each MetaTile.
+    topLeft_low :      [u8 ; 256],
+    topLeft_high :     [u8 ; 256],
+    topRight_low :     [u8 ; 256],
+    topRight_high :    [u8 ; 256],
+    bottomLeft_low :   [u8 ; 256],
+    bottomLeft_high :  [u8 ; 256],
+    bottomRight_low :  [u8 ; 256],
+    bottomRight_high : [u8 ; 256],
+
+    // Tile properties for each MetaTile
+    // (`TILE_PROPERTY_*_BIT` bitfield for each tile)
+    properties:        [u8 ; 256],
+};
+
+
+// Tileset data format in ROM.
+struct _DataFormat {
+    ram_data : _Tileset,
+
+    palette_data : [u16 ; 128],
+
+    tile_data : u8,
+};
+
+
+// player_tile_collision direction
+//
+// Cannot use MovementState enum as I need separate directions.
+enum CollisionDirection : u8 {
+    DOWN    = 0,
+    UP      = 2,
+    RIGHT   = 4,
+    LEFT    = 6,
+};
+let CollisionDirection_MASK = 0b110;
+
+// Used to determine if CollisionDirection is X-axis or Y-axis collision
+let CollisionDirection_LEFT_RIGHT_BIT_TEST = 4;
+
+
+
+in zeropage {
+
+}
+
+
+in lowram {
+    // MetaTiles to draw on the next VBlank.
+    //
+    // Array of word structures
+    namespace DrawTileBuffer {
+        let BUFFER_SIZE = 8;
+
+
+        var vramWordAddr : [u16 ; BUFFER_SIZE];
+
+        var topLeft     : [u16 ; BUFFER_SIZE];
+        var topRight    : [u16 ; BUFFER_SIZE];
+        var bottomLeft  : [u16 ; BUFFER_SIZE];
+        var bottomRight : [u16 ; BUFFER_SIZE];
+    }
+
+    // Current position with `DrawTileBuffer`.
+    // (byte index, increment by 2)
+    var drawTileBufferIndex : u8;
+}
+
+
+in wram7e_roomstate {
+    // The map for the current room.
+    //
+    // NOTE: Whenever the map is updated the corresponding `mapTileProperties` cells must be changed.
+    let map = room.map;
+
+
+    // The MetaTile tileset tile properties for each map tile.
+    //
+    // (bitfield of `TILE_PROPERTY_*_BIT`s for each map tile.)
+    //
+    // Whenever the map is updated the corresponding `mapTileProperties` cells must be changed.
+    #[align(256)]
+    var mapTileProperties : [u8 ; 256];
+}
+
+
+in wram7e {
+    // this hack allows me to write `tileset.topLeft[y]` without a compile error.
+    #[align(256)]
+    var __far_tileset : _Tileset;
+        var tileset @ &__far_tileset : _Tileset;
+}
+
+
+in code {
+
+
+// Load a tileset into memory and the PPU
+//
+// REQUIRES: Force-Blank
+// Uses DMA channel 0
+//
+// NOTE: tileset address cannot be in RAM.
+//
+// DB = 0x80
+#[mem8, idx16]
+func load_tileset__forceblank(tileset_id : u8 in a) {
+var _res : resources.ResourceEntry in resources.res;
+
+    _res = resources.load_mt_tileset(a);
+
+    // Transfer header to WorkRAM
+    resources.transfer_resource_header_to_wram7e(_res, &tileset as u16, sizeof(_Tileset));
+
+    dma.set_dma0_source__res_plus_offset(_res, offsetof(_DataFormat, palette_data));
+
+    // Transfer palette to CGRAM
+    CGADD = 0;
+    dma.continue_transfer_to_cgram__forceblank(256);
+
+    // Transfer tiles to VRAM
+    VMADD = xx = VRAM_BG1_TILES_WADDR;
+    dma.transfer_remaining_res_data_to_vram__forceblank(_res);
+}
+
+
+
+// Draws the entire map to BG1.
+//
+// REQUIRES: Force-Blank, Tileset loaded into memory.
+//
+// DB = 0x80
+#[mem8, idx8]
+func draw_map__forceblank() {
+var _rowsLeft    : u8 in zpTmp_byte_0;
+var _columnsLeft : u8 in zpTmp_byte_1;
+
+
+    INIDISP = a = INIDISP_FORCE_BLANK | INIDISP_BRIGHTNESS_MASK;
+
+    VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+    VMADDL = <:VRAM_BG1_MAP_WADDR;
+    VMADDH = >:VRAM_BG1_MAP_WADDR;
+
+
+
+    push8(a = 0x7e);
+    data_bank = pop8();
+// DB = 0x7e
+
+
+    // ::TODO setup variables::
+
+
+    // X = map position
+    x = 0;
+
+    _rowsLeft = a = MAP_HEIGHT;
+    do {
+        push8(x);
+
+        _columnsLeft = a = MAP_WIDTH;
+        do {
+            y = map[x];
+
+            *(far &VMDATAL) = a = tileset.topLeft_low[y];
+            *(far &VMDATAH) = a = tileset.topLeft_high[y];
+            *(far &VMDATAL) = a = tileset.topRight_low[y];
+            *(far &VMDATAH) = a = tileset.topRight_high[y];
+
+            x++;
+            _columnsLeft--;
+        } while !zero;
+
+        x = pop8();
+
+        _columnsLeft = a = MAP_WIDTH;
+        do {
+            y = map[x];
+
+            *(far &VMDATAL) = a = tileset.bottomLeft_low[y];
+            *(far &VMDATAH) = a = tileset.bottomLeft_high[y];
+            *(far &VMDATAL) = a = tileset.bottomRight_low[y];
+            *(far &VMDATAH) = a = tileset.bottomRight_high[y];
+
+            x++;
+            _columnsLeft--;
+        } while !zero;
+
+
+        _rowsLeft--;
+    } while !zero;
+
+
+    transitions._reset_state();
+
+    drawTileBufferIndex = 0;
+
+
+    push8(program_bank);
+    data_bank = pop8();
+// DB = 0x80
+}
+
+
+
+// Populate the `mapTileProperties` array.
+//
+// This function MUST be called when the map or MetaTile tileset is loaded.
+//
+// ASSUMES: The room is valid
+//
+// DB = 0x7e
+#[mem8, idx8]
+func populate_map_tile_properties() {
+
+    x = sizeof(typeof(map)) - 1;
+    do {
+        y = map[x];
+        mapTileProperties[x] = a = tileset.properties[y];
+
+        x--;
+    } while !zero;
+
+    y = map[0];
+    mapTileProperties[0] = a = tileset.properties[y];
+
+
+    // Clear tiles outside map
+    x = sizeof(typeof(map));
+    do {
+        mapTileProperties[x] = 0;
+        x++;
+    } while !zero;
+}
+
+
+
+// Populate the `mapTileProperties` array with solid tiles.
+//
+// This function MUST be called when the map or MetaTile tileset is loaded.
+//
+// ASSUMES: The room map is invalid
+//
+// DB = 0x7e
+#[mem8, idx8]
+func populate_map_tile_properties__all_tiles_solid() {
+    // Fill the `mapTileProperties` array with solid tiles.
+
+    a = (1 << TILE_PROPERTY_SOLID_BIT) | (1 << TILE_PROPERTY_PROJECTILE_SOLID_BIT);
+
+    x = 0;
+    do {
+        mapTileProperties[x] = a;
+
+        x++;
+    } while !zero;
+}
+
+
+// Entity functions
+// ================
+
+
+// Return the tile index of the current entity
+//
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+func get_tile_index_under_entity(entityId : u8 in y) : u8 in x {
+var _tmp : u8 in zpTmp_byte_0;
+
+    _tmp = a = entities.SoA.xPos_px[y] >>> 4;
+    a = (entities.SoA.yPos_px[y] & 0xf0) | _tmp;
+
+    return a;
+}
+
+
+
+// Map manipulation functions
+// ==========================
+
+
+// Makes the tile solid without changing its appearance.
+//
+// NOTE: This function MUST not be called in the room-event init() or entity init() routines.
+//       Room transition code calls `populate_map_tile_properties()` after entity/room init.
+//
+// KEEP: Y
+// DB = 0x80
+#[mem8, idx8]
+func set_tile_solid(tileIndex : u8 in x) {
+    let SOLID_MASK = (1 << TILE_PROPERTY_SOLID_BIT) | (1 << TILE_PROPERTY_PROJECTILE_SOLID_BIT);
+
+    if x < sizeof(typeof(map)) {
+        mapTileProperties[x] = a = mapTileProperties[x] | SOLID_MASK;
+    }
+}
+
+
+
+// Resets a tile's properties.
+//
+// Used to reset a tile's solid properties after a `set_tile_solid()` call.
+//
+// DB = 0x80
+#[mem8, idx8]
+func reset_tile_properties(tileIndex : u8 in x) {
+    if x < sizeof(typeof(map)) {
+        y = map[x];
+        mapTileProperties[x] = a = tileset.properties[y];
+    }
+}
+
+
+
+// DrawTileBuffer functions
+// ========================
+
+
+// Update the tiles in VRAM that were changed by `set_tile`.
+//
+// REQUIRES: V-Blank
+//
+// DB = 0x80
+#[mem16, idx8]
+inline func process_draw_tile_buffer__vblank() {
+    // MUST NOT modify zpTmp variables.
+
+    x = drawTileBufferIndex;
+    if !zero {
+        VMAIN = y = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+
+        x--;
+        x--;
+
+        do {
+            VMADD = aa = DrawTileBuffer.vramWordAddr[unaligned x];
+
+            VMDATA = aa = DrawTileBuffer.topLeft[unaligned x];
+            VMDATA = aa = DrawTileBuffer.topRight[unaligned x];
+
+
+            VMADD = aa = DrawTileBuffer.vramWordAddr[unaligned x] | 32;
+
+            VMDATA = aa = DrawTileBuffer.bottomLeft[unaligned x];
+            VMDATA = aa = DrawTileBuffer.bottomRight[unaligned x];
+
+            x--;
+            x--;
+        } while !negative;
+
+        drawTileBufferIndex = x = 0;
+    }
+}
+
+
+
+// Set a tile within the map.
+//
+// Also updates `mapTileProperties` and queues a new entry in the DrawTileBuffer.
+//
+// NOTE: This function may fail if the DrawTileBuffer is full
+//
+// NOTE: This function returns true if `tileIndex` is out of bounds.
+//       The map will remain unchanged.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_tile(tileIndex : u8 in y, tile : u8 in a) : bool in carry {
+var _tmp : u16 in zpTmp_word_0;
+
+    if y < sizeof(typeof(map)) {
+
+        x = drawTileBufferIndex;
+        if x < sizeof(typeof(DrawTileBuffer.vramWordAddr)) {
+
+            map[y] = a;
+
+            // Calculate VRAM word address
+            mem16();
+            #[mem16] {
+                #[idx16] { aa = yy; }
+                _tmp = aa = (aa & 0x0f) << 1;
+
+                #[idx16] { aa = yy; }
+                aa = ((aa & 0xf0) << 2) | _tmp;
+                aa = (aa + transitions.vramVerticalWoffset) & 0x3ff;
+                aa |= transitions.currentTilemap_vramWaddr;
+
+                // X = drawTileBufferIndex
+                DrawTileBuffer.vramWordAddr[unaligned x] = aa;
+            }
+            mem8_idx8();
+
+
+            // Update mapTileProperties
+            x = map[y];
+            mapTileProperties[y] = a = tileset.properties[x];
+
+
+            y = drawTileBufferIndex;
+
+            (&<:DrawTileBuffer.topLeft[0] as *u8)[unaligned y] = a = tileset.topLeft_low[x];
+            (&>:DrawTileBuffer.topLeft[0] as *u8)[unaligned y] = a = tileset.topLeft_high[x];
+            (&<:DrawTileBuffer.topRight[0] as *u8)[unaligned y] = a = tileset.topRight_low[x];
+            (&>:DrawTileBuffer.topRight[0] as *u8)[unaligned y] = a = tileset.topRight_high[x];
+            (&<:DrawTileBuffer.bottomLeft[0] as *u8)[unaligned y] = a = tileset.bottomLeft_low[x];
+            (&>:DrawTileBuffer.bottomLeft[0] as *u8)[unaligned y] = a = tileset.bottomLeft_high[x];
+            (&<:DrawTileBuffer.bottomRight[0] as *u8)[unaligned y] = a = tileset.bottomRight_low[x];
+            (&>:DrawTileBuffer.bottomRight[0] as *u8)[unaligned y] = a = tileset.bottomRight_high[x];
+
+            y++;
+            y++;
+            drawTileBufferIndex = y;
+
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    // Ignore all out of bounds writes.
+    return true;
+}
+
+
+
+// Sets a 2x2 tile block of tiles.
+//
+// `topLeftTile` is the tileset index of the top-left tile of the 2x2 MT grid.
+// The other three tile indexes are relative to `topLeftTile`.
+//
+// NOTE: This function may fail if DrawTileBuffer cannot hold 4 entries.
+//
+// NOTE: This function returns true if `tileIndex` is out of bounds.
+//       The map will remain unchanged.
+//
+// ASSUMES: `tileIndex` is not on the rightmost tile column.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_2x2_tiles(tileIndex : u8 in y, topLeftTile : u8 in a) : bool in carry {
+let N_MT_TILES_CHANGED = 4;
+
+var _tmp : u16 in zpTmp_word_0;
+
+    if y >= sizeof(typeof(map)) - MAP_WIDTH - 1 {
+        // Ignore all out of bounds writes.
+        return true;
+    }
+
+    // Test if 4 tiles can be added to DrawTileBuffer
+    x = drawTileBufferIndex;
+    if x >= sizeof(typeof(DrawTileBuffer.vramWordAddr)) - N_MT_TILES_CHANGED * 2 + 1 {
+        return false;
+    }
+
+    // Set the four tiles
+
+    (&map[0x00] as *u8)[y] = a;
+    a++;
+    (&map[0x01] as *u8)[y] = a;
+    a += 0x10 - 1;
+    (&map[0x10] as *u8)[y] = a;
+    a++;
+    (&map[0x11] as *u8)[y] = a;
+
+
+    // Calculate VRAM word address for the four tiles
+    mem16();
+    #[mem16] {
+        #[idx16] { aa = yy; }
+        _tmp = aa = (aa & 0x0f) << 1;
+
+        #[idx16] { aa = yy; }
+        aa = ((aa & 0xf0) << 2) | _tmp;
+        _tmp = aa;
+        aa = (aa + transitions.vramVerticalWoffset) & 0x3ff;
+        aa |= transitions.currentTilemap_vramWaddr;
+
+        // X = end of drawTileBufferIndex
+        (&DrawTileBuffer.vramWordAddr[0] as *u16)[unaligned x] = aa;
+        aa++;
+        aa++;
+        (&DrawTileBuffer.vramWordAddr[1] as *u16)[unaligned x] = aa;
+
+        aa = _tmp + (0x10 << 2);
+        aa = (aa + transitions.vramVerticalWoffset) & 0x3ff;
+        aa |= transitions.currentTilemap_vramWaddr;
+        (&DrawTileBuffer.vramWordAddr[2] as *u16)[unaligned x] = aa;
+        aa++;
+        aa++;
+        (&DrawTileBuffer.vramWordAddr[3] as *u16)[unaligned x] = aa;
+    }
+    mem8_idx8();
+
+
+    // Update mapTileProperties
+    x = map[y];
+    (&mapTileProperties[0x00])[y] = a = (&tileset.properties[0x00])[x];
+    (&mapTileProperties[0x01])[y] = a = (&tileset.properties[0x01])[x];
+    (&mapTileProperties[0x10])[y] = a = (&tileset.properties[0x10])[x];
+    (&mapTileProperties[0x11])[y] = a = (&tileset.properties[0x11])[x];
+
+
+    y = drawTileBufferIndex;
+
+    inline func __populate_buffer(let _bi : u8, let _ti : u8) {
+        (&<:DrawTileBuffer.topLeft[_bi] as *u8)[unaligned y] = a = (&tileset.topLeft_low[_ti])[x];
+        (&>:DrawTileBuffer.topLeft[_bi] as *u8)[unaligned y] = a = (&tileset.topLeft_high[_ti])[x];
+        (&<:DrawTileBuffer.topRight[_bi] as *u8)[unaligned y] = a = (&tileset.topRight_low[_ti])[x];
+        (&>:DrawTileBuffer.topRight[_bi] as *u8)[unaligned y] = a = (&tileset.topRight_high[_ti])[x];
+        (&<:DrawTileBuffer.bottomLeft[_bi] as *u8)[unaligned y] = a = (&tileset.bottomLeft_low[_ti])[x];
+        (&>:DrawTileBuffer.bottomLeft[_bi] as *u8)[unaligned y] = a = (&tileset.bottomLeft_high[_ti])[x];
+        (&<:DrawTileBuffer.bottomRight[_bi] as *u8)[unaligned y] = a = (&tileset.bottomRight_low[_ti])[x];
+        (&>:DrawTileBuffer.bottomRight[_bi] as *u8)[unaligned y] = a = (&tileset.bottomRight_high[_ti])[x];
+    }
+    __populate_buffer(0, 0x00);
+    __populate_buffer(1, 0x01);
+    __populate_buffer(2, 0x10);
+    __populate_buffer(3, 0x11);
+
+    drawTileBufferIndex = a = y + N_MT_TILES_CHANGED * 2;
+
+    return true;
+}
+
+
+
+
+// Interactive Tiles
+// =================
+
+
+// Retrieve the unaligned interactive tiles function table index for a given map tile.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func __get_interactive_tile_ft_index(tileId : u8 in y) : u8 in x {
+    return x = a = (mapTileProperties[y] << 1) & metatiles.interactive_tiles.FUNCTION_TABLE_MASK;
+}
+
+
+// Process any interactive tiles that the player might be touching.
+//
+// SHOULD ONLY be called inside the player's process function.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process_interactive_tiles__player() {
+var _tmp : u8 in zpTmp_byte_0;
+
+    _tmp = a = player.xPos.px >>> 4;
+    y = a = (player.yPos.px & 0xf0) | _tmp;
+
+    x = __get_interactive_tile_ft_index(y);
+
+    metatiles.interactive_tiles.player_touches_tile_function_table[unaligned x](y);
+
+
+    // Interactions with solid tiles are only preformed on the tile at the player's
+    // origin point.  The tile (if any) to the left or right will not be interacted with.
+    //
+    // ::TODO throughly test if this works as expected::
+
+    a = player.movementState;
+    if a & entities.MovementState.LEFT_COLLISION != 0 {
+        // left = xPos - 1 - tileHitbox_halfWidth (with clamping)
+        a = player.xPos.px;
+        if !zero {
+            a--;
+            a -= player.tileHitbox_halfWidth;
+            if !carry { a = 0; }
+        }
+
+        _tmp = a = a >>> 4;
+        y = a = (player.yPos.px & 0xf0) | _tmp;
+
+        x = __get_interactive_tile_ft_index(y);
+        return metatiles.interactive_tiles.player_tile_collision_function_table[unaligned x](y, CollisionDirection.LEFT);
+
+        a = player.movementState;
+
+    }
+    else if a & entities.MovementState.RIGHT_COLLISION != 0 {
+        // right = xPos + 1 + tileHitbox_halfWidth (with clamping)
+
+        a = player.xPos.px;
+        a++;
+        if zero {
+            a = 0xff;
+        }
+        else {
+            a += player.tileHitbox_halfWidth;
+            if carry { a = 0xff; }
+        }
+
+        _tmp = a = a >>> 4;
+        y = a = (player.yPos.px & 0xf0) | _tmp;
+
+        x = __get_interactive_tile_ft_index(y);
+        return metatiles.interactive_tiles.player_tile_collision_function_table[unaligned x](y, CollisionDirection.RIGHT);
+
+        a = player.movementState;
+    }
+
+
+    // A is player.movementState
+    if a & entities.MovementState.UP_COLLISION != 0 {
+        _tmp = a = player.xPos.px >>> 4;
+
+        // top = yPos - 1 - tileHitbox_halfHeight (with clamping)
+        a = player.yPos.px;
+        if !zero {
+            a--;
+            a -= player.tileHitbox_halfHeight;
+            if !carry { a = 0; }
+        }
+
+        y = a = (a & 0xf0) | _tmp;
+
+        x = __get_interactive_tile_ft_index(y);
+        return metatiles.interactive_tiles.player_tile_collision_function_table[unaligned x](y, CollisionDirection.UP);
+
+    }
+    else if a & entities.MovementState.DOWN_COLLISION != 0 {
+        _tmp = a = player.xPos.px >>> 4;
+
+        // bottom = yPos + 1 + tileHitbox_halfHeight (with clamping)
+        a = player.yPos.px;
+        a++;
+        if zero {
+            a = 0xff;
+        }
+        else {
+            a += player.tileHitbox_halfHeight;
+            if carry { a = 0xff; }
+        }
+
+        y = a = (a & 0xf0) | _tmp;
+
+        x = __get_interactive_tile_ft_index(y);
+        return metatiles.interactive_tiles.player_tile_collision_function_table[unaligned x](y, CollisionDirection.DOWN);
+    }
+}
+
+
+
+// Collisions
+// ==========
+
+
+
+// Check if a tile at a given position is solid
+//
+// DB = 0x7e
+#[mem8, idx8]
+func check_tile_solid(xPos : u8 in x, yPos : u8 in y) : bool in negative {
+var _tmp : u8 in zpTmp_byte_0;
+
+    _tmp = a = x >>> 4;
+    x = a = (y & 0xf0) | _tmp;
+
+    bit(mapTileProperties[x]);
+    return negative;
+}
+
+
+
+// Tests if the player is touching a solid tile.
+//
+// NOTE: This only checks the four corners of the player's tile hitbox.
+//
+// ASSUMES: The player's tile hitbox's half-width and half-height is <= 8.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func test_if_player_touches_a_solid_tile() : bool in negative {
+
+var _tmp          : u8 in zpTmp_byte_0;
+var _topMasked    : u8 in zpTmp_byte_1;
+var _bottomMasked : u8 in zpTmp_byte_2;
+
+    // assumes TILE_PROPERTY_SOLID_BIT == 7
+
+    // Left tiles
+    a = player.xPos.px - player.tileHitbox_halfWidth;
+    if !carry { a = 0; }
+    _tmp = a = a >>> 4;
+
+
+    // Test Top-left tile
+    a = player.yPos.px - player.tileHitbox_halfHeight;
+    if !carry { a = 0; }
+    _topMasked = a = a & 0xf0;
+    x = a = a | _tmp;
+
+    bit(mapTileProperties[x]);
+    goto Return if negative;
+
+
+    // Test bottom-left tile
+    a = player.yPos.px + player.tileHitbox_halfHeight;
+    if carry { a = 0xff; }
+    _bottomMasked = a = a & 0xf0;
+    x = a = a | _tmp;
+
+    bit(mapTileProperties[x]);
+    goto Return if negative;
+
+
+    // Right tiles
+    a = player.xPos.px + player.tileHitbox_halfWidth;
+    if carry { a = 0xff; }
+    y = a = a >>> 4;
+
+
+    // Test Top-Right tile
+    x = a = a | _topMasked;
+
+    bit(mapTileProperties[x]);
+    goto Return if negative;
+
+
+    // Test bottom-Right tile
+    x = a = y | _bottomMasked;
+
+    bit(mapTileProperties[x]);
+Return:
+    return negative;
+}
+
+
+
+// Tests if the player is standing on a doorway tile
+//
+// DB = 0x7e
+#[mem8, idx8]
+func test_if_player_touches_a_doorway_tile() : bool in zero {
+var _tmp : u8 in zpTmp_byte_0;
+
+let _DOORWAY_TP = metatiles.interactive_tiles.DOORWAY_FUNCTION_TABLE_UNALIGNED_INDEX >> 1;
+
+    _tmp = a = player.xPos.px >>> 4;
+    y = a = (player.yPos.px & 0xf0) | _tmp;
+
+    a = mapTileProperties[y] & TILE_PROPERTY_INTERACTIVE_TILES_MASK;
+
+    // return a == DOORWAY_TP;
+    cmp(a, _DOORWAY_TP);
+    return zero;
+}
+
+
+
+// Unbounded Tile Collisions
+// -------------------------
+
+
+
+// Add velocity to the entity's position and preform a collision test (screen boundary is not solid).
+//
+// This function will not stop the entity from walking to the edge of the screen.
+//
+// OUTPUT: entities.SoA.movementState bits will be set if there is a collision, otherwise cleared.
+//
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+func move_entity_and_collision_test__unbounded(entityId : u8 in y) {
+    // Clear movementState flags;
+    entities.SoA.movementState[y] = a = 0;
+
+    _move_entity_and_collision_test__unbounded__x_axis__inline(y, TILE_PROPERTY_SOLID_BIT);
+    _move_entity_and_collision_test__unbounded__y_axis__inline(y, TILE_PROPERTY_SOLID_BIT);
+}
+
+
+
+// Add X-Velocity to X-Position and preform a collision test in the X axis (screen boundary is not solid).
+//
+// NOTE: If you edit this function, you should also edit `_move_entity_and_collision_test__bounded__x_axis__inline`.
+//
+// OUTPUT: entities.SoA.movementState bits will be set if there is a collision, otherwise cleared.
+// KEEP: Y
+#[mem8, idx8]
+inline func _move_entity_and_collision_test__unbounded__x_axis__inline(entityId : u8 in y, let SOLID_BIT : u8) {
+var _tmp    : u8 in zpTmp_byte_0;
+var _top    : u8 in zpTmp_byte_1;
+var _left   : u8 in zpTmp_byte_2;
+var _right  : u8 in zpTmp_byte_3;
+
+
+    a = entities.SoA.yPos_px[y] - entities.SoA.tileHitbox_halfHeight[y];
+    if !carry { a = 0; }
+    _top = a;
+
+    entities.SoA.xPos_sx[y] = a = entities.SoA.xVelocity_sx[y] + entities.SoA.xPos_sx[y];
+    a = entities.SoA.xVelocity_px[y];
+    if negative {
+        a +#= entities.SoA.xPos_px[y];
+        if !carry { a = 0; }
+        entities.SoA.xPos_px[y] = a;
+
+        // Entity moving left
+
+        a -= entities.SoA.tileHitbox_halfWidth[y];
+        if !carry { a = 0; }
+        _left = a;
+
+        // calculate tile position
+        _tmp = a = a >>> 4;
+        x = a = (_top & 0xf0) | _tmp;
+
+        if mapTileProperties[x] $ SOLID_BIT {
+            // solid collision
+            a = (~_left & 0xf);
+            a++;
+            a += entities.SoA.xPos_px[y];
+            if carry { a = 0xff; }
+            entities.SoA.xPos_px[y] = a;
+
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.LEFT_COLLISION;
+        }
+        else {
+            // Check if the hitbox touches the tile below this one
+            a = (_top & 0xf) + entities.SoA.tileHitbox_halfHeight[y] + entities.SoA.tileHitbox_halfHeight[y];
+            if a >= METATILE_SIZE + 1 {
+                if (&mapTileProperties[MAP_WIDTH])[x] $ SOLID_BIT {
+                    a = (~_left & 0xf);
+                    a++;
+                    a += entities.SoA.xPos_px[y];
+                    if carry { a = 0xff; }
+                    entities.SoA.xPos_px[y] = a;
+
+                    entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.LEFT_COLLISION;
+                }
+            }
+        }
+    }
+    else {
+        a +#= entities.SoA.xPos_px[y];
+        if carry { a = 0xff; }
+        entities.SoA.xPos_px[y] = a;
+
+        // Entity moving right
+
+        a += entities.SoA.tileHitbox_halfWidth[y];
+        if carry { a = 0xff; }
+        _right = a;
+
+        // calculate tile position
+        _tmp = a = a >>> 4;
+        x = a = (_top & 0xf0) | _tmp;
+
+        if mapTileProperties[x] $ SOLID_BIT {
+            // solid collision
+            a = (_right & 0xf0);
+            a--;
+            a -= entities.SoA.tileHitbox_halfWidth[y];
+            if !carry { a = 1; }
+            entities.SoA.xPos_px[y] = a;
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.RIGHT_COLLISION;
+        }
+        else {
+            // Check if the hitbox touches the tile below this one
+            a = (_top & 0xf) + entities.SoA.tileHitbox_halfHeight[y] + entities.SoA.tileHitbox_halfHeight[y];
+            if a >= METATILE_SIZE + 1 {
+                if (&mapTileProperties[MAP_WIDTH])[x] $ SOLID_BIT {
+                    // solid collision
+                    a = (_right & 0xf0);
+                    a--;
+                    a -= entities.SoA.tileHitbox_halfWidth[y];
+                    if !carry { a = 1; }
+                    entities.SoA.xPos_px[y] = a;
+                    entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.RIGHT_COLLISION;
+                }
+            }
+        }
+    }
+}
+
+
+
+// Add Y-Velocity to Y-Position and preform a collision test in the Y axis (screen boundary is not-solid).
+//
+// NOTE: If you edit this function, you should also edit `_move_entity_and_collision_test__bounded__y_axis__inline`.
+//
+// OUTPUT: entities.SoA.movementState bits will be set if there is a collision, otherwise cleared.
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+inline func _move_entity_and_collision_test__unbounded__y_axis__inline(entityId : u8 in y, let SOLID_BIT : u8) {
+var _tmp    : u8 in zpTmp_byte_0;
+var _left   : u8 in zpTmp_byte_1;
+var _top    : u8 in zpTmp_byte_2;
+var _bottom : u8 in zpTmp_byte_3;
+
+    a = entities.SoA.xPos_px[y] - entities.SoA.tileHitbox_halfWidth[y];
+    if !carry { a = 0; }
+    _left = a;
+
+    entities.SoA.yPos_sx[y] = a = entities.SoA.yVelocity_sx[y] + entities.SoA.yPos_sx[y];
+    a = entities.SoA.yVelocity_px[y];
+    if negative {
+        a +#= entities.SoA.yPos_px[y];
+        if !carry { a = 0; }
+        entities.SoA.yPos_px[y] = a;
+
+        // Entity moving up
+
+        a -= entities.SoA.tileHitbox_halfHeight[y];
+        if !carry { a = 0; }
+        _top = a;
+
+        // calculate tile position
+        _tmp = a = _left >>> 4;
+        x = a = (_top & 0xf0) | _tmp;
+
+        if mapTileProperties[x] $ SOLID_BIT {
+            // solid collision
+            a = (~_top & 0xf);
+            a++;
+            a += entities.SoA.yPos_px[y];
+            if carry { a = 0xff; }
+            entities.SoA.yPos_px[y] = a;
+
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.UP_COLLISION;
+        }
+        else {
+            // Check if the hitbox touches the tile to the right of this one
+            a = (_left & 0xf) + entities.SoA.tileHitbox_halfWidth[y] + entities.SoA.tileHitbox_halfWidth[y];
+            if a >= METATILE_SIZE + 1 {
+                // Test X index to prevent an out-of-bounds read past the rightmost tile.
+                a = x & 0xf;
+                if a != 0x0f {
+                    if (&mapTileProperties[1])[x] $ SOLID_BIT {
+                        a = (~_top & 0xf);
+                        a++;
+                        a += entities.SoA.yPos_px[y];
+                        if carry { a = 0xff; }
+                        entities.SoA.yPos_px[y] = a;
+
+                        entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.UP_COLLISION;
+                    }
+                }
+            }
+        }
+    }
+    else {
+        a +#= entities.SoA.yPos_px[y];
+        if carry { a = 0xff; }
+        entities.SoA.yPos_px[y] = a;
+
+        // Entity moving down
+
+        a += entities.SoA.tileHitbox_halfHeight[y];
+        if carry { a = 0xff; }
+        _bottom = a;
+
+        // calculate tile position
+        _tmp = a = _left >>> 4;
+        x = a = (_bottom & 0xf0) | _tmp;
+
+        if mapTileProperties[x] $ SOLID_BIT {
+            // solid collision
+            a = (_bottom & 0xf0);
+            a--;
+            a -= entities.SoA.tileHitbox_halfHeight[y];
+            if !carry { a = 1; }
+            entities.SoA.yPos_px[y] = a;
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.DOWN_COLLISION;
+        }
+        else {
+            // Check if the hitbox touches the tile to the right of this one
+            a = (_left & 0xf) + entities.SoA.tileHitbox_halfWidth[y] + entities.SoA.tileHitbox_halfWidth[y];
+            if a >= METATILE_SIZE + 1 {
+                // Test X index to prevent an out-of-bounds read past the rightmost tile.
+                a = x & 0xf;
+                if a != 0x0f {
+                    if (&mapTileProperties[1])[x] $ SOLID_BIT {
+                        a = (_bottom & 0xf0);
+                        a--;
+                        a -= entities.SoA.tileHitbox_halfHeight[y];
+                        if !carry { a = 1; }
+                        entities.SoA.yPos_px[y] = a;
+                        entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.DOWN_COLLISION;
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
+// Bounded Tile Collisions
+// -----------------------
+
+
+
+// Add velocity to the projectile entity's position and preform a collision test (screen boundary is solid).
+//
+// Unlike the other MetaTile collision functions, this function will use the `TILE_PROPERTY_PROJECTILE_SOLID_BIT`
+// bit of `mapTileProperties` to determine if the entity collided with a map tile.
+//
+// ASSUMES: the entity is a projectile.
+//
+// OUTPUT: entities.SoA.movementState bits will be set if there is a collision, otherwise cleared.
+//
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+func move_entity_and_collision_test__projectile_bounded(entityId : u8 in y) : u8 in y {
+    // Clear movementState flags;
+    entities.SoA.movementState[y] = a = 0;
+
+    _move_entity_and_collision_test__bounded__x_axis__inline(y, TILE_PROPERTY_PROJECTILE_SOLID_BIT);
+    _move_entity_and_collision_test__bounded__y_axis__inline(y, TILE_PROPERTY_PROJECTILE_SOLID_BIT);
+
+    return y;
+}
+
+
+
+// Add velocity to the entity's position and preform a collision test (screen boundary is solid).
+//
+// OUTPUT: entities.SoA.movementState bits will be set if there is a collision, otherwise cleared.
+//
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+func move_entity_and_collision_test__bounded(entityId : u8 in y) {
+    // Clear movementState flags;
+    entities.SoA.movementState[y] = a = 0;
+
+    _move_entity_and_collision_test__bounded__x_axis__inline(y, TILE_PROPERTY_SOLID_BIT);
+    _move_entity_and_collision_test__bounded__y_axis__inline(y, TILE_PROPERTY_SOLID_BIT);
+}
+
+
+
+// Add X-Velocity to X-Position and preform a collision test in the X axis (screen boundary is solid).
+//
+// NOTE: If you edit this function, you should also edit `_move_entity_and_collision_test__unbounded__x_axis__inline`.
+//
+// OUTPUT: entities.SoA.movementState bits will be set if there is a collision, otherwise cleared.
+// KEEP: Y
+#[mem8, idx8]
+inline func _move_entity_and_collision_test__bounded__x_axis__inline(entityId : u8 in y, let SOLID_BIT : u8) {
+var _tmp    : u8 in zpTmp_byte_0;
+var _top    : u8 in zpTmp_byte_1;
+var _left   : u8 in zpTmp_byte_2;
+var _right  : u8 in zpTmp_byte_3;
+
+    // X Axis
+    // ------
+
+    a = entities.SoA.yPos_px[y] - entities.SoA.tileHitbox_halfHeight[y];
+    if !carry { a = 0; }
+    _top = a;
+
+    entities.SoA.xPos_sx[y] = a = entities.SoA.xVelocity_sx[y] + entities.SoA.xPos_sx[y];
+    a = entities.SoA.xVelocity_px[y];
+    ^if negative {
+        a +#= entities.SoA.xPos_px[y];
+        if !carry { a = 0; }
+        entities.SoA.xPos_px[y] = a;
+
+        // Entity moving left
+
+        a -= entities.SoA.tileHitbox_halfWidth[y];
+        if !carry {
+            // Collided with left edge of the screen
+            entities.SoA.xPos_px[y] = a = entities.SoA.tileHitbox_halfWidth[y];
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.LEFT_COLLISION;
+            ^return;
+        }
+        _left = a;
+
+        // calculate tile position
+        _tmp = a = a >>> 4;
+        x = a = (_top & 0xf0) | _tmp;
+
+        if mapTileProperties[x] $ SOLID_BIT {
+            // solid collision
+            a = (~_left & 0xf);
+            a++;
+            a += entities.SoA.xPos_px[y];
+            if carry { a = 0xff; }
+            entities.SoA.xPos_px[y] = a;
+
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.LEFT_COLLISION;
+        }
+        else {
+            // Check if the hitbox touches the tile below this one
+            a = (_top & 0xf) + entities.SoA.tileHitbox_halfHeight[y] + entities.SoA.tileHitbox_halfHeight[y];
+            if a >= METATILE_SIZE + 1 {
+                if (&mapTileProperties[MAP_WIDTH])[x] $ SOLID_BIT {
+                    a = (~_left & 0xf);
+                    a++;
+                    a += entities.SoA.xPos_px[y];
+                    if carry { a = 0xff; }
+                    entities.SoA.xPos_px[y] = a;
+
+                    entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.LEFT_COLLISION;
+                }
+            }
+        }
+    }
+    else {
+        a +#= entities.SoA.xPos_px[y];
+        if carry { a = 0xff; }
+        entities.SoA.xPos_px[y] = a;
+
+        // Entity moving right
+
+        a += entities.SoA.tileHitbox_halfWidth[y];
+        if carry {
+            // Collided with right edge of the screen
+            entities.SoA.xPos_px[y] = a = (MAP_WIDTH_PIXELS - 1) - entities.SoA.tileHitbox_halfWidth[y];
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.RIGHT_COLLISION;
+            return;
+        }
+        _right = a;
+
+        // calculate tile position
+        _tmp = a = a >>> 4;
+        x = a = (_top & 0xf0) | _tmp;
+
+        if mapTileProperties[x] $ SOLID_BIT {
+            // solid collision
+            a = (_right & 0xf0);
+            a--;
+            a -= entities.SoA.tileHitbox_halfWidth[y];
+            if !carry { a = 1; }
+            entities.SoA.xPos_px[y] = a;
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.RIGHT_COLLISION;
+        }
+        else {
+            // Check if the hitbox touches the tile below this one
+            a = (_top & 0xf) + entities.SoA.tileHitbox_halfHeight[y] + entities.SoA.tileHitbox_halfHeight[y];
+            if a >= METATILE_SIZE + 1 {
+                if (&mapTileProperties[MAP_WIDTH])[x] $ SOLID_BIT {
+                    // solid collision
+                    a = (_right & 0xf0);
+                    a--;
+                    a -= entities.SoA.tileHitbox_halfWidth[y];
+                    if !carry { a = 1; }
+                    entities.SoA.xPos_px[y] = a;
+                    entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.RIGHT_COLLISION;
+                }
+            }
+        }
+    }
+}
+
+
+
+// Add Y-Velocity to Y-Position and preform a collision test in the Y axis (screen boundary is solid).
+//
+// NOTE: If you edit this function, you should also edit `_move_entity_and_collision_test__unbounded__y_axis__inline`.
+//
+// OUTPUT: entities.SoA.movementState bits will be set if there is a collision, otherwise cleared.
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+inline func _move_entity_and_collision_test__bounded__y_axis__inline(entityId : u8 in y, let SOLID_BIT : u8) {
+var _tmp    : u8 in zpTmp_byte_0;
+var _left   : u8 in zpTmp_byte_1;
+var _top    : u8 in zpTmp_byte_2;
+var _bottom : u8 in zpTmp_byte_3;
+
+    a = entities.SoA.xPos_px[y] - entities.SoA.tileHitbox_halfWidth[y];
+    if !carry { a = 0; }
+    _left = a;
+
+    entities.SoA.yPos_sx[y] = a = entities.SoA.yVelocity_sx[y] + entities.SoA.yPos_sx[y];
+    a = entities.SoA.yVelocity_px[y];
+    ^if negative {
+        a +#= entities.SoA.yPos_px[y];
+        if !carry { a = 0; }
+        entities.SoA.yPos_px[y] = a;
+
+        // Entity moving up
+
+        a -= entities.SoA.tileHitbox_halfHeight[y];
+        if !carry {
+            // Collided with top edge of screen
+            entities.SoA.yPos_px[y] = a = entities.SoA.tileHitbox_halfHeight[y];
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.UP_COLLISION;
+            ^return;
+        }
+        _top = a;
+
+        // calculate tile position
+        _tmp = a = _left >>> 4;
+        x = a = (_top & 0xf0) | _tmp;
+
+        if mapTileProperties[x] $ SOLID_BIT {
+            // solid collision
+            a = (~_top & 0xf);
+            a++;
+            a += entities.SoA.yPos_px[y];
+            if carry { a = 0xff; }
+            entities.SoA.yPos_px[y] = a;
+
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.UP_COLLISION;
+        }
+        else {
+            // Check if the hitbox touches the tile to the right of this one
+            a = (_left & 0xf) + entities.SoA.tileHitbox_halfWidth[y] + entities.SoA.tileHitbox_halfWidth[y];
+            if a >= METATILE_SIZE + 1 {
+                // Test X index to prevent an out-of-bounds read past the rightmost tile.
+                a = x & 0xf;
+                if a != 0x0f {
+                    if (&mapTileProperties[1])[x] $ SOLID_BIT {
+                        a = (~_top & 0xf);
+                        a++;
+                        a += entities.SoA.yPos_px[y];
+                        if carry { a = 0xff; }
+                        entities.SoA.yPos_px[y] = a;
+
+                        entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.UP_COLLISION;
+                    }
+                }
+            }
+        }
+    }
+    else {
+        a +#= entities.SoA.yPos_px[y];
+        if carry { a = 0xff; }
+        entities.SoA.yPos_px[y] = a;
+
+        // Entity moving down
+
+        a += entities.SoA.tileHitbox_halfHeight[y];
+        if carry || a >= MAP_HEIGHT_PIXELS {
+            // Collided with bottom edge of the screen
+            entities.SoA.yPos_px[y] = a = (MAP_HEIGHT_PIXELS - 1) - entities.SoA.tileHitbox_halfHeight[y];
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.DOWN_COLLISION;
+            return;
+        }
+        _bottom = a;
+
+        // calculate tile position
+        _tmp = a = _left >>> 4;
+        x = a = (_bottom & 0xf0) | _tmp;
+
+        if mapTileProperties[x] $ SOLID_BIT {
+            // solid collision
+            a = (_bottom & 0xf0);
+            a--;
+            a -= entities.SoA.tileHitbox_halfHeight[y];
+            if !carry { a = 1; }
+            entities.SoA.yPos_px[y] = a;
+            entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.DOWN_COLLISION;
+        }
+        else {
+            // Check if the hitbox touches the tile to the right of this one
+            a = (_left & 0xf) + entities.SoA.tileHitbox_halfWidth[y] + entities.SoA.tileHitbox_halfWidth[y];
+            if a >= METATILE_SIZE + 1 {
+                // Test X index to prevent an out-of-bounds read past the rightmost tile.
+                a = x & 0xf;
+                if a != 0x0f {
+                    if (&mapTileProperties[1])[x] $ SOLID_BIT {
+                        a = (_bottom & 0xf0);
+                        a--;
+                        a -= entities.SoA.tileHitbox_halfHeight[y];
+                        if !carry { a = 1; }
+                        entities.SoA.yPos_px[y] = a;
+                        entities.SoA.movementState[y] = a = entities.SoA.movementState[y] | entities.MovementState.DOWN_COLLISION;
+                    }
+                }
+            }
+        }
+    }
+}
+
+}
+
+
+// Transitions
+// ===========
+
+namespace transitions {
+
+let TRANSITION_SPEED = 8;
+
+
+in wram7e {
+    // Map position within the current transition
+    // (byte index)
+    var mapPos : u8;
+
+
+    // The VRAM word address of the tilemap the map is drawn to.
+    //
+    // This variable contains one of two possible values:
+    //  * VRAM_BG1_MAP_WADDR
+    //  * VRAM_BG1_MAP_WADDR + 0x400
+    //
+    // This variable MUST only be changed by `_reset_state()` and `swap_currentTilemap()`.
+    //
+    // (VRAM word address)
+    var currentTilemap_vramWaddr : u16;
+
+
+    // The offset between the top of the tilemap and the top of the room map in tiles.
+    //
+    // This value should be masked by `topmostRowOffset_MASK` whenever it is used to
+    // calculate a VRAM address or buffer index.
+    //
+    // (byte)
+    var topmostRowOffset : u8;
+    let topmostRowOffset_MASK = 0x1f;
+
+
+    // The offset between the top of the tilemap and the top row of the room map.
+    //
+    // NOTE: This variable only holds a vertical offset,  it does NOT contain
+    //       the horizontal offset (`currentTilemap_vramWaddr`).
+    //
+    // (word - VRAM word offset)
+    var vramVerticalWoffset : u16;
+
+
+    // A buffer containing a single row/column to transfer to VRAM.
+    var buffer : [u8 ; 32 * 2];
+}
+
+
+in lowram {
+    // `VMAIN` register to use when transferring the buffer to VRAM.
+    //
+    // NOTE: If this value is 0 then no buffer will be transferred.
+    //
+    // (byte)
+    var buffer_vmain : u8;
+
+
+    // VRAM word position to store the buffer to.
+    //
+    // NOTE: This variable is handled differently in horizontal and vertical transitions.
+    //
+    // (word)
+    var buffer_vramWordPos : u16;
+
+    // ::ANNOY why do I have to do this?::
+    // ::: Used to work around a "could not generate code for assignment `=` (got: `a = *(8269313 as *u8)` (mem8, idx8))" error::
+        var buffer_vramWordPos_l : u8 in <:buffer_vramWordPos;
+        var buffer_vramWordPos_h : u8 in >:buffer_vramWordPos;
+}
+
+
+in code {
+
+
+
+// Transfer the buffer to VRAM if required.
+//
+// REQUIRES: V-Blank
+//
+// Uses DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+func transfer_buffer__vblank() {
+    // MUST NOT modify zpTmp variables.
+
+    a = buffer_vmain;
+    if !zero {
+        VMAIN = a;
+
+        VMADD = xx = buffer_vramWordPos;
+
+        dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_TWO, <:&VMDATA);
+
+        A1T0 = xx = &buffer as u16;
+        A1B0 = a = #:far &buffer;
+
+        DAS0 = xx = sizeof(typeof(buffer));
+
+        MDMAEN = a = MDMAEN_DMA0;
+
+
+        // Do not transfer buffer on the next frame
+        buffer_vmain = 0;
+    }
+}
+
+
+
+// Reset internal state and scroll positions.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _reset_state() {
+    transitions.topmostRowOffset = 0;
+
+    mem16();
+    #[mem16] {
+        vramVerticalWoffset = 0;
+        currentTilemap_vramWaddr = VRAM_BG1_MAP_WADDR;
+
+        // Reset BG1 scroll
+        bg1_scrollX = 0;
+        bg1_scrollY = aa = 0xffff;
+    }
+    mem8();
+}
+
+
+
+// Horizontal Transitions
+// ----------------------
+
+
+// Swap the currentTilemap.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func swap_currentTilemap() {
+    a = *(&>:currentTilemap_vramWaddr as *u8);
+    if a == >:VRAM_BG1_MAP_WADDR {
+        a = >:(VRAM_BG1_MAP_WADDR + 0x400);
+    }
+    else {
+        a = >:VRAM_BG1_MAP_WADDR;
+    }
+
+    *(&>:currentTilemap_vramWaddr as *u8) = a;
+}
+
+
+
+// Fill the buffer with the right half of a MetaTile column and queue a transfer during VBlank.
+//
+// REQUIRES: buffer_vramWordPos set.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _draw_left_column() {
+var _tmp : u8 in zpTmp_byte_0;
+
+    y = a = (topmostRowOffset & topmostRowOffset_MASK) << 1;
+
+    a = mapPos;
+
+    do {
+        _tmp = a;
+
+        x = a = map[x = a];
+
+        buffer[y++] = a = tileset.topLeft_low[x];
+        buffer[y++] = a = tileset.topLeft_high[x];
+        buffer[y++] = a = tileset.bottomLeft_low[x];
+        buffer[y++] = a = tileset.bottomLeft_high[x];
+
+        if y == sizeof(typeof(buffer)) {
+            y = 0;
+        }
+
+        a = _tmp + 0x10;
+    }
+    while a < MAP_HEIGHT * MAP_WIDTH;
+
+
+    buffer_vmain = a = VMAIN_INCREMENT_32 | VMAIN_INCREMENT_HIGH;
+}
+
+
+
+// Fill the buffer with the right half of a MetaTile column and queue a transfer during VBlank.
+//
+// REQUIRES: buffer_vramWordPos set.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _draw_right_column() {
+var _tmp : u8 in zpTmp_byte_0;
+
+    y = a = (topmostRowOffset & topmostRowOffset_MASK) << 1;
+
+    a = mapPos;
+
+    do {
+        _tmp = a;
+
+        x = a = map[x = a];
+
+        buffer[y++] = a = tileset.topRight_low[x];
+        buffer[y++] = a = tileset.topRight_high[x];
+        buffer[y++] = a = tileset.bottomRight_low[x];
+        buffer[y++] = a = tileset.bottomRight_high[x];
+
+        if y == sizeof(typeof(buffer)) {
+            y = 0;
+        }
+
+        a = _tmp + 0x10;
+    }
+    while a < MAP_HEIGHT * MAP_WIDTH;
+
+
+    buffer_vmain = a = VMAIN_INCREMENT_32 | VMAIN_INCREMENT_HIGH;
+}
+
+
+
+// Initialize a scroll right transition.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_right__setup() {
+
+    swap_currentTilemap();
+
+    mapPos = 0;
+
+
+    // Determine the next VRAM position
+    let VRAM_OFFSET = 0;
+
+    // Subtract one to counter the +1 at the start of `right__process()`
+    *(&<:buffer_vramWordPos as *u8) = a = <:(VRAM_BG1_MAP_WADDR + VRAM_OFFSET - 1);
+
+    *(&>:buffer_vramWordPos as *u8) = a = *(&>:currentTilemap_vramWaddr as *u8);
+}
+
+
+
+// Process a scroll right transition.
+//
+// This function is to be called once per frame until the transition has completed.
+//
+// Returns true if transition is complete.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_right__process() : bool in carry {
+
+    *(&<:bg1_scrollX as *u8) = a = *(&<:bg1_scrollX as *u8) + TRANSITION_SPEED;
+    if carry {
+        (*(&>:bg1_scrollX as *u8))++;
+    }
+
+
+    a = buffer_vramWordPos_l;
+    a++;
+    buffer_vramWordPos_l = a;
+
+    if a & 1 == 0 {
+        _draw_left_column();
+    }
+    else {
+        _draw_right_column();
+
+        mapPos++;
+    }
+
+
+    a = mapPos;
+    if a == MAP_WIDTH {
+        return true;
+    }
+
+    return false;
+}
+
+
+
+// Rollback a scroll right transition.
+//
+// This function is to be called once per frame until it returns true.
+//
+// Returns true if transition is complete.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_right__rollback() : bool in carry {
+
+    // no need to draw tiles, only need to change scroll.
+
+    *(&<:bg1_scrollX as *u8) = a = *(&<:bg1_scrollX as *u8) - TRANSITION_SPEED;
+    if !carry {
+        (*(&>:bg1_scrollX as *u8))--;
+    }
+
+    if a == 0 {
+        swap_currentTilemap();
+        return true;
+    }
+    return false;
+}
+
+
+
+// Initialize a scroll left transition.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_left__setup() {
+
+    swap_currentTilemap();
+
+    mapPos = a = 0xf;
+
+    // Determine the next VRAM position
+    let VRAM_OFFSET = 31;
+
+    // Add one to counter the -1 at the start of `left__process()`
+    *(&<:buffer_vramWordPos as *u8) = a = <:(VRAM_BG1_MAP_WADDR + VRAM_OFFSET + 1);
+
+    *(&>:buffer_vramWordPos as *u8) = a = *(&>:currentTilemap_vramWaddr as *u8);
+}
+
+
+
+// Process a scroll left transition.
+//
+// This function is to be called once per frame until the transition has completed.
+//
+// Returns true if transition is complete.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_left__process() : bool in carry {
+
+    *(&<:bg1_scrollX as *u8) = a = *(&<:bg1_scrollX as *u8) - TRANSITION_SPEED;
+    if !carry {
+        (*(&>:bg1_scrollX as *u8))--;
+    }
+
+
+    a = buffer_vramWordPos_l;
+    a--;
+    buffer_vramWordPos_l = a;
+
+    if a & 1 != 0 {
+        _draw_right_column();
+    }
+    else {
+        _draw_left_column();
+
+        mapPos--;
+    }
+
+
+    a = mapPos;
+    if negative {
+        return true;
+    }
+
+    return false;
+}
+
+
+
+// Rollback a scroll left transition.
+//
+// This function is to be called once per frame until it returns true.
+//
+// Returns true if transition is complete.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_left__rollback() : bool in carry {
+
+    // no need to draw tiles, only need to change scroll.
+
+    *(&<:bg1_scrollX as *u8) = a = *(&<:bg1_scrollX as *u8) + TRANSITION_SPEED;
+    if carry {
+        (*(&>:bg1_scrollX as *u8))++;
+    }
+
+    if a == 0 {
+        swap_currentTilemap();
+        return true;
+    }
+    return false;
+}
+
+
+
+// Vertical Transitions
+// --------------------
+
+
+
+// Calculate the `buffer_vramWordPos` value to use for a vertical scroll transition.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _calculate_vram_position_for_row(tilemapRow : u8 in a) {
+    mem16();
+    #[mem16] {
+        aa = (aa & topmostRowOffset_MASK) << 5;
+        aa += currentTilemap_vramWaddr;
+
+        buffer_vramWordPos = aa;
+    }
+    mem8();
+}
+
+
+
+// Fill the buffer with the top half of a MetaTile row and queue a transfer during VBlank.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _draw_top_row(tilemapRow : u8 in a) {
+var _tmp : u8 in zpTmp_byte_0;
+
+    _calculate_vram_position_for_row(a);
+
+
+    y = 0;
+    a = mapPos;
+
+    do {
+        _tmp = a;
+
+        x = a = map[x = a];
+
+        buffer[y++] = a = tileset.topLeft_low[x];
+        buffer[y++] = a = tileset.topLeft_high[x];
+        buffer[y++] = a = tileset.topRight_low[x];
+        buffer[y++] = a = tileset.topRight_high[x];
+
+        a = _tmp;
+        a++;
+    }
+    while y < sizeof(typeof(buffer));
+
+
+    buffer_vmain = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+}
+
+
+
+// Fill the buffer with the bottom half of a MetaTile row and queue a transfer during VBlank.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _draw_bottom_row(tilemapRow : u8 in a) {
+var _tmp : u8 in zpTmp_byte_0;
+
+    _calculate_vram_position_for_row(a);
+
+
+    y = 0;
+    a = mapPos;
+
+    do {
+        _tmp = a;
+
+        x = a = map[x = a];
+
+        buffer[y++] = a = tileset.bottomLeft_low[x];
+        buffer[y++] = a = tileset.bottomLeft_high[x];
+        buffer[y++] = a = tileset.bottomRight_low[x];
+        buffer[y++] = a = tileset.bottomRight_high[x];
+
+        a = _tmp;
+        a++;
+    }
+    while y < sizeof(typeof(buffer));
+
+
+    buffer_vmain = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+}
+
+
+
+// Initialize a scroll down transition.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_down__setup() {
+
+    mapPos = 0;
+}
+
+
+
+// Process a scroll down transition.
+//
+// This function is to be called once per frame until the transition has completed.
+//
+// Returns true if transition is complete.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_down__process() : bool in carry {
+
+    *(&<:bg1_scrollY as *u8) = a = *(&<:bg1_scrollY as *u8) + TRANSITION_SPEED;
+
+
+    a = topmostRowOffset;
+    a++;
+    topmostRowOffset = a;
+
+    if a & 1 != 0 {
+        _draw_top_row(a + MAP_HEIGHT * 2 - 1);
+    }
+    else {
+        _draw_bottom_row(a + MAP_HEIGHT * 2 - 1);
+
+        mapPos = a = mapPos + MAP_WIDTH;
+
+        if a >= MAP_WIDTH * MAP_HEIGHT {
+            return _update_vram_vertical_woffset__and_return_true();
+        }
+    }
+
+    return false;
+}
+
+
+
+
+// Initialize a scroll up transition.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_up__setup() {
+
+    mapPos = a = MAP_WIDTH * (MAP_HEIGHT - 1);
+}
+
+
+
+// Process a scroll up transition.
+//
+// This function is to be called once per frame until the transition has completed.
+//
+// Returns true if transition is complete.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_up__process() : bool in carry {
+
+    *(&<:bg1_scrollY as *u8) = a = *(&<:bg1_scrollY as *u8) - TRANSITION_SPEED;
+
+
+    a = topmostRowOffset;
+    a--;
+    topmostRowOffset = a;
+
+    if a & 1 != 0 {
+        _draw_bottom_row(a);
+    }
+    else {
+        _draw_top_row(a);
+
+        mapPos = a = mapPos - 0x10;
+
+        if a >= MAP_WIDTH * MAP_HEIGHT{
+            return _update_vram_vertical_woffset__and_return_true();
+        }
+    }
+
+    return false;
+}
+
+
+
+// Calculates the new value of the `vramVerticalWoffset`.
+//
+// NOTE: Always returns true
+#[mem8, idx8]
+func _update_vram_vertical_woffset__and_return_true() : bool in carry {
+    a = topmostRowOffset;
+
+    mem16();
+    #[mem16] {
+        vramVerticalWoffset = aa = (aa & topmostRowOffset_MASK) << 5;
+    }
+    mem8();
+
+    return true;
+}
+
+
+}
+
+}
+}
+
+

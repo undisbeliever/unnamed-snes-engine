@@ -1,0 +1,93 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+
+import "registers";
+import "common/reset";
+
+
+in lowram {
+
+// Number of NMI interrupts processed between wait_frame calls.
+// (byte)
+var nmiCounter : u8;
+
+}
+
+
+in code {
+
+
+#[nmi]
+func nmi_handler() {
+    mem8();
+    #[mem8] {
+        push8(a);
+
+        a = *(far &nmiCounter as far *u8);
+        a++;
+        *(far &nmiCounter as far *u8) = a;
+
+        // ::TODO add watchdog timer that activates when nmiCounter is negative::
+
+        a = pop8();
+    }
+
+    nmireturn;
+}
+
+
+#[irq]
+func irq_handler() {
+    irqreturn;
+}
+
+
+#[irq]
+func break_handler() {
+    nointerrupt = true;
+    decimal = false;
+    carry = false;
+    swap_carry_emulation();
+
+    push8(program_bank);
+    data_bank = pop8();
+
+    mem8_idx8();
+    #[mem8, idx8] {
+        reset_registers();
+
+        // Change BG colour to dark BLUE
+        CGADD = 0;
+        CGDATA = 0;
+        CGDATA = a = 12 << 2;
+
+        // ::TODO display a message::
+
+        // Enable the screen
+        INIDISP = a = INIDISP_BRIGHTNESS_MASK;
+
+
+        // Wait forever.
+        //
+        // I cannot jump to `__reset` as I do not know the state of the audio driver
+        // and there is no way for the S-CPU to reset the S-SMP.
+        while true {
+            wait_until_interrupt();
+        }
+    }
+}
+
+
+#[irq]
+func invalid_handler() {
+    // ::TODO show Red Screen of Death::
+    while true {
+    }
+}
+
+
+}
+
+

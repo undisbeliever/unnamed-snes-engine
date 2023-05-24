@@ -1,0 +1,114 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "engine/entity_api";
+
+
+// Entity that constantly spawns and removes itself in a (hopefully) random manner.
+
+namespace entities {
+namespace spawn_test_entity {
+
+
+in wram7e {
+    var globalCounter : u8;
+
+
+var SoA_counter : [ u8 ; SoA.BA_SIZE ] in SoA.var_0_l;
+
+}
+
+
+
+in code {
+
+let ms_draw_function = ms.dungeon.Skull.pattern;
+
+
+// Entity process routine.
+//
+// Called when the entity is spawned
+//
+// DB = 0x7e
+#[mem8, idx8]
+func init(entityId : u8 in y) {
+    mem16();
+    #[mem16] {
+        SoA.xVelocity[unaligned y] = aa =  0x0120;
+        SoA.yVelocity[unaligned y] = aa = -0x0120 as u16;
+
+        SoA.metaSpriteFrame[unaligned y] = aa = &ms.dungeon.Skull.frames[0] as u16;
+
+        SoA_counter[unaligned y] = aa = 10 * 60;
+    }
+    mem8();
+}
+
+
+// Entity process routine.
+//
+// Called once per frame.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process(entityId : u8 in y) {
+    move_entity_and_tile_collision_test(y);
+
+    a = SoA.movementState[y];
+    if a & MovementState.X_AXIS_COLLISION != 0 {
+        mem16();
+        #[mem16] {
+            SoA.xVelocity[unaligned y] = aa = 0 - SoA.xVelocity[unaligned y];
+        }
+        mem8();
+    }
+
+    a = SoA.movementState[y];
+    if a & MovementState.Y_AXIS_COLLISION != 0 {
+        mem16();
+        #[mem16] {
+            SoA.yVelocity[unaligned y] = aa = 0 - SoA.yVelocity[unaligned y];
+        }
+        mem8();
+    }
+
+
+    globalCounter++;
+    a = globalCounter;
+
+    // 3 random primes, should make the spawning/deleting more unpredictable
+    if a == 79 || a == 149 || a == 211 {
+        push8(y);
+        spawn_entity(a = 128, a = 112, a = 0);
+        y = pop8();
+    }
+    else if a == 251 {
+        globalCounter = 0;
+
+        return false;
+    }
+
+    // Remove entity when `SoA_counter` is zero.
+    {
+        mem16();
+        #[mem16] {
+            x = y;
+            SoA_counter[unaligned x]--;
+        }
+        mem8();
+
+        if zero {
+            SoA.health[unaligned x] = 0;
+        }
+    }
+}
+
+
+
+}
+
+}
+}
+

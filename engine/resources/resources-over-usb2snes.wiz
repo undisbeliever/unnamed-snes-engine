@@ -1,0 +1,416 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "../registers";
+
+import "rou2s-commands";
+
+import "resources";
+import "../game/room";
+import "../common/reset";
+
+import "gen/enums";
+
+namespace resources_over_usb2snes {
+
+
+// If non-zero then the ROM on usb2snes does not match the .sfc file and needs to be updated.
+//
+// Address is inside the `Reserved` space of the SFC header.
+//
+// Address MUST match `ROM_UPDATE_REQUIRED_ADDR` in `tools/resources_over_usb2snes.py`
+// Address MUST match address in `UpdateRomSpinloopCode`
+extern const RomUpdateRequired @ 0x00ffb9 : u8;
+
+
+
+// Must match `SpecialRequestType` in `tools/resources_over_usb2snes.py`
+enum SpecialRequestType : u8 {
+    room            = 0xff,
+
+    // This special request type tells `resources_over_usb2snes.py` that the game has been reset.
+    // It will populate `MsFsData` and `entity_rom_data` and reset the `request_id` counter.
+    init            = 0xaa,
+};
+
+
+// A resources_over_usb2snes request.  Stored in Work-RAM and read by usb2snes.
+//
+// `resources_over_usb2snes.py` will repeatedly read the request bytes and will process it if:
+//    * `request_type` is `SpecialRequestType.init`, or
+//    * `request_id` has changed
+//
+// Requests with a `request_id` of 0 are ignored.
+//
+// If `request_type` is SpecialRequestType.init`, then `resources_over_usb2snes.py` will wait until
+// the request bytes match `INIT_REQUEST` before processing the request.
+//
+// When making a request, the `request_id` variable should be written last.
+//
+// `last_command_id` is used to signal to `resources_over_usb2snes.py` that the console is ready to receive new commands.
+//
+// NOTE: `resources_over_usb2snes.py` may update `MsFsData` and `entity_rom_data` when a request has been made.
+struct Request {
+    // Request ID.
+    request_id   : u8,
+
+    // Type of request, either a `resources.ResourceType` request or a `SpecialRequestType` request.
+    //
+    // (`resources.ResourceType` or `SpecialRequestType`)
+    request_type : u8,
+
+    // ::SHOULDDO increase to u16 when implementing multiple-worlds ::
+    resource_id  : u8,
+
+    // The last rou2s command that has been processed the console.
+    last_command_id: u8,
+};
+
+// Must match `INIT_REQUEST` in `tools/resources_over_usb2snes.py`
+let INIT_REQUEST = Request{
+        request_id      = 0,
+        request_type    = SpecialRequestType.init as u8,
+        resource_id     = ~(SpecialRequestType.init as u8),
+        last_command_id = 0xff
+};
+
+
+// Must match `ResponseStatus` in `tools/resources_over_usb2snes.py`
+enum ResponseStatus : u8 {
+    NOT_CONNECTED        = 0,
+    OK                   = 0x20,
+    OK_RESOURCES_CHANGED = 0x21, // Only `room` requests return this response.
+    INIT_OK              = 0xbb, // Only `init` requests return this response.
+    NOT_FOUND            = 0x40,
+    ERROR                = 0xff,
+};
+
+
+// The response from `resources_over_usb2snes.py`.  Stored in ROM and updated via usb2snes.
+//
+// If data was requested, then the response data will be stored in `response_data` before the
+// `Response` struct is written.
+//
+// The system should wait until the `response_id` and `status` bytes match the expected value
+// before reading `response_data`.
+//
+// `response_id` is last field in this struct as the `response_id` byte should be written last.
+//
+struct Response {
+    data_size    : u16,
+    status       : ResponseStatus,
+    response_id  : u8,
+};
+
+
+// Response data from `resources_over_usb2snes.py`.
+//
+// `response_data` will remain valid until the next request, unless `resources_over_usb2snes.py` has been restarted.
+extern const response_data @ resources._USB2SNES_DATA_ADDR : [ u8 ; resources._BANK_SIZE ];
+
+
+in wram7e {
+    var request : Request;
+}
+
+in rodata0 {
+    const response = Response{
+        data_size   = 0,
+        status      = ResponseStatus.NOT_CONNECTED,
+        response_id = 0,
+    };
+
+    // Annoying hack to get wiz to read response with long addressing
+    let __far_response_u8  = far&response as far *const u8;
+    let __far_response_u16 = far&response as far *const u16;
+
+    let _RESPONSE_u8_STATUS    = offsetof(Response, status);
+    let _RESPONSE_u8_ID        = offsetof(Response, response_id);
+
+    let _RESPONSE_u16_DATA_SIZE     = offsetof(Response, data_size);
+    let _RESPONSE_u16_STATUS_AND_ID = offsetof(Response, status);
+}
+
+
+in rodata0 {
+    const InitRequest = INIT_REQUEST;
+}
+
+
+in code {
+
+
+// Send a request to `resources_over_usb2snes.py`
+//
+// ASSUMES: type is not `SpecialRequestType.init`
+// ASSUMES `resources_over_usb2snes.py` is running.
+//
+// Returns `request_id`.
+//
+// DB unknown
+#[mem8, idx8]
+func __send_request(type : u8 in x, resourceId : u8 in y) : u8 in a{
+
+    // Annoying hack to access var struct elements with far addressing
+    in wram7e {
+        extern var __request_id   @ &request.request_id   : u8;
+        extern var __request_type @ &request.request_type : u8;
+        extern var __resource_id  @ &request.resource_id  : u8;
+    }
+
+    // This function MUST ONLY use long addressing
+
+    *(far& __request_type) = a = x;
+    *(far& __resource_id)  = a = y;
+
+    // `request_id` must be written last
+
+    // Increment request_id
+    a = *(far& __request_id);
+    a++;
+    if zero { a++; }
+    *(far& __request_id) = a;
+
+    return a;
+}
+
+
+
+// Send a `SpecialRequestType.init` request to `resources_over_usb2snes.py` and wait for
+// `resources_over_usb2snes.py` to populate the missing ROM data.
+//
+// ASSUMES `resources_over_usb2snes.py` is running.
+//
+// DB unknown
+#[mem8, idx8]
+func __send_init_request_and_wait_for_response() {
+
+    // Annoying hack to access var struct elements with far addressing
+    in wram7e {
+        extern var __request_type @ &request.request_type : u8;
+    }
+
+    // This function MUST ONLY use long addressing
+
+    // Send INIT_REQUEST
+    // (`request_id` must be written last)
+    // ASSUMES `request_id` is the first element in `Request` struct
+    x = sizeof(Request) - 1;
+    do {
+        (far &request as far *u8)[x] = a = (far&InitRequest as far *u8)[x];
+        x--;
+    } while !negative;
+
+
+    // Wait until the response_id matches request_id and response status is INIT_OK
+    mem16();
+    #[mem16] {
+        aa = (INIT_REQUEST.request_id as u16 << 8) | (ResponseStatus.INIT_OK as u16);
+        do {
+        } while aa != __far_response_u16[unaligned _RESPONSE_u16_STATUS_AND_ID];
+    }
+    mem8();
+
+    rou2s_commands.init__inline();
+
+    // Change request_type so it is not `SpecialRequestType.init`
+    *(far& __request_type) = a = 0;
+}
+
+
+
+// Test the `RomUpdateRequired` byte.  If it is non-zero, execute `RomUpdateRequiredSpinloop` in Work-RAM.
+//
+// DB unknown
+#[mem8, idx8]
+inline func __test_and_process_RomUpdateRequired() {
+
+// Use page after zeropage to store spinloop code
+var __spinloop_code_wram @ 0x0100 : [u8 ; 8];
+
+
+    a = *far &RomUpdateRequired;
+    if !zero {
+        mem8_idx8();
+        #[mem8, idx8] {
+            push8(a = 0);
+            data_bank = pop8();
+        // DB = 0
+
+            // Disables interrupts and HDMA
+            reset_registers();
+
+            // Copy spinloop code to Work-RAM
+            x = RomUpdateRequiredSpinloop.len - 1;
+            do {
+                __spinloop_code_wram[x] = a = (far&RomUpdateRequiredSpinloop as far *u8)[x];
+                x--;
+            } while !negative;
+
+            // Jump to spinloop in Work-RAM
+            ^goto &__spinloop_code_wram as func;
+        }
+    }
+}
+
+
+
+in rodata0 {
+    // RomUpdateRequired spinloop.  Executed in Work-RAM.
+    //
+    // Repeatedly copies the value of `RomUpdateRequired` into every byte of zeropage.
+    //
+    // `resources_over_usb2snes.py` needs to confirm the game is executing in Work-RAM, otherwise the console may crash
+    // (or worse, corrupt game data) when updating the ROM.  To do this, the python-script will modify `RomUpdateRequired`,
+    // the spinloop will copy that value to zeropage and the python-script will wait until every byte of zeropage
+    // matches `RomUpdateRequired`.  The test is repeated a few times to ensure it is not a fluke.
+    //
+    // If the test passes, `resources_over_usb2snes.py` knows the spinloop is running and the ROM can be safely modified.
+    // After the ROM is updated, `resources_over_usb2snes.py` will reset the console.
+    //
+    // I have written the spinloop code as raw hexadecimal bytes to prevent me from accidentally running it in ROM space.
+    //
+    // REQUIRES: 8 bit A, 8 bit Index, DP = 0, DB = 0
+    const RomUpdateRequiredSpinloop : [u8] =  [ // Loop:
+        0xad, 0xb9, 0xff,                       //     lda a:RomUpdateRequired
+        0x95, 0,                                //     sta z:0,x
+        0xe8,                                   //     inx
+        0x80, (-8) & 0xff,                      //     bra Loop
+    ];
+}
+
+
+
+// Initialise the resources_over_usb2snes subsystem.
+//
+// This function MUST be called as early as possible after a system reset.
+//
+// DB unknown
+#[mem8, idx8]
+inline func init() {
+    a = *far &resources.UseResourcesOverUsb2Snes;
+    if !zero {
+        __test_and_process_RomUpdateRequired();
+
+        __send_init_request_and_wait_for_response();
+    }
+}
+
+
+// Set the `last_command_id` variable
+//
+// DB unknown
+#[mem8, idx8]
+inline func set_last_command_id__inline(cId : u8 in a) {
+
+    // This function MUST ONLY use long addressing
+
+    // Annoying hack to access var struct elements with far addressing
+    in wram7e {
+        extern var __request_last_command_id @ &request.last_command_id : u8;
+    }
+
+    *(far &__request_last_command_id) = a;
+}
+
+
+
+// Load a resource into ROM.
+//
+// NOTE: The high byte of `xx` and `yy` is ignored.
+// ASSUMES: `xx` is a valid `resources.ResourceType` value
+//
+// DB unknown
+#[mem8, idx16]
+func load_resource(resourceType : u16 in xx, resourceId : u16 in yy) : resources.ResourceEntry in resources.res {
+
+var _res : resources.ResourceEntry in resources.res;
+
+    // This function MUST ONLY use zeropage variables or long addressing
+
+    idx8();
+    #[idx8] {
+        a = __send_request(x, y);
+    }
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        // Wait until the response_id matches request_id and response status is OK
+        // a = request_id
+        swap_bytes(aa);
+        aa = (aa & 0xff00) | (ResponseStatus.OK as u16);
+        do {
+        } while aa != __far_response_u16[unaligned _RESPONSE_u16_STATUS_AND_ID];
+
+
+        _res.size = aa = __far_response_u16[unaligned _RESPONSE_u16_DATA_SIZE];
+    }
+    mem8();
+
+    #:_res.farPtr = a = #:far &response_data;
+    *(&_res.farPtr as *u16) = xx = &response_data as u16;
+
+    return _res;
+}
+
+
+
+// Load a room into ROM.  Returns false if the room does not exist.
+//
+// NOTE: The high byte of `xx` and `yy` is ignored.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func load_room(roomId : u8 in y) : bool in carry {
+
+    y = a = __send_request(SpecialRequestType.room as u8, y);
+
+    // Wait until the response_id matches request_id and status is OK or NOT_FOUND
+    do {
+        // y = request_id
+
+        // Wait until the response_id matches request_id
+        a = y;
+        do {
+        } while a != __far_response_u8[_RESPONSE_u8_ID];
+
+        // Check response status
+        a = __far_response_u8[_RESPONSE_u8_STATUS];
+        if a == ResponseStatus.NOT_FOUND as u8 {
+            // Room does not exist
+            return false;
+        }
+
+        if a == ResponseStatus.OK_RESOURCES_CHANGED as u8 {
+            // Room exists the resources have changed.
+            // Force a fade-out room transition to ensure new resources will be loaded.
+            // a is non-zero
+            roomstate.forceFadeoutRoomTransition = a;
+            break;
+        }
+    }
+    while a != ResponseStatus.OK as u8;
+
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        // Copy room into memory.
+        // Parameter order is destination, source::
+        load_dec_repeat(0x7e,                yy = &room as u16,
+                        #:far&response_data, xx = &response_data as u16,
+                        aa = sizeof(typeof(room)) - 1);
+
+    // NOTE: load_dec_repeat changes the data bank
+    //       (safe as I have hard-coded the target bank to 0x7e)
+    }
+    mem8_idx8();
+
+    return true;
+}
+
+
+}
+
+}
+

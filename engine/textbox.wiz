@@ -1,0 +1,825 @@
+// Copyright (c) 2023, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "registers";
+import "registers_math";
+
+import "audio";
+import "wait-frame";
+import "resources/dma";
+import "resources/resources";
+
+// For `empty_byte`
+import "common/reset";
+
+import "src/engine-hooks";
+
+import "gen/enums";
+
+
+namespace textbox {
+
+// Taken from UI.wiz
+// Shifts BG3 half a tile
+let X_BG_OFFSET = -4;
+let Y_BG_OFFSET = -4;
+
+
+// NOTE: This offset is used to calculate the VRAM word address.
+// It does not affect the start of the line within the buffer.
+let TEXTBOX_BORDER_X = 2;
+
+
+// MUST be an odd value
+let TEXTBOX_WIDTH = 25;
+let TEXTBOX_WIDTH_BYTES = TEXTBOX_WIDTH * 2;
+
+let MAX_TEXTBOX_HEIGHT = 5;
+let MIN_TEXTBOX_HEIGHT = 1;
+
+let BUFFER_WIDTH = 32;
+let BUFFER_WIDTH_BYTES = BUFFER_WIDTH * 2;
+let BUFFER_HEIGHT = (MAX_TEXTBOX_HEIGHT * 2) + 2;
+
+
+let DEFAULT_HEIGHT = 4;
+let DEFAULT_YPOS = 15;
+
+
+let MAX_UINT16_CHARS = 5;
+
+
+namespace Font {
+    let TILE_OFFSET = 16;
+
+    // Offset between the top half of a character and the bottom half of a character.
+    let BOTTOM_TILE_OFFSET = 98;
+
+
+    let BORDER_CORNER     = TILE_OFFSET + 0;
+    let BORDER_HORIZONTAL = TILE_OFFSET + 1;
+    let BORDER_VERTICAL   = TILE_OFFSET + BOTTOM_TILE_OFFSET + 0;
+    let BORDER_EMPTY      = TILE_OFFSET + BOTTOM_TILE_OFFSET + 1;
+
+    let SPACE_TILE = TILE_OFFSET + 2;
+    let RIGHT_ARROW_TILE = TILE_OFFSET + 97;
+
+    let FIRST_PRINTABLE_ASCII_CHAR = ' ';
+    let ASCII_OFFSET = ' ' - SPACE_TILE;
+
+
+    let MAIN_PALETTE = 1;
+    let ALT_PALETTE = 2;
+
+
+    // Tilemap charattr words for the border and padding.
+    namespace CharAttr {
+        let __ATTR = (Font.MAIN_PALETTE << 10) | 0x2000;  // High priority
+        let __ATTR_HFLIP = __ATTR | 0x4000;
+        let __ATTR_VFLIP = __ATTR | 0x8000;
+        let __ATTR_HVFLIP = __ATTR_VFLIP | __ATTR_HFLIP;
+
+        let BORDER_TOP_LEFT = Font.BORDER_CORNER | __ATTR;
+        let BORDER_TOP = Font.BORDER_HORIZONTAL | __ATTR;
+        let BORDER_TOP_RIGHT = Font.BORDER_CORNER | __ATTR_HFLIP;
+
+        let BORDER_LEFT = Font.BORDER_VERTICAL | __ATTR;
+        let BORDER_RIGHT = Font.BORDER_VERTICAL | __ATTR_HFLIP;
+
+        let PADDING = Font.SPACE_TILE | __ATTR;
+
+        let BORDER_BOTTOM_LEFT = Font.BORDER_CORNER | __ATTR_VFLIP;
+        let BORDER_BOTTOM = Font.BORDER_HORIZONTAL | __ATTR_VFLIP;
+        let BORDER_BOTTOM_RIGHT = Font.BORDER_CORNER | __ATTR_HVFLIP;
+    }
+}
+
+
+// Special string characters/tokens.
+//
+// NOTE: These tokens are processed every time the textbox is printed.
+//       As apposed to DecodeTokens, which are processed when `decodedString` is built.
+//
+// NOTE: The largest value in this section SHOULD BE < the first printable character.
+namespace SpecialChars {
+    // String End (end of textbox)
+    let END = 0;
+
+    // Change text palette to MAIN_PALETTE
+    let MAIN_PALETTE = 1;
+
+    // Change text palette to ALT_PALETTE
+    // ::TODO add codes to change the alt-color::
+    let ALT_PALETTE = 2;
+
+    // Print a '▶' cursor if `selectedMenuItem` == n, otherwise print a ' '
+    let MENU_CURSOR_0 = 3;
+    let MENU_CURSOR_1 = 4;
+    let MENU_CURSOR_2 = 5;
+    let MENU_CURSOR_3 = 6;
+    let MENU_CURSOR_4 = 7;
+    let MENU_CURSOR_5 = 8;
+
+    let _LAST_MENU_CURSOR = 8;
+
+    let NEW_LINE = 10;
+
+    // Changes the menu cursor selection to left/right
+    let LEFT_RIGHT_SELECTION = 11;
+
+    // ::TODO add special characters for two-column selection::
+}
+
+
+// These special characters are used when decoding ROM data into `decodedString`.
+//
+// NOTE: All tokens must be >= _FIRST_CHAR.
+namespace DecodeTokens {
+    let _FIRST_CHAR = 0xc0;
+
+    let SET_U16_PADDING_1 = 0xc0;
+    let SET_U16_PADDING_2 = 0xc1;
+    let SET_U16_PADDING_3 = 0xc2;
+    let SET_U16_PADDING_4 = 0xc3;
+    let SET_U16_PADDING_5 = 0xc4;
+
+    // ::TODO add special chars for DTE (Dual Tile Encoding) and names and strings::
+
+    let PRINT_FIRST_U16 = 0xff;
+    let PRINT_SECOND_U16 = 0xfe;
+}
+
+
+// The action to preform on the next VBlank.
+enum VBlankAction : u8 {
+    NOTHING = 0,
+    COPY_TEXTBOX = 1,
+    ERASE_TEXTBOX = 0x80,
+}
+
+
+in zeropage {
+    // The selected menu item
+    var selectedMenuItem : u8;
+}
+
+
+in lowram {
+    var nextVBlankAction : VBlankAction;
+
+    // The VRAM word address to store the buffer.
+    var bufferVramWaddr : u16;
+
+    // The number of bytes to transfer when uploading the buffer.
+    var bufferSizeInBytes : u16;
+
+    // Used to determine if the textbox has finished drawing.
+    // Points to the start of the bottom-half of the last line of text.
+    var bufferIndexAtEndOfText : u16;
+}
+
+
+in wram7e {
+    // The tilemap buffer.
+    var buffer : [u16 ; BUFFER_WIDTH * BUFFER_HEIGHT];
+
+    // The decoded string to print inside the textbox.
+    // This buffer is large enough for 10 lines of text.
+    // (no need to align the variable, it is read with a 16 bit index and written with an 8 bit index)
+    var decodedString : [u8 ; 256];
+
+    // Buffer for converting a u16 to a string.
+    // MUST BE > `MAX_UINT16_CHARS + 2`
+    var u16Buffer : [u8 ; 8];
+
+
+    // The values to print when the string decoder encounters a `PRINT_FIRST_U16` or `PRINT_SECOND_U16` token.
+    var firstU16parameter : u16;
+    var secondU16parameter : u16;
+}
+
+
+
+// Temporary variables used by this subsystem.
+//
+// NOTE: This subsystem is not allowed to call external functions that modify zpTmp variables.
+in zeropage {
+    // A far-pointer to the hold the string to decode.
+    // Used by `decode_string()`
+    var _string : far *const u8 in zpTmp_farPtr;
+
+    // The high byte of the tilemap word when printing characters.
+    // Used by `print_decoded_textbox()`
+    var _attrByte : u8 in zpTmp_byte_0;
+
+    // State variables by `print_decoded_textbox()` and `print_textbox_and_wait()`
+    var _lastOption : u8 in zpTmp_byte_1;
+    var _dpadMask_h : u8 in zpTmp_byte_2;
+
+    // Equal to the minimum number of digits to print - 1.
+    // Used by `decode_string()`
+    var _integerPadding : u8 in zpTmp_byte_3;
+
+    // The index (within buffer) at the end of the current line.
+    // Used by `print_decoded_textbox()`
+    var _endOfLineIndex : u16 in zpTmp_word_0;
+
+    // Used by `print_textbox_and_wait()`
+    var _confirmButton : u16 in zpTmp_word_1;
+}
+
+
+in code {
+
+
+// Setup the PPU, load tiles into VRAM, clear tilemap
+//
+// MUST be initialised before the UI subsystem as it overrides BG3 tilemap.
+//
+// REQUIRES: Force-Blank
+// Uses DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+func setup_ppu__forceblank() {
+
+    // Clear the first `Font.TILE_OFFSET` tiles
+    dma.clear_vram__forceblank(VRAM_BG3_TILES_WADDR, 8 * Font.TILE_OFFSET);
+
+
+    // Transfer UI tiles VRAM
+    resources.load_tiles_resource_into_vram(resources.tiles.text, VRAM_BG3_TILES_WADDR + 8 * Font.TILE_OFFSET);
+
+    // Clear BG3 tilemap (with order bit set high)
+    dma.set_tilemap__forceblank(VRAM_BG3_MAP_WADDR, 0x2000);
+
+
+    // Reset BG3 scroll
+    BG3HOFS = a = <:X_BG_OFFSET;
+    BG3HOFS = a = >:X_BG_OFFSET;
+    // Set Y scroll to -1;
+    BG3VOFS = a = <:(Y_BG_OFFSET - 1);
+    BG3VOFS = a = >:(Y_BG_OFFSET - 1);
+
+
+    // Do not transfer the buffer to VRAM on the next VBlank
+    nextVBlankAction = VBlankAction.NOTHING;
+
+    // There is no need to reset the other buffer size variables.
+    //
+    // `bufferIndexAtEndOfText` is checked at the start of `print_decoded_textbox()` to
+    // determine if `setup_textbox()` has been called.
+    bufferIndexAtEndOfText = xx = 0;
+
+    selectedMenuItem = 0;
+}
+
+
+
+// Transfer the textbox buffer to VRAM if required.
+//
+// REQUIRES: V-Blank
+// Uses DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func transfer_buffer__vblank() {
+    // MUST NOT modify zpTmp variables.
+
+    // assumes VBlankAction.ERASE_TEXTBOX == 0x80
+    a = nextVBlankAction as u8;
+    if !zero {
+        if negative {
+            // Erase textbox
+            yy = DMAP_TO_PPU | DMAP_FIXED | DMAP_TRANSFER_TWO | ((<:&VMDATA as u16) << 8);
+            xx = &empty_byte as u16;
+            a = #:far &empty_byte;
+        }
+        else {
+            // Copy textbox
+            yy = DMAP_TO_PPU | DMAP_TRANSFER_TWO | ((<:&VMDATA as u16) << 8);
+            xx = &buffer as u16;
+            a = #:far &buffer;
+        }
+        *(&DMAP0 as *u16) = yy; // also sets BBAD0
+
+        A1T0 = xx;
+        A1B0 = a;
+
+        DAS0 = xx = bufferSizeInBytes;
+
+        VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+        VMADD = xx = bufferVramWaddr;
+
+        MDMAEN = a = MDMAEN_DMA0;
+
+        nextVBlankAction = VBlankAction.NOTHING;
+    }
+}
+
+
+
+#[mem8, idx8]
+#[fallthrough]
+func setup_default_textbox() {
+    a = DEFAULT_HEIGHT;
+    y = DEFAULT_YPOS;
+
+// Fallthrough
+}
+
+// Setup the textbox height and location, draw the top and bottom borders of the textbox.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func setup_textbox(height : u8 in a, yPos : u8 in y) {
+    if a < MIN_TEXTBOX_HEIGHT {
+        a = MIN_TEXTBOX_HEIGHT;
+    }
+    else if a >= MAX_TEXTBOX_HEIGHT + 1 {
+        a = MAX_TEXTBOX_HEIGHT;
+    }
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        aa = aa & 0xff;
+        swap_bytes(aa); // << 8
+        aa >>>= 1;      // << 8 >> 1 == << 7
+
+        // aa = height * BUFFER_WIDTH
+        bufferIndexAtEndOfText = aa;
+        bufferSizeInBytes = aa = aa + BUFFER_WIDTH_BYTES * 2; // + top and bottom border rows
+
+        aa = yy & 31;
+        swap_bytes(aa); // << 8
+        aa >>>= 3;      // << 8 >> 2 == << 5
+        bufferVramWaddr = aa = aa | (VRAM_BG3_MAP_WADDR + TEXTBOX_BORDER_X);
+
+
+        // Copy the top row to `buffer`
+        // Parameter order is destination, source.
+        load_dec_repeat(#: far &buffer, yy = &buffer as u16,
+                        #: far &TopRow, xx = &TopRow as u16,
+                        aa = sizeof(typeof(TopRow)) - 1);
+        // DB = 0x7e
+
+        // Copy the bottom row to `buffer`.
+        // Parameter order is destination, source.
+        yy = aa = bufferSizeInBytes + (&buffer as u16 - BUFFER_WIDTH_BYTES);
+        load_dec_repeat(#: far &buffer, yy,
+                        #: far &BottomRow, xx = &BottomRow as u16,
+                        aa = sizeof(typeof(BottomRow)) - 1);
+        // DB = 0x7e
+    }
+    mem8_idx8();
+
+    // Do not transfer the buffer to VRAM until the textbox has been fully drawn.
+    nextVBlankAction = VBlankAction.NOTHING;
+}
+
+
+
+// Erase the textbox.
+//
+// NOTE: There MUST be a `WaitFrame` call before the next `setup_textbox()` or `print_textbox()` call.
+//
+// DB = 0x7e
+#[mem8, idx16]
+func erase_textbox() {
+    xx = bufferIndexAtEndOfText;
+    if !zero && xx < sizeof(typeof(buffer)) - BUFFER_WIDTH_BYTES * 2 + 1 { // (+1 `if xx >`)
+        // textbox exists.
+
+        a = VBlankAction.ERASE_TEXTBOX as u8;
+        nextVBlankAction = a as VBlankAction;
+    }
+}
+
+
+
+// Decode the string into `decodedString`
+//
+// DB = 0x7e
+#[mem8, idx16]
+func decode_string(bankbyte : u8 in a, addr : u16 in xx) : [u8; 256] in decodedString {
+    #:_string = a;
+    *(&_string as *u16) = xx;
+
+    // Using an 8 bit index to store the buffer
+    // There is no way a single textbox is over 256 bytes in size, this is safe.
+    mem8_idx8();
+    #[mem8, idx8] {
+        _integerPadding = 0;
+
+        x = y = 0;
+        while true {
+            // y = index into _string
+            // x = index into decodedString
+
+            a = _string[y];
+            break if zero;
+            y++;
+
+            if a < DecodeTokens._FIRST_CHAR {
+                decodedString[x] = a;
+                x++;
+                continue;
+            }
+
+            // Assumes PRINT_FIRST_U16 == 0xfe and PRINT_SECOND_U16 == 0xff
+            if a >= 0xfe {
+                // OK to use here, does not modify flags
+                push8(y);
+                    x = __decode_string__u16__inline(x, zero);
+                y = pop8();
+                continue;
+            }
+
+            if a < DecodeTokens.SET_U16_PADDING_5 + 1 {
+                // Assumes DecodeTokens.SET_U16_PADDING_1 == DecodeTokens._FIRST_CHAR
+                _integerPadding = a = a - DecodeTokens.SET_U16_PADDING_1;
+                continue;
+            }
+        }
+    }
+    idx16();
+
+    return decodedString;
+}
+
+
+
+// Convert one of the two u16 parameters into a string (with padding) and append it to `decodedString`.
+//
+// Uses: `_integerPadding` to determine the number of padding characters to print.
+//
+// Return: the new end of `decodedString`.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func __decode_string__u16__inline(decodedStringPos : u8 in x, isSecondParameter : bool in zero) : u8 in x {
+
+    // OK to use here, does not manipulate flags
+    push8(x);
+
+    mem16();
+    #[mem16] {
+        // Get the U16 value
+        // Assumes only 2 PRINT_*_U16 symbols
+        // Assumes comparison is done against the second u16 parameter
+        if !zero {
+            aa = firstU16parameter;
+        } else {
+            aa = secondU16parameter;
+        }
+
+        // Divisor
+        x = 10;
+
+        // Index into `u16Buffer`.
+        // The +1 inside the loop will set to 0 on the first pass of the loop.
+        y = -1 as u8;
+
+        // Set DP so we can access the division registers
+        push16(&WRDIV as u16 & 0xff00);
+        direct_page = pop16();
+        {
+        // DP = 0x4200
+        // MUST NOT USE zeropage variables
+            do {
+                *((&WRDIV as u16 & 0xff) as *u16) = aa;
+                *((&WRDIVB as u16 & 0xff) as *u8) = x;
+
+                // Must wait 16 cycles before reading result.
+
+                swap_bytes(aa);                            // 3
+                nop();                                     // 2
+                nop();                                     // 2
+
+                y++;                                       // 2
+                aa = '0' as u16;                           // 3
+                carry = false;                             // 2
+                // RDMPY contains the remainder
+                aa +#= *((&RDMPY as u16 & 0xff) as *u16);  // +2 instruction fetch
+
+                (&u16Buffer as *u16)[unaligned y] = aa;
+
+                aa = *((&RDDIV as u16 & 0xff) as *u16);
+            } while !zero;
+        }
+        direct_page = aa = 0;
+    // DP = 0
+    }
+    mem8();
+
+    x = pop8();
+
+    // Y = last value written to `u16Buffer` (number of chars in u16Buffer MINUS one)
+
+    if y < _integerPadding {
+        push8(y);
+        a = '0';
+        do {
+            decodedString[x] = a;
+            x++;
+            y++;
+        } while y < _integerPadding && y < MAX_UINT16_CHARS;
+        y = pop8();
+    }
+
+    do {
+        decodedString[x] = a = u16Buffer[y];
+        x++;
+        y--;
+    } while !negative;
+
+    return x;
+}
+
+
+
+// Decode and then print the textbox.
+//
+// DB = 0x7e
+#[mem8, idx16]
+#[fallthrough]
+func print_textbox(bankbyte : u8 in a, addr : u16 in xx) {
+    decodedString = decode_string(a, xx);
+
+// Fallthrough
+}
+
+
+// Print the textbox (while also drawing the left/right borders and BG tiles).
+//
+// Also sets `_lastOption` to the `selectedMenuItem` index of the last item.
+// May also modify `_dpadMask_h`.
+//
+// ASSUMES: `buffer` was zeroed out by the Reset Handler and the buffer is only modified by
+//          this function and `setup_textbox()`.
+//
+// WARNING: Spaghetti code
+//
+// DB = 0x7e
+#[mem8, idx16]
+func print_decoded_textbox(_decodedString : [u8 ; 256] in decodedString) {
+
+    // -----------------------
+    // WARNING: Spaghetti code
+    // -----------------------
+
+    // MUST NOT CALL any external functions
+
+    _attrByte = a = Font.MAIN_PALETTE << 2;
+
+    _lastOption = 0;
+
+
+    // Setup the buffer if required.
+    // (Ensures an invalid `bufferIndexAtEndOfText` will not overflow the buffer)
+    // (Also allows the caller of omit the `setup_textbox()` call)
+    xx = bufferIndexAtEndOfText;
+    if zero || xx >= sizeof(typeof(buffer)) - BUFFER_WIDTH_BYTES * 2 + 1 { // (+1 `if xx >`)
+        mem8_idx8();
+        #[mem8, idx8] {
+            setup_default_textbox();
+        }
+    }
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        _endOfLineIndex = xx = BUFFER_WIDTH_BYTES + 2 + TEXTBOX_WIDTH_BYTES; // +2 for the border tiles
+        xx = BUFFER_WIDTH_BYTES;
+
+        yy = 0;
+        // Loop until all textbox lines are completed
+        // (even if the string has ended)
+        ^while true {
+            // Draw the left border character
+            aa = Font.CharAttr.BORDER_LEFT;
+            buffer[unaligned xx] = aa;
+            (&buffer[BUFFER_WIDTH])[unaligned xx] = aa;
+            xx++;
+            xx++;
+
+            mem8();
+            #[mem8] {
+                // Print one line
+                do {
+                    // xx = index into buffer
+                    // yy = index into decodedString
+
+                    a = decodedString[yy];
+                    goto NewLine if zero;   // Fill the line with padding tiles if the string is ended.
+
+                    yy++;
+
+                    if a < Font.FIRST_PRINTABLE_ASCII_CHAR {
+                        goto NewLine if a == SpecialChars.NEW_LINE;
+
+                        if a == SpecialChars.MAIN_PALETTE {
+                            _attrByte = a = Font.MAIN_PALETTE << 2;
+                            continue;
+                        }
+                        else if a == SpecialChars.ALT_PALETTE {
+                            _attrByte = a = Font.ALT_PALETTE << 2;
+                            continue;
+                        }
+                        else if a == SpecialChars.LEFT_RIGHT_SELECTION {
+                            __set_left_right_selection__inline();
+                            continue;
+                        }
+                        // ASSUMES all codes < `SpecialChars.MENU_CURSOR_0 have` already been processed
+                        else if a < SpecialChars._LAST_MENU_CURSOR {
+                            a -= SpecialChars.MENU_CURSOR_0;
+
+                            if a >= _lastOption {
+                                _lastOption = a;
+                            }
+
+                            if a == selectedMenuItem {
+                                a = Font.RIGHT_ARROW_TILE;
+                            }
+                            else {
+                                a = Font.SPACE_TILE;
+                            }
+                            // no continue - print this character
+                        }
+                        else {
+                            // Invalid control code
+                            continue;
+                        }
+                    }
+                    else {
+                        // ::TODO remove ASCII translation, build my own character encoding::
+                        a = a - Font.ASCII_OFFSET;
+                    }
+
+                    // A = tile to print.
+
+                    (&<:buffer[0])[unaligned xx] = a;
+                    (&<:buffer[BUFFER_WIDTH])[unaligned xx] = a = a + Font.BOTTOM_TILE_OFFSET;
+
+                    a = _attrByte;
+                    (&>:buffer[0])[unaligned xx] = a;
+                    (&>:buffer[BUFFER_WIDTH])[unaligned xx] = a;
+
+                    xx++;
+                    xx++;
+                } while xx < _endOfLineIndex;
+            }
+            mem16();
+            // The line is over, do not draw padding.
+            goto DrawRightBorder;
+
+
+        // .A8
+        NewLine:
+            // The line is incomplete, fill the rest of the line with padding tiles.
+            mem16();
+
+            aa = Font.CharAttr.PADDING;
+            do {
+                (&buffer[0])[unaligned xx] = aa;
+                (&buffer[BUFFER_WIDTH])[unaligned xx] = aa;
+                xx++;
+                xx++;
+            } while xx < _endOfLineIndex;
+
+
+        DrawRightBorder:
+            xx = _endOfLineIndex;
+            aa = Font.CharAttr.BORDER_RIGHT;
+            buffer[unaligned xx] = aa;
+            (&buffer[BUFFER_WIDTH])[unaligned xx] = aa;
+
+            aa = xx + BUFFER_WIDTH_BYTES * 2;
+            break if aa >= bufferIndexAtEndOfText;
+
+            _endOfLineIndex = aa;
+            xx = aa = aa - TEXTBOX_WIDTH_BYTES - 2;
+        }
+    }
+    mem8();
+
+    a = VBlankAction.COPY_TEXTBOX as u8;
+    nextVBlankAction = a as VBlankAction;
+}
+
+
+#[mem8, idx16]
+inline func __set_up_down_selection__inline() {
+    _dpadMask_h = a = JOYH_UP | JOYH_DOWN;
+}
+
+#[mem8, idx16]
+inline func __set_left_right_selection__inline() {
+    _dpadMask_h = a = JOYH_LEFT | JOYH_RIGHT;
+}
+
+
+
+// Print a textbox and wait for the player to press start.
+// If the text has a menu, allow player to select options with the d-pad.
+//
+// Returns: `selectedMenuItem`.
+//
+// DB = 0x7e
+#[mem8, idx16]
+func print_textbox_and_wait__start(bankbyte : u8 in a, addr : u16 in xx) : u8 in a {
+    return print_textbox_and_wait(a, xx, JOY_START);
+}
+
+
+
+// Print a textbox and wait for the player to press A.
+// If the text has a menu, allow player to select options with the d-pad.
+//
+// Returns: `selectedMenuItem`.
+//
+// DB = 0x7e
+#[mem8, idx16]
+func print_textbox_and_wait__a(bankbyte : u8 in a, addr : u16 in xx) : u8 in a {
+    return print_textbox_and_wait(a, xx, JOY_A);
+}
+
+
+
+// Print a textbox and wait for the player to press a `confirmButton`.
+// If the text has a menu, allow player to select options with the d-pad.
+//
+// Returns: `selectedMenuItem`.
+//
+// DB = 0x7e
+#[mem8, idx16]
+func print_textbox_and_wait(bankbyte : u8 in a, addr : u16 in xx, confirmButton : u16 in yy) : u8 in a {
+
+    // MUST NOT CALL any external functions that modify zpTmp variables
+
+    _confirmButton = yy;
+
+    decodedString = decode_string(a, xx);
+
+    __set_up_down_selection__inline();
+    selectedMenuItem = 0;
+
+    while true {
+        print_decoded_textbox(decodedString);
+
+        a = engine_hooks.joypad_pressed_l;
+        break if a & <:_confirmButton != 0;
+
+        a = engine_hooks.joypad_pressed_h;
+        break if a & >:_confirmButton != 0;
+
+        a = _lastOption;
+        if !zero {
+            a = engine_hooks.joypad_pressed_h;
+            if a & _dpadMask_h != 0 {
+                if a & (JOYH_UP | JOYH_LEFT) != 0 {
+                    a = selectedMenuItem;
+                    a--;
+                    if negative {
+                        a = _lastOption;
+                    }
+                }
+                else {
+                    a = selectedMenuItem;
+                    if a >= _lastOption {
+                        a = -1 as u8;
+                    }
+                    a++;
+                }
+                selectedMenuItem = a;
+
+                // Safe - does not modify zpTmp variables.
+                audio.queue_sound_effect(sound_effects.menu_cursor);
+            }
+        }
+
+        wait_frame();
+    }
+
+    return selectedMenuItem;
+}
+
+}
+
+
+in rodata0 {
+    const TopRow : [ u16 ; BUFFER_WIDTH] =
+        [ Font.CharAttr.BORDER_TOP_LEFT ; 1 ]
+        ~ [ Font.CharAttr.BORDER_TOP ; TEXTBOX_WIDTH ]
+        ~ [ Font.CharAttr.BORDER_TOP_RIGHT ; 1 ]
+        ~ [ 0 ; BUFFER_WIDTH - TEXTBOX_WIDTH - 2 ];
+
+    const BottomRow : [ u16 ; BUFFER_WIDTH ] =
+        [ Font.CharAttr.BORDER_BOTTOM_LEFT ; 1 ]
+        ~ [ Font.CharAttr.BORDER_BOTTOM ; TEXTBOX_WIDTH ]
+        ~ [ Font.CharAttr.BORDER_BOTTOM_RIGHT ; 1 ]
+        ~ [ 0 ; BUFFER_WIDTH - TEXTBOX_WIDTH - 2 ];
+}
+
+}
+

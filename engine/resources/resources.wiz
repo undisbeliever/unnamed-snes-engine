@@ -1,0 +1,360 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "../registers";
+
+import "dma";
+import "../game/room";
+
+import "gen/enums";
+
+
+
+namespace resources {
+
+// order MUST match `ResourceType` in `tools/_common.py`
+enum ResourceType : u8 {
+  mt_tileset,
+  ms_spritesheet,
+  tiles,
+  bg_image,
+  songs,
+};
+
+
+struct ResourceEntry {
+    // ::TODO indicate compressed data::
+
+    farPtr  : far *u8,
+    size    : u16,
+};
+
+
+// Hack to provide access into `resourceEntries` fields by `unaligned xx` addressing.
+//
+// ASSUMES `radata0` is in bank 0xc1.
+namespace _RE {
+    let addr        = 0xc10000 as far *u16;
+    let addrBank    = 0xc10002 as far *u8;
+    let size        = 0xc10003 as far *u16;
+};
+
+
+in rodata0 {
+    let N_RESOURCE_TYPES = resources.n_resources_per_type.len;
+
+    // Number of resources for each resource resource type.
+    // (byte ROM table)
+    const __NResourcesPerTypeTable : [ u8 ] = [ i for let i in resources.n_resources_per_type ];
+    let NResourcesPerTypeTable = far &__NResourcesPerTypeTable as far *u8;
+
+    // resource entry = ResourceEntryTable[type][resourceId]
+    const __ResourceEntryTable : [ *const u8 ] = [
+        @[ 0u8 ; sizeof(ResourceEntry) * i ] for let i in resources.n_resources_per_type
+    ];
+    let ResourceEntryTable = far &__ResourceEntryTable as far * const *ResourceEntry;
+
+
+    let INVALID_ROOM_ADDR = 0xffff;
+
+    // Table of room addresses.
+    //
+    // If a room address is `INVALID_ROOM_ADDR` the room does not exist.
+    //
+    // (256 word address, pointing to RoomData)
+    const __RoomsTable : [ *const RoomData ; 0x100 ] = [ INVALID_ROOM_ADDR as *const RoomData ; 0x100 ];
+    let RoomsTable = far &__RoomsTable as far * const * RoomData;
+
+
+    // This value is set to 0 by `insert_resources.py`
+    const UseResourcesOverUsb2Snes : u8 = 0xff;
+}
+
+
+in zeropage {
+    var res : ResourceEntry;
+}
+
+
+
+in code {
+
+
+// Load a MetaTile tileset resource.
+//
+// DB unknown
+#[mem8, idx16]
+func load_mt_tileset(resourceId : u8 in a) : ResourceEntry in res {
+    return __load_resource(ResourceType.mt_tileset as u16, a);
+}
+
+
+
+// Load a MetaSprite spritesheet resource.
+//
+// DB unknown
+#[mem8, idx16]
+func load_ms_spritesheet(resourceId : u8 in a) : ResourceEntry in res {
+    return __load_resource(ResourceType.ms_spritesheet as u16, a);
+}
+
+
+
+// Load a tiles resource.
+//
+// DB unknown
+#[mem8, idx16]
+func load_tiles_resource(resourceId : u8 in a) : ResourceEntry in res {
+    return __load_resource(ResourceType.tiles as u16, a);
+}
+
+
+
+// Load a song resource.
+//
+// NOTE: Resource ID 0 contains the common audio data and not song data.
+//
+// DB unknown
+#[mem8, idx16]
+func load_songs_resource(resourceId : resources.songs in a) : ResourceEntry in res {
+    return __load_resource(ResourceType.songs as u16, a);
+}
+
+
+
+// Load a resource
+//
+// ASSUMES: type is always valid
+//
+// DB unknown
+#[mem8, idx16]
+func __load_resource(type : u16 in xx, resourceId : u8 in a) : ResourceEntry in res {
+
+    // This function MUST ONLY use zeropage variables
+
+    if a >= NResourcesPerTypeTable[xx] {
+        a = 0;
+    }
+
+    // Save resourceId in `yy`, UseResourcesOverUsb2Snes test clobbers `a` (no `bit long` instructions).
+    #[idx8] {
+        y = a;
+    }
+    a = *far &UseResourcesOverUsb2Snes;
+    if !zero {
+        ^return resources_over_usb2snes.load_resource(xx, yy);
+    }
+
+    // Clear high bytes of the index registers
+    idx8();
+
+    mem16_idx16();
+    #[mem16] {
+        // No need to mask high byte of `xx`, it is always 0
+        xx = aa = xx << 1;
+
+        // Multiply yy by 5
+        // No need to mask high byte of `yy`, it is always 0
+        // Reuse res.size as temporary variable, ensure all zeropage variables are unused
+        // +# is safe: carry always clear
+        res.size = aa = yy;
+        aa = (aa << 2) +# res.size;
+
+        xx = aa = aa + ResourceEntryTable[unaligned xx] as u16;
+
+        // X = address of ResourceEntry
+
+        res.size = aa = _RE.size[unaligned xx];
+
+        *(&res.farPtr as *u16) = aa = _RE.addr[unaligned xx];
+
+        aa = (_RE.addrBank as far *u16)[unaligned xx];
+    }
+    mem8();
+
+    #:res.farPtr = a;
+
+    return res;
+}
+
+
+
+// Load a room into memory
+//
+// DB = 0x7e
+#[mem8, idx8]
+func load_room(roomId : u8 in a) : bool in carry {
+
+    // Save roomId in `y`, UseResourcesOverUsb2Snes test clobbers `a` (no `bit long` instructions).
+    y = a;
+
+    a = *far &UseResourcesOverUsb2Snes;
+    if !zero {
+        ^return resources_over_usb2snes.load_room(y);
+    }
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        // No need to mask high byte of `yy`, it is always 0
+        xx = aa = yy << 1;
+
+        aa = RoomsTable[unaligned xx] as u16;
+        if aa == INVALID_ROOM_ADDR {
+            mem8_idx8();
+            return false;
+        }
+
+        *(&res.farPtr as *u16) = aa;
+    }
+    mem8();
+
+    #[idx16] {
+        #:res.farPtr = a = ROOM_DATA_BANK;
+
+        // Copy room into memory.
+        yy = sizeof(typeof(room)) - 1;
+        do {
+            (&room as *u8)[yy] = a = res.farPtr[yy];
+            yy--;
+        } while !negative;
+    }
+    mem8_idx8();
+
+    return true;
+}
+
+
+
+// Load a tiles resource into VRAM.
+//
+// REQUIRES: Force-Blank
+// Uses DMA Channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+func load_tiles_resource_into_vram(resourceId : resources.tiles in a, vramWordAddr : u16 in xx) {
+
+    VMADD = xx;
+
+    res = __load_resource(ResourceType.tiles as u16, a);
+
+    ^return dma.transfer_to_vram__forceblank(#:res.farPtr, *(&res.farPtr as *u16), res.size);
+}
+
+
+let load_tiles_resource_into_vram_a = load_tiles_resource_into_vram as func(u8 in a, u16 in xx);
+
+
+
+// Load a bg_image resource into VRAM.
+//
+// REQUIRES: Force-Blank
+// Uses DMA Channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+func load_bg_image_resource_into_vram(resourceId : resources.bg_images in a, vramTilemapWaddr : u16 in xx, vramTilesWaddr : u16 in yy) {
+var _vramTilesWaddr : u16 in zpTmp_word_0;
+var _tileMapByteSize   : u16 in zpTmp_word_1;
+
+    // BG Image Data format:
+    //  * Single byte header: %pppptt00
+    //      pppp = palette size (number of 16 colour palettes)
+    //      tt   = tilemap size (number of 32x32 nametables)
+    //
+    //  * paletteData
+    //  * tilemapData
+    //  * tileData
+
+
+    // ::TODO Add palette resource type, remove palette from BgImage::
+    // ::TODO Lookup VRAM word addresses from a table in memory::
+
+    VMADD = xx;
+    _vramTilesWaddr = yy;
+
+    res = __load_resource(ResourceType.bg_image as u16, a);
+
+    dma.set_dma0_source__res_plus_offset(res, 1);
+
+    mem16();
+    #[mem16] {
+        // Calculate tilemap size
+        aa = (**(&res.farPtr as *far *u16) & 0b00001100);
+        swap_bytes(aa); // left shift by 8
+        aa <<<= (11 - 8 - 2);
+        if zero {
+            // Don't override all of VRAM with a 64 KiB VRAM write
+            aa = 0x800;
+        }
+        _tileMapByteSize = aa;
+
+        // Calculate palette byte size
+        yy = aa = (**(&res.farPtr as *far *u16) & 0xf0) <<< 1;
+    }
+    mem8();
+
+    // Transfer palette to CGRAM
+    CGADD = 0;
+    dma.continue_transfer_to_cgram__forceblank(yy);
+
+    // Transfer tilemap to VRAM
+    // VRAM address set at the top of this function
+    dma.continue_transfer_to_vram__forceblank(_tileMapByteSize);
+
+    // Transfer tiles to VRAM
+    VMADD = xx = _vramTilesWaddr;
+    dma.transfer_remaining_res_data_to_vram__forceblank(res);
+}
+
+
+let load_bg_image_resource_into_vram_a = load_bg_image_resource_into_vram as func(u8 in a, u16 in xx, u16 in yy);
+
+
+
+
+// Transfer the first `size` bytes of resource data into Work-RAM bank 0x7e.
+//
+// ASSUMES: resource size > size
+// Uses DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+func transfer_resource_header_to_wram7e(_resourceData : ResourceEntry in res, ptr : u16 in xx, size : u16 in yy)
+{
+    // Assumes res.farPtr is not Work-RAM.
+    // ::TODO slow path if `res.farPtr` bank is a Work-RAM address::
+
+    WMADDML = xx;
+    WMADDH = a = 0x7e;
+
+    // DMA size
+    DAS0 = yy;
+
+    // DMA A-Bus address
+    A1T0 = xx = *(&res.farPtr as *u16);
+    A1B0 = a = #:res.farPtr;
+
+    dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_ONE, <:&WMDATA);
+
+    MDMAEN = a = MDMAEN_DMA0;
+}
+
+}
+
+
+
+// Rooms
+// =====
+
+namespace rooms {
+    let STARTING_ROOM = _STARTING_ROOM;
+}
+
+}
+
+
+
+import "resources-over-usb2snes";
+

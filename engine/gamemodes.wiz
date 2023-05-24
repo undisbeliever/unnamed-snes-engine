@@ -1,0 +1,116 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "registers";
+
+import "gen/enums";
+import "gen/function-tables";
+
+
+in lowram {
+    // The next game mode to execute.
+    // NOTE: This value is negative if the game mode is unchanged.
+    var __nextGameMode : GameModes;
+
+    // The room transition to execute when the game mode changes to ROOM_TRANSITION.
+    var __nextRoomTransition : RoomTransitions;
+}
+
+
+
+in code {
+
+
+// Set the next game mode
+//
+// DB access lowram
+#[mem8]
+inline func set_next_game_mode(nextGameMode : GameModes in a) {
+    __nextGameMode = a as GameModes;
+}
+
+
+
+// Returns true if the game mode is unchanged
+//
+// DB access lowram
+#[mem8]
+inline func is_next_game_mode_unchanged() : bool in negative {
+    // ASSUMES: N_GAME_MODES <= 128;
+    bit(__nextGameMode);
+    return negative;
+}
+
+
+
+// Switch to the room transition game mode.
+//
+// DB access lowram
+#[mem8]
+func set_next_game_mode_to_room_transition(type : RoomTransitions in a) {
+    __nextRoomTransition = a as RoomTransitions;
+
+    a = GameModes.ROOM_TRANSITION as u8;
+    __nextGameMode = a as GameModes;
+}
+
+
+
+// Get the next room transition
+//
+// DB access lowram
+#[idx8]
+inline func get_next_room_transition() : RoomTransitions in x {
+    return __nextRoomTransition;
+}
+
+
+
+// Execute the next game mode.
+//
+// NOTE: This function will reset the DB, DP and stack pointer on every game mode change
+#[mem8, fallthrough]
+inline func execute_game_mode__inline() {
+    while true {
+        mem8_idx8();
+        #[mem8, idx8] {
+            if a >= gamemodes.N_GAME_MODES {
+                // Invalid game mode, maybe it set to 0xff and was not changed in the previous exec call.
+                irqcall(0);   // Break
+            }
+            x = a = a << 1;
+        }
+
+        // MUST NOT change X
+
+        // Reset registers
+        mem16();
+        #[mem16] {
+            ss = aa = STACK_TOP;
+            direct_page = aa = 0;
+        }
+        mem8();
+
+        push8(a = 0x7e);
+        data_bank = pop8();
+    // DB = 0x7e
+
+        // Enable VBlank interrupts and auto-joypad
+        *(far& NMITIMEN) = a = NMITIMEN_V_BLANK | NMITIMEN_AUTO_JOY;
+
+        // Make __nextGameMode invalid
+        // (Requires the `exec()` function to call set_next_game_mode)
+        a = 0xff;
+        __nextGameMode = a as GameModes;
+
+
+        gamemodes.exec_function_table[unaligned x]();
+
+        a = __nextGameMode as u8;
+    }
+}
+
+
+}
+

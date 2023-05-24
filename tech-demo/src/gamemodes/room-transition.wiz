@@ -1,0 +1,53 @@
+// Copyright (c) 2023, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "engine/gamemodes";
+import "engine/game/room-transitions";
+
+import "gen/enums";
+import "gen/function-tables";
+
+
+namespace gamemodes {
+namespace room_transition {
+
+in code {
+
+// Load the next room, then switch to the gameloop gamemode.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func exec() {
+    x = get_next_room_transition();
+    return gamemodes.room_transition.RoomTransitionsTable[unaligned x]();
+}
+
+
+// Fadeout the screen, initialise the player and gameloop, and start the game.
+//
+// MUST BE used when the gamestate is loaded/reset, before any other room transitions occur.
+//
+// Assumes the current room/position is valid.  Will softlock if invalid.
+let fadein_reset_player = room_transitions.fadein_reset_player;
+
+
+// Fadeout the screen, load a room, fadein the screen and start the gameloop.
+// `currentRoom` contains room to load.
+// To be used if the screen is blank.
+let fadein              = room_transitions.load_room__fadein;
+
+
+// Scroll transition to next room.
+// Will do a fadeout room transition if the room graphics are different to the current room.
+let scroll_up           = room_transitions.scroll_up;
+let scroll_down         = room_transitions.scroll_down;
+let scroll_left         = room_transitions.scroll_left;
+let scroll_right        = room_transitions.scroll_right;
+
+}
+
+}
+}
+

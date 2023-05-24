@@ -1,0 +1,236 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "../registers";
+
+import "resources";
+import "../common/reset"; // for `empty_byte`
+
+
+namespace dma {
+
+
+in code {
+
+
+// Sets DMAP0 and BBAD0 registers with a 16-bit Y register.
+//
+// Uses DMA channel 0
+// DB = 0x80
+#[idx16]
+inline func set_dmap0_and_bbad0__yy(let dmap : u8, let bbad : u8) {
+    *(&DMAP0 as *u16) = yy = (dmap as u16) | ((bbad as u16) << 8);
+}
+
+
+// Fill a block of VRAM with zeros.
+//
+// Uses DMA channel 0
+// REQUIRES: Force-Blank
+// DB = 0x80
+#[mem8, idx16]
+func clear_vram__forceblank(vramWaddr : u16 in xx, byteCount : u16 in yy) {
+    HDMAEN = 0;
+
+    VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+
+    VMADD = xx;
+
+    // DMA size
+    DAS0 = yy;
+
+    // Ensure we are in force blank;
+    INIDISP = a = INIDISP_FORCE_BLANK | INIDISP_BRIGHTNESS_MASK;
+
+    set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_FIXED | DMAP_TRANSFER_TWO, <:&VMDATA);
+
+    A1T0 = xx = &empty_byte as u16;
+    A1B0 = a = #:far &empty_byte;
+
+    MDMAEN = a = MDMAEN_DMA0;
+}
+
+
+
+// Replace all words in a 32x32 tilemap with a given value.
+//
+// Uses DMA channel 0
+// REQUIRES: Force-Blank
+// DB = 0x80
+#[mem8, idx16]
+func set_tilemap__forceblank(vramWaddr : u16 in xx, tilemapEntry : u16 in yy) {
+
+var _tmp : u16 in zpTmp_word_0;
+
+    // MUST not modify xx
+
+    _tmp = yy;
+
+
+    HDMAEN = 0;
+
+    // Ensure we are in force blank;
+    INIDISP = a = INIDISP_FORCE_BLANK | INIDISP_BRIGHTNESS_MASK;
+
+    set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_FIXED | DMAP_TRANSFER_ONE, <:&VMDATAL);
+    A1B0 = #:far &_tmp;
+    A1T0 = yy = &_tmp as u16;
+
+    // Transfer low byte
+    VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_LOW;
+    VMADD = xx;
+
+    DAS0 = yy = 32 * 32;
+
+    MDMAEN = a = MDMAEN_DMA0;
+
+    // MUST not modify yy
+
+
+    // Transfer high byte
+    VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+    VMADD = xx;
+
+    // Switch to high byte
+    // (DMA registers are read/write)
+    (*(&A1T0L as *u8))++;
+    (*(&BBAD0 as *u8))++;
+
+    DAS0 = yy;
+
+    MDMAEN = a = MDMAEN_DMA0;
+}
+
+
+
+// Set the DMA channel 0 source address
+// Uses DMA channel 0
+// REQUIRES: Force-Blank
+// DB = 0x80
+#[mem8, idx16]
+func set_dma0_source__res_plus_offset(res : resources.ResourceEntry in resources.res, offset : u16 in yy) {
+    mem16();
+    #[mem16] {
+        A1T0 = aa = yy + *(&res.farPtr as *u16);
+    }
+    mem8();
+    A1B0 = a = #:res.farPtr;
+}
+
+
+
+// Transfer data to VRAM
+// Uses DMA channel 0
+// REQUIRES: Force-Blank
+// DB = 0x80
+#[mem8, idx16, fallthrough]
+func transfer_to_vram__forceblank(data_bank : u8 in a, data_addr : u16 in xx, size : u16 in yy) {
+
+    // Set DMA A-Bus address
+    A1B0 = a;
+    A1T0 = xx;
+
+// fallthrough
+}
+
+
+
+// Transfer data to VRAM without changing the DMA channel 0 source address.
+//
+// Uses DMA channel 0
+//
+// ASSUMES: DMA channel 0 A-Bus address is set
+// REQUIRES: Force-Blank
+// DB = 0x80
+#[mem8, idx16]
+func continue_transfer_to_vram__forceblank(size : u16 in yy) {
+
+    HDMAEN = 0;
+
+    // DMA size
+    DAS0 = yy;
+
+    // Ensure we are in force blank;
+    INIDISP = a = INIDISP_FORCE_BLANK | INIDISP_BRIGHTNESS_MASK;
+
+    VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+
+    set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_TWO, <:&VMDATA);
+
+    MDMAEN = a = MDMAEN_DMA0;
+}
+
+
+
+// Transfer the remaining resource data from `res` to VRAM.
+//
+// Uses DMA channel 0
+//
+// ASSUMES: DMA channel 0 A-Bus address is somewhere inside `res`
+//
+// REQUIRES: Force-Blank
+// DB = 0x80
+#[mem8, idx16]
+func transfer_remaining_res_data_to_vram__forceblank(res : resources.ResourceEntry in resources.res) {
+    mem16();
+    #[mem16 ] {
+        // Calculate number of bytes remaining in resource data
+        yy = aa = *(&res.farPtr as *u16) + res.size - (A1T0 as u16);
+    }
+    mem8();
+
+    // Only preform the transfer if the subtraction did not underflow.
+    if carry {
+        continue_transfer_to_vram__forceblank(yy);
+    }
+
+}
+
+
+
+// Transfer data to CGRAM
+// Uses DMA channel 0
+// REQUIRES: Force-Blank
+// DB = 0x80
+#[mem8, idx16, fallthrough]
+func transfer_to_cgram__forceblank(data_bank : u8 in a, data_addr : u16 in xx, size : u16 in yy) {
+
+    // Set DMA A-Bus address
+    A1B0 = a;
+    A1T0 = xx;
+
+// fallthrough
+}
+
+
+
+// Transfer data to CGRAM without changing the DMA channel 0 source address.
+//
+// Uses DMA channel 0
+//
+// ASSUMES: DMA channel 0 A-Bus address is set
+// REQUIRES: Force-Blank
+// DB = 0x80
+#[mem8, idx16]
+func continue_transfer_to_cgram__forceblank(size : u16 in yy) {
+
+    HDMAEN = 0;
+
+    // DMA size
+    DAS0 = yy;
+
+    // Ensure we are in force blank;
+    INIDISP = a = INIDISP_FORCE_BLANK | INIDISP_BRIGHTNESS_MASK;
+
+    set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_ONE, <:&CGDATA);
+
+    MDMAEN = a = MDMAEN_DMA0;
+}
+
+
+}
+
+}
+
+
