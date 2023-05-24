@@ -1,0 +1,142 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "engine/entity_api";
+import "engine/gamemodes";
+import "engine/wait-frame";
+import "engine/game/room";
+import "engine/game/gamestate";
+import "engine/game/metatiles";
+import "engine/game/metasprites";
+import "engine/game/room-transitions";
+import "engine/game/entityloop";
+
+import "engine/room-events-api";
+
+import "../entities/player-bomb";
+import "../player";
+import "../ui";
+
+// ::TODO find a better place to call `rou2s_commands.process_commands()`::
+import "engine/resources/rou2s-commands";
+
+import "gen/enums";
+
+
+namespace gamemodes {
+namespace game_loop {
+
+
+in code {
+
+
+// Process the game loop
+//
+// ASSUMES: PPU setup and screen enabled
+//
+// DB = 0x7e
+#[mem8, idx8]
+func exec {
+
+    ^do {
+        entities.player_bomb.prepare_explosion_variables__inline();
+
+        room_events.process__inline();
+
+        // Always process player entity first
+        entities.currentEntityId = PLAYER_ENTITY_ID;
+        player.process();
+        metasprites.process_entity_animation(PLAYER_ENTITY_ID);
+
+        idx16();
+        #[mem8, idx16] {
+            player.update_collision_boxes__inline();
+        }
+        mem8_idx8();
+
+
+        entityloop.process_active_entities();
+
+        entityloop.sort_active_entities();
+        entityloop.draw_entities();
+
+
+        ui.process();
+
+
+        _check_for_room_transition();
+
+
+        a = ui.healthBarValue;
+        if zero {
+            set_next_game_mode(GameModes.GAME_OVER);
+            break;
+        }
+
+        // ::TODO find a better spot to put this::
+        // Cannot put it in `wait_frame()`, it might use `zpTmp` variables
+        rou2s_commands.process_commands();
+
+        wait_frame();
+
+
+        // loop until gameMode changes
+
+        negative = is_next_game_mode_unchanged();
+    } while negative;
+}
+
+
+
+// Check for a room transition and preform them as required.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _check_for_room_transition() {
+
+    a = player.yPos.px;
+    if zero {
+        // Check if there is a room above this one
+        a = gamestate.data.currentRoom - 0x10;
+        if carry {
+            set_next_game_mode_to_room_transition(RoomTransitions.scroll_up);
+        }
+
+        // Do not check x axis after loading next room
+        return;
+    }
+    else if a >= DISPLAY_HEIGHT - 1 {
+        // Check if there is a room below this one
+        a = gamestate.data.currentRoom + 0x10;
+        if !carry {
+            set_next_game_mode_to_room_transition(RoomTransitions.scroll_down);
+        }
+
+        // Do not check x axis after loading next room
+        return;
+    }
+
+    a = player.xPos.px;
+    if zero {
+        // Check if there is a room to the left of this one
+        a = gamestate.data.currentRoom & 0x0f;
+        if !zero {
+            set_next_game_mode_to_room_transition(RoomTransitions.scroll_left);
+        }
+    }
+    else if a >= DISPLAY_WIDTH - 1 {
+        // Check if there is a room to the right of this one
+        a = gamestate.data.currentRoom & 0x0f;
+        if a != 0x0f {
+            set_next_game_mode_to_room_transition(RoomTransitions.scroll_right);
+        }
+    }
+}
+
+}
+
+}
+}
+

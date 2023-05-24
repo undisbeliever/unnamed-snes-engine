@@ -1,0 +1,238 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "engine/room-events-api";
+import "_common";
+import "../player";
+
+import "gen/enums";
+import "gen/room-events";
+
+
+namespace room_events {
+namespace monster_doors {
+
+let MAX_N_DOORS = 4;
+
+
+// Delay to wait before locking the door if the player entered the room outside of a doorway.
+// (time in frames)
+let WAIT_A_BIT_FRAMES = 20;
+
+
+// Delay between spawning the first smoke particle and spawning the first enemy.
+// (time in frames)
+let DELAY_UNTIL_SPAWNING_ENEMIES = 14;
+
+
+enum State : u8 {
+    WAIT_FOR_PLAYER_TO_LEAVE_DOORWAY =  0,
+    WAIT_A_BIT                       =  2,
+    LOCK_DOORS                       =  4,
+    SPAWN_SMOKE                      =  6,
+    SPAWN_ENEMIES                    =  8,
+    WAIT_UNTIL_ENEMIES_DEFEATED      = 10,
+    UNLOCK_DOORS                     = 12,
+};
+
+
+in wram7e_roomstate {
+    var parameter__doorLocations @ &parameter__door0 : [u8 ; MAX_N_DOORS];
+
+
+    var state : State in <:var_0;
+
+    var counter : u8 in <:var_1;
+}
+
+
+in code {
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func init() {
+    a = player.state;
+    if a == player.State.WALK_THROUGH_DOORWAY as u8 {
+        a = State.WAIT_FOR_PLAYER_TO_LEAVE_DOORWAY as u8;
+    } else {
+        // ::BUGTESTING remember to test the "can enter a monster_door room outside a doorway" feature::
+        a = State.WAIT_A_BIT as u8;
+    }
+    state = a as State;
+
+    counter = 0;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process() {
+    x = state as u8;
+    return process_state_functions[unaligned x]();
+}
+
+const process_state_functions = [
+    process__wait_for_player_to_leave_doorway,
+    process__wait_a_bit,
+    process__lock_doors,
+    process__spawn_smoke,
+    process__spawn_enemies,
+    process__wait_until_enemies_defeated,
+    process__unlock_doors,
+];
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__wait_for_player_to_leave_doorway() {
+    a = player.state;
+    if a != player.State.WALK_THROUGH_DOORWAY as u8
+        && a != player.State.ATTACKING_IN_DOORWAY as u8 {
+
+        set_state__lock_doors();
+    }
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__wait_a_bit() {
+    x = counter;
+    counter++;
+
+    if x >= WAIT_A_BIT_FRAMES {
+        set_state__lock_doors();
+    }
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_state__lock_doors() {
+    queue_sound_effect(sound_effects.door_slam);
+
+    x = State.LOCK_DOORS as u8;
+    state = x as State;
+
+    counter = 0;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__lock_doors() {
+    x = counter;
+    if x < MAX_N_DOORS {
+        y = parameter__doorLocations[x];
+        if !zero {
+            // door exists
+            carry = lock_door(y);
+            if carry {
+                // door successfully locked.
+                // Lock the next door on the next frame
+                counter++;
+            }
+
+            // continue locking doors on the next frame
+            return;
+        }
+    }
+
+    // No more doors to unlock, start spawning smoke
+
+    queue_sound_effect(sound_effects.spawn_enemy_with_smoke);
+
+    x = State.SPAWN_SMOKE as u8;
+    state = x as State;
+    counter = 0;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__spawn_smoke() {
+    x = counter;
+    counter++;
+
+    if x < N_ENTITIES_IN_ROOM_DATA {
+        ^return spawn_small_smoke_at_room_enemy_position(x);
+    }
+
+    // No more smoke to spawn, wait until counter == `DELAY_UNTIL_SPAWNING_ENEMIES` before spawning enemies
+    if x >= DELAY_UNTIL_SPAWNING_ENEMIES {
+        x = State.SPAWN_ENEMIES as u8;
+        state = x as State;
+        counter = 0;
+    }
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__spawn_enemies() {
+    x = counter;
+    if x < N_ENTITIES_IN_ROOM_DATA {
+        counter++;
+        ^return spawn_room_entity(x);
+    }
+
+    // No more smoke to spawn, start spawning enemies
+    x = State.WAIT_UNTIL_ENEMIES_DEFEATED as u8;
+    state = x as State;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__wait_until_enemies_defeated() {
+    zero = is_all_enemies_defeated();
+    if zero {
+        // No more smoke to spawn, start spawning enemies
+
+        queue_sound_effect(sound_effects.door_open);
+
+        x = State.UNLOCK_DOORS as u8;
+        state = x as State;
+        counter = 0;
+    }
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__unlock_doors() {
+    x = counter;
+    if x < MAX_N_DOORS {
+        y = parameter__doorLocations[x];
+        if !zero {
+            // door exists
+            carry = unlock_door(y);
+            if !carry {
+                // Door could not be unlocked, try again on the next frame.
+                return;
+            }
+        }
+
+        // Unlock the next door on the next frame.
+        counter++;
+    }
+}
+
+
+}
+
+}
+}
+

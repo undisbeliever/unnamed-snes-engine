@@ -47,7 +47,7 @@ endif
 
 
 
-ENGINE_SRC_DIR := $(ENGINE_DIR)/src
+ENGINE_SRC_DIR := $(ENGINE_DIR)/engine
 AUDIO_SRC_DIR  := $(ENGINE_DIR)/audio-driver
 TOOLS_DIR      := $(ENGINE_DIR)/tools
 WIZ_DIR        := $(ENGINE_DIR)/wiz
@@ -106,7 +106,7 @@ $(MLB_FILE): $(INTERMEDIATE_BINARY) $(AUDIO_DRIVER_BINARIES) $(TOOLS_DIR)/sym_to
 
 
 $(INTERMEDIATE_BINARY): $(WIZ) $(SOURCES) $(GEN_SOURCES) $(AUDIO_DRIVER_BINARIES) $(AUDIO_DRIVER_DATA)
-	$(WIZ) -s wla '$(SRC_DIR)/main.wiz' -o '$(INTERMEDIATE_BINARY)'
+	$(WIZ) -s wla -I '$(ENGINE_DIR)/' '$(SRC_DIR)/main.wiz' -o '$(INTERMEDIATE_BINARY)'
 
 
 

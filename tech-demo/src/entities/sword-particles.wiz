@@ -1,0 +1,56 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "engine/entity_api";
+import "_base";
+
+import "engine/common/math";
+
+import "gen/entities";
+
+
+// ::TODO add a generic particle entity::
+
+
+namespace entities {
+namespace sword_particles {
+
+
+in code {
+
+
+// Entity init routine.
+//
+// Called when the entity is spawned
+//
+// DB = 0x7e
+#[mem8, idx8]
+func init(entityId : u8 in y, parameter : u8 in x) {
+
+    SoA.yPos_px[y] = a = SoA.yPos_px[y] + SoA.zPos[y];
+}
+
+
+
+// Entity process routine
+//
+// Called once per frame.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process(entityId : u8 in y) {
+
+    carry = is_ms_non_looping_animation_running(y);
+    if !carry {
+        SoA.health[unaligned y] = a = 0;
+    }
+}
+
+}
+
+
+}
+}
+

@@ -1,0 +1,247 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+import "engine/registers";
+import "engine/common/reset";
+
+import "engine/gamemodes";
+import "engine/wait-frame";
+import "engine/resources/resources";
+import "../joypad";
+
+import "gen/enums";
+
+
+namespace gamemodes {
+namespace credits {
+
+
+// The credits screen uses a custom VRAM map
+
+let VRAM_BG1_MAP_WADDR   = 0x0000;  // 32x32
+let VRAM_BG2_MAP_WADDR   = 0x0800;  // 32x64
+
+let VRAM_BG1_TILES_WADDR = 0x1000;
+let VRAM_BG2_TILES_WADDR = 0x2000;
+
+
+let MIT_LICENSE_TEXT_MAX_YPOS = 202;
+
+
+in code {
+
+
+
+// Credits and licenses screen
+//
+// DB = 0x7e
+#[mem8, idx8]
+func exec() {
+    wait_multiple_frames_and_fadeout__slow();
+
+    push16(0x7e80);
+    data_bank = pop8();
+// DB = 0x80
+
+    idx16();
+    #[idx16] {
+        setup_ppu__credits();
+    }
+    mem8_idx8();
+
+    data_bank = pop8();
+// DB = 0x7e
+
+    wait_multiple_frames_and_fadein();
+
+    process__credits();
+
+
+    wait_multiple_frames_and_fadeout();
+
+    push16(0x7e80);
+    data_bank = pop8();
+// DB = 0x80
+
+    idx16();
+    #[idx16] {
+        setup_ppu__licenses();
+    }
+    mem8_idx8();
+
+    data_bank = pop8();
+// DB = 0x7e
+
+    wait_multiple_frames_and_fadein();
+
+    process__licenses();
+
+
+    set_next_game_mode(GameModes.TITLE_SCREEN);
+}
+
+
+
+// Setup the PPU for the credits image
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func setup_ppu__credits() {
+
+    reset_registers();
+
+    // ::TODO move elsewhere::
+    mem16();
+    #[mem16] {
+        bg1_scrollX = 0;
+        bg1_scrollY = 0;
+    }
+    mem8();
+
+    BGMODE = a = BGMODE_MODE_0;
+    BG1SC = a = ((VRAM_BG1_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_64x32;
+    BG12NBA = a = ((VRAM_BG1_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG1_SHIFT);
+    TM = a = TM_BG1;
+
+    resources.load_bg_image_resource_into_vram(resources.bg_images.credits, VRAM_BG1_MAP_WADDR, VRAM_BG1_TILES_WADDR);
+}
+
+
+// Process the credits image
+// DB = 0x7e
+#[mem8, idx8]
+inline func process__credits() {
+
+    // Wait until the player pressed start
+    // Or 8 seconds have elapsed
+    mem16();
+    #[mem16] {
+        do {
+            wait_frame();
+
+            aa = joypad.pressed;
+        } while aa & joypad.JOY.START == 0;
+    }
+    mem8_idx8();
+}
+
+
+
+
+// Setup the PPU for the licences screen
+//
+// DMA: Uses DMA channel 7
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func setup_ppu__licenses() {
+
+    reset_registers();
+
+    // ::TODO move elsewhere::
+    mem16();
+    #[mem16] {
+        bg1_scrollX = 0;
+        bg1_scrollY = 0;
+        bg2_scrollX = 0;
+        bg2_scrollY = 0;
+    }
+    mem8();
+
+    BGMODE = BGMODE_MODE_0;
+    BG12NBA = a = ((VRAM_BG1_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG1_SHIFT)
+                  | ((VRAM_BG2_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG2_SHIFT);
+    BG1SC = a = ((VRAM_BG1_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT);
+    BG2SC = a = ((VRAM_BG2_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_32x64;
+    TM = a = TM_BG1 | TM_BG2;
+
+    resources.load_bg_image_resource_into_vram(resources.bg_images.licenses_bg1, VRAM_BG1_MAP_WADDR, VRAM_BG1_TILES_WADDR);
+    resources.load_bg_image_resource_into_vram(resources.bg_images.licenses_bg2, VRAM_BG2_MAP_WADDR, VRAM_BG2_TILES_WADDR);
+
+    // Set BG2 palette
+    CGADD = a = 32 + 1;
+    CGDATA = a = 0xff;
+    CGDATA = a = 0xff;
+
+
+    // Setup a HDMA to hide the second half of BG1
+    DMAP7 = a = DMAP_TO_PPU | DMAP_TRANSFER_ONE;
+    BBAD7 = a = <:&TM;
+    A1T7 = xx = &HdmaTable as u16;
+    A1B7 = a = #:far &HdmaTable;
+
+    HDMAEN = a = HDMAEN_DMA7;
+}
+
+
+in rodata0 {
+
+const HdmaTable : [ u8 ] = [
+    80, TM_BG1,
+    1,  TM_BG2,
+    0,
+];
+
+
+}
+
+
+
+// Process the open source licences
+// DB = 0x7e
+#[mem8, idx8]
+inline func process__licenses() {
+
+    idx16();
+    #[idx16] {
+        bg1_scrollY = xx = 0;
+
+        yy = 0;
+
+        do {
+            bg2_scrollY = yy;
+
+            wait_frame();
+
+            xx = bg1_scrollY;
+            yy = bg2_scrollY;
+
+            a = joypad.current_h;
+            if a & joypad.JOYH.LEFT != 0 {
+                // Show first license
+                xx = 0;
+                yy = 0;
+            }
+            else if a & joypad.JOYH.RIGHT != 0 {
+                // Show second license
+                xx = 128;
+                yy = 0;
+            }
+            else {
+                if a & joypad.JOYH.UP != 0 {
+                    yy--;
+                    if negative {
+                        yy = 0;
+                    }
+                }
+                else if a & joypad.JOYH.DOWN != 0 {
+                    yy++;
+                    if yy >= MIT_LICENSE_TEXT_MAX_YPOS {
+                        yy = MIT_LICENSE_TEXT_MAX_YPOS;
+                    }
+                }
+            }
+
+            // Loop until start is pressed
+            a = joypad.pressed_h;
+        } while a & joypad.JOYH.START == 0;
+    }
+    mem8_idx8();
+}
+
+}
+
+}
+}
+

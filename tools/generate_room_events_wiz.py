@@ -39,7 +39,7 @@ def generate_wiz_code(room_events: OrderedDict[Name, RoomEvent]) -> str:
         out.write(
             """
 import "src/memmap";
-import "src/game/room";
+import "engine/game/room";
 
 namespace room_events {
 

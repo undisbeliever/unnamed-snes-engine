@@ -1,0 +1,225 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+
+import "game/room";
+import "game/metatiles";
+
+import "gen/function-tables";
+
+
+// Variables
+// =========
+
+namespace room_events {
+
+let N_ENTITIES_IN_ROOM_DATA = room.entity_xPos.len;
+
+
+in wram7e_roomstate {
+    // Variable storage for the room events
+    // Reset to 0 before init() is called.
+    var var_0 : u16;
+    var var_1 : u16;
+    var var_2 : u16;
+    var var_3 : u16;
+    var var_4 : u16;
+}
+
+
+
+// Engine functions
+// ================
+
+
+// Initialize the room event subsystem and call the event's init function.
+//
+// This function will be called by the engine (in the room-transitions module).
+//
+// ASSUMES: entities subsystem is initialised and room is loaded into memory.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _init__inline() {
+    let MAX_REF = (room_events.N_ROOM_EVENT_FUNCTIONS - 1) * 2;
+
+
+    // Clear var variables
+    mem16();
+    #[mem16] {
+        room_events.var_0 = 0;
+        room_events.var_1 = 0;
+        room_events.var_2 = 0;
+        room_events.var_3 = 0;
+        room_events.var_4 = 0;
+    }
+    mem8();
+
+    // Validate `roomEventFunction`
+    a = room.roomEventFunction & 0xfe;
+    if a >= MAX_REF + 1{
+        a = MAX_REF;
+    }
+    room.roomEventFunction = a;
+
+    x = a;
+    room_events.init_function_table[unaligned x]();
+}
+
+
+
+// Call the room event's process function.
+//
+// This function must be called once per frame in the gameloop.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func process__inline() {
+    x = room.roomEventFunction;
+    room_events.process_function_table[unaligned x]();
+}
+
+
+
+// Enemy spawning functions
+// ========================
+
+in code {
+
+// Spawn all room entities.
+//
+// This function MUST NOT be called more than once per room.
+//
+// ASSUMES: entities subsystem is initialised.
+// ASSUMES: room entities have not been spawned.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func spawn_all_room_entities() {
+
+    x = N_ENTITIES_IN_ROOM_DATA - 1;
+    do {
+        push8(x);
+
+        spawn_room_entity(x);
+
+        x = pop8();
+
+        x--;
+    } while !negative;
+}
+
+
+
+// Spawn a room entity.
+//
+// NOTE: `roomEntityIndex` MUST BE < N_ENTITIES_IN_ROOM_DATA
+//
+// DB = 0x7e
+#[mem8, idx8]
+func spawn_room_entity(roomEntityIndex : u8 in x) {
+    ^return spawn_entity(a = room.entity_xPos[x],
+                         a = room.entity_yPos[x],
+                         a = room.entity_type[x],
+                         y = room.entity_parameter[x]);
+}
+
+}
+
+
+
+// Door functions
+// ==============
+
+in code {
+
+
+// Unlock a 2x2 door inside an `init()` function.
+//
+// MUST NOT be called in the `process()` function.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func init__unlock_door(doorLocation : u8 in y) {
+    // Get the top-left door tile and determine which door it is a part of.
+    a = metatiles.map[y] & (0x13 ^ 0xff);
+
+    // The unlocked door tiles are 2 tiles to the right of the locked door tile.
+    a |= 2;
+
+    // Set map tiles to the unlocked door tiles
+    (&room.map[0x00])[y] = a;
+    a++;
+    (&room.map[0x01])[y] = a;
+    a += 0x10 - 1;
+    (&room.map[0x10])[y] = a;
+    a++;
+    (&room.map[0x11])[y] = a;
+}
+
+
+
+// Lock a 2x2 door.
+//
+// MUST NOT be called in the `init()` function.
+//
+// Return true if the door was locked.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func lock_door(doorLocation : u8 in y) : bool in carry {
+    // Get the top-left door tile and determine which door it is a part of
+    a = metatiles.map[y] & (0x13 ^ 0xff);
+
+    ^return metatiles.set_2x2_tiles(y, a);
+}
+
+
+
+// Unlock a 2x2 door.
+//
+// MUST NOT be called in the `init()` function.
+//
+// Return true if the door was unlocked.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func unlock_door(doorLocation : u8 in y) : bool in carry {
+    // Get the top-left door tile and determine which door it is a part of
+    a = metatiles.map[y] & (0x13 ^ 0xff);
+
+    // The unlocked door tiles are 2 tiles to the right of the locked door tile.
+    a |= 2;
+
+    ^return metatiles.set_2x2_tiles(y, a);
+}
+
+}
+
+
+
+// Functions that can be called in the room-event context
+// ======================================================
+
+
+// Audio functions
+import "audio";
+let queue_sound_effect = audio.queue_sound_effect;
+
+
+// Entity-loop
+import "game/entityloop";
+let spawn_entity            = entityloop.spawn_entity;
+let is_all_enemies_defeated = entityloop.is_all_enemies_defeated;
+let get_enemy_count_a       = entityloop.get_enemy_count_a;
+
+
+// Gamestate functions
+import "game/gamestate";
+let is_gs_flag_clear             = gamestate.is_flag_clear;
+let set_gs_flag                  = gamestate.set_game_flag;
+let test_and_decrement_key_count = gamestate.test_and_decrement_key_count;
+
+}
+

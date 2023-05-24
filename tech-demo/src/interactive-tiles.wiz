@@ -1,0 +1,264 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "memmap";
+
+import "engine/entity_api";
+import "engine/game/gamestate";
+import "engine/game/metatiles";
+
+import "player";
+
+
+in code {
+
+
+namespace metatiles {
+namespace interactive_tiles {
+
+
+// An empty function that does nothing
+func null_function(tileIndex : u8 in y) { }
+
+let tile_collision_null_function = null_function as func(tileIndex : u8 in y, direction : metatiles.CollisionDirection in a);
+
+
+
+// player_tile_collision_test
+// ==========================
+//
+// ::TODO replace with something more useful::
+namespace player_tile_collision_test {
+
+in wram7e {
+    var _tileIndex : u8;
+}
+
+
+let player_touches_tile = null_function;
+
+
+// Called when the player is touching a solid tile.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func player_tile_collision(tileIndex : u8 in y, direction : metatiles.CollisionDirection in a) {
+
+    _tileIndex = y;
+
+    a = player.movementState;
+    if a & entities.MovementState.Y_AXIS_COLLISION != 0 {
+        // Y axis collision
+
+        a = y & 0xf;
+        if !zero && a != 0xf {
+            y--;
+            metatiles.set_tile(y, 0x11);
+
+            y = _tileIndex;
+            metatiles.set_tile(y, 0x12);
+
+            y = _tileIndex;
+            y++;
+            metatiles.set_tile(y, 0x13);
+        }
+    }
+    else {
+        // X axis collision
+
+        // No need for bounds checking.
+        // `metaSprites.set_tile()` does the bounds checking for me.
+
+        metatiles.set_tile(y, 0x30);
+
+        y = a = _tileIndex - 0x10;
+        metatiles.set_tile(y, 0x20);
+
+        y = a = _tileIndex + 0x10;
+        metatiles.set_tile(y, 0x40);
+    }
+}
+
+}
+
+
+
+// heal
+// ====
+namespace heal {
+
+
+let player_tile_collision = tile_collision_null_function;
+
+
+// Heal the player when the player stands on the healing tile.
+//
+// Called when the player is touching the tile.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func player_touches_tile(tileIndex : u8 in y) {
+
+    // ::TODO spawn a particle effect::
+
+    // Heal 1HP every 8 frames
+    a = frameCounter_lobyte;
+    if a & 0x7 == 0 {
+
+        a = player.health;
+        a++;
+        if a >= player.maxHealth {
+            a = player.maxHealth;
+        }
+        player.health = a;
+    }
+}
+
+}
+
+
+
+// poison
+// ======
+namespace poison {
+
+
+let player_tile_collision = tile_collision_null_function;
+
+
+// Hurt the player when the player touches a poison tile.
+//
+// Called when the player is touching the tile.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func player_touches_tile(tileIndex : u8 in y) {
+    // Player takes 1HP damage every 16 frame
+    // ::TODO (important) confirm this is a good damage counter::
+    a = frameCounter_lobyte;
+    if a & 0xf == 0 {
+        player.take_environmental_damage(1);
+    }
+}
+
+}
+
+
+// locked_door
+// ===========
+//
+// The locked door tile writes to the `playerTouchedLockedDoor` variable when the player
+// runs into the locked door tile.
+//
+// The `locked_door` room event is responsible for opening the locked door.
+//
+// REQUIRES: The locked door cannot be at room map location 0, 0.
+//
+namespace locked_door {
+
+in wram7e_roomstate {
+    // Set to the collision tileIndex if the player touches the door
+    //
+    // NOTE: This variable is not reset on room load.
+    var playerTouchedLockedDoor : u8;
+}
+
+let player_touches_tile = null_function;
+
+
+// Called when the player is touching the locked_door tile
+//
+// DB = 0x7e
+#[mem8, idx8]
+func player_tile_collision(tileIndex : u8 in y, direction : metatiles.CollisionDirection in a) {
+    playerTouchedLockedDoor = y;
+}
+
+}
+
+
+
+// doorway
+// =======
+//
+// This doorway interactive tile type is used for doorways of all 4 directions.
+//
+// The direction of the doorway is determined by the direction the player collides with it.
+//
+// The player's alt-axis target position is determined by the position of the door tiles
+// within the MetaTile tileset.
+//
+// REQUIRES: The doorways needs to be surrounded by solid tiles.
+// REQUIRES: All doorways MUST be 2x2 MetaTiles in size.
+// REQUIRES: The top-left tile of the doorway MUST start on an even tile row and column.
+namespace doorway {
+
+
+let player_touches_tile = null_function;
+
+
+// Called when the player is touching a solid tile.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func player_tile_collision(tileIndex : u8 in y, direction : metatiles.CollisionDirection in a) {
+
+    x = player.state;
+    if x == player.State.WALKING as u8 {
+
+        // MUST NOT MODIFY X
+        x = a;
+
+        // Use the tile index within the MetaTile tileset to determine the
+        // alt-axis target position for this doorway.
+
+        if a & metatiles.CollisionDirection_LEFT_RIGHT_BIT_TEST != 0 {
+            // X axis collision
+
+            a = metatiles.map[y];
+            if a & 0x10 == 0 {
+                // Entering the top half of the door
+                a = (player.yPos.px & 0xf0) + 0x10 + player.DOORWAY_X_DIRECTION_OFFSET;
+            }
+            else {
+                // Entering the bottom half of the door
+                a = (player.yPos.px & 0xf0) + player.DOORWAY_X_DIRECTION_OFFSET;
+            }
+
+            y = player.xPos.px;
+        }
+        else {
+            // Y axis collision
+
+            a = metatiles.map[y];
+            if a & 0x01 == 0 {
+                // Entering the left side of the door
+                a = (player.xPos.px & 0xf0) + 0x10;
+            }
+            else {
+                // Entering the right side of the door
+                a = (player.xPos.px & 0xf0);
+            }
+
+            y = player.yPos.px;
+        }
+
+        // X = direction
+        // Y = main-axis starting position
+        // A = alt-axis target position
+        player.set_state__walk_through_doorway__inline(x as metatiles.CollisionDirection, y, a);
+    }
+
+
+}
+
+}
+
+
+
+}
+}
+
+}
+
+

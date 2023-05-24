@@ -156,12 +156,12 @@ def generate_wiz_code(mappings: Mappings, entities_json: EntitiesJson) -> str:
     with StringIO() as out:
         out.write(
             """
-import "../src/memmap";
+import "src/memmap";
 
-import "../src/entities/_death_functions";
-import "../src/interactive-tiles";
-import "../src/gamemodes/room-transition.wiz";
-import "../src/game/metatiles";
+import "src/entities/_death_functions";
+import "src/interactive-tiles";
+import "src/gamemodes/room-transition.wiz";
+import "engine/game/metatiles";
 """
         )
         room_events_imports(out, mappings.room_events)

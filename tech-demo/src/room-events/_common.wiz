@@ -1,0 +1,56 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "engine/room-events-api";
+import "engine/game/room";
+
+import "gen/entities";
+
+namespace room_events {
+
+
+in code {
+
+
+// Spawn a room enemy with a smoke particle
+//
+// NOTE: `roomEntityIndex` MUST BE < N_ENTITIES_IN_ROOM_DATA
+//
+// DB = 0x7e
+#[mem8, idx8, fallthrough]
+func spawn_enemy_with_smoke(roomEntityIndex : u8 in x,
+                            particle_type : entities.smoke_particles.init_parameter in y) {
+
+    push8(x);
+    {
+        // Spawn smoke particle
+        spawn_entity(a = room.entity_xPos[x],
+                     a = room.entity_yPos[x] - 1,
+                     a = entities.EntityTypes.smoke_particles as u8,
+                     y);
+    }
+    x = pop8();
+
+    ^return spawn_room_entity(x);
+}
+
+
+
+// Spawn small smoke at the location of a room enemy
+//
+// NOTE: `roomEntityIndex` MUST BE < N_ENTITIES_IN_ROOM_DATA
+//
+// DB = 0x7e
+#[mem8, idx8]
+func spawn_small_smoke_at_room_enemy_position(roomEntityIndex : u8 in x) {
+    ^return spawn_entity(a = room.entity_xPos[x],
+                         a = room.entity_yPos[x],
+                         a = entities.EntityTypes.smoke_particles as u8,
+                         y = entities.smoke_particles.init_parameter.small as u8);
+}
+
+}
+}
+
