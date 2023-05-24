@@ -5,7 +5,6 @@ import "memmap";
 import "registers";
 
 import "audio";
-import "joypad";
 import "textbox";
 import "interrupts";
 import "game/metasprites";
@@ -135,8 +134,6 @@ func wait_frame() {
     mem8_idx8();
     #[mem8, idx8] {
         nmiCounter = 0;
-
-        joypad.update_state__inline();
 
         audio.process_sfx_queue__inline();
 

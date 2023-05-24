@@ -6,13 +6,14 @@ import "registers";
 import "registers_math";
 
 import "audio";
-import "joypad";
 import "wait-frame";
 import "resources/dma";
 import "resources/resources";
 
 // For `empty_byte`
 import "common/reset";
+
+import "src/engine-hooks";
 
 import "gen/enums";
 
@@ -709,12 +710,12 @@ func print_decoded_textbox(_decodedString : [u8 ; 256] in decodedString) {
 
 #[mem8, idx16]
 inline func __set_up_down_selection__inline() {
-    _dpadMask_h = a = joypad.JOYH.UP | joypad.JOYH.DOWN;
+    _dpadMask_h = a = JOYH_UP | JOYH_DOWN;
 }
 
 #[mem8, idx16]
 inline func __set_left_right_selection__inline() {
-    _dpadMask_h = a = joypad.JOYH.LEFT | joypad.JOYH.RIGHT;
+    _dpadMask_h = a = JOYH_LEFT | JOYH_RIGHT;
 }
 
 
@@ -727,7 +728,7 @@ inline func __set_left_right_selection__inline() {
 // DB = 0x7e
 #[mem8, idx16]
 func print_textbox_and_wait__start(bankbyte : u8 in a, addr : u16 in xx) : u8 in a {
-    return print_textbox_and_wait(a, xx, joypad.JOY.START);
+    return print_textbox_and_wait(a, xx, JOY_START);
 }
 
 
@@ -740,7 +741,7 @@ func print_textbox_and_wait__start(bankbyte : u8 in a, addr : u16 in xx) : u8 in
 // DB = 0x7e
 #[mem8, idx16]
 func print_textbox_and_wait__a(bankbyte : u8 in a, addr : u16 in xx) : u8 in a {
-    return print_textbox_and_wait(a, xx, joypad.JOY.A);
+    return print_textbox_and_wait(a, xx, JOY_A);
 }
 
 
@@ -766,17 +767,17 @@ func print_textbox_and_wait(bankbyte : u8 in a, addr : u16 in xx, confirmButton 
     while true {
         print_decoded_textbox(decodedString);
 
-        a = joypad.pressed_l;
+        a = engine_hooks.joypad_pressed_l;
         break if a & <:_confirmButton != 0;
 
-        a = joypad.pressed_h;
+        a = engine_hooks.joypad_pressed_h;
         break if a & >:_confirmButton != 0;
 
         a = _lastOption;
         if !zero {
-            a = joypad.pressed_h;
+            a = engine_hooks.joypad_pressed_h;
             if a & _dpadMask_h != 0 {
-                if a & (joypad.JOYH.UP | joypad.JOYH.LEFT) != 0 {
+                if a & (JOYH_UP | JOYH_LEFT) != 0 {
                     a = selectedMenuItem;
                     a--;
                     if negative {

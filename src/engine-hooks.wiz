@@ -3,6 +3,7 @@
 
 import "player";
 import "ui";
+import "joypad";
 import "rng";
 
 import "game/gamestate";
@@ -53,7 +54,16 @@ inline func wait_frame__after_vblank__mem16_idx16__inline() {
 // DB = 0x80
 #[mem8, idx8]
 inline func wait_frame__after_vblank__mem8_idx8__inline() {
+    joypad.update_state__inline();
 }
+
+
+// Textbox
+// =======
+
+const joypad_pressed @ &joypad.pressed : u16;
+const joypad_pressed_l @ &<:joypad.pressed : u8;
+const joypad_pressed_h @ &>:joypad.pressed : u8;
 
 
 
