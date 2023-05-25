@@ -11,6 +11,7 @@ import tkinter.messagebox
 
 from .errors_tab import ErrorsTab
 from .test_sfx_tab import TestSoundEffectTab
+from .test_mml_tab import TestMmlTab
 
 from ..resources_over_usb2snes import FsWatcherSignals, BgThread
 from ..resources_compiler import DataStore
@@ -130,12 +131,16 @@ class Rou2sWindow:
         self._test_sfx_tab: Final = TestSoundEffectTab(data_store, self.signals, self._notebook)
         self._notebook.add(self._test_sfx_tab.frame, text="Test Sound Effect")
 
+        self._test_mml_tab: Final = TestMmlTab(data_store, self.signals, self._notebook)
+        self._notebook.add(self._test_mml_tab.frame, text="Test MML")
+
         # Signals
         self._window.bind(GuiSignals.STATUS_CHANGED_EVENT_NAME, self._statusbar.on_status_changed)
         self._window.bind(GuiSignals.WS_CONNECTION_CHANGED_EVENT_NAME, self._statusbar.on_ws_connected_status_changed)
         self._window.bind(GuiSignals.RES_COMPILED_EVENT_NAME, self._errors_tab.on_resource_compiled)
         self._window.bind(GuiSignals.BG_THREAD_STOPPED_EVENT_NAME, self._on_bg_thread_stopped)
         self._window.bind(GuiSignals.AUDIO_SAMPLES_CHANGED_EVENT_NAME, self._test_sfx_tab.on_audio_samples_changed)
+        self._window.bind(GuiSignals.AUDIO_SAMPLES_CHANGED_EVENT_NAME, self._test_mml_tab.on_audio_samples_changed)
 
     def add_bg_thread(self, t: BgThread) -> None:
         if self._running:
