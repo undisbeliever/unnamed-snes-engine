@@ -3,7 +3,7 @@
 
 from typing import Final, Optional
 
-from .driver_constants import SONG_HEADER_SIZE, N_MUSIC_CHANNELS, MIN_TICK_TIMER
+from .driver_constants import SONG_HEADER_SIZE, N_MUSIC_CHANNELS, MAX_N_SUBROUTINES, MIN_TICK_TIMER
 
 
 def song_header(tick_clock: int, channels: list[bytes], loop_points: list[Optional[int]], subroutines: list[bytes]) -> bytes:
@@ -13,7 +13,7 @@ def song_header(tick_clock: int, channels: list[bytes], loop_points: list[Option
     if len(channels) > N_MUSIC_CHANNELS:
         raise RuntimeError("Too many music channels")
 
-    if len(subroutines) > 128:
+    if len(subroutines) > MAX_N_SUBROUTINES:
         raise RuntimeError("Too many subroutines")
 
     if tick_clock < MIN_TICK_TIMER or tick_clock > 0xFF:
@@ -23,7 +23,7 @@ def song_header(tick_clock: int, channels: list[bytes], loop_points: list[Option
 
     out = bytearray()
 
-    song_offset = SONG_HEADER_SIZE + len(subroutines) * 2
+    data_offset = SONG_HEADER_SIZE + len(subroutines) * 2
 
     for i in range(N_MUSIC_CHANNELS):
         c_size = None
@@ -34,14 +34,14 @@ def song_header(tick_clock: int, channels: list[bytes], loop_points: list[Option
 
         c_loop = None
         if i < len(loop_points):
-            c_loop = i
+            c_loop = loop_points[i]
         if (c_loop is None) or (not c_size) or (c_loop >= c_size):
             c_loop = 0xFFFF
 
         if c_size:
-            out.append(song_offset & 0xFF)
-            out.append(song_offset >> 8)
-            song_offset += c_size
+            out.append(data_offset & 0xFF)
+            out.append(data_offset >> 8)
+            data_offset += c_size
         else:
             out.append(0xFF)
             out.append(0xFF)
@@ -56,13 +56,12 @@ def song_header(tick_clock: int, channels: list[bytes], loop_points: list[Option
     assert len(out) == SONG_HEADER_SIZE
 
     # Subroutine table
-    subroutine_offset = SONG_HEADER_SIZE
     for s in subroutines:
         assert s
 
-        out.append(subroutine_offset & 0xFF)
-        out.append(subroutine_offset >> 8)
+        out.append(data_offset & 0xFF)
+        out.append(data_offset >> 8)
 
-        subroutine_offset += len(s)
+        data_offset += len(s)
 
     return out

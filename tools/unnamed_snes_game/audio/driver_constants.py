@@ -46,6 +46,8 @@ assert EXTERNAL_DATA_HEADER_ADDR & 0xFF == 0
 
 N_MUSIC_CHANNELS: Final = 6
 
+MAX_N_SUBROUTINES: Final = 128
+
 # MUST match `audio/src/common_memmap.wiz`
 # MUST match `SongHeader` in `audio/src/audio-driver.wiz`
 SONG_HEADER_SIZE = N_MUSIC_CHANNELS * 4 + 2
