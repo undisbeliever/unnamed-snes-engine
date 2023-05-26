@@ -11,6 +11,8 @@ from tkinter import font
 from tkinter.scrolledtext import ScrolledText
 
 from ..audio.json_formats import SamplesJson
+from ..audio.mml_compiler import MmlData, compile_mml
+from ..audio.songs import mml_data_to_song_data
 from ..resources_compiler import DataStore
 from ..resources_over_usb2snes import FsWatcherSignals, Rou2sCommands, Command
 
@@ -22,7 +24,7 @@ class TestMmlTab:
 
         self._audio_samples: Optional[SamplesJson] = None
 
-        # Sound effect compiled as a song
+        self._mml_data: Optional[MmlData] = None
         self._song_data: Optional[bytes] = None
         self._has_errors: bool = False
 
@@ -74,22 +76,30 @@ class TestMmlTab:
                 self._has_errors = False
 
     def _set_error_text(self, s: str) -> None:
+        assert s
+
         self._errors["state"] = tk.NORMAL
         self._errors.delete("1.0", "end")
         self._errors.insert("1.0", s)
         self._errors["state"] = tk.DISABLED
 
-        if s:
-            self._has_errors = True
-            self._text.tag_add("invalid", "0.0", "end")
-        else:
-            self._has_errors = False
-            self._text.tag_remove("invalid", "0.0", "end")
+        self._has_errors = True
+        self._text.tag_add("invalid", "0.0", "end")
+
+    def _set_success_text(self, s: str) -> None:
+        self._errors["state"] = tk.NORMAL
+        self._errors.delete("1.0", "end")
+        self._errors.insert("1.0", s)
+        self._errors["state"] = tk.DISABLED
+
+        self._has_errors = False
+        self._text.tag_remove("invalid", "0.0", "end")
 
     def _compile(self) -> None:
         # Mark text as unmodified, `_on_text_modified()` will be called the next time the text changes
         self._text.edit_modified(False)
 
+        self._mml_data = None
         self._song_data = None
 
         if self._audio_samples is None:
@@ -101,14 +111,13 @@ class TestMmlTab:
 
         try:
             if text.strip():
-                raise NotImplementedError("compile_mml() not implemented")
+                self._mml_data = compile_mml(text, self._audio_samples)
+                self._song_data = mml_data_to_song_data(self._mml_data)
+
+                self._set_success_text(f"MML compiled successfully.\n\nTick counts:\n{self._mml_data.tick_counts_string()}")
 
         except Exception as e:
-            self._text.tag_add("invalid", "0.0", "end")
-            error_text = str(e)
-
-        finally:
-            self._set_error_text(error_text)
+            self._set_error_text(str(e))
 
     def _send_to_console(self) -> None:
         if not self._song_data:

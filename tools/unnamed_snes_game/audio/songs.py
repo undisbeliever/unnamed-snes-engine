@@ -4,6 +4,7 @@
 from typing import Final, Optional
 
 from .driver_constants import SONG_HEADER_SIZE, N_MUSIC_CHANNELS, MAX_N_SUBROUTINES, MIN_TICK_TIMER
+from .mml_compiler import MmlData
 
 
 def song_header(tick_clock: int, channels: list[bytes], loop_points: list[Optional[int]], subroutines: list[bytes]) -> bytes:
@@ -63,5 +64,22 @@ def song_header(tick_clock: int, channels: list[bytes], loop_points: list[Option
         out.append(data_offset >> 8)
 
         data_offset += len(s)
+
+    return out
+
+
+def mml_data_to_song_data(mml_data: MmlData) -> bytes:
+    channels = [c.bytecode for c in mml_data.channels]
+    loop_points: list[Optional[int]] = [None for c in mml_data.channels]
+    subroutines = [c.bytecode for c in mml_data.channels]
+
+    # ::TODO set tick timer::
+    out = song_header(MIN_TICK_TIMER, channels, loop_points, subroutines)
+
+    for s in mml_data.channels:
+        out += s.bytecode
+
+    for s in mml_data.subroutines:
+        out += s.bytecode
 
     return out

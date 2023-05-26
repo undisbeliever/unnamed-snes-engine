@@ -8,6 +8,7 @@ from collections import OrderedDict
 from typing import Any, Callable, Final, Optional
 
 from .json_formats import SamplesJson, Name, Instrument, NAME_REGEX
+from .driver_constants import MAX_N_SUBROUTINES
 
 MAX_PAN: Final = 128
 
@@ -329,6 +330,10 @@ class Bytecode:
         self.bytecode.append(SET_INSTRUMENT)
         self.bytecode.append(instrument_id)
 
+    def set_instrument_int(self, instrument_id: int) -> None:
+        self.bytecode.append(SET_INSTRUMENT)
+        self.bytecode.append(instrument_id)
+
     @_instruction(integer_argument)
     def rest(self, length: int) -> None:
         length = test_length_argument(length)
@@ -487,6 +492,14 @@ class Bytecode:
         if subroutine_id is None:
             raise BytecodeError(f"Unknown subroutine: {name}")
         assert subroutine_id < 128
+        self.bytecode.append(CALL_SUBROUTINE)
+        self.bytecode.append(subroutine_id)
+
+    def call_subroutine_int(self, subroutine_id: int) -> None:
+        if self.is_subroutine:
+            raise BytecodeError("Cannot call a subroutine in a subroutine")
+        if subroutine_id < 0 or subroutine_id >= MAX_N_SUBROUTINES:
+            raise BytecodeError("Subroutine id out of bounds")
         self.bytecode.append(CALL_SUBROUTINE)
         self.bytecode.append(subroutine_id)
 
