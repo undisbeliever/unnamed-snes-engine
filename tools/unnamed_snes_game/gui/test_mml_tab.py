@@ -11,7 +11,7 @@ from tkinter import font
 from tkinter.scrolledtext import ScrolledText
 
 from ..audio.json_formats import SamplesJson
-from ..audio.mml_compiler import MmlData, compile_mml
+from ..audio.mml_compiler import MmlData, CompileError, compile_mml
 from ..audio.songs import mml_data_to_song_data
 from ..resources_compiler import DataStore
 from ..resources_over_usb2snes import FsWatcherSignals, Rou2sCommands, Command
@@ -86,6 +86,22 @@ class TestMmlTab:
         self._has_errors = True
         self._text.tag_add("invalid", "0.0", "end")
 
+    def _show_mml_errors(self, compile_error: CompileError) -> None:
+        self._errors["state"] = tk.NORMAL
+        self._errors.delete("1.0", "end")
+        self._errors.insert("1.0", str(compile_error))
+        self._errors["state"] = tk.DISABLED
+
+        self._has_errors = True
+
+        self._text.tag_remove("invalid", "0.0", "end")
+
+        for e in compile_error.errors:
+            if e.char_start is not None and e.char_start > 0:
+                self._text.tag_add("invalid", f"{e.line_number}.{e.char_start-1}", f"{e.line_number}.{e.char_start}")
+            else:
+                self._text.tag_add("invalid", f"{e.line_number}.0", f"{e.line_number}.end")
+
     def _set_success_text(self, s: str) -> None:
         self._errors["state"] = tk.NORMAL
         self._errors.delete("1.0", "end")
@@ -115,7 +131,8 @@ class TestMmlTab:
                 self._song_data = mml_data_to_song_data(self._mml_data)
 
                 self._set_success_text(f"MML compiled successfully.\n\nTick counts:\n{self._mml_data.tick_counts_string()}")
-
+        except CompileError as e:
+            self._show_mml_errors(e)
         except Exception as e:
             self._set_error_text(str(e))
 
