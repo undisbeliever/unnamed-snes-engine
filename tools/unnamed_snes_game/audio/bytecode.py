@@ -15,6 +15,9 @@ MAX_PAN: Final = 128
 N_OCTAVES: Final = 8
 N_NOTES: Final = N_OCTAVES * 12
 
+MAX_LOOP_COUNT: Final = 256
+
+
 # Opcode values MUST MATCH `src/bytecode.wiz`
 DISABLE_CHANNEL: Final = 0xFE
 
@@ -346,13 +349,32 @@ class Bytecode:
         self.bytecode.append(REST_KEYOFF)
         self.bytecode.append(length)
 
+    def _loop_id(self) -> int:
+        """
+        Returns the current loop id.
+         * For non-subroutines: loop_id starts at 0 and increases to `MAX_NESTED_LOOPS-1`
+         * For subroutines:     loop_id starts at `MAX_NESTED_LOOPS-1` and decreases to 0
+
+        When starting a new loop, this method MUST be called after `skip_last_loop_pos` is appended.
+        """
+
+        n_loops: Final = len(self.skip_last_loop_pos)
+
+        if n_loops <= 0:
+            raise BytecodeError("Not in a loop")
+
+        if n_loops > MAX_NESTED_LOOPS:
+            raise BytecodeError(f"Too many loops.  The maximum number of nested loops is { MAX_NESTED_LOOPS}.")
+
+        if self.is_subroutine:
+            return MAX_NESTED_LOOPS - n_loops
+        else:
+            return n_loops - 1
+
     @_instruction(integer_argument)
     def start_loop(self, loop_count: int) -> None:
-        loop_id: Final = len(self.skip_last_loop_pos)
         self.skip_last_loop_pos.append(None)
-
-        if loop_id >= MAX_NESTED_LOOPS:
-            raise BytecodeError(f"Too many loops.  The maximum number of nested loops is { MAX_NESTED_LOOPS}.")
+        loop_id: Final = self._loop_id()
 
         if loop_count < 1 or loop_count > 256:
             raise BytecodeError("Loop count out of range (1-256)")
@@ -366,13 +388,10 @@ class Bytecode:
 
     @_instruction(no_argument)
     def skip_last_loop(self) -> None:
-        if not self.skip_last_loop_pos:
-            raise BytecodeError("Not in a loop")
+        loop_id: Final = self._loop_id()
 
         if self.skip_last_loop_pos[-1] is not None:
             raise BytecodeError("Only one `skip_last_loop` instruction is allowed per loop")
-
-        loop_id: Final = len(self.skip_last_loop_pos) - 1
 
         # Save location of instruction argument for the `end_loop` instruction
         self.skip_last_loop_pos[-1] = len(self.bytecode) + 1
@@ -383,11 +402,11 @@ class Bytecode:
 
     @_instruction(no_argument)
     def end_loop(self) -> None:
-        if not self.skip_last_loop_pos:
-            raise BytecodeError("There is no loop to end")
-
-        skip_last_loop_pos = self.skip_last_loop_pos.pop()
-        loop_id: Final = len(self.skip_last_loop_pos)
+        try:
+            loop_id: Final = self._loop_id()
+        finally:
+            # Ensure loop stack is popped if _loop_id() raises an exception
+            skip_last_loop_pos: Final = self.skip_last_loop_pos.pop()
 
         # Write the parameter of the `skip_last_loop` instruction (if required)
         if skip_last_loop_pos is not None:

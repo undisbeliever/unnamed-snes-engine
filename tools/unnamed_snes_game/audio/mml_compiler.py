@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from .driver_constants import N_MUSIC_CHANNELS
 from .samples import SEMITONES_PER_OCTAVE
 from .json_formats import SamplesJson
-from .bytecode import Bytecode, BcMappings, create_bc_mappings, N_OCTAVES
+from .bytecode import Bytecode, BcMappings, create_bc_mappings, N_OCTAVES, MAX_NESTED_LOOPS, MAX_LOOP_COUNT
 
 from typing import Final, NamedTuple, Optional
 
@@ -53,6 +53,7 @@ class ChannelData(NamedTuple):
     name: str
     bytecode: bytes
     tick_counter: int
+    max_nested_loops: int
 
 
 class MmlData(NamedTuple):
@@ -217,6 +218,9 @@ IDENTIFIER_REGEX: Final = re.compile(r"[0-9]+|([^0-9][^\s]*(\s|$))")
 NOTE_REGEX: Final = re.compile(r"([a-g](?:\-+|\++)?)\s*([0-9]*)(\.*)")
 NOTE_LENGTH_REGEX: Final = re.compile(r"([0-9]*)(\.*)")
 
+FIND_LOOP_END_REGEX: Final = re.compile(r"\[|\]")
+LOOP_END_COUNT_REGEX: Final = re.compile(r"\s*([0-9]+)")
+
 
 class Note(NamedTuple):
     note: int
@@ -274,6 +278,46 @@ class Tokenizer:
 
     def get_pos(self) -> tuple[int, int]:
         return self._line_no, self._line_pos + 1
+
+    def read_loop_end_count(self) -> tuple[bool, Optional[int]]:
+        """
+        Scan for the `]` token in the current loop and return the loop count without
+        advancing the position.
+
+        Assumes the previous token was `[`.
+        """
+
+        nested_loops = 1
+
+        for line_index in range(self._line_index, len(self.lines)):
+            line = self.lines[line_index]
+
+            if line_index == self._line_index:
+                line_pos = self._line_pos
+                if self._line_str is None or line_pos > len(line.text):
+                    # All characters in the line have been processed.
+                    # Skip to the next line
+                    continue
+            else:
+                line_pos = line.char_start
+
+            for m in FIND_LOOP_END_REGEX.finditer(line.text, line_pos):
+                token = m.group(0)
+                if token == "[":
+                    nested_loops += 1
+                elif token == "]":
+                    nested_loops -= 1
+                    if nested_loops <= 0:
+                        loop_end_pos = m.end(0)
+                        m2 = LOOP_END_COUNT_REGEX.match(line.text, loop_end_pos)
+                        if m2 is None:
+                            return True, None
+                        else:
+                            return True, int(m2.group(1))
+
+            line_index += 1
+
+        return False, None
 
     def parse_regex(self, pattern: re.Pattern[str]) -> Optional[re.Match[str]]:
         if self._line_str is None:
@@ -364,6 +408,15 @@ class Tokenizer:
             return None, 0
 
 
+@dataclass
+class LoopState:
+    loop_count: int
+    # Tick counter at the start of the loop
+    tc_start_of_loop: int
+    # Tick counter at the optional skip_last_loop token (`:`)
+    tc_skip_last_loop: Optional[int]
+
+
 class MmlChannelParser:
     ZENLEN: Final = 96
 
@@ -388,6 +441,9 @@ class MmlChannelParser:
         self.octave: int = 4
         self.default_length_ticks: int = self.ZENLEN // 8
         self.tick_counter: int = 0
+
+        self.loop_stack: list[LoopState] = list()
+        self.max_nested_loops: int = 0
 
         # The currently playing instrument
         self.instrument: Optional[Instrument] = None
@@ -517,12 +573,94 @@ class MmlChannelParser:
             s_index = self.bc.mappings.subroutines.get(i)
 
             if s_index is not None:
+                s: Final = self.subroutines[s_index]
+
+                n_nested_loops: Final = len(self.loop_stack) + s.max_nested_loops
+
+                if n_nested_loops > self.max_nested_loops:
+                    self.max_nested_loops = n_nested_loops
+
+                if n_nested_loops > MAX_NESTED_LOOPS:
+                    self.add_error(
+                        f"Too many nested loops when calling subroutine {i} (requires: {n_nested_loops}, max: {MAX_NESTED_LOOPS})"
+                    )
+
                 self.bc.call_subroutine_int(s_index)
-                self.tick_counter += self.subroutines[s_index].tick_counter
+                self.tick_counter += s.tick_counter
             else:
                 self.add_error(f"Unknown subroutine {i}")
         else:
             self.add_error("Cannot call a subroutine inside a subroutine")
+
+    def parse_start_loop(self) -> None:
+        found_end, loop_count = self.tokenizer.read_loop_end_count()
+        if not found_end:
+            raise RuntimeError("Cannot find end of loop")
+
+        if loop_count is None:
+            # ::TODO add infinite loops::
+            loop_count = 2
+
+        self.loop_stack.append(LoopState(loop_count, self.tick_counter, None))
+        n_nested_loops = len(self.loop_stack)
+
+        if n_nested_loops > self.max_nested_loops:
+            self.max_nested_loops = n_nested_loops
+
+        if loop_count < 2 or loop_count > MAX_LOOP_COUNT:
+            # Ignore loop count here so error message location is at the end of the loop
+            loop_count = 2
+        self.bc.start_loop(loop_count)
+
+    def parse_skip_last_loop(self) -> None:
+        if not self.loop_stack:
+            raise RuntimeError("Not in a loop")
+
+        if self.loop_stack[-1].tc_skip_last_loop is not None:
+            raise RuntimeError("Only one skip last loop `:` token is allowed per loop")
+
+        self.loop_stack[-1].tc_skip_last_loop = self.tick_counter
+
+        self.bc.skip_last_loop()
+
+    def parse_end_loop(self) -> None:
+        loop_count: Final = self.tokenizer.parse_optional_uint()
+
+        if not self.loop_stack:
+            raise RuntimeError("Loop stack empty (missing start of loop)")
+        ls: Final = self.loop_stack.pop()
+
+        if loop_count is None:
+            # ::TODO add infinite loops::
+            raise RuntimeError("Missing loop count")
+
+        if loop_count < 2 or loop_count > MAX_LOOP_COUNT:
+            # Adding error message here ensures error location is correct
+            self.add_error(f"Loop count is out of range (2 - {MAX_LOOP_COUNT})")
+
+        n_nested_loops: Final = len(self.loop_stack)
+
+        if loop_count != ls.loop_count:
+            # This should not happen.  Check `Tokenizer.read_loop_end_count()`
+            self.add_error(f"SOMETHING WENT WRONG: loop_count != expected_loop_count")
+
+        ticks_in_loop: Final = self.tick_counter - ls.tc_start_of_loop
+        if ticks_in_loop <= 0:
+            self.add_error("Loop does not play a note or rest")
+
+        if ls.tc_skip_last_loop is not None:
+            ticks_in_last_loop = ls.tc_skip_last_loop - ls.tc_start_of_loop
+        else:
+            ticks_in_last_loop = ticks_in_loop
+
+        if ticks_in_loop > 0 and loop_count > 2:
+            self.tick_counter += ticks_in_loop * (loop_count - 2)
+        if ticks_in_last_loop > 0:
+            self.tick_counter += ticks_in_last_loop
+
+        # If statement ensures the "too many nested loops" error is only outputted once
+        if n_nested_loops < MAX_NESTED_LOOPS:
+            self.bc.end_loop()
 
     def parse_at(self) -> None:
         "Set Instrument"
@@ -556,6 +694,9 @@ class MmlChannelParser:
 
     PARSERS: Final = {
         "!": parse_exclamation_mark,
+        "[": parse_start_loop,
+        ":": parse_skip_last_loop,
+        "]": parse_end_loop,
         "@": parse_at,
         "l": parse_l,
         "o": parse_o,
@@ -583,13 +724,18 @@ class MmlChannelParser:
             except Exception as e:
                 self.add_error(str(e))
 
+        if self.loop_stack:
+            self.add_error("Missing loop end ]")
+
         if self.is_subroutine:
             self.bc.return_from_subroutine()
         else:
             self.bc.end()
 
     def channel_data(self) -> ChannelData:
-        return ChannelData(self.channel_name, self.bc.bytecode, tick_counter=self.tick_counter)
+        return ChannelData(
+            name=self.channel_name, bytecode=self.bc.bytecode, tick_counter=self.tick_counter, max_nested_loops=self.max_nested_loops
+        )
 
 
 def parse_mml_subroutine(
