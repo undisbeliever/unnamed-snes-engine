@@ -130,7 +130,9 @@ class TestMmlTab:
                 self._mml_data = compile_mml(text, self._audio_samples)
                 self._song_data = mml_data_to_song_data(self._mml_data)
 
-                self._set_success_text(f"MML compiled successfully.\n\nTick counts:\n{self._mml_data.tick_counts_string()}")
+                self._set_success_text(
+                    f"MML compiled successfully.\n{len(self._song_data)} bytes.\n\nTick counts:\n{self._mml_data.tick_counts_string()}"
+                )
         except CompileError as e:
             self._show_mml_errors(e)
         except Exception as e:
