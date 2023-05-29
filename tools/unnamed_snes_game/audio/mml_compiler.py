@@ -439,7 +439,7 @@ class MmlChannelParser:
         self.error_list: Final = error_list
 
         self.octave: int = 4
-        self.default_length_ticks: int = self.ZENLEN // 8
+        self.default_length_ticks: int = self.ZENLEN // 4
         self.tick_counter: int = 0
 
         self.loop_stack: list[LoopState] = list()
