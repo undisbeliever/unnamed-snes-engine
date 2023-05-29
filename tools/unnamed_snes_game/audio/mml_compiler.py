@@ -454,6 +454,7 @@ class MmlChannelParser:
         self.error_list: Final = error_list
 
         self.octave: int = 4
+        self.semitone_offset: int = 0  # transpose commands (_ and __)
         self.default_length_ticks: int = self.ZENLEN // 4
         self.tick_counter: int = 0
 
@@ -475,7 +476,7 @@ class MmlChannelParser:
         self.error_list.append(MmlError(message, *self._pos))
 
     def calculate_note_id(self, note: int) -> int:
-        note_id: Final = note + self.octave * SEMITONES_PER_OCTAVE
+        note_id: Final = note + self.octave * SEMITONES_PER_OCTAVE + self.semitone_offset
 
         if self.show_missing_set_instrument_error:
             self.add_error("Cannot play a note before setting an instrument")
@@ -720,6 +721,21 @@ class MmlChannelParser:
         if o < MIN_OCTAVE or o > MAX_OCTAVE:
             raise RuntimeError(f"Octave out of range (min: {MIN_OCTAVE}, max: {MAX_OCTAVE})")
 
+    def parse_underscore(self) -> None:
+        "Transpose"
+        if self._test_next_token_matches("_"):
+            # Relative setting
+            value, is_relative = self.tokenizer.parse_relative_int()
+            if value < -128 or value > 128:
+                raise RuntimeError("Transpose out of range (-128 - +128)")
+            self.semitone_offset += value
+        else:
+            # Absolute setting
+            value, is_relative = self.tokenizer.parse_relative_int()
+            if value < -128 or value > 128:
+                raise RuntimeError("Transpose out of range (-128 - +128)")
+            self.semitone_offset = value
+
     def parse_v(self) -> None:
         "Volume"
         v, is_v_relative = self._parse_volume_value()
@@ -807,6 +823,7 @@ class MmlChannelParser:
         "<": parse_decrease_octave,
         "v": parse_v,
         "p": parse_p,
+        "_": parse_underscore,
     }
 
     def parse_mml(self) -> None:
