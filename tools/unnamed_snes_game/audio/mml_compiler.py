@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from .driver_constants import N_MUSIC_CHANNELS
 from .samples import SEMITONES_PER_OCTAVE
 from .json_formats import SamplesJson
-from .bytecode import Bytecode, BcMappings, create_bc_mappings, N_OCTAVES, MAX_NESTED_LOOPS, MAX_LOOP_COUNT
+from .bytecode import Bytecode, BcMappings, create_bc_mappings, N_OCTAVES, MAX_NESTED_LOOPS, MAX_LOOP_COUNT, MAX_PAN, MAX_VOLUME
 
 from typing import Final, NamedTuple, Optional
 
@@ -214,6 +214,7 @@ NOTE_MAP: Final = {
 }
 WHITESPACE_REGEX: Final = re.compile(r"\s+")
 UINT_REGEX: Final = re.compile(r"[0-9]+")
+RELATIVE_INT_REGEX: Final = re.compile(r"[+-]?[0-9]+")
 IDENTIFIER_REGEX: Final = re.compile(r"[0-9]+|([^0-9][^\s]*(\s|$))")
 NOTE_REGEX: Final = re.compile(r"([a-g](?:\-+|\++)?)\s*([0-9]*)(\.*)")
 NOTE_LENGTH_REGEX: Final = re.compile(r"([0-9]*)(\.*)")
@@ -354,6 +355,20 @@ class Tokenizer:
             return int(m.group(0))
         else:
             return None
+
+    def parse_relative_int(self) -> tuple[int, bool]:
+        """Returns (value, is_relative)"""
+
+        m = self.parse_regex(RELATIVE_INT_REGEX)
+        if not m:
+            raise RuntimeError("Cannot parse integer, expected a decimal digit, - or +")
+
+        s = m.group(0)
+        value = int(s)
+        if s[0] in "+-":
+            return value, True
+        else:
+            return value, False
 
     def parse_identifier(self) -> str:
         m = self.parse_regex(IDENTIFIER_REGEX)
@@ -705,6 +720,74 @@ class MmlChannelParser:
         if o < MIN_OCTAVE or o > MAX_OCTAVE:
             raise RuntimeError(f"Octave out of range (min: {MIN_OCTAVE}, max: {MAX_OCTAVE})")
 
+    def parse_v(self) -> None:
+        "Volume"
+        v, is_v_relative = self._parse_volume_value()
+        if not is_v_relative:
+            if self._test_next_token_matches("p"):
+                p, is_p_relative = self._parse_pan_value()
+                self._set_pan_and_volume(p, is_p_relative, v, is_v_relative)
+            else:
+                self.bc.set_volume(v)
+        else:
+            # v is relative
+            if v > 0:
+                self.bc.inc_volume(v)
+            else:
+                self.bc.dec_volume(-v)
+
+    def parse_p(self) -> None:
+        "Pan"
+        p, is_p_relative = self._parse_pan_value()
+        if not is_p_relative:
+            if self._test_next_token_matches("v"):
+                v, is_v_relative = self._parse_volume_value()
+                self._set_pan_and_volume(p, is_p_relative, v, is_v_relative)
+            else:
+                self.bc.set_pan(p)
+        else:
+            # p is relative
+            if p > 0:
+                self.bc.inc_pan(p)
+            else:
+                self.bc.dec_pan(-p)
+
+    def _parse_volume_value(self) -> tuple[int, bool]:
+        v, is_v_relative = self.tokenizer.parse_relative_int()
+
+        # Validating volume value here to ensure error message location is correct
+        abs_v = abs(v)
+        if abs_v < 0 or abs_v > MAX_VOLUME:
+            raise RuntimeError(f"Volume out of range (1-{MAX_VOLUME})")
+        return v, is_v_relative
+
+    def _parse_pan_value(self) -> tuple[int, bool]:
+        p, is_p_relative = self.tokenizer.parse_relative_int()
+
+        # Validating pan value here to ensure error message location is correct
+        abs_p = abs(p)
+        if abs_p < 0 or abs_p > MAX_PAN:
+            raise RuntimeError(f"Pan out of range (1-{MAX_PAN})")
+        return p, is_p_relative
+
+    def _set_pan_and_volume(self, p: int, is_p_relative: bool, v: int, is_v_relative: bool) -> None:
+        if not is_p_relative and not is_v_relative:
+            self.bc.set_pan_and_volume(p, v)
+        else:
+            if not is_v_relative:
+                self.bc.set_volume(v)
+            elif v > 0:
+                self.bc.inc_volume(v)
+            else:
+                self.bc.dec_volume(-v)
+
+            if not is_p_relative:
+                self.bc.set_pan(p)
+            elif p > 0:
+                self.bc.inc_pan(p)
+            else:
+                self.bc.dec_pan(-p)
+
     def parse_increase_octave(self) -> None:
         self.octave = min(MAX_OCTAVE, self.octave + 1)
 
@@ -722,6 +805,8 @@ class MmlChannelParser:
         "r": parse_r,
         ">": parse_increase_octave,
         "<": parse_decrease_octave,
+        "v": parse_v,
+        "p": parse_p,
     }
 
     def parse_mml(self) -> None:

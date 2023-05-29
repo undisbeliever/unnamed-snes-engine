@@ -10,6 +10,7 @@ from typing import Any, Callable, Final, Optional
 from .json_formats import SamplesJson, Name, Instrument, NAME_REGEX
 from .driver_constants import MAX_N_SUBROUTINES
 
+MAX_VOLUME: Final = 255
 MAX_PAN: Final = 128
 
 N_OCTAVES: Final = 8
@@ -445,22 +446,22 @@ class Bytecode:
 
     @_instruction(integer_argument)
     def set_volume(self, v: int) -> None:
-        if v < 0 or v > 255:
-            raise BytecodeError(f"Volume out of range")
+        if v < 0 or v > MAX_VOLUME:
+            raise BytecodeError(f"Volume out of range (1-{MAX_VOLUME})")
         self.bytecode.append(SET_VOLUME)
         self.bytecode.append(v)
 
     @_instruction(integer_argument)
     def inc_volume(self, v: int) -> None:
-        if v < 1 or v > 255:
-            raise BytecodeError(f"Volume out of range (1-255)")
+        if v < 1 or v > MAX_VOLUME:
+            raise BytecodeError(f"Volume out of range (1-{MAX_VOLUME})")
         self.bytecode.append(INC_VOLUME)
         self.bytecode.append(v)
 
     @_instruction(integer_argument)
     def dec_volume(self, v: int) -> None:
-        if v < 1 or v > 255:
-            raise BytecodeError(f"Volume out of range (1-255)")
+        if v < 1 or v > MAX_VOLUME:
+            raise BytecodeError(f"Volume out of range (1-{MAX_VOLUME})")
         self.bytecode.append(DEC_VOLUME)
         self.bytecode.append(v)
 
