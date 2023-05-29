@@ -543,10 +543,29 @@ class MmlChannelParser:
 
         tick_length = self.calculate_note_length(note.length, note.dot_count)
 
-        # ::TODO parse slur/tie::
-        # ::TODO confirm slur/tie error message has the correct line and character number::
+        key_off = True
 
-        self._play_note(note_id, True, tick_length)
+        # Extend tick_length if there is a tie ('^')
+        while self._test_next_token_matches("^"):
+            try:
+                tick_length += self.parse_note_length()
+            except Exception as e:
+                self.add_error(str(e))
+
+        # Slur (&)
+        while self._test_next_token_matches("&"):
+            n_length, n_dot_count = self.tokenizer.parse_note_length()
+            if n_length is not None or n_dot_count > 0:
+                # This is a tie, extend the tick length
+                try:
+                    tick_length += self.calculate_note_length(n_length, n_dot_count)
+                except Exception as e:
+                    self.add_error(str(e))
+            else:
+                # This is a slur, do not keyoff the note
+                key_off = False
+
+        self._play_note(note_id, key_off, tick_length)
 
     def parse_r(self) -> None:
         ticks = self.parse_note_length()
