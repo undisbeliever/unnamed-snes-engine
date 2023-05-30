@@ -26,6 +26,12 @@ DEFAULT_BPM: Final = 60
 MIN_BPM: Final = int((TIMER_HZ * 60) / (48 * MAX_TICK_TIMER)) + 1
 MAX_BPM: Final = int((TIMER_HZ * 60) / (48 * MIN_TICK_TIMER)) + 1
 
+DEFAULT_ZENLEN: Final = 96
+MIN_ZENLEN: Final = 4
+MAX_ZENLEN: Final = 255
+
+STARTING_DEFAULT_NOTE_LENGTH: Final = 4
+
 
 @dataclass
 class MmlError:
@@ -57,6 +63,7 @@ class MetaData(NamedTuple):
     license: Optional[str]
 
     tick_timer: int
+    zenlen: int
 
 
 class Instrument(NamedTuple):
@@ -176,7 +183,7 @@ def split_lines(mml_text: str) -> MmlLines:
     return MmlLines(headers=headers, instruments=instruments, subroutines=subroutines, channels=channels)
 
 
-HEADER_REGEX = re.compile(r"^#(.+)\s+(.+)$")
+HEADER_REGEX = re.compile(r"^#([^\s]+)\s+(.+)$")
 VALID_HEADERS = frozenset(("Title", "Composer", "Author", "Copyright", "Date", "License"))
 
 
@@ -199,6 +206,7 @@ def parse_headers(headers: list[Line], error_list: list[MmlError]) -> MetaData:
     header_map = dict()
 
     tick_timer = None
+    zenlen = None
 
     for line in headers:
         try:
@@ -217,6 +225,11 @@ def parse_headers(headers: list[Line], error_list: list[MmlError]) -> MetaData:
                 else:
                     tick_timer = parse_int_range(value, MIN_TICK_TIMER, MAX_TICK_TIMER)
 
+            elif name == "Zenlen":
+                if zenlen is not None:
+                    raise RuntimeError("Cannot set zenlen: zenlen already set")
+                zenlen = parse_int_range(value, MIN_ZENLEN, MAX_ZENLEN)
+
             elif name in VALID_HEADERS:
                 if name in header_map:
                     raise RuntimeError("Duplicate header name: {name}")
@@ -231,7 +244,8 @@ def parse_headers(headers: list[Line], error_list: list[MmlError]) -> MetaData:
     if tick_timer is None:
         tick_timer = bpm_to_tick_timer(60)
 
-    assert tick_timer >= MIN_TICK_TIMER and tick_timer <= MAX_TICK_TIMER
+    if zenlen is None:
+        zenlen = DEFAULT_ZENLEN
 
     return MetaData(
         title=header_map.get("Title"),
@@ -241,6 +255,7 @@ def parse_headers(headers: list[Line], error_list: list[MmlError]) -> MetaData:
         copyright=header_map.get("Copyright"),
         license=header_map.get("License"),
         tick_timer=tick_timer,
+        zenlen=zenlen,
     )
 
 
@@ -520,12 +535,11 @@ class LoopState:
 
 
 class MmlChannelParser:
-    ZENLEN: Final = 96
-
     def __init__(
         self,
         input_lines: list[Line],
         channel_name: str,
+        metadata: MetaData,
         instruments: OrderedDict[str, Instrument],
         subroutines: Optional[list[ChannelData]],
         bc_mappings: BcMappings,
@@ -540,9 +554,11 @@ class MmlChannelParser:
 
         self.error_list: Final = error_list
 
+        self.zenlen: int = metadata.zenlen
+
         self.octave: int = 4
         self.semitone_offset: int = 0  # transpose commands (_ and __)
-        self.default_length_ticks: int = self.ZENLEN // 4
+        self.default_length_ticks: int = self.zenlen // STARTING_DEFAULT_NOTE_LENGTH
         self.tick_counter: int = 0
 
         self.loop_stack: list[LoopState] = list()
@@ -579,9 +595,9 @@ class MmlChannelParser:
 
     def calculate_note_length(self, length: Optional[int], dot_count: int) -> int:
         if length is not None:
-            if length < 0:
+            if length < 1 or length > self.zenlen:
                 raise ValueError("Invalid note length")
-            ticks = self.ZENLEN // length
+            ticks = self.zenlen // length
         else:
             ticks = self.default_length_ticks
 
@@ -598,6 +614,19 @@ class MmlChannelParser:
     def parse_note_length(self) -> int:
         l, dc = self.tokenizer.parse_note_length()
         return self.calculate_note_length(l, dc)
+
+    def parse_change_whole_note_length(self) -> None:
+        """
+        Change zenlen (AKA: whole note length) value.
+
+        NOTE: This command resets the default note length.
+        NOTE: This command changes the zenlen for the current channel/macro only.
+        """
+        z = self.tokenizer.parse_uint()
+        if z < MIN_ZENLEN or z > MAX_ZENLEN:
+            raise ValueError(f"zenlen out of bounds ({MIN_ZENLEN}-{MAX_ZENLEN})")
+        self.zenlen = z
+        self.default_length_ticks = z // STARTING_DEFAULT_NOTE_LENGTH
 
     def _play_note(self, note_id: int, key_off: bool, tick_length: int) -> None:
         assert tick_length > 0
@@ -903,6 +932,7 @@ class MmlChannelParser:
         ":": parse_skip_last_loop,
         "]": parse_end_loop,
         "@": parse_at,
+        "C": parse_change_whole_note_length,
         "l": parse_l,
         "o": parse_o,
         "r": parse_r,
@@ -949,11 +979,12 @@ class MmlChannelParser:
 def parse_mml_subroutine(
     channel_lines: list[Line],
     channel_name: str,
+    metadata: MetaData,
     instruments: OrderedDict[str, Instrument],
     bc_mappings: BcMappings,
     error_list: list[MmlError],
 ) -> ChannelData:
-    parser = MmlChannelParser(channel_lines, channel_name, instruments, None, bc_mappings, error_list)
+    parser = MmlChannelParser(channel_lines, channel_name, metadata, instruments, None, bc_mappings, error_list)
     parser.parse_mml()
     return parser.channel_data()
 
@@ -961,12 +992,13 @@ def parse_mml_subroutine(
 def parse_mml_channel(
     channel_lines: list[Line],
     channel_name: str,
+    metadata: MetaData,
     instruments: OrderedDict[str, Instrument],
     subroutines: list[ChannelData],
     bc_mappings: BcMappings,
     error_list: list[MmlError],
 ) -> ChannelData:
-    parser = MmlChannelParser(channel_lines, channel_name, instruments, subroutines, bc_mappings, error_list)
+    parser = MmlChannelParser(channel_lines, channel_name, metadata, instruments, subroutines, bc_mappings, error_list)
     parser.parse_mml()
     return parser.channel_data()
 
@@ -984,7 +1016,7 @@ def compile_mml(mml_text: str, samples: SamplesJson) -> MmlData:
 
     subroutines: Final = list()
     for s_name, c_lines in mml_lines.subroutines.items():
-        subroutines.append(parse_mml_subroutine(c_lines, s_name, instruments, bc_mappings, error_list))
+        subroutines.append(parse_mml_subroutine(c_lines, s_name, metadata, instruments, bc_mappings, error_list))
 
     # add subroutines to bc_mappings
     for i, s_name in enumerate(mml_lines.subroutines.keys()):
@@ -994,7 +1026,7 @@ def compile_mml(mml_text: str, samples: SamplesJson) -> MmlData:
     for i, c_lines in enumerate(mml_lines.channels):
         if c_lines:
             channel_name = chr(FIRST_CHANNEL_ORD + i)
-            channels.append(parse_mml_channel(c_lines, channel_name, instruments, subroutines, bc_mappings, error_list))
+            channels.append(parse_mml_channel(c_lines, channel_name, metadata, instruments, subroutines, bc_mappings, error_list))
 
     if error_list:
         raise CompileError(error_list)
