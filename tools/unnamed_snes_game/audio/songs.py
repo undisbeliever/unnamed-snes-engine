@@ -3,7 +3,7 @@
 
 from typing import Final, Optional
 
-from .driver_constants import SONG_HEADER_SIZE, N_MUSIC_CHANNELS, MAX_N_SUBROUTINES, MIN_TICK_TIMER
+from .driver_constants import SONG_HEADER_SIZE, N_MUSIC_CHANNELS, MAX_N_SUBROUTINES, MIN_TICK_TIMER, MAX_TICK_TIMER
 from .mml_compiler import MmlData
 
 
@@ -17,8 +17,8 @@ def song_header(tick_clock: int, channels: list[bytes], loop_points: list[Option
     if len(subroutines) > MAX_N_SUBROUTINES:
         raise RuntimeError("Too many subroutines")
 
-    if tick_clock < MIN_TICK_TIMER or tick_clock > 0xFF:
-        raise RuntimeError(f"Tick clock out of bounds (got {tick_clock}, min: {MIN_TICK_TIMER}, max: {0xff})")
+    if tick_clock < MIN_TICK_TIMER or tick_clock > MAX_TICK_TIMER:
+        raise RuntimeError(f"Tick clock out of bounds (got {tick_clock}, min: {MIN_TICK_TIMER}, max: {MAX_TICK_TIMER})")
 
     assert len(channels) == len(loop_points)
 
@@ -74,7 +74,7 @@ def mml_data_to_song_data(mml_data: MmlData) -> bytes:
     subroutines = [c.bytecode for c in mml_data.channels]
 
     # ::TODO set tick timer::
-    out = song_header(MIN_TICK_TIMER, channels, loop_points, subroutines)
+    out = song_header(mml_data.metadata.tick_timer, channels, loop_points, subroutines)
 
     for s in mml_data.channels:
         out += s.bytecode

@@ -7,7 +7,10 @@ from typing import Final, TypeAlias
 Addr: TypeAlias = int
 
 
+TIMER_HZ: Final = 8000
+
 MIN_TICK_TIMER: Final = 64
+MAX_TICK_TIMER: Final = 255
 
 SFX_TICK_TIMER: Final = 64
 

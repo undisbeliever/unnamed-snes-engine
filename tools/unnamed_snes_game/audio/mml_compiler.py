@@ -5,7 +5,7 @@ import re
 from collections import OrderedDict
 from dataclasses import dataclass
 
-from .driver_constants import N_MUSIC_CHANNELS
+from .driver_constants import N_MUSIC_CHANNELS, TIMER_HZ, MIN_TICK_TIMER, MAX_TICK_TIMER
 from .samples import SEMITONES_PER_OCTAVE
 from .json_formats import SamplesJson
 from .bytecode import Bytecode, BcMappings, create_bc_mappings, N_OCTAVES, MAX_NESTED_LOOPS, MAX_LOOP_COUNT, MAX_PAN, MAX_VOLUME
@@ -13,11 +13,18 @@ from .bytecode import Bytecode, BcMappings, create_bc_mappings, N_OCTAVES, MAX_N
 from typing import Final, NamedTuple, Optional
 
 
+CLOCK_CYCLES_PER_BPM: Final = 48
+
+
 MIN_OCTAVE: Final = 1
 MAX_OCTAVE: Final = N_OCTAVES - 1
 
 MAX_PLAY_NOTE_TICKS: Final = 0xFF
 MAX_REST_TICKS: Final = 0xFF
+
+DEFAULT_BPM: Final = 60
+MIN_BPM: Final = int((TIMER_HZ * 60) / (48 * MAX_TICK_TIMER)) + 1
+MAX_BPM: Final = int((TIMER_HZ * 60) / (48 * MIN_TICK_TIMER)) + 1
 
 
 @dataclass
@@ -41,6 +48,17 @@ class CompileError(RuntimeError):
         return "Error compiling MML:\n    " + "\n    ".join(map(MmlError.str, self.errors))
 
 
+class MetaData(NamedTuple):
+    title: Optional[str]
+    date: Optional[str]
+    composer: Optional[str]
+    author: Optional[str]
+    copyright: Optional[str]
+    license: Optional[str]
+
+    tick_timer: int
+
+
 class Instrument(NamedTuple):
     name: str
     instrument_name: str
@@ -57,6 +75,7 @@ class ChannelData(NamedTuple):
 
 
 class MmlData(NamedTuple):
+    metadata: MetaData
     instruments: OrderedDict[str, Instrument]
     subroutines: list[ChannelData]
     channels: list[ChannelData]
@@ -155,6 +174,74 @@ def split_lines(mml_text: str) -> MmlLines:
         raise CompileError(errors)
 
     return MmlLines(headers=headers, instruments=instruments, subroutines=subroutines, channels=channels)
+
+
+HEADER_REGEX = re.compile(r"^#(.+)\s+(.+)$")
+VALID_HEADERS = frozenset(("Title", "Composer", "Author", "Copyright", "Date", "License"))
+
+
+def parse_int_range(s: str, min_value: int, max_value: int) -> int:
+    i = int(s)
+    if i < min_value or i > max_value:
+        raise ValueError(f"Integer out of range ({min_value}-{max_value})")
+    return i
+
+
+def bpm_to_tick_timer(bpm: int) -> int:
+    if bpm < MIN_BPM or bpm > MAX_BPM:
+        raise ValueError(f"bpm out of range ({MIN_BPM}-{MAX_BPM})")
+    tick_timer = round((TIMER_HZ * 60) / (bpm * CLOCK_CYCLES_PER_BPM))
+    assert tick_timer >= MIN_TICK_TIMER and tick_timer <= MAX_TICK_TIMER
+    return tick_timer
+
+
+def parse_headers(headers: list[Line], error_list: list[MmlError]) -> MetaData:
+    header_map = dict()
+
+    tick_timer = None
+
+    for line in headers:
+        try:
+            m = HEADER_REGEX.match(line.text)
+            if not m:
+                raise ValueError("Invalid header format")
+
+            name = m.group(1).title()
+            value = m.group(2).strip()
+
+            if name == "Tempo" or name == "Timer":
+                if tick_timer is not None:
+                    raise RuntimeError("Cannot set {name}: tick_timer already set")
+                if name == "Tempo":
+                    tick_timer = bpm_to_tick_timer(int(value))
+                else:
+                    tick_timer = parse_int_range(value, MIN_TICK_TIMER, MAX_TICK_TIMER)
+
+            elif name in VALID_HEADERS:
+                if name in header_map:
+                    raise RuntimeError("Duplicate header name: {name}")
+                header_map[name] = value
+
+            else:
+                raise ValueError(f"Unknown header: {m.group(1)}")
+
+        except Exception as e:
+            error_list.append(MmlError(str(e), line.line_number, None))
+
+    if tick_timer is None:
+        tick_timer = bpm_to_tick_timer(60)
+
+    assert tick_timer >= MIN_TICK_TIMER and tick_timer <= MAX_TICK_TIMER
+
+    return MetaData(
+        title=header_map.get("Title"),
+        date=header_map.get("Date"),
+        composer=header_map.get("Composer"),
+        author=header_map.get("Author"),
+        copyright=header_map.get("Copyright"),
+        license=header_map.get("License"),
+        tick_timer=tick_timer,
+    )
 
 
 INSTRUNMENT_REGEX: Final = re.compile(r"^@(\w+)\s+(\w+)$")
@@ -887,11 +974,13 @@ def parse_mml_channel(
 def compile_mml(mml_text: str, samples: SamplesJson) -> MmlData:
     mml_lines: Final = split_lines(mml_text)
 
+    error_list: Final[list[MmlError]] = list()
+
+    metadata: Final = parse_headers(mml_lines.headers, error_list)
+
     instruments: Final = parse_instruments(mml_lines.instruments, samples)
 
     bc_mappings: Final = create_bc_mappings(samples)
-
-    error_list: Final[list[MmlError]] = list()
 
     subroutines: Final = list()
     for s_name, c_lines in mml_lines.subroutines.items():
@@ -910,4 +999,4 @@ def compile_mml(mml_text: str, samples: SamplesJson) -> MmlData:
     if error_list:
         raise CompileError(error_list)
 
-    return MmlData(instruments, subroutines, channels)
+    return MmlData(metadata, instruments, subroutines, channels)
