@@ -328,10 +328,14 @@ FIND_LOOP_END_REGEX: Final = re.compile(r"\[|\]")
 LOOP_END_COUNT_REGEX: Final = re.compile(r"\s*([0-9]+)")
 
 
-class Note(NamedTuple):
-    note: int
+class NoteLength(NamedTuple):
     length: Optional[int]
     dot_count: int
+
+
+class Note(NamedTuple):
+    note: int
+    length: NoteLength
 
 
 class Tokenizer:
@@ -436,7 +440,7 @@ class Tokenizer:
             self._set_pos_skip_whitespace(m.end(0))
         return m
 
-    # NOTE: Does not parse integer tokens
+    # NOTE: Does not parse integer or note tokens
     def next_token(self) -> Optional[str]:
         if self._line_str is None:
             return None
@@ -553,24 +557,25 @@ class Tokenizer:
 
         dot_count = len(m.group(3))
 
-        return Note(n, length, dot_count)
+        return Note(n, NoteLength(length, dot_count))
 
-    def parse_note_length(self) -> tuple[Optional[int], int]:
-        "Returns (optional length, number_of_dots)"
-
+    def parse_optional_note_length(self) -> Optional[NoteLength]:
         m = self.parse_regex(NOTE_LENGTH_REGEX)
-        if m:
-            length_str = m.group(1)
-            if length_str:
-                length = int(length_str)
-            else:
-                length = None
+        if m is None:
+            return None
 
-            dot_count = len(m.group(2))
+        if not m.group(0):
+            return None
 
-            return length, dot_count
+        length_str = m.group(1)
+        if length_str:
+            length = int(length_str)
         else:
-            return None, 0
+            length = None
+
+        dot_count = len(m.group(2))
+
+        return NoteLength(length, dot_count)
 
 
 @dataclass
@@ -673,33 +678,36 @@ class MmlChannelParser:
 
         return note_id
 
-    def calculate_note_length(self, length: Optional[int], dot_count: int) -> int:
-        if length is not None:
-            if length < 1 or length > self.zenlen:
+    def calculate_note_length(self, nl: NoteLength) -> int:
+        "Returns note length in ticks"
+        if nl.length is not None:
+            if nl.length < 1 or nl.length > self.zenlen:
                 raise ValueError("Invalid note length")
-            ticks = self.zenlen // length
+            ticks = self.zenlen // nl.length
         else:
             ticks = self.default_length_ticks
 
-        if dot_count:
-            assert dot_count > 0
+        if nl.dot_count:
+            assert nl.dot_count > 0
 
             half_t = ticks // 2
-            for i in range(dot_count):
+            for i in range(nl.dot_count):
                 ticks += half_t
                 half_t //= 2
 
         return ticks
 
     def parse_note_length(self) -> int:
-        l, dc = self.tokenizer.parse_note_length()
-        return self.calculate_note_length(l, dc)
+        nl = self.tokenizer.parse_optional_note_length()
+        if nl is None:
+            return self.default_length_ticks
+        return self.calculate_note_length(nl)
 
     def parse_optional_note_length(self) -> Optional[int]:
-        l, dc = self.tokenizer.parse_note_length()
-        if l is not None or dc > 0:
-            return self.calculate_note_length(l, dc)
-        return None
+        nl = self.tokenizer.parse_optional_note_length()
+        if nl is None:
+            return None
+        return self.calculate_note_length(nl)
 
     def parse_change_whole_note_length(self) -> None:
         """
@@ -779,7 +787,7 @@ class MmlChannelParser:
         # Calculated here to ensure error message location is correct
         note_id = self.calculate_note_id(note.note)
 
-        tick_length = self.calculate_note_length(note.length, note.dot_count)
+        tick_length = self.calculate_note_length(note.length)
 
         key_off = True
 
@@ -792,13 +800,10 @@ class MmlChannelParser:
 
         # Slur (&)
         while self._test_next_token_matches("&"):
-            n_length, n_dot_count = self.tokenizer.parse_note_length()
-            if n_length is not None or n_dot_count > 0:
+            nl = self.parse_optional_note_length()
+            if nl is not None:
                 # This is a tie, extend the tick length
-                try:
-                    tick_length += self.calculate_note_length(n_length, n_dot_count)
-                except Exception as e:
-                    self.add_error(str(e))
+                tick_length += nl
             else:
                 # This is a slur, do not keyoff the note
                 key_off = False
@@ -1069,25 +1074,19 @@ class MmlChannelParser:
 
         chord_end_pos: Final = self._pos
 
-        total_length_pos: Final = self._pos
-
         total_length: Final = self.parse_note_length()
 
-        note_length = None
+        note_length = 1
         tie = True
         if self._test_next_token_matches_no_newline(","):
             self.set_error_pos()
-            note_length = self.parse_optional_note_length()
+            nl = self.tokenizer.parse_optional_note_length()
+            if nl:
+                note_length = self.calculate_note_length(nl)
 
             if self._test_next_token_matches_no_newline(","):
                 self.set_error_pos()
                 tie = self.tokenizer.parse_bool()
-            else:
-                if note_length is None:
-                    raise RuntimeError("Broken chord: missing note length")
-
-        if note_length is None:
-            note_length = 1
 
         # Ensure error message for loop errors are at the correct location
         self._pos = chord_end_pos
