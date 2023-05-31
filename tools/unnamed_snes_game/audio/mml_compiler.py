@@ -332,6 +332,8 @@ class Note(NamedTuple):
 
 
 class Tokenizer:
+    TWO_CHARACTER_TOKENS: Final = frozenset(("__", "{{", "}}"))
+
     def __init__(self, lines: list[Line]):
         self.lines: Final = lines
 
@@ -431,18 +433,30 @@ class Tokenizer:
             self._set_pos_skip_whitespace(m.end(0))
         return m
 
-    def next_char(self) -> Optional[str]:
+    # NOTE: Does not parse integer tokens
+    def next_token(self) -> Optional[str]:
         if self._line_str is None:
             return None
 
-        c = self._line_str[self._line_pos]
-        self._set_pos_skip_whitespace(self._line_pos + 1)
-        return c
+        t = self._line_str[self._line_pos : self._line_pos + 2]
+        if t in self.TWO_CHARACTER_TOKENS:
+            self._set_pos_skip_whitespace(self._line_pos + 2)
+            return t
+        elif t:
+            self._set_pos_skip_whitespace(self._line_pos + 1)
+            return t[0]
+        else:
+            return None
 
-    def peek_char(self) -> Optional[str]:
+    def peek_next_token(self) -> Optional[str]:
         if self._line_str is None:
             return None
-        return self._line_str[self._line_pos]
+
+        t = self._line_str[self._line_pos : self._line_pos + 2]
+        if t in self.TWO_CHARACTER_TOKENS:
+            return t
+        else:
+            return t[0]
 
     def parse_uint(self) -> int:
         m = self.parse_regex(UINT_REGEX)
@@ -655,17 +669,15 @@ class MmlChannelParser:
 
     def _test_next_token_matches(self, token: str) -> bool:
         """
-        Tests if the next character is `token`.
-
-        ASSUMES token is a single character.
+        Tests if the next token is `token`.
 
         Also advances the tokenizer to a new line and sets the error_pos (if token matches).
         """
         self.tokenizer.skip_new_line()
-        if self.tokenizer.peek_char() == token:
+        if self.tokenizer.peek_next_token() == token:
             self.set_error_pos()
-            c = self.tokenizer.next_char()
-            assert c == token
+            t = self.tokenizer.next_token()
+            assert t == token
             return True
         return False
 
@@ -839,18 +851,18 @@ class MmlChannelParser:
 
     def parse_underscore(self) -> None:
         "Transpose"
-        if self._test_next_token_matches("_"):
-            # Relative setting
-            value, is_relative = self.tokenizer.parse_relative_int()
-            if value < -128 or value > 128:
-                raise RuntimeError("Transpose out of range (-128 - +128)")
-            self.semitone_offset += value
-        else:
-            # Absolute setting
-            value, is_relative = self.tokenizer.parse_relative_int()
-            if value < -128 or value > 128:
-                raise RuntimeError("Transpose out of range (-128 - +128)")
-            self.semitone_offset = value
+        value, is_relative = self.tokenizer.parse_relative_int()
+        if value < -128 or value > 128:
+            raise RuntimeError("Transpose out of range (-128 - +128)")
+        self.semitone_offset = value
+
+    def parse_double_underscore(self) -> None:
+        "Relative transpose"
+        # Relative setting
+        value, is_relative = self.tokenizer.parse_relative_int()
+        if value < -128 or value > 128:
+            raise RuntimeError("Transpose out of range (-128 - +128)")
+        self.semitone_offset += value
 
     def parse_v(self) -> None:
         "Volume"
@@ -941,6 +953,7 @@ class MmlChannelParser:
         "v": parse_v,
         "p": parse_p,
         "_": parse_underscore,
+        "__": parse_double_underscore,
     }
 
     def parse_mml(self) -> None:
@@ -952,13 +965,13 @@ class MmlChannelParser:
                 if note := self.tokenizer.parse_optional_note():
                     self.parse_note(note)
                 else:
-                    c = self.tokenizer.next_char()
-                    if c:
-                        p = self.PARSERS.get(c)
+                    t = self.tokenizer.next_token()
+                    if t:
+                        p = self.PARSERS.get(t)
                         if p:
                             p(self)
                         else:
-                            self.add_error(f"Unknown token: {c}")
+                            self.add_error(f"Unknown token: {t}")
             except Exception as e:
                 self.add_error(str(e))
 
