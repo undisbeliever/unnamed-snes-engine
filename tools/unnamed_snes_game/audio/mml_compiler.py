@@ -80,7 +80,9 @@ class ChannelData(NamedTuple):
     name: str
     bytecode: bytes
     tick_counter: int
+
     max_nested_loops: int
+    last_instrument: Optional[Instrument]
 
 
 class MmlData(NamedTuple):
@@ -671,15 +673,16 @@ class MmlChannelParser:
     def calculate_note_id(self, note: int) -> int:
         note_id: Final = note + self.octave * SEMITONES_PER_OCTAVE + self.semitone_offset
 
-        if self.show_missing_set_instrument_error:
-            self.add_error("Cannot play a note before setting an instrument")
-            self.show_missing_set_instrument_error = False
-
         if self.instrument:
             if note_id < self.instrument.first_note or note_id > self.instrument.last_note:
                 self.add_error(
                     f"Cannot play {self.instrument.instrument_name} note: note out of range ({note_id}, min: {self.instrument.first_note}, max: {self.instrument.last_note})"
                 )
+        else:
+            # instrument is None
+            if self.show_missing_set_instrument_error:
+                self.add_error("Cannot play a note before setting an instrument")
+                self.show_missing_set_instrument_error = False
 
         return note_id
 
@@ -872,7 +875,13 @@ class MmlChannelParser:
                     )
 
                 self.bc.call_subroutine_int(s_index)
+
                 self.tick_counter += s.tick_counter
+
+                # Subroutine changed the current instrument
+                if s.last_instrument is not None:
+                    self.instrument = s.last_instrument
+
             else:
                 self.add_error(f"Unknown subroutine {i}")
         else:
@@ -1193,7 +1202,11 @@ class MmlChannelParser:
 
     def channel_data(self) -> ChannelData:
         return ChannelData(
-            name=self.channel_name, bytecode=self.bc.bytecode, tick_counter=self.tick_counter, max_nested_loops=self.max_nested_loops
+            name=self.channel_name,
+            bytecode=self.bc.bytecode,
+            tick_counter=self.tick_counter,
+            max_nested_loops=self.max_nested_loops,
+            last_instrument=self.instrument,
         )
 
 
