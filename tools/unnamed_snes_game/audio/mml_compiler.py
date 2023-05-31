@@ -19,6 +19,8 @@ CLOCK_CYCLES_PER_BPM: Final = 48
 MIN_OCTAVE: Final = 1
 MAX_OCTAVE: Final = N_OCTAVES - 1
 
+MAX_QUANTIZATION: Final = 8
+
 MAX_PLAY_NOTE_TICKS: Final = 0xFF
 MAX_REST_TICKS: Final = 0xFF
 
@@ -605,6 +607,8 @@ class MmlChannelParser:
         self.octave: int = 4
         self.semitone_offset: int = 0  # transpose commands (_ and __)
         self.default_length_ticks: int = self.zenlen // STARTING_DEFAULT_NOTE_LENGTH
+        self.quantization: Optional[int] = None
+
         self.tick_counter: int = 0
 
         self.loop_stack: list[LoopState] = list()
@@ -735,6 +739,16 @@ class MmlChannelParser:
                     self.bc.rest(MAX_REST_TICKS)
                     t -= MAX_REST_TICKS
 
+    def _rest(self, ticks: int) -> None:
+        assert ticks > 0
+
+        self.tick_counter += ticks
+
+        while ticks > 0:
+            t = min(MAX_REST_TICKS, ticks)
+            ticks -= t
+            self.bc.rest(t)
+
     def _test_next_token_matches(self, token: str) -> bool:
         """
         Tests if the next token is `token`.
@@ -789,7 +803,20 @@ class MmlChannelParser:
                 # This is a slur, do not keyoff the note
                 key_off = False
 
-        self._play_note(note_id, key_off, tick_length)
+        if self.quantization and key_off:
+            assert 0 < self.quantization < MAX_QUANTIZATION, "Invalid quantization value"
+
+            # -1 for the key-off tick in the `play_note` bytecode instruction
+            key_on_length = tick_length * self.quantization // MAX_QUANTIZATION + 1
+            key_off_length = tick_length - key_on_length
+
+            if key_on_length > 1 and key_off_length > 1:
+                self._play_note(note_id, True, key_on_length)
+                self._rest(key_off_length)
+            else:
+                self._play_note(note_id, key_off, tick_length)
+        else:
+            self._play_note(note_id, key_off, tick_length)
 
     def parse_r(self) -> None:
         ticks = self.parse_note_length()
@@ -798,12 +825,7 @@ class MmlChannelParser:
         while self._test_next_token_matches("r"):
             ticks += self.parse_note_length()
 
-        self.tick_counter += ticks
-
-        while ticks > 0:
-            t = min(MAX_REST_TICKS, ticks)
-            ticks -= t
-            self.bc.rest(t)
+        self._rest(ticks)
 
     def parse_exclamation_mark(self) -> None:
         "Call subroutine"
@@ -931,6 +953,16 @@ class MmlChannelParser:
     def parse_l(self) -> None:
         "Change default note length"
         self.default_length_ticks = self.parse_note_length()
+
+    def parse_quantize(self) -> None:
+        q = self.tokenizer.parse_uint()
+        if q < 1 or q > MAX_QUANTIZATION:
+            raise ValueError(f"Quantization out of bounds (1-{MAX_QUANTIZATION})")
+        if q == MAX_QUANTIZATION:
+            # Disable quantization
+            self.quantization = None
+        else:
+            self.quantization = q
 
     def parse_o(self) -> None:
         "Set octave"
@@ -1111,6 +1143,7 @@ class MmlChannelParser:
         "<": parse_decrease_octave,
         "v": parse_v,
         "p": parse_p,
+        "Q": parse_quantize,
         "_": parse_underscore,
         "__": parse_double_underscore,
         "{{": parse_broken_chord,
