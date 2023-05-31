@@ -320,16 +320,17 @@ WHITESPACE_REGEX: Final = re.compile(r"\s+")
 UINT_REGEX: Final = re.compile(r"[0-9]+")
 RELATIVE_INT_REGEX: Final = re.compile(r"[+-]?[0-9]+")
 IDENTIFIER_REGEX: Final = re.compile(r"[0-9]+|([^0-9][^\s]*(\s|$))")
-NOTE_REGEX: Final = re.compile(r"([a-g](?:\-+|\++)?)\s*([0-9]*)(\.*)")
+NOTE_REGEX: Final = re.compile(r"([a-g](?:\-+|\++)?)\s*(%?)([0-9]*)(\.*)")
 PITCH_REGEX: Final = re.compile(r"([a-g](?:\-+|\++)?)\s*([0-9]*)(\.*)")
-NOTE_LENGTH_REGEX: Final = re.compile(r"([0-9]*)(\.*)")
+NOTE_LENGTH_REGEX: Final = re.compile(r"(%?)([0-9]*)(\.*)")
 
 FIND_LOOP_END_REGEX: Final = re.compile(r"\[|\]")
 LOOP_END_COUNT_REGEX: Final = re.compile(r"\s*([0-9]+)")
 
 
 class NoteLength(NamedTuple):
-    length: Optional[int]
+    is_clock_value: int
+    value: Optional[int]
     dot_count: int
 
 
@@ -542,6 +543,8 @@ class Tokenizer:
 
         n = NOTE_MAP[note_str[0]]
 
+        is_clock_value = bool(m.group(2))
+
         n_semitone_shifts = len(note_str) - 1
         if n_semitone_shifts > 0:
             if note_str[1] == "-":
@@ -549,15 +552,15 @@ class Tokenizer:
             else:
                 n += n_semitone_shifts
 
-        length_str = m.group(2)
+        length_str = m.group(3)
         if length_str:
             length = int(length_str)
         else:
             length = None
 
-        dot_count = len(m.group(3))
+        dot_count = len(m.group(4))
 
-        return Note(n, NoteLength(length, dot_count))
+        return Note(n, NoteLength(is_clock_value, length, dot_count))
 
     def parse_optional_note_length(self) -> Optional[NoteLength]:
         m = self.parse_regex(NOTE_LENGTH_REGEX)
@@ -567,15 +570,17 @@ class Tokenizer:
         if not m.group(0):
             return None
 
-        length_str = m.group(1)
+        is_clock_value = bool(m.group(1))
+
+        length_str = m.group(2)
         if length_str:
             length = int(length_str)
         else:
             length = None
 
-        dot_count = len(m.group(2))
+        dot_count = len(m.group(3))
 
-        return NoteLength(length, dot_count)
+        return NoteLength(is_clock_value, length, dot_count)
 
 
 @dataclass
@@ -680,22 +685,34 @@ class MmlChannelParser:
 
     def calculate_note_length(self, nl: NoteLength) -> int:
         "Returns note length in ticks"
-        if nl.length is not None:
-            if nl.length < 1 or nl.length > self.zenlen:
-                raise ValueError("Invalid note length")
-            ticks = self.zenlen // nl.length
+        if nl.is_clock_value:
+            if nl.value is None:
+                raise ValueError("Missing clock tick count")
+            if nl.value < 1:
+                raise ValueError("Invalid clock tick count")
+            if nl.dot_count:
+                raise ValueError("Dots not allowed after a % clock value")
+            return nl.value
+
         else:
-            ticks = self.default_length_ticks
+            # Whole note length divisor
 
-        if nl.dot_count:
-            assert nl.dot_count > 0
+            if nl.value is not None:
+                if nl.value < 1 or nl.value > self.zenlen:
+                    raise ValueError("Invalid note length")
+                ticks = self.zenlen // nl.value
+            else:
+                ticks = self.default_length_ticks
 
-            half_t = ticks // 2
-            for i in range(nl.dot_count):
-                ticks += half_t
-                half_t //= 2
+            if nl.dot_count:
+                assert nl.dot_count > 0
 
-        return ticks
+                half_t = ticks // 2
+                for i in range(nl.dot_count):
+                    ticks += half_t
+                    half_t //= 2
+
+            return ticks
 
     def parse_note_length(self) -> int:
         nl = self.tokenizer.parse_optional_note_length()
