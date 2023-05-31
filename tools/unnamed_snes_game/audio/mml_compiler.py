@@ -737,15 +737,14 @@ class MmlChannelParser:
             self.bc.play_note(note_id, False, MAX_PLAY_NOTE_TICKS)
             t -= MAX_PLAY_NOTE_TICKS
 
-            while t > 0:
-                if t <= MAX_REST_TICKS:
-                    if key_off:
-                        self.bc.rest_keyoff(t)
-                    else:
-                        self.bc.rest(t)
-                else:
-                    self.bc.rest(MAX_REST_TICKS)
-                    t -= MAX_REST_TICKS
+            while t > MAX_REST_TICKS:
+                self.bc.rest(MAX_REST_TICKS)
+                t -= MAX_REST_TICKS
+
+            if key_off:
+                self.bc.rest_keyoff(t)
+            else:
+                self.bc.rest(t)
 
     def _rest(self, ticks: int) -> None:
         assert ticks > 0
