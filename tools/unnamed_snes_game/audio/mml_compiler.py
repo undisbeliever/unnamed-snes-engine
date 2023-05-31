@@ -971,14 +971,15 @@ class MmlChannelParser:
     def parse_at(self) -> None:
         "Set Instrument"
 
-        i = self.tokenizer.parse_identifier()
+        i: Final = self.tokenizer.parse_identifier()
 
-        self.instrument = self.instruments.get(i)
-        if self.instrument is not None:
-            self.bc.set_instrument_int(self.instrument.instrument_id)
-            self.show_missing_set_instrument_error = False
-        else:
+        inst: Final = self.instruments.get(i)
+        if inst is None:
             raise RuntimeError(f"Unknown instrument: {i}")
+
+        if inst != self.instrument:
+            self.bc.set_instrument_int(inst.instrument_id)
+            self.instrument = inst
 
     def parse_l(self) -> None:
         "Change default note length"
