@@ -319,6 +319,7 @@ UINT_REGEX: Final = re.compile(r"[0-9]+")
 RELATIVE_INT_REGEX: Final = re.compile(r"[+-]?[0-9]+")
 IDENTIFIER_REGEX: Final = re.compile(r"[0-9]+|([^0-9][^\s]*(\s|$))")
 NOTE_REGEX: Final = re.compile(r"([a-g](?:\-+|\++)?)\s*([0-9]*)(\.*)")
+PITCH_REGEX: Final = re.compile(r"([a-g](?:\-+|\++)?)\s*([0-9]*)(\.*)")
 NOTE_LENGTH_REGEX: Final = re.compile(r"([0-9]*)(\.*)")
 
 FIND_LOOP_END_REGEX: Final = re.compile(r"\[|\]")
@@ -458,6 +459,20 @@ class Tokenizer:
         else:
             return t[0]
 
+    def parse_bool(self) -> bool:
+        if self._line_str is None:
+            raise RuntimeError("Cannot parse bool, expected a 0 or a 1")
+
+        t = self._line_str[self._line_pos]
+        if t == "0":
+            self._set_pos_skip_whitespace(self._line_pos + 1)
+            return False
+        elif t == "1":
+            self._set_pos_skip_whitespace(self._line_pos + 1)
+            return True
+        else:
+            raise RuntimeError("Cannot parse bool, expected a 0 or a 1")
+
     def parse_uint(self) -> int:
         m = self.parse_regex(UINT_REGEX)
         if not m:
@@ -492,6 +507,23 @@ class Tokenizer:
             raise RuntimeError("Cannot parse identifier")
 
         return m.group(0).rstrip()
+
+    def parse_optional_pitch(self) -> Optional[int]:
+        m = self.parse_regex(PITCH_REGEX)
+        if m is None:
+            return None
+
+        note_str = m.group(1)
+        n = NOTE_MAP[note_str[0]]
+
+        n_semitone_shifts = len(note_str) - 1
+        if n_semitone_shifts > 0:
+            if note_str[1] == "-":
+                n -= n_semitone_shifts
+            else:
+                n += n_semitone_shifts
+
+        return n
 
     def parse_optional_note(self) -> Optional[Note]:
         "Returns (note, length, number_of_dots)"
@@ -592,6 +624,36 @@ class MmlChannelParser:
     def add_error(self, message: str) -> None:
         self.error_list.append(MmlError(message, *self._pos))
 
+    def _parse_list_of_pitches(self, end_token: str) -> list[int]:
+        note_ids = list()
+
+        while True:
+            self.set_error_pos()
+
+            if (p := self.tokenizer.parse_optional_pitch()) is not None:
+                try:
+                    note_ids.append(self.calculate_note_id(p))
+                except Exception as e:
+                    self.add_error(str(e))
+
+            elif t := self.tokenizer.next_token():
+                if t == end_token:
+                    break
+                elif t == "o":
+                    self.parse_o()
+                elif t == ">":
+                    self.parse_increase_octave()
+                elif t == "<":
+                    self.parse_decrease_octave()
+                else:
+                    self.add_error(f"Unknown token: {t}")
+
+            else:
+                # Line ended early
+                raise RuntimeError("Missing `{end_token}`")
+
+        return note_ids
+
     def calculate_note_id(self, note: int) -> int:
         note_id: Final = note + self.octave * SEMITONES_PER_OCTAVE + self.semitone_offset
 
@@ -628,6 +690,12 @@ class MmlChannelParser:
     def parse_note_length(self) -> int:
         l, dc = self.tokenizer.parse_note_length()
         return self.calculate_note_length(l, dc)
+
+    def parse_optional_note_length(self) -> Optional[int]:
+        l, dc = self.tokenizer.parse_note_length()
+        if l is not None or dc > 0:
+            return self.calculate_note_length(l, dc)
+        return None
 
     def parse_change_whole_note_length(self) -> None:
         """
@@ -674,6 +742,18 @@ class MmlChannelParser:
         Also advances the tokenizer to a new line and sets the error_pos (if token matches).
         """
         self.tokenizer.skip_new_line()
+        if self.tokenizer.peek_next_token() == token:
+            self.set_error_pos()
+            t = self.tokenizer.next_token()
+            assert t == token
+            return True
+        return False
+
+    def _test_next_token_matches_no_newline(self, token: str) -> bool:
+        """
+        Tests if the next token is `token` without advancing to the next line.
+        Also sets the error_pos (if the token matches).
+        """
         if self.tokenizer.peek_next_token() == token:
             self.set_error_pos()
             t = self.tokenizer.next_token()
@@ -759,10 +839,15 @@ class MmlChannelParser:
         found_end, loop_count = self.tokenizer.read_loop_end_count()
         if not found_end:
             raise RuntimeError("Cannot find end of loop")
+        self._start_loop(loop_count)
 
+    def _start_loop(self, loop_count: Optional[int]) -> None:
         if loop_count is None:
             # ::TODO add infinite loops::
             loop_count = 2
+
+        if loop_count < 2 or loop_count > MAX_LOOP_COUNT:
+            self.add_error(f"Loop count is out of range (2 - {MAX_LOOP_COUNT})")
 
         self.loop_stack.append(LoopState(loop_count, self.tick_counter, None))
         n_nested_loops = len(self.loop_stack)
@@ -771,7 +856,7 @@ class MmlChannelParser:
             self.max_nested_loops = n_nested_loops
 
         if loop_count < 2 or loop_count > MAX_LOOP_COUNT:
-            # Ignore loop count here so error message location is at the end of the loop
+            # Ignore loop count errors here so error message location is at the end of the loop
             loop_count = 2
         self.bc.start_loop(loop_count)
 
@@ -791,7 +876,8 @@ class MmlChannelParser:
 
         if not self.loop_stack:
             raise RuntimeError("Loop stack empty (missing start of loop)")
-        ls: Final = self.loop_stack.pop()
+
+        ls: Final = self.loop_stack[-1]
 
         if loop_count is None:
             # ::TODO add infinite loops::
@@ -801,11 +887,16 @@ class MmlChannelParser:
             # Adding error message here ensures error location is correct
             self.add_error(f"Loop count is out of range (2 - {MAX_LOOP_COUNT})")
 
-        n_nested_loops: Final = len(self.loop_stack)
-
         if loop_count != ls.loop_count:
             # This should not happen.  Check `Tokenizer.read_loop_end_count()`
             self.add_error(f"SOMETHING WENT WRONG: loop_count != expected_loop_count")
+
+        self._end_loop()
+
+    def _end_loop(self) -> None:
+        n_nested_loops: Final = len(self.loop_stack)
+
+        ls: Final = self.loop_stack.pop()
 
         ticks_in_loop: Final = self.tick_counter - ls.tc_start_of_loop
         if ticks_in_loop <= 0:
@@ -816,8 +907,8 @@ class MmlChannelParser:
         else:
             ticks_in_last_loop = ticks_in_loop
 
-        if ticks_in_loop > 0 and loop_count > 2:
-            self.tick_counter += ticks_in_loop * (loop_count - 2)
+        if ticks_in_loop > 0 and ls.loop_count > 2:
+            self.tick_counter += ticks_in_loop * (ls.loop_count - 2)
         if ticks_in_last_loop > 0:
             self.tick_counter += ticks_in_last_loop
 
@@ -938,6 +1029,74 @@ class MmlChannelParser:
     def parse_decrease_octave(self) -> None:
         self.octave = max(MIN_OCTAVE, self.octave - 1)
 
+    def parse_broken_chord(self) -> None:
+        chord_notes: Final = self._parse_list_of_pitches("}}")
+
+        if len(chord_notes) < 2:
+            self.add_error("Expected 2 or more pitches in a broken chord")
+
+        chord_end_pos: Final = self._pos
+
+        total_length_pos: Final = self._pos
+
+        total_length: Final = self.parse_note_length()
+
+        note_length = None
+        tie = True
+        if self._test_next_token_matches_no_newline(","):
+            self.set_error_pos()
+            note_length = self.parse_optional_note_length()
+
+            if self._test_next_token_matches_no_newline(","):
+                self.set_error_pos()
+                tie = self.tokenizer.parse_bool()
+            else:
+                if note_length is None:
+                    raise RuntimeError("Broken chord: missing note length")
+
+        if note_length is None:
+            note_length = 1
+
+        # Ensure error message for loop errors are at the correct location
+        self._pos = chord_end_pos
+
+        expected_tick_counter: Final = self.tick_counter + total_length
+
+        # If tie is true, a keyoff note is added to the end of the loop
+        notes_in_loop = total_length // note_length - int(tie)
+
+        # `ticks_remaining` cannot be 1, remove a note to from the loop to prevent this from happening
+        if note_length == 1:
+            notes_in_loop -= 1
+
+        n_loops = notes_in_loop // len(chord_notes)
+        break_point: Final = notes_in_loop % len(chord_notes)
+        keyoff: Final = not tie
+
+        if break_point != 0:
+            n_loops += 1
+
+        if n_loops < 2:
+            raise RuntimeError("Broken chord total length too short (a minimum of 2 loops are required)")
+
+        self._start_loop(n_loops)
+
+        for i, n in enumerate(chord_notes):
+            if i == break_point and break_point > 0:
+                self.parse_skip_last_loop()
+            self._play_note(n, keyoff, note_length)
+
+        self._end_loop()
+
+        ticks_remaining: Final = expected_tick_counter - self.tick_counter
+        if ticks_remaining > 0:
+            # The last note to play is always a keyoff note
+            next_note = chord_notes[(break_point + 1) % len(chord_notes)]
+            self._play_note(next_note, True, ticks_remaining)
+
+        if self.tick_counter != expected_tick_counter:
+            raise RuntimeError("Broken chord tick_count mismatch")
+
     PARSERS: Final = {
         "!": parse_exclamation_mark,
         "[": parse_start_loop,
@@ -954,6 +1113,7 @@ class MmlChannelParser:
         "p": parse_p,
         "_": parse_underscore,
         "__": parse_double_underscore,
+        "{{": parse_broken_chord,
     }
 
     def parse_mml(self) -> None:
