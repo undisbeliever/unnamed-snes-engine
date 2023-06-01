@@ -751,7 +751,10 @@ class MmlChannelParser:
 
     def calculate_note_id(self, note: int) -> int:
         note_id: Final = note + self.octave * SEMITONES_PER_OCTAVE + self.semitone_offset
+        self.test_note_id(note_id)
+        return note_id
 
+    def test_note_id(self, note_id: int) -> None:
         if self.instrument:
             if note_id < self.instrument.first_note or note_id > self.instrument.last_note:
                 self.add_error(
@@ -762,8 +765,6 @@ class MmlChannelParser:
             if self.show_missing_set_instrument_error:
                 self.add_error("Cannot play a note before setting an instrument")
                 self.show_missing_set_instrument_error = False
-
-        return note_id
 
     def calculate_note_length(self, nl: NoteLength) -> int:
         "Returns note length in ticks"
@@ -968,16 +969,7 @@ class MmlChannelParser:
             return True
         return False
 
-    def parse_note(self, note: Note) -> None:
-        # Calculated here to ensure error message location is correct
-        note_id = self.calculate_note_id(note.note)
-
-        tick_length = self.calculate_note_length(note.length)
-
-        tie_length, slur_note = self._parse_tie_and_slur()
-
-        tick_length += tie_length
-
+    def _play_note_with_quantization(self, note_id: int, tick_length: int, slur_note: bool) -> None:
         key_off = not slur_note
 
         if self.quantization and not slur_note:
@@ -994,6 +986,30 @@ class MmlChannelParser:
                 self._play_note(note_id, key_off, tick_length)
         else:
             self._play_note(note_id, key_off, tick_length)
+
+    def parse_note(self, note: Note) -> None:
+        # Must calculate note_id here to ensure error message location is correct
+        note_id = self.calculate_note_id(note.note)
+
+        note_length = self.calculate_note_length(note.length)
+        tie_length, slur_note = self._parse_tie_and_slur()
+
+        tick_length: Final = note_length + tie_length
+
+        self._play_note_with_quantization(note_id, tick_length, slur_note)
+
+    def parse_n(self) -> None:
+        "Play midi note integer ID at default length"
+
+        note_id: Final = self.tokenizer.parse_uint() - SEMITONES_PER_OCTAVE
+        # Must test note_id here to ensure error message location is correct
+        self.test_note_id(note_id)
+
+        tie_length, slur_note = self._parse_tie_and_slur()
+
+        tick_length: Final = self.default_length_ticks + tie_length
+
+        self._play_note_with_quantization(note_id, tick_length, slur_note)
 
     def parse_r(self) -> None:
         ticks = self.parse_note_length()
@@ -1373,6 +1389,7 @@ class MmlChannelParser:
         "]": parse_end_loop,
         "@": parse_at,
         "C": parse_change_whole_note_length,
+        "n": parse_n,
         "l": parse_l,
         "o": parse_o,
         "r": parse_r,
