@@ -2,11 +2,12 @@
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
 import re
+import math
 from collections import OrderedDict
 from dataclasses import dataclass
 
 from .driver_constants import N_MUSIC_CHANNELS, TIMER_HZ, MIN_TICK_TIMER, MAX_TICK_TIMER
-from .samples import SEMITONES_PER_OCTAVE
+from .samples import SEMITONES_PER_OCTAVE, PitchTable, build_pitch_table
 from .json_formats import SamplesJson
 from .bytecode import Bytecode, BcMappings, create_bc_mappings, N_OCTAVES, MAX_NESTED_LOOPS, MAX_LOOP_COUNT, MAX_PAN, MAX_VOLUME
 
@@ -602,6 +603,7 @@ class MmlChannelParser:
         metadata: MetaData,
         instruments: OrderedDict[str, Instrument],
         subroutines: Optional[list[ChannelData]],
+        pitch_table: PitchTable,
         bc_mappings: BcMappings,
         error_list: list[MmlError],
     ):
@@ -610,6 +612,7 @@ class MmlChannelParser:
         self.is_subroutine: Final = subroutines is None
         self.subroutines: Final = subroutines
         self.instruments: Final = instruments
+        self.pitch_table: Final = pitch_table
         self.bc: Final = Bytecode(bc_mappings, is_subroutine=self.is_subroutine)
 
         self.error_list: Final = error_list
@@ -620,6 +623,9 @@ class MmlChannelParser:
         self.semitone_offset: int = 0  # transpose commands (_ and __)
         self.default_length_ticks: int = self.zenlen // STARTING_DEFAULT_NOTE_LENGTH
         self.quantization: Optional[int] = None
+
+        # Note id of the previously slurred note (if any)
+        self.prev_slured_note_id: Optional[int] = None
 
         self.tick_counter: int = 0
 
@@ -742,32 +748,103 @@ class MmlChannelParser:
         self.zenlen = z
         self.default_length_ticks = z // STARTING_DEFAULT_NOTE_LENGTH
 
+    def _play_portamento(
+        self,
+        note1_id: int,
+        note2_id: int,
+        is_slur: bool,
+        speed_override: Optional[int],
+        delay_ticks: int,
+        portamento_ticks: int,
+        after_ticks: Optional[int],
+    ) -> None:
+        if self.instrument is None:
+            raise RuntimeError("Instrument must be set before a portamento (even in subroutines)")
+
+        # Play note1 (if required)
+        if self.prev_slured_note_id != note1_id or delay_ticks > 0:
+            if delay_ticks == 0:
+                delay_ticks = 1
+                portamento_ticks -= 1
+            self._play_note(note1_id, False, delay_ticks)
+
+        note2_ticks = portamento_ticks
+        if after_ticks:
+            assert after_ticks > 0
+            note2_ticks += after_ticks
+
+        key_off: Final[bool] = not is_slur
+
+        if speed_override:
+            assert speed_override > 0
+
+            if note2_id > note1_id:
+                pitch_velocity = +speed_override
+            else:
+                pitch_velocity = -speed_override
+        elif self.instrument:
+            pitch1: Final = self.pitch_table.pitch_for_note(self.instrument.instrument_id, note1_id)
+            pitch2: Final = self.pitch_table.pitch_for_note(self.instrument.instrument_id, note2_id)
+
+            # Round towards 0
+            pitch_velocity = math.trunc((pitch2 - pitch1) / portamento_ticks)
+        else:
+            raise RuntimeError(
+                "Cannot calculate portamento velocity.  Either set an instrument or manually override speed (third parameter of `{{ }}`)."
+            )
+
+        if note2_ticks < MAX_PLAY_NOTE_TICKS:
+            self.tick_counter += note2_ticks
+            self.bc.portamento(note2_id, key_off, pitch_velocity, note2_ticks)
+        else:
+            self.tick_counter += MAX_PLAY_NOTE_TICKS
+            self.bc.portamento(note2_id, False, pitch_velocity, MAX_PLAY_NOTE_TICKS)
+            self._rest_after_play_note(note2_ticks - MAX_PLAY_NOTE_TICKS, key_off)
+
+        if is_slur:
+            self.prev_slured_note_id = note2_id
+        else:
+            self.prev_slured_note_id = None
+
     def _play_note(self, note_id: int, key_off: bool, tick_length: int) -> None:
         assert tick_length > 0
 
-        self.tick_counter += tick_length
+        if not key_off:
+            self.prev_slured_note_id = note_id
+        else:
+            self.prev_slured_note_id = None
 
         if tick_length <= MAX_PLAY_NOTE_TICKS:
+            self.tick_counter += tick_length
             self.bc.play_note(note_id, key_off, tick_length)
         else:
             # Cannot play note in a single instruction
-            # Chain multiple rest instructions after the play_note instruction
-            t = tick_length
-
+            self.tick_counter += MAX_PLAY_NOTE_TICKS
             self.bc.play_note(note_id, False, MAX_PLAY_NOTE_TICKS)
-            t -= MAX_PLAY_NOTE_TICKS
+            self._rest_after_play_note(tick_length - MAX_PLAY_NOTE_TICKS, key_off)
 
-            while t > MAX_REST_TICKS:
-                self.bc.rest(MAX_REST_TICKS)
-                t -= MAX_REST_TICKS
+    def _rest_after_play_note(self, ticks: int, key_off: bool) -> None:
+        "IMPORTANT NOTE: Does not modify self.prev_slurred_note_id"
+        assert ticks > 0
 
-            if key_off:
-                self.bc.rest_keyoff(t)
-            else:
-                self.bc.rest(t)
+        if key_off:
+            self.prev_slured_note_id = None
+
+        self.tick_counter += ticks
+
+        while ticks > MAX_REST_TICKS:
+            self.bc.rest(MAX_REST_TICKS)
+            ticks -= MAX_REST_TICKS
+
+        if key_off:
+            self.bc.rest_keyoff(ticks)
+        else:
+            self.bc.rest(ticks)
 
     def _rest(self, ticks: int) -> None:
         assert ticks > 0
+
+        self.prev_slured_note_id = None
 
         self.tick_counter += ticks
 
@@ -1154,6 +1231,51 @@ class MmlChannelParser:
         if self.tick_counter != expected_tick_counter:
             raise RuntimeError("Broken chord tick_count mismatch")
 
+    def parse_portamento(self) -> None:
+        portamento_start_pos: Final = self._pos
+
+        notes: Final = self._parse_list_of_pitches("}")
+
+        total_ticks: Final = self.parse_note_length()
+        delay_ticks = 0
+        speed = None
+
+        if self._test_next_token_matches_no_newline(","):
+            self.set_error_pos()
+            nl = self.tokenizer.parse_optional_note_length()
+
+            if nl:
+                delay_ticks = self.calculate_note_length(nl)
+                if delay_ticks >= total_ticks:
+                    self.add_error("Portamento delay must be < portamento length")
+                    delay_ticks = 0
+
+            if self._test_next_token_matches_no_newline(","):
+                self.set_error_pos()
+                speed = self.tokenizer.parse_uint()
+            else:
+                # Only show "Missing delay length" error if there is no third parameter
+                if nl is None:
+                    self.add_error("Missing delay length")
+
+        is_slur = False
+        after_ticks = None
+        if self._test_next_token_matches("&"):
+            after_ticks = self.parse_optional_note_length()
+            if after_ticks is None:
+                is_slur = True
+        elif self._test_next_token_matches("^"):
+            after_ticks = self.parse_note_length()
+
+        if len(notes) != 2:
+            raise RuntimeError("Only two notes are allowed in a portamento")
+
+        # Ensure error message at the correct location
+        self._pos = portamento_start_pos
+
+        p_ticks: Final = total_ticks - delay_ticks
+        self._play_portamento(notes[0], notes[1], is_slur, speed, delay_ticks, p_ticks, after_ticks)
+
     PARSERS: Final = {
         "!": parse_exclamation_mark,
         "[": parse_start_loop,
@@ -1172,6 +1294,7 @@ class MmlChannelParser:
         "_": parse_underscore,
         "__": parse_double_underscore,
         "{{": parse_broken_chord,
+        "{": parse_portamento,
     }
 
     def parse_mml(self) -> None:
@@ -1216,10 +1339,11 @@ def parse_mml_subroutine(
     channel_name: str,
     metadata: MetaData,
     instruments: OrderedDict[str, Instrument],
+    pitch_table: PitchTable,
     bc_mappings: BcMappings,
     error_list: list[MmlError],
 ) -> ChannelData:
-    parser = MmlChannelParser(channel_lines, channel_name, metadata, instruments, None, bc_mappings, error_list)
+    parser = MmlChannelParser(channel_lines, channel_name, metadata, instruments, None, pitch_table, bc_mappings, error_list)
     parser.parse_mml()
     return parser.channel_data()
 
@@ -1230,15 +1354,18 @@ def parse_mml_channel(
     metadata: MetaData,
     instruments: OrderedDict[str, Instrument],
     subroutines: list[ChannelData],
+    pitch_table: PitchTable,
     bc_mappings: BcMappings,
     error_list: list[MmlError],
 ) -> ChannelData:
-    parser = MmlChannelParser(channel_lines, channel_name, metadata, instruments, subroutines, bc_mappings, error_list)
+    parser = MmlChannelParser(channel_lines, channel_name, metadata, instruments, subroutines, pitch_table, bc_mappings, error_list)
     parser.parse_mml()
     return parser.channel_data()
 
 
 def compile_mml(mml_text: str, samples: SamplesJson) -> MmlData:
+    pitch_table: Final = build_pitch_table(samples)
+
     mml_lines: Final = split_lines(mml_text)
 
     error_list: Final[list[MmlError]] = list()
@@ -1251,7 +1378,7 @@ def compile_mml(mml_text: str, samples: SamplesJson) -> MmlData:
 
     subroutines: Final = list()
     for s_name, c_lines in mml_lines.subroutines.items():
-        subroutines.append(parse_mml_subroutine(c_lines, s_name, metadata, instruments, bc_mappings, error_list))
+        subroutines.append(parse_mml_subroutine(c_lines, s_name, metadata, instruments, pitch_table, bc_mappings, error_list))
 
     # add subroutines to bc_mappings
     for i, s_name in enumerate(mml_lines.subroutines.keys()):
@@ -1261,7 +1388,9 @@ def compile_mml(mml_text: str, samples: SamplesJson) -> MmlData:
     for i, c_lines in enumerate(mml_lines.channels):
         if c_lines:
             channel_name = chr(FIRST_CHANNEL_ORD + i)
-            channels.append(parse_mml_channel(c_lines, channel_name, metadata, instruments, subroutines, bc_mappings, error_list))
+            channels.append(
+                parse_mml_channel(c_lines, channel_name, metadata, instruments, subroutines, pitch_table, bc_mappings, error_list)
+            )
 
     if error_list:
         raise CompileError(error_list)

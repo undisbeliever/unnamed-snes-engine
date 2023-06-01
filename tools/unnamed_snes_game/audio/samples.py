@@ -243,6 +243,16 @@ class PitchTable(NamedTuple):
     # pitch table offset for each of the instruments
     instrument_offsets: list[int]
 
+    def pitch_for_note(self, instrument_id: int, semitone: int) -> int:
+        assert semitone >= 0
+        offset: Final = self.instrument_offsets[instrument_id]
+        i: Final = (semitone + offset) & 0xFF
+
+        if i > len(self.table_data):
+            raise IndexError("Cannot retrieve pitch for note, index out of range")
+
+        return self.table_data[i]
+
 
 def _build_instrument_pitch_table(mst_map: OrderedDict[int, list[InstrumentPitch]], n_instruments: int) -> PitchTable:
     # Pitch table (uint16 array)
@@ -282,11 +292,21 @@ def _build_instrument_pitch_table(mst_map: OrderedDict[int, list[InstrumentPitch
     )
 
 
-def _pitch_table_data(pt: PitchTable) -> bytes:
-    # ::TODO somehow add raw sound samples to the pitch table data::
+def build_pitch_table(samples: SamplesJson) -> PitchTable:
+    instruments: Final = samples.instruments
+    smt_map: Final = _build_microsemitone_map(instruments)
+    pt: Final = _build_instrument_pitch_table(smt_map, len(instruments))
 
     if len(pt.table_data) > N_PITCHES_IN_PITCH_TABLE:
         raise RuntimeError(f"Too many pitches in the pitch table.  (got: {len(pt)}, max: {N_PITCHES_IN_PITCH_TABLE}")
+
+    return pt
+
+
+def _pitch_table_data(pt: PitchTable) -> bytes:
+    # ::TODO somehow add raw sound samples to the pitch table data::
+
+    assert len(pt.table_data) <= N_PITCHES_IN_PITCH_TABLE
 
     # Ensure all pitches are valid
     assert all(MIN_PITCH <= p <= MAX_PITCH for p in pt.table_data)
@@ -415,8 +435,7 @@ def build_sample_and_instrument_data(samplesInput: SamplesJson) -> SampleAndInst
 
     samples = _compile_brr_samples(instruments)
 
-    smt_map: Final = _build_microsemitone_map(instruments)
-    pitch_table: Final = _build_instrument_pitch_table(smt_map, len(instruments))
+    pitch_table: Final = build_pitch_table(samplesInput)
 
     header = bytearray()
     header += samples.brr_directory
