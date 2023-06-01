@@ -14,7 +14,7 @@ from .bytecode import validate_adsr
 
 from .json_formats import Instrument as SamplesJsonInstrument
 
-from typing import Final, NamedTuple, Optional
+from typing import Final, NamedTuple, Optional, Union
 
 
 CLOCK_CYCLES_PER_BPM: Final = 48
@@ -713,6 +713,42 @@ class MmlChannelParser:
 
         return note_ids
 
+    def _parse_tie_and_slur(self) -> tuple[int, bool]:
+        """Returns: tie_length (in ticks), slur_note"""
+        tie_length = 0
+        slur_note = False
+
+        while t := self._test_next_token_matches_multiple(r"lo><^&"):
+            # Allow note length and octave change before tick/slur
+            if t == "l":
+                self.parse_l()
+            elif t == "o":
+                self.parse_o()
+            elif t == ">":
+                self.parse_increase_octave()
+            elif t == "<":
+                self.parse_decrease_octave()
+
+            elif t == "^":
+                # Extend tick_length on ties ('^')
+                try:
+                    tie_length += self.parse_note_length()
+                except Exception as e:
+                    self.add_error(str(e))
+
+            elif t == "&":
+                # Slur or tie
+
+                nl = self.parse_optional_note_length()
+                if nl is not None:
+                    # This is a tie, extend the tick length
+                    tie_length += nl
+                else:
+                    # This is a slur
+                    slur_note = True
+
+        return tie_length, slur_note
+
     def calculate_note_id(self, note: int) -> int:
         note_id: Final = note + self.octave * SEMITONES_PER_OCTAVE + self.semitone_offset
 
@@ -793,7 +829,7 @@ class MmlChannelParser:
         speed_override: Optional[int],
         delay_ticks: int,
         portamento_ticks: int,
-        after_ticks: Optional[int],
+        after_ticks: int,
     ) -> None:
         if self.instrument is None:
             raise RuntimeError("Instrument must be set before a portamento (even in subroutines)")
@@ -904,6 +940,22 @@ class MmlChannelParser:
             return True
         return False
 
+    def _test_next_token_matches_multiple(self, tokens: Union[str | list[str]]) -> Optional[str]:
+        """
+        Tests if the next token is a character in `tokens`.  Returns the token
+
+        Also advances the tokenizer to a new line and sets the error_pos (if token matches).
+        """
+        self.tokenizer.skip_new_line()
+
+        t = self.tokenizer.peek_next_token()
+        if t and t in tokens:
+            self.set_error_pos()
+            nt = self.tokenizer.next_token()
+            assert nt == t
+            return t
+        return None
+
     def _test_next_token_matches_no_newline(self, token: str) -> bool:
         """
         Tests if the next token is `token` without advancing to the next line.
@@ -922,26 +974,13 @@ class MmlChannelParser:
 
         tick_length = self.calculate_note_length(note.length)
 
-        key_off = True
+        tie_length, slur_note = self._parse_tie_and_slur()
 
-        # Extend tick_length if there is a tie ('^')
-        while self._test_next_token_matches("^"):
-            try:
-                tick_length += self.parse_note_length()
-            except Exception as e:
-                self.add_error(str(e))
+        tick_length += tie_length
 
-        # Slur (&)
-        while self._test_next_token_matches("&"):
-            nl = self.parse_optional_note_length()
-            if nl is not None:
-                # This is a tie, extend the tick length
-                tick_length += nl
-            else:
-                # This is a slur, do not keyoff the note
-                key_off = False
+        key_off = not slur_note
 
-        if self.quantization and key_off:
+        if self.quantization and not slur_note:
             assert 0 < self.quantization < MAX_QUANTIZATION, "Invalid quantization value"
 
             # -1 for the key-off tick in the `play_note` bytecode instruction
@@ -1316,14 +1355,7 @@ class MmlChannelParser:
                 if nl is None:
                     self.add_error("Missing delay length")
 
-        is_slur = False
-        after_ticks = None
-        if self._test_next_token_matches("&"):
-            after_ticks = self.parse_optional_note_length()
-            if after_ticks is None:
-                is_slur = True
-        elif self._test_next_token_matches("^"):
-            after_ticks = self.parse_note_length()
+        after_ticks, slur_note = self._parse_tie_and_slur()
 
         if len(notes) != 2:
             raise RuntimeError("Only two notes are allowed in a portamento")
@@ -1332,7 +1364,7 @@ class MmlChannelParser:
         self._pos = portamento_start_pos
 
         p_ticks: Final = total_ticks - delay_ticks
-        self._play_portamento(notes[0], notes[1], is_slur, speed, delay_ticks, p_ticks, after_ticks)
+        self._play_portamento(notes[0], notes[1], slur_note, speed, delay_ticks, p_ticks, after_ticks)
 
     PARSERS: Final = {
         "!": parse_exclamation_mark,
