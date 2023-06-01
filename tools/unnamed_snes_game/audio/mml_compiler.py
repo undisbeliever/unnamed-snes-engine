@@ -1382,6 +1382,13 @@ class MmlChannelParser:
         p_ticks: Final = total_ticks - delay_ticks
         self._play_portamento(notes[0], notes[1], slur_note, speed, delay_ticks, p_ticks, after_ticks)
 
+    def parse_divider(self) -> None:
+        """
+        Skip divider (pipe `|`) tokens.
+        They do not do anything and exist for aesthetic reasons (ie, splitting a line into bars).
+        """
+        pass
+
     PARSERS: Final = {
         "!": parse_exclamation_mark,
         "[": parse_start_loop,
@@ -1402,6 +1409,7 @@ class MmlChannelParser:
         "__": parse_double_underscore,
         "{{": parse_broken_chord,
         "{": parse_portamento,
+        "|": parse_divider,
     }
 
     def parse_mml(self) -> None:
