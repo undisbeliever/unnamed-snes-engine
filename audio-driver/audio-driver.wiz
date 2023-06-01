@@ -131,9 +131,15 @@ in zeropage {
         var pan : [u8 ; N_CHANNELS];
 
 
-        // Portamento Velocity
-        // Portamento is disabled if velocity is 0.
-        var portamento_velocity : [i8 ; N_CHANNELS];
+        // Portamento direction
+        //  * zero - portamento disabled
+        //  *  > 0 - increase pitch
+        //  *  < 0 - decrease pitch
+        var portamento_direction : [i8 ; N_CHANNELS];
+
+        // Portamento PITCH speed
+        // (pitch change/tick)
+        var portamento_speed : [u8 ; N_CHANNELS];
 
         // Portamento target pitch
         var portamento_target_l : [u8 ; N_CHANNELS];
@@ -466,7 +472,8 @@ func __reset_channel(channelIndex : u8 in x) {
     channelSoA.nextEventIsKeyOff[x] = a;
     channelSoA.instPitchOffset[x] = a;
 
-    channelSoA.portamento_velocity[x] = a as i8;
+    // Disable portamento
+    channelSoA.portamento_direction[x] = a as i8;
 
 
     // Set keyOnMask.  The next play-note instruction will queue a KON event.
@@ -501,7 +508,7 @@ func __reset_channel(channelIndex : u8 in x) {
 inline func process_portamento__inline(channelIndex : u8 in x) {
 var _target_h : u8 in zpTmp;
 
-    a = channelSoA.portamento_velocity[x] as u8;
+    a = channelSoA.portamento_direction[x] as u8;
     if !zero {
         if negative {
             // portamento down
@@ -515,8 +522,8 @@ var _target_h : u8 in zpTmp;
             smp.dsp_addr--;
             a = smp.dsp_data;
 
-            // Add velocity to pitch (i8 velocity is negative)
-            a += channelSoA.portamento_velocity[x] as u8;
+            // Subtract speed from pitch
+            a -= channelSoA.portamento_speed[x];
             if !carry {
                 y--;
                 goto Underflowed if negative;
@@ -534,7 +541,7 @@ var _target_h : u8 in zpTmp;
 
             // Disable portamento
             a = 0;
-            channelSoA.portamento_velocity[x] = a as i8;
+            channelSoA.portamento_direction[x] = a as i8;
 
             a = channelSoA.portamento_target_l[x];
             y = channelSoA.portamento_target_h[x];
@@ -551,8 +558,8 @@ var _target_h : u8 in zpTmp;
             smp.dsp_addr--;
             a = smp.dsp_data;
 
-            // Add velocity to pitch
-            a += channelSoA.portamento_velocity[x] as u8;
+            // Add speed to pitch
+            a += channelSoA.portamento_speed[x] as u8;
             if carry {
                 y++;
                 // PITCH is 14 bits long, no overflow test required.
@@ -569,7 +576,7 @@ var _target_h : u8 in zpTmp;
 
                 // Disable portamento
                 a = 0;
-                channelSoA.portamento_velocity[x] = a as i8;
+                channelSoA.portamento_direction[x] = a as i8;
 
                 a = channelSoA.portamento_target_l[x];
                 y = channelSoA.portamento_target_h[x];
@@ -727,7 +734,7 @@ inline func _play_note__inline(channelIndex : u8 in x, noteAndKeyOffBit : u8 in 
 
     // Y = 0
     // disable portamento
-    channelSoA.portamento_velocity[x] = y as i8;
+    channelSoA.portamento_direction[x] = y as i8;
 
     channelSoA.countdownTimer[x] = a;
 }
@@ -736,9 +743,33 @@ inline func _play_note__inline(channelIndex : u8 in x, noteAndKeyOffBit : u8 in 
 
 // IN: Y = 0
 // KEEP: X
-func portamento(channelIndex : u8 in x, velocity : u8 in a) {
-    channelSoA.portamento_velocity[x] = a as i8;
+func portamento_down(channelIndex : u8 in x, speed : u8 in a) {
+    channelSoA.portamento_speed[x] = a;
 
+    return __portamento(channelIndex, -1 as u8);
+}
+
+
+
+// IN: Y = 0
+// KEEP: X
+#[fallthrough]
+func portamento_up(channelIndex : u8 in x, speed : u8 in a) {
+    channelSoA.portamento_speed[x] = a;
+
+    // direction
+    a = 1;
+
+// Fallthrough
+}
+
+
+// Assumes portamento_speed already set
+//
+// IN: Y = 0
+// KEEP: X
+func __portamento(channelIndex : u8 in x, direction : u8 in a) {
+    channelSoA.portamento_direction[x] = a as i8;
 
     // Wait length
     // Y = 0
@@ -778,7 +809,7 @@ func disable_channel(channelIndex : u8 in x) {
     channelSoA.countdownTimer[x] = a;
 
     // Disable portamento
-    channelSoA.portamento_velocity[x] = a as i8;
+    channelSoA.portamento_direction[x] = a as i8;
 
 
     // Send key-off event

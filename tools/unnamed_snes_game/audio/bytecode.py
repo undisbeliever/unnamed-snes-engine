@@ -22,39 +22,40 @@ MAX_LOOP_COUNT: Final = 256
 # Opcode values MUST MATCH `src/bytecode.wiz`
 DISABLE_CHANNEL: Final = 0xFE
 
-PORTAMENTO: Final = 0xC0
+PORTAMENTO_DOWN: Final = 0xC0
+PORTAMENTO_UP: Final = 0xC2
 
-SET_INSTRUMENT: Final = 0xC2
-REST: Final = 0xC4
-REST_KEYOFF: Final = 0xC6
-CALL_SUBROUTINE: Final = 0xC8
+SET_INSTRUMENT: Final = 0xC4
+REST: Final = 0xC6
+REST_KEYOFF: Final = 0xC8
+CALL_SUBROUTINE: Final = 0xCA
 
-START_LOOP_0: Final = 0xCA
-START_LOOP_1: Final = 0xCC
-START_LOOP_2: Final = 0xCE
-SKIP_LAST_LOOP_0: Final = 0xD0
-SKIP_LAST_LOOP_1: Final = 0xD2
-SKIP_LAST_LOOP_2: Final = 0xD4
+START_LOOP_0: Final = 0xCC
+START_LOOP_1: Final = 0xCE
+START_LOOP_2: Final = 0xD0
+SKIP_LAST_LOOP_0: Final = 0xD2
+SKIP_LAST_LOOP_1: Final = 0xD4
+SKIP_LAST_LOOP_2: Final = 0xD6
 
-SET_ADSR: Final = 0xD6
-SET_GAIN: Final = 0xD8
+SET_ADSR: Final = 0xD8
+SET_GAIN: Final = 0xDA
 
-SET_VOLUME: Final = 0xDA
-INC_VOLUME: Final = 0xDC
-DEC_VOLUME: Final = 0xDE
-SET_PAN: Final = 0xE0
-INC_PAN: Final = 0xE2
-DEC_PAN: Final = 0xE4
-SET_PAN_AND_VOLUME: Final = 0xE6
+SET_VOLUME: Final = 0xDC
+INC_VOLUME: Final = 0xDE
+DEC_VOLUME: Final = 0xE0
+SET_PAN: Final = 0xE2
+INC_PAN: Final = 0xE4
+DEC_PAN: Final = 0xE6
+SET_PAN_AND_VOLUME: Final = 0xE8
 
-END: Final = 0xE8
-RETURN_FROM_SUBROUTINE: Final = 0xEA
-END_LOOP_0: Final = 0xEC
-END_LOOP_1: Final = 0xEE
-END_LOOP_2: Final = 0xF0
+END: Final = 0xEA
+RETURN_FROM_SUBROUTINE: Final = 0xEC
+END_LOOP_0: Final = 0xEE
+END_LOOP_1: Final = 0xF0
+END_LOOP_2: Final = 0xF2
 
 
-assert PORTAMENTO == N_NOTES * 2
+assert PORTAMENTO_DOWN == N_NOTES * 2
 
 MAX_NESTED_LOOPS: Final = 3
 
@@ -93,13 +94,6 @@ def create_bc_mappings(samples: SamplesJson) -> BcMappings:
 
 class BytecodeError(Exception):
     pass
-
-
-def cast_i8(i: int) -> int:
-    """Cast an i8 to a u8 with boundary checking."""
-    if i < -128 or i > 127:
-        raise BytecodeError(f"integer cannot be represented by an i8: {i}")
-    return i if i >= 0 else 0x100 + i
 
 
 def no_argument(s: str) -> tuple[()]:
@@ -315,14 +309,21 @@ class Bytecode:
     def portamento(self, note_id: int, key_off: bool, velocity: int, length: int) -> None:
         if note_id < 0 or note_id > N_NOTES:
             raise BytecodeError("note is out of range")
-        if velocity == 0:
+
+        speed: Final = abs(velocity)
+        if speed == 0:
             raise BytecodeError("portamento velocity cannot be 0")
-        if velocity < -128 or velocity > 127:
-            raise BytecodeError("portamento velocity is out of range")
+        if speed > 0xFF:
+            raise BytecodeError(f"portamento velocity is out of range ({speed}, max: 255 per tick)")
         length = test_length_argument(length)
 
-        self.bytecode.append(PORTAMENTO)
-        self.bytecode.append(cast_i8(velocity))
+        if velocity < 0:
+            opcode = PORTAMENTO_DOWN
+        else:
+            opcode = PORTAMENTO_UP
+
+        self.bytecode.append(opcode)
+        self.bytecode.append(speed)
         self.bytecode.append(length)
         self.bytecode.append((note_id << 1) | (key_off & 1))
 

@@ -42,14 +42,23 @@ let DISABLE_CHANNEL_BYTECODE = 0xfe;
 
 // These bytecodes do have parameters
 let INSTRUCTIONS_WITH_ARGUMENTS = [
-    // parameters: vvvvvvvv llllllll nnnnnnnO
-    //     vvvvvvvv = i8 velocity (signed PITCH change per tick)
+    // parameters: ssssssss llllllll nnnnnnnO
+    //     ssssssss = u8 speed (PITCH change per tick)
     //     llllllll = note length
     //      nnnnnnn = note to target (number of semitones above c0)
     //            O = key-off after note ends
     //
     // NOTE: portamento does not emit a KON event
-    portamento,
+    portamento_down,
+
+    // parameters: ssssssss llllllll nnnnnnnO
+    //     ssssssss = u8 speed (PITCH change per tick)
+    //     llllllll = note length
+    //      nnnnnnn = note to target (number of semitones above c0)
+    //            O = key-off after note ends
+    //
+    // NOTE: portamento does not emit a KON event
+    portamento_up,
 
 
     set_instrument,
@@ -144,7 +153,6 @@ let NO_ARGUMENT_INSTRUCTIONS = [
 
 
     // padding
-    disable_channel,
     disable_channel,
     disable_channel,
     disable_channel,
