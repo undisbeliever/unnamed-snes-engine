@@ -96,6 +96,17 @@ class BytecodeError(Exception):
     pass
 
 
+def validate_adsr(a: int, d: int, sl: int, sr: int) -> None:
+    if a & 0b1111 != a:
+        raise BytecodeError("Invalid ADSR attack value")
+    if d & 0b111 != d:
+        raise BytecodeError("Invalid ADSR decay value")
+    if sl & 0b111 != sl:
+        raise BytecodeError("Invalid ADSR sustain level value")
+    if sr & 0b11111 != sr:
+        raise BytecodeError("Invalid ADSR sustain rate value")
+
+
 def no_argument(s: str) -> tuple[()]:
     if s:
         raise ValueError(f"Instruction has no argument")
@@ -424,14 +435,7 @@ class Bytecode:
 
     @_instruction(adsr_argument)
     def set_adsr(self, a: int, d: int, sl: int, sr: int) -> None:
-        if a & 0b1111 != a:
-            raise BytecodeError("Invalid ADSR attack value")
-        if d & 0b111 != d:
-            raise BytecodeError("Invalid ADSR decay value")
-        if sl & 0b111 != sl:
-            raise BytecodeError("Invalid ADSR sustain level value")
-        if sr & 0b11111 != sr:
-            raise BytecodeError("Invalid ADSR sustain rate value")
+        validate_adsr(a, d, sl, sr)
 
         self.bytecode.append(SET_ADSR)
         self.bytecode.append((1 << 7) | (d << 4) | (a))

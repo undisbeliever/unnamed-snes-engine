@@ -10,6 +10,9 @@ from .driver_constants import N_MUSIC_CHANNELS, TIMER_HZ, MIN_TICK_TIMER, MAX_TI
 from .samples import SEMITONES_PER_OCTAVE, PitchTable, build_pitch_table
 from .json_formats import SamplesJson
 from .bytecode import Bytecode, BcMappings, create_bc_mappings, N_OCTAVES, MAX_NESTED_LOOPS, MAX_LOOP_COUNT, MAX_PAN, MAX_VOLUME
+from .bytecode import validate_adsr
+
+from .json_formats import Instrument as SamplesJsonInstrument
 
 from typing import Final, NamedTuple, Optional
 
@@ -75,6 +78,10 @@ class Instrument(NamedTuple):
     instrument_id: int
     first_note: int
     last_note: int
+
+    # Override adsr or gain values
+    adsr: Optional[tuple[int, int, int, int]]
+    gain: Optional[int]
 
 
 class ChannelData(NamedTuple):
@@ -264,45 +271,75 @@ def parse_headers(headers: list[Line], error_list: list[MmlError]) -> MetaData:
     )
 
 
-INSTRUNMENT_REGEX: Final = re.compile(r"^@(\w+)\s+(\w+)$")
+INSTRUNMENT_REGEX: Final = re.compile(r"^@([^\s]+)\s+(.+)$")
+
+
+def _parse_instrument_line(line: str, inst_map: dict[str, tuple[int, SamplesJsonInstrument]]) -> Instrument:
+    m: Final = INSTRUNMENT_REGEX.fullmatch(line)
+    if not m:
+        raise RuntimeError("Invalid instrument format.")
+
+    name: Final = m.group(1)
+    args: Final = m.group(2).split()
+
+    inst_name: Final = args.pop(0)
+
+    if not is_identifier_valid(name):
+        raise RuntimeError(f"Invalid instrument name: {name}")
+
+    map_value: Final = inst_map.get(inst_name)
+    if map_value is None:
+        raise RuntimeError(f"Unknown samples.json instrument: {inst_name}")
+
+    inst_id, inst = map_value
+
+    adsr = None
+    gain = None
+
+    if args:
+        arg_name: Final = args[0]
+        if arg_name == "adsr":
+            if len(args) != 5:
+                raise RuntimeError("adsr argument requires 4 integers")
+            adsr = int(args[1]), int(args[2]), int(args[3]), int(args[4])
+            validate_adsr(*adsr)
+
+        elif arg_name == "gain":
+            if len(args) != 2:
+                raise RuntimeError("Invalid gain: expected 1 integer")
+            # ::TODO parse gain::
+            gain = int(args[1], 0)
+            if gain < 0 or gain > 0xFF:
+                raise RuntimeError("Invalid gain byte")
+        else:
+            raise RuntimeError(f"Unknown instrument argument: {arg_name}")
+
+    return Instrument(
+        name=name,
+        instrument_name=inst.name,
+        instrument_id=inst_id,
+        first_note=inst.first_octave * SEMITONES_PER_OCTAVE,
+        last_note=(inst.last_octave + 1) * SEMITONES_PER_OCTAVE - 1,
+        adsr=adsr,
+        gain=gain,
+    )
 
 
 def parse_instruments(instrument_lines: list[Line], samples: SamplesJson) -> OrderedDict[str, Instrument]:
     out = OrderedDict()
     errors = list()
 
-    instruments: Final = samples.instruments
-    inst_map: Final = {inst.name: i for i, inst in enumerate(instruments)}
+    inst_map: Final = {inst.name: (i, inst) for i, inst in enumerate(samples.instruments)}
 
     for line in instrument_lines:
-        m = INSTRUNMENT_REGEX.fullmatch(line.text)
-        if not m:
-            errors.append(MmlError('Invalid instrument format. Expected "@id instrument_name"', line.line_number, None))
-            continue
+        try:
+            inst = _parse_instrument_line(line.text, inst_map)
+            if inst.name in out:
+                raise RuntimeError(f"Duplicate instrument: {inst.name}")
 
-        name = m.group(1)
-        inst_name = m.group(2)
-
-        if not is_identifier_valid(name):
-            errors.append(MmlError(f"Invalid instrument name: {name}", line.line_number, None))
-
-        if name in out:
-            errors.append(MmlError(f"Duplicate instrument: {name}", line.line_number, None))
-
-        inst_id = inst_map.get(inst_name)
-        if inst_id is None:
-            errors.append(MmlError(f"Unknown samples.json instrument: {inst_name}", line.line_number, None))
-            continue
-
-        inst = instruments[inst_id]
-
-        out[name] = Instrument(
-            name=name,
-            instrument_name=inst.name,
-            instrument_id=inst_id,
-            first_note=inst.first_octave * SEMITONES_PER_OCTAVE,
-            last_note=(inst.last_octave + 1) * SEMITONES_PER_OCTAVE - 1,
-        )
+            out[inst.name] = inst
+        except Exception as e:
+            errors.append(MmlError(str(e), line.line_number, None))
 
     if errors:
         raise CompileError(errors)
@@ -1054,9 +1091,30 @@ class MmlChannelParser:
         if inst is None:
             raise RuntimeError(f"Unknown instrument: {i}")
 
-        if inst != self.instrument:
+        old_adsr: Final = self.instrument.adsr if self.instrument else None
+        old_gain: Final = self.instrument.gain if self.instrument else None
+
+        adsr_or_gain_changed: Final[bool] = inst.adsr != old_adsr or inst.gain != old_gain
+
+        emit_si_bc: Final[bool] = (
+            # First instrument command
+            self.instrument is None
+            # Instrument id changed
+            or inst.instrument_id != self.instrument.instrument_id
+            # ADSR/GAIN needs to be restored
+            or (inst.adsr is None and inst.gain is None and adsr_or_gain_changed)
+        )
+
+        if emit_si_bc:
             self.bc.set_instrument_int(inst.instrument_id)
-            self.instrument = inst
+
+        if inst.adsr is not None and inst.adsr != old_adsr:
+            self.bc.set_adsr(*inst.adsr)
+
+        if inst.gain is not None and inst.gain != old_gain:
+            self.bc.set_gain(inst.gain)
+
+        self.instrument = inst
 
     def parse_l(self) -> None:
         "Change default note length"
