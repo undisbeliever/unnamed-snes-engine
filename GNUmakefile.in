@@ -74,7 +74,7 @@ GEN_SOURCES  += $(GEN_DIR)/cosine-tables.wiz
 RESOURCES_SRC := $(wildcard $(RESOURCES_DIR)/*.json $(RESOURCES_DIR)/* $(RESOURCES_DIR)/*/* $(RESOURCES_DIR)/*/*/*)
 
 
-AUDIO_DRIVER_SRC      := $(wildcard AUDIO_SRC_DIR/*.wiz)
+AUDIO_DRIVER_SRC      := $(wildcard $(AUDIO_SRC_DIR)/*.wiz)
 AUDIO_DRIVER_BINARIES := $(GEN_DIR)/audio-loader.bin $(GEN_DIR)/audio-driver.bin
 AUDIO_DRIVER_DATA     := $(GEN_DIR)/audio-blank-song.bin
 
