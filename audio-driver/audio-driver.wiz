@@ -275,11 +275,12 @@ var _loopEnd : u8 in zpTmp;
     smp.timer_0 = a = songPtr[y];
 
     smp.timer_1 = SFX_TICK_CLOCK;
-    smp.control = smp.CONTROL__ENABLE_TIMER_0 | smp.CONTROL__ENABLE_TIMER_1;
 
     // Reset counters to ensure `maxTimerCounter` is accurate
-    a = smp.counter_0;
-    a = smp.counter_1;
+    // Timers and counters reset when the timer control bits transition from 0 to 1
+    smp.control = 0;
+    smp.control = smp.CONTROL__ENABLE_TIMER_0 | smp.CONTROL__ENABLE_TIMER_1;
+
 
     ^while true {
         process_event_loop__inline();
