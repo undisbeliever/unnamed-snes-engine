@@ -140,7 +140,7 @@ class Rou2sWindow:
         self._window.bind(GuiSignals.RES_COMPILED_EVENT_NAME, self._errors_tab.on_resource_compiled)
         self._window.bind(GuiSignals.BG_THREAD_STOPPED_EVENT_NAME, self._on_bg_thread_stopped)
         self._window.bind(GuiSignals.AUDIO_SAMPLES_CHANGED_EVENT_NAME, self._test_sfx_tab.on_audio_samples_changed)
-        self._window.bind(GuiSignals.AUDIO_SAMPLES_CHANGED_EVENT_NAME, self._test_mml_tab.on_audio_samples_changed)
+        self._window.bind(GuiSignals.AUDIO_SAMPLES_CHANGED_EVENT_NAME, self._test_mml_tab.on_audio_samples_changed, add="+")
 
     def add_bg_thread(self, t: BgThread) -> None:
         if self._running:
