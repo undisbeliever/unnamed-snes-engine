@@ -17,6 +17,18 @@ bank code           @ CODE_ADDR : [constdata;   CODE_SIZE];
 extern const external_data @ COMMON_DATA_ADDR : ExternalData;
 
 
+// Must wait a minimum of 240ms after setting `EDL` and `EDA` before reading/writing the echo buffer.
+//
+// Added a little extra to be safe.
+let EDL_SLEEP_MS = 250;
+
+// Instead of setting TIMER_0 register to 8 and counting `EDL_SLEEP_MS` clocks, we can set TIMER_0 to `EDL_SLEEP_MS` and wait 8 clocks.
+let EDL_SLEEP_TIMER_0 = EDL_SLEEP_MS;
+let EDL_SLEEP_COUNT   = smp.TIMER_0_HZ / 1000;
+
+// Assert EDL_SLEEP_COUNT < 12
+
+
 
 // Variables
 // =========
@@ -182,8 +194,108 @@ var _loopEnd : u8 in zpTmp;
 
     write_dsp(GlobalDspAddr.KOFF,   0xff);  // all keys off
 
+
+    // Setup echo.
+    //
+    // This is done as soon as possible as we need to wait a while after setting EDL and ESA.
+    {
+        // Assumes ECHO write is disabled.
+
+        y = offsetof(SongHeader, echo);
+
+        // EchoBufferSettings.edl (mask for safety)
+        a = songPtr[y] & 0xf;
+        y++;
+
+        // Set EDL
+        smp.dsp_addr = GlobalDspAddr.EDL as u8;
+        smp.dsp_data = a;
+
+
+        // Calculate echo address
+
+        // a = 0x100 - a * (2048 / 256)
+
+        // Multiply by 8
+        // (XCN is safe, A has been masked)
+        swap_digits(a);
+        a >>>= 1;
+
+        // Negate A
+        a ^= 0xff;
+        a++;
+
+        if zero {
+            // Ensure echo buffer is at the end of audio-ram when EDL is 0
+            a--;
+        }
+
+        // set ESA (Echo start address??)
+        // Assumes GlobalDspAddr.ESA | 0x10 = GlobalDspAddr.EDL
+        smp.dsp_addr $ 4 = false;
+        smp.dsp_data = a;
+
+        // Save EDA for later.
+        x = a;
+
+        // MUST NOT USE X
+
+
+        // `EDL` does not take affect immediately.
+        // The S-DSP reads `EDL` when the echo buffer is full and wraps around.
+        //
+        // Since `EDL` starts in an uninitialised state, we must wait a minimum of 240ms before
+        // setting echo volume or enabling echo writes.
+        //
+        // Setup a timer here and enable echo writes at the end of driver initialization.
+        //
+        // Source: fullsnes https://problemkaputt.de/fullsnes.htm#snesapudspechoregisters
+
+        smp.timer_0 = EDL_SLEEP_TIMER_0;
+
+        // Reset and enable timer 0 (timers are reset on a transition from 0 to 1)
+        smp.control = 0;
+        smp.control = smp.CONTROL__ENABLE_TIMER_0;
+
+
+        // Copy FIR filter from header to C0-C7
+        smp.dsp_addr = GlobalDspAddr.C0 as u8;
+        do {
+            // EchoBufferSettings.firFilter
+            smp.dsp_data = a = songPtr[y];
+            y++;
+
+            // Assumes GlobalDspAddr.C1 - GlobalDspAddr.C0 == 0x10
+            // Assumes GlobalDspAddr.C7 + 0x10 >= 0x80
+            smp.dsp_addr += 0x10;
+        } while !negative;
+
+
+        // EchoBufferSettings.echoFeedback
+        a = songPtr[y];
+        y++;
+
+        smp.dsp_addr = GlobalDspAddr.EFB as u8;
+        smp.dsp_data = a;
+
+
+        // EchoBufferSettings.echoVolume
+        a = songPtr[y];
+
+        smp.dsp_addr = GlobalDspAddr.EVOL_L as u8;
+        smp.dsp_data = a;
+
+        // Assumes GlobalDspAddr.EVOL_R = GlobalDspAddr.EVOL_L | 0x10
+        smp.dsp_addr $ 4 = true;
+        smp.dsp_data = a;
+
+
+        // X = EDA
+        __clear_echo_buffer__inline(x);
+    }
+
+
     y = 0;
-    write_dsp(GlobalDspAddr.EFB,    y);     // No echo feedback
     write_dsp(GlobalDspAddr.PMON,   y);     // No pitch modulation
     write_dsp(GlobalDspAddr.NON,    y);     // No noise
     write_dsp(GlobalDspAddr.EON,    y);     // No echo
@@ -194,18 +306,8 @@ var _loopEnd : u8 in zpTmp;
     write_dsp(GlobalDspAddr.MVOL_L, y);
     write_dsp(GlobalDspAddr.MVOL_R, y);
 
-    y = 0;
-    write_dsp(GlobalDspAddr.EVOL_L, y);
-    write_dsp(GlobalDspAddr.EVOL_R, y);
-
-
-
     // Set directory table
     write_dsp(GlobalDspAddr.DIR, >:&external_data.brrDirectory[0]);
-
-
-    // Unmute the audio (keep echo disabled)
-    write_dsp(GlobalDspAddr.FLG,    dsp.FLG__ECHO_DISABLE);
 
 
     // Clear all zero-page variables before `songPtr`.
@@ -270,6 +372,20 @@ var _loopEnd : u8 in zpTmp;
     init_io_ports__inline();
 
 
+    // Wait until the echo buffer can be safely written to.
+    // (wait until `EDL_SLEEP_COUNT` ticks of TIMER_0)
+
+    a = EDL_SLEEP_COUNT - 1;
+    do {
+        a -= smp.counter_0;
+    } while carry;
+
+
+    // Enable echo write and unmute the DSP
+    write_dsp(GlobalDspAddr.FLG, 0);
+
+
+
     // Setup and enable the timers
     y = offsetof(SongHeader, tickTimer);
     smp.timer_0 = a = songPtr[y];
@@ -285,6 +401,45 @@ var _loopEnd : u8 in zpTmp;
     ^while true {
         process_event_loop__inline();
     }
+}
+
+
+
+// Clears the echo buffer.
+//
+// ASSUMES: IPL is disabled
+// ASSUMES: X matches the `EDA` S-DSP register
+//
+// WARNING: Can clobber the entirely of Audio-RAM if `eda` is invalid.
+//
+// WARNING: self modifying code
+inline func __clear_echo_buffer__inline(eda : u8 in x) {
+    // X = page address of the start of the echo buffer
+    // Echo buffer ends at the end of memory.
+
+    // Set the high byte of the `mov !abs+Y, a` instructions.
+    (&STA_1 as *u8)[2] = x;
+    (&STA_2 as *u8)[2] = x;
+
+    a = 0;
+
+    // Have to use a manual loop so the above code can access the `MOV_absY_A` label.
+    OuterLoop:
+        y = 0x80;
+        InnerLoop:
+            // Write 2 bytes every loop.
+            // Writing 1 byte per loop is too slow (COUNTER_0 is 11 when it should be <=8 (TIMER_0=250)).
+        STA_1:
+            (0x0000 as *u8)[y] = a;
+        STA_2:
+            (0x0080 as *u8)[y] = a;
+
+            goto InnerLoop if --y != 0;
+
+        // Advance to the next page
+        (&STA_1 as *u8)[2]++;
+        (&STA_2 as *u8)[2]++;
+        goto OuterLoop if !zero;
 }
 
 
@@ -959,6 +1114,28 @@ func end_loop_1(channelIndex : u8 in x) {
 // KEEP: X
 func end_loop_2(channelIndex : u8 in x) {
     return __end_loop(x, 2);
+}
+
+
+
+func enable_echo(channelIndex : u8 in x) {
+    a = ChannelVoiceBit[x];
+
+    smp.dsp_addr = GlobalDspAddr.EON as u8;
+    test_and_set(a, smp.dsp_data);
+
+    ^return process_next_bytecode(x);
+}
+
+
+
+func disable_echo(channelIndex : u8 in x) {
+    a = ChannelVoiceBit[x];
+
+    smp.dsp_addr = GlobalDspAddr.EON as u8;
+    test_and_clear(a, smp.dsp_data);
+
+    ^return process_next_bytecode(x);
 }
 
 

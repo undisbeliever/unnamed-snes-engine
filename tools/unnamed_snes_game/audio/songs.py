@@ -5,11 +5,23 @@ from collections import OrderedDict
 
 from typing import Final, Optional
 
-from .driver_constants import SONG_HEADER_SIZE, N_MUSIC_CHANNELS, MAX_N_SUBROUTINES, MIN_TICK_TIMER, MAX_TICK_TIMER, SFX_TICK_TIMER
-from .mml_compiler import MmlData, MetaData, ChannelData
+from .driver_constants import (
+    SONG_HEADER_SIZE,
+    N_MUSIC_CHANNELS,
+    MAX_N_SUBROUTINES,
+    MIN_TICK_TIMER,
+    MAX_TICK_TIMER,
+    SFX_TICK_TIMER,
+    IDENITIY_FIR_FILTER,
+    FIR_FILTER_SIZE,
+    ECHO_BUFFER_MAX_EDL,
+)
+from .mml_compiler import MmlData, MetaData, ChannelData, cast_i8
 
 
 def song_header(mml_data: MmlData) -> bytes:
+    md: Final = mml_data.metadata
+
     if len(mml_data.channels) == 0:
         raise RuntimeError("No music channels")
 
@@ -57,6 +69,20 @@ def song_header(mml_data: MmlData) -> bytes:
             out.append(0xFF)
             out.append(0xFF)
 
+    #
+    # EchoBufferSettings
+
+    if md.echo_edl < 0 or md.echo_edl > ECHO_BUFFER_MAX_EDL:
+        raise RuntimeError("Echo buffer EDL is out of bounds")
+
+    if len(md.echo_fir) != FIR_FILTER_SIZE:
+        raise RuntimeError("Invalid FIR filter")
+
+    out.append(md.echo_edl)
+    out += md.echo_fir
+    out.append(cast_i8(md.echo_feedback))
+    out.append(cast_i8(md.echo_volume))
+
     out.append(tick_clock)
 
     out.append(len(mml_data.subroutines))
@@ -97,6 +123,10 @@ def dummy_sfx_song_header() -> bytes:
                 author=None,
                 copyright=None,
                 license=None,
+                echo_edl=0,
+                echo_fir=IDENITIY_FIR_FILTER,
+                echo_feedback=0,
+                echo_volume=0,
                 tick_timer=SFX_TICK_TIMER,
                 zenlen=96,
             ),

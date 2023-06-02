@@ -13,6 +13,13 @@ in rodata {
 const BlankSong = SongHeader{
     channels = [ MusicChannelHeader{ starting = 0xffff, loop = 0xffff } ; N_MUSIC_CHANNELS ],
 
+    echo = EchoBufferSettings{
+        edl = 0,
+        firFilter = [0x7f, 0 , 0 , 0 , 0 , 0 , 0 , 0], // Identity FIR filter
+        echoFeedback = 0,
+        echoVolume = 0,
+    },
+
     // Maximum tick timer
     tickTimer = 255,
 

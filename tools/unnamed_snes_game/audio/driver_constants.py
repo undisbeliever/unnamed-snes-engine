@@ -53,4 +53,19 @@ MAX_N_SUBROUTINES: Final = 128
 
 # MUST match `audio/src/common_memmap.wiz`
 # MUST match `SongHeader` in `audio/src/audio-driver.wiz`
-SONG_HEADER_SIZE = N_MUSIC_CHANNELS * 4 + 2
+SONG_HEADER_SIZE = N_MUSIC_CHANNELS * 4 + 13
+
+
+# S-DSP constants
+
+FIR_FILTER_SIZE: Final = 8
+IDENITIY_FIR_FILTER: Final = b"\x7f\x00\x00\x00\x00\x00\x00\x00"
+
+
+# milliseconds of echo buffer per EDL value
+ECHO_BUFFER_EDL_MS: Final = 16
+
+# Bytes per EDL value
+ECHO_BUFFER_EDL_SIZE: Final = 2048
+
+ECHO_BUFFER_MAX_EDL: Final = 15

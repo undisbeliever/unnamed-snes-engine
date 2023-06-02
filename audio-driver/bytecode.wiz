@@ -158,9 +158,14 @@ let NO_ARGUMENT_INSTRUCTIONS = [
     end_loop_2,
 
 
+    // Enable echo on this channel
+    enable_echo,
+
+    // Disable echo on this channel
+    disable_echo,
+
+
     // padding
-    disable_channel,
-    disable_channel,
     disable_channel,
     disable_channel,
 ];

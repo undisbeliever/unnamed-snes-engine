@@ -56,6 +56,9 @@ END_LOOP_0: Final = 0xF0
 END_LOOP_1: Final = 0xF2
 END_LOOP_2: Final = 0xF4
 
+ENABLE_ECHO: Final = 0xF6
+DISABLE_ECHO: Final = 0xF8
+
 
 assert PORTAMENTO_DOWN == N_NOTES * 2
 
@@ -546,6 +549,14 @@ class Bytecode:
             raise BytecodeError(f"timer0 value out of range: {timer} (min: {MIN_TICK_TIMER}, max: {0xff})")
         self.bytecode.append(SET_SONG_TICK_CLOCK)
         self.bytecode.append(timer)
+
+    @_instruction(no_argument)
+    def enable_echo(self) -> None:
+        self.bytecode.append(ENABLE_ECHO)
+
+    @_instruction(no_argument)
+    def disable_echo(self) -> None:
+        self.bytecode.append(DISABLE_ECHO)
 
 
 def test_length_argument(length: int) -> int:

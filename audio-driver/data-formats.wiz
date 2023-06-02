@@ -85,16 +85,40 @@ struct MusicChannelHeader {
     loop: u16,
 };
 
+struct EchoBufferSettings {
+
+    // 4-bit echo buffer size.
+    //
+    // The echo buffer is `2048 * edl` bytes in size and `16ms * edl` in length.
+    //
+    // NOTE: An edl value of 0 allocates 2048 bytes of RAM to the echo buffer.
+    //
+    // NOTE: There is no echo buffer overflow checking.
+    //       The echo buffer may clobber song/sample/sfx data if `edl` is too large.
+    edl : u8,
+
+    // FIR filter.  Written to the `C0`-`C7` S-DSP registers.
+    firFilter : [i8 ; 8],
+
+    // Echo feedback.  Written to the `EFB` S-DSP register.
+    echoFeedback : i8,
+
+    // Echo volume.  Written to the `EVOL_L` and `EVOL_R` S-DSP registers.
+    echoVolume : i8,
+}
+
 // Size MUST match `audio/driver_constants.py`
 struct SongHeader {
     channels : [MusicChannelHeader ; N_MUSIC_CHANNELS],
+
+
+    echo: EchoBufferSettings,
 
 
     // Length of a tick in 1/8000 cycles (song tempo).
     //
     // MUST BE >= MIN_TICK_CLOCK
     tickTimer : u8,
-
 
     // Number of subroutines
     // NOTE: This variable has a maximum value of 128.

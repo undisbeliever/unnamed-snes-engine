@@ -6,7 +6,17 @@ import math
 from collections import OrderedDict
 from dataclasses import dataclass
 
-from .driver_constants import N_MUSIC_CHANNELS, TIMER_HZ, MIN_TICK_TIMER, MAX_TICK_TIMER
+from .driver_constants import (
+    N_MUSIC_CHANNELS,
+    FIR_FILTER_SIZE,
+    IDENITIY_FIR_FILTER,
+    TIMER_HZ,
+    MIN_TICK_TIMER,
+    MAX_TICK_TIMER,
+    ECHO_BUFFER_EDL_MS,
+    ECHO_BUFFER_EDL_SIZE,
+    ECHO_BUFFER_MAX_EDL,
+)
 from .samples import SEMITONES_PER_OCTAVE, PitchTable, build_pitch_table
 from .json_formats import SamplesJson
 from .bytecode import Bytecode, BcMappings, create_bc_mappings, N_OCTAVES, MAX_NESTED_LOOPS, MAX_LOOP_COUNT, MAX_PAN, MAX_VOLUME
@@ -68,8 +78,18 @@ class MetaData(NamedTuple):
     copyright: Optional[str]
     license: Optional[str]
 
+    # Echo edl value
+    echo_edl: int
+    echo_fir: bytes
+    echo_feedback: int
+    echo_volume: int
+
     tick_timer: int
     zenlen: int
+
+    # ::TODO confirm echo buffer is not too large::
+    def echo_buffer_size(self) -> int:
+        return max(256, self.echo_edl * ECHO_BUFFER_EDL_SIZE)
 
 
 class Instrument(NamedTuple):
@@ -199,6 +219,18 @@ def split_lines(mml_text: str) -> MmlLines:
 HEADER_REGEX = re.compile(r"^#([^\s]+)\s+(.+)$")
 VALID_HEADERS = frozenset(("Title", "Composer", "Author", "Copyright", "Date", "License"))
 
+I8_MIN: Final = -128
+I8_MAX: Final = 127
+
+
+def cast_i8(i: int) -> int:
+    "Cast an i8 to a u8 with boundary checking."
+    if i < -128 or i > 127:
+        raise ValueError(f"i8 integer out of bounds: {i}")
+    if i < 0:
+        return i + 0x100
+    return i
+
 
 def parse_int_range(s: str, min_value: int, max_value: int) -> int:
     i = int(s)
@@ -215,11 +247,46 @@ def bpm_to_tick_timer(bpm: int) -> int:
     return tick_timer
 
 
+def parse_fir_filter(line: str) -> bytes:
+    values = line.split()
+    if len(values) != FIR_FILTER_SIZE:
+        raise RuntimeError(f"FIR filter requires {FIR_FILTER_SIZE} values")
+
+    out = bytearray()
+
+    for s in values:
+        if s[0] == "$":
+            out.append(int(s[1:], 16))
+        else:
+            out.append(cast_i8(int(s)))
+
+    return bytes(out)
+
+
+def parse_echo_length_to_edl(line: str) -> int:
+    m = re.match(r"([0-9]+)ms", line)
+    if not m:
+        raise ValueError("Cannot parse echo length, expected #EchoLength 00ms")
+
+    length_ms = int(m.group(1))
+    if length_ms % ECHO_BUFFER_EDL_MS != 0:
+        raise ValueError("Echo buffer length is not a multiple of 16ms")
+
+    edl = length_ms // ECHO_BUFFER_EDL_MS
+    if edl > ECHO_BUFFER_MAX_EDL:
+        raise ValueError(f"Echo buffer is too large (max {ECHO_BUFFER_MAX_EDL * ECHO_BUFFER_EDL_MS}ms)")
+    return edl
+
+
 def parse_headers(headers: list[Line], error_list: list[MmlError]) -> MetaData:
     header_map = dict()
 
     tick_timer = None
-    zenlen = None
+    zenlen = DEFAULT_ZENLEN
+    echo_edl = 0
+    echo_fir = IDENITIY_FIR_FILTER
+    echo_feedback = 0
+    echo_volume = 0
 
     for line in headers:
         try:
@@ -227,8 +294,12 @@ def parse_headers(headers: list[Line], error_list: list[MmlError]) -> MetaData:
             if not m:
                 raise ValueError("Invalid header format")
 
-            name = m.group(1).title()
+            name = m.group(1)
             value = m.group(2).strip()
+
+            if name in header_map:
+                raise RuntimeError("Duplicate header name: {name}")
+            header_map[name] = value
 
             if name == "Tempo" or name == "Timer":
                 if tick_timer is not None:
@@ -239,16 +310,21 @@ def parse_headers(headers: list[Line], error_list: list[MmlError]) -> MetaData:
                     tick_timer = parse_int_range(value, MIN_TICK_TIMER, MAX_TICK_TIMER)
 
             elif name == "Zenlen":
-                if zenlen is not None:
-                    raise RuntimeError("Cannot set zenlen: zenlen already set")
                 zenlen = parse_int_range(value, MIN_ZENLEN, MAX_ZENLEN)
 
-            elif name in VALID_HEADERS:
-                if name in header_map:
-                    raise RuntimeError("Duplicate header name: {name}")
-                header_map[name] = value
+            elif name == "EchoLength":
+                echo_edl = parse_echo_length_to_edl(value)
 
-            else:
+            elif name == "FirFilter":
+                echo_fir = parse_fir_filter(value)
+
+            elif name == "EchoFeedback":
+                echo_feedback = parse_int_range(value, I8_MIN, I8_MAX)
+
+            elif name == "EchoVolume":
+                echo_volume = parse_int_range(value, I8_MIN, I8_MAX)
+
+            elif name not in VALID_HEADERS:
                 raise ValueError(f"Unknown header: {m.group(1)}")
 
         except Exception as e:
@@ -257,9 +333,6 @@ def parse_headers(headers: list[Line], error_list: list[MmlError]) -> MetaData:
     if tick_timer is None:
         tick_timer = bpm_to_tick_timer(60)
 
-    if zenlen is None:
-        zenlen = DEFAULT_ZENLEN
-
     return MetaData(
         title=header_map.get("Title"),
         date=header_map.get("Date"),
@@ -267,6 +340,10 @@ def parse_headers(headers: list[Line], error_list: list[MmlError]) -> MetaData:
         author=header_map.get("Author"),
         copyright=header_map.get("Copyright"),
         license=header_map.get("License"),
+        echo_edl=echo_edl,
+        echo_fir=echo_fir,
+        echo_feedback=echo_feedback,
+        echo_volume=echo_volume,
         tick_timer=tick_timer,
         zenlen=zenlen,
     )
@@ -520,6 +597,20 @@ class Tokenizer:
             return True
         else:
             raise RuntimeError("Cannot parse bool, expected a 0 or a 1")
+
+    def parse_optional_bool(self, default: bool) -> bool:
+        if self._line_str is None:
+            return default
+
+        t = self._line_str[self._line_pos]
+        if t == "0":
+            self._set_pos_skip_whitespace(self._line_pos + 1)
+            return False
+        elif t == "1":
+            self._set_pos_skip_whitespace(self._line_pos + 1)
+            return True
+        else:
+            return default
 
     def parse_uint(self) -> int:
         m = self.parse_regex(UINT_REGEX)
@@ -1386,6 +1477,16 @@ class MmlChannelParser:
         p_ticks: Final = total_ticks - delay_ticks
         self._play_portamento(notes[0], notes[1], slur_note, speed, delay_ticks, p_ticks, after_ticks)
 
+    def parse_echo(self) -> None:
+        """
+        Enable/Disable echo
+        """
+        b: Final = self.tokenizer.parse_optional_bool(True)
+        if b:
+            self.bc.enable_echo()
+        else:
+            self.bc.disable_echo()
+
     def parse_set_song_tempo(self) -> None:
         """
         Set song tempo
@@ -1437,6 +1538,7 @@ class MmlChannelParser:
         "__": parse_double_underscore,
         "{{": parse_broken_chord,
         "{": parse_portamento,
+        "E": parse_echo,
         "t": parse_set_song_tempo,
         "T": parse_set_song_tick_clock,
         "L": parse_set_loop_point,
