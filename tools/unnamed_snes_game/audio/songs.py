@@ -33,8 +33,12 @@ def song_header(mml_data: MmlData) -> bytes:
 
             c_size = len(channel.bytecode)
 
-            # ::TODO add channel loop point::
-            c_loop = 0xFFFF
+            if channel.loop_point is not None:
+                if channel.loop_point < 0 or channel.loop_point >= c_size:
+                    raise ValueError("Invalid channel loop point")
+                c_loop = data_offset + channel.loop_point
+            else:
+                c_loop = 0xFFFF
 
             # starting offset
             out.append(data_offset & 0xFF)
@@ -102,6 +106,7 @@ def dummy_sfx_song_header() -> bytes:
                 ChannelData(
                     name="A",
                     bytecode=b"\0xff",
+                    loop_point=None,
                     tick_counter=0,
                     max_nested_loops=0,
                     last_instrument=None,

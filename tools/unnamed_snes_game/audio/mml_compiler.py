@@ -87,8 +87,9 @@ class Instrument(NamedTuple):
 class ChannelData(NamedTuple):
     name: str
     bytecode: bytes
-    tick_counter: int
+    loop_point: Optional[int]
 
+    tick_counter: int
     max_nested_loops: int
     last_instrument: Optional[Instrument]
 
@@ -666,6 +667,11 @@ class MmlChannelParser:
 
         self.tick_counter: int = 0
 
+        # Bytecode offset to loop to after an `end` instruction
+        self.loop_point: Optional[int] = None
+        # Used to detect infinite loops with the `L` command.
+        self.loop_point_tick_counter: Optional[int] = None
+
         self.loop_stack: list[LoopState] = list()
         self.max_nested_loops: int = 0
 
@@ -1064,7 +1070,6 @@ class MmlChannelParser:
 
     def _start_loop(self, loop_count: Optional[int]) -> None:
         if loop_count is None:
-            # ::TODO add infinite loops::
             loop_count = 2
 
         if loop_count < 2 or loop_count > MAX_LOOP_COUNT:
@@ -1101,7 +1106,6 @@ class MmlChannelParser:
         ls: Final = self.loop_stack[-1]
 
         if loop_count is None:
-            # ::TODO add infinite loops::
             raise RuntimeError("Missing loop count")
 
         if loop_count < 2 or loop_count > MAX_LOOP_COUNT:
@@ -1396,6 +1400,16 @@ class MmlChannelParser:
         t: Final = self.tokenizer.parse_uint()
         self.bc.set_song_tick_clock(t)
 
+    def parse_set_loop_point(self) -> None:
+        if self.is_subroutine:
+            raise RuntimeError("Cannot set loop point in a subroutine")
+
+        if self.loop_point is not None:
+            raise RuntimeError("Cannot set loop point, loop point already set")
+
+        self.loop_point = len(self.bc.bytecode)
+        self.loop_point_tick_counter = self.tick_counter
+
     def parse_divider(self) -> None:
         """
         Skip divider (pipe `|`) tokens.
@@ -1425,6 +1439,7 @@ class MmlChannelParser:
         "{": parse_portamento,
         "t": parse_set_song_tempo,
         "T": parse_set_song_tick_clock,
+        "L": parse_set_loop_point,
         "|": parse_divider,
     }
 
@@ -1450,6 +1465,10 @@ class MmlChannelParser:
         if self.loop_stack:
             self.add_error("Missing loop end ]")
 
+        if self.loop_point is not None:
+            if self.loop_point_tick_counter == self.tick_counter:
+                self.add_error("Expected at least one note or rest after the loop point (L)")
+
         if self.is_subroutine:
             self.bc.return_from_subroutine()
         else:
@@ -1459,6 +1478,7 @@ class MmlChannelParser:
         return ChannelData(
             name=self.channel_name,
             bytecode=self.bc.bytecode,
+            loop_point=self.loop_point,
             tick_counter=self.tick_counter,
             max_nested_loops=self.max_nested_loops,
             last_instrument=self.instrument,
