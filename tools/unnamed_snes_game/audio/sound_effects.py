@@ -21,7 +21,7 @@ def compile_sound_effect(sfx: str, samples_input: SamplesJson) -> bytes:
 
     bc_mappings = create_bc_mappings(samples_input)
 
-    bc = Bytecode(bc_mappings, False)
+    bc = Bytecode(bc_mappings, is_subroutine=False, is_sound_effect=True)
 
     for line_no, line in enumerate(sfx.split("\n")):
         try:
@@ -70,7 +70,7 @@ def compile_sound_effects_file(lines: Sequence[str], filename: str, bcMappings: 
                         add_error(f"The sound effect must end with a `(END_INSTRUCTION)` instruction")
 
                     current_sfx = m.group(1)
-                    current_bc = Bytecode(bcMappings, False)
+                    current_bc = Bytecode(bcMappings, is_subroutine=False, is_sound_effect=True)
                     sound_effects[current_sfx] = current_bc.bytecode
                 else:
                     if current_bc:

@@ -127,6 +127,12 @@ let INSTRUCTIONS_WITH_ARGUMENTS = [
     //      pppppppp = pan (0 - MAX_PAN, MAX_PAN/2 is centered)
     //      vvvvvvvv = volume
     set_pan_and_volume,
+
+
+    // parameter: u8 new timer0 value
+    //
+    // NOTE: Only sets the song timer (tempo).  The timer for the sound-effect channels is unchanged.
+    set_song_tick_clock,
 ];
 
 
@@ -153,7 +159,6 @@ let NO_ARGUMENT_INSTRUCTIONS = [
 
 
     // padding
-    disable_channel,
     disable_channel,
     disable_channel,
     disable_channel,

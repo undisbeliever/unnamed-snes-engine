@@ -8,7 +8,7 @@ from collections import OrderedDict
 from typing import Any, Callable, Final, Optional
 
 from .json_formats import SamplesJson, Name, Instrument, NAME_REGEX
-from .driver_constants import MAX_N_SUBROUTINES
+from .driver_constants import MAX_N_SUBROUTINES, MIN_TICK_TIMER
 
 MAX_VOLUME: Final = 255
 MAX_PAN: Final = 128
@@ -48,11 +48,13 @@ INC_PAN: Final = 0xE4
 DEC_PAN: Final = 0xE6
 SET_PAN_AND_VOLUME: Final = 0xE8
 
-END: Final = 0xEA
-RETURN_FROM_SUBROUTINE: Final = 0xEC
-END_LOOP_0: Final = 0xEE
-END_LOOP_1: Final = 0xF0
-END_LOOP_2: Final = 0xF2
+SET_SONG_TICK_CLOCK = 0xEA
+
+END: Final = 0xEC
+RETURN_FROM_SUBROUTINE: Final = 0xEE
+END_LOOP_0: Final = 0xF0
+END_LOOP_1: Final = 0xF2
+END_LOOP_2: Final = 0xF4
 
 
 assert PORTAMENTO_DOWN == N_NOTES * 2
@@ -287,9 +289,10 @@ class Bytecode:
     # Populated by the __bytecode_class decorator
     instructions: dict[str, tuple[Callable[[str], Any], Callable[..., None]]]
 
-    def __init__(self, mappings: BcMappings, is_subroutine: bool) -> None:
+    def __init__(self, mappings: BcMappings, is_subroutine: bool, is_sound_effect: bool) -> None:
         self.mappings: Final = mappings
         self.is_subroutine: Final = is_subroutine
+        self.is_sound_effect: Final = is_sound_effect
         self.bytecode = bytearray()
 
         # Location of the parameter of the `skip_last_loop` instruction (if any) for each loop.
@@ -533,6 +536,16 @@ class Bytecode:
         if not self.is_subroutine:
             raise BytecodeError("Not a subroutine")
         self.bytecode.append(RETURN_FROM_SUBROUTINE)
+
+    @_instruction(integer_argument)
+    def set_song_tick_clock(self, timer: int) -> None:
+        if self.is_sound_effect:
+            raise BytecodeError("Cannot change song tick clock in a sound effect")
+
+        if timer < MIN_TICK_TIMER or timer > 0xFF:
+            raise BytecodeError(f"timer0 value out of range: {timer} (min: {MIN_TICK_TIMER}, max: {0xff})")
+        self.bytecode.append(SET_SONG_TICK_CLOCK)
+        self.bytecode.append(timer)
 
 
 def test_length_argument(length: int) -> int:

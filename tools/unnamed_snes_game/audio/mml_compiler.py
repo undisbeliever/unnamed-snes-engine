@@ -650,7 +650,7 @@ class MmlChannelParser:
         self.subroutines: Final = subroutines
         self.instruments: Final = instruments
         self.pitch_table: Final = pitch_table
-        self.bc: Final = Bytecode(bc_mappings, is_subroutine=self.is_subroutine)
+        self.bc: Final = Bytecode(bc_mappings, is_subroutine=self.is_subroutine, is_sound_effect=False)
 
         self.error_list: Final = error_list
 
@@ -1382,6 +1382,20 @@ class MmlChannelParser:
         p_ticks: Final = total_ticks - delay_ticks
         self._play_portamento(notes[0], notes[1], slur_note, speed, delay_ticks, p_ticks, after_ticks)
 
+    def parse_set_song_tempo(self) -> None:
+        """
+        Set song tempo
+        """
+        t: Final = bpm_to_tick_timer(self.tokenizer.parse_uint())
+        self.bc.set_song_tick_clock(t)
+
+    def parse_set_song_tick_clock(self) -> None:
+        """
+        Set the song's timer0 register value
+        """
+        t: Final = self.tokenizer.parse_uint()
+        self.bc.set_song_tick_clock(t)
+
     def parse_divider(self) -> None:
         """
         Skip divider (pipe `|`) tokens.
@@ -1409,6 +1423,8 @@ class MmlChannelParser:
         "__": parse_double_underscore,
         "{{": parse_broken_chord,
         "{": parse_portamento,
+        "t": parse_set_song_tempo,
+        "T": parse_set_song_tick_clock,
         "|": parse_divider,
     }
 

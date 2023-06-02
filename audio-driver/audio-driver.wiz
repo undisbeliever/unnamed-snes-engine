@@ -1185,6 +1185,20 @@ func rest_keyoff(channelIndex : u8 in x, length: u8 in a) {
     return;
 }
 
+
+// Sets the timer for the music channels
+//
+// KEEP: x
+func set_song_tick_clock(channelIndex : u8 in x, timer_clock: u8 in a) {
+    if a < MIN_TICK_CLOCK {
+        a = MIN_TICK_CLOCK;
+    }
+
+    smp.timer_0 = a;
+
+    ^return process_next_bytecode(x);
+}
+
 }
 
 }
