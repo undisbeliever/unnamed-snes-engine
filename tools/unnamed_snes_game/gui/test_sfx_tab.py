@@ -13,14 +13,13 @@ from tkinter.scrolledtext import ScrolledText
 from ..audio.json_formats import SamplesJson
 from ..audio.bytecode import Bytecode
 from ..audio.bytecode import no_argument as bc_parser__no_argument
-from ..audio.driver_constants import SFX_TICK_TIMER
 from ..audio.sound_effects import compile_sound_effect
-from ..audio.songs import song_header
+from ..audio.songs import dummy_sfx_song_header
 from ..resources_compiler import DataStore
 from ..resources_over_usb2snes import FsWatcherSignals, Rou2sCommands, Command
 
 
-DUMMY_SFX_SONG_HEADER = song_header(SFX_TICK_TIMER, [b"\0xff"], [None], [])
+DUMMY_SFX_SONG_HEADER = dummy_sfx_song_header()
 
 
 def bytecode_instructions_string() -> str:
