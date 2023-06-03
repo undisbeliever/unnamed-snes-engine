@@ -5,7 +5,7 @@ import re
 import math
 from dataclasses import dataclass
 from collections import OrderedDict
-from typing import Any, Callable, Final, Optional
+from typing import Any, Callable, Final, NamedTuple, Optional
 
 from .json_formats import SamplesJson, Name, Instrument, NAME_REGEX
 from .driver_constants import MAX_N_SUBROUTINES, MIN_TICK_TIMER
@@ -101,15 +101,41 @@ class BytecodeError(Exception):
     pass
 
 
-def validate_adsr(a: int, d: int, sl: int, sr: int) -> None:
+class Adsr(NamedTuple):
+    adsr1: int
+    adsr2: int
+
+
+def parse_adsr(args: list[str]) -> Adsr:
+    if len(args) != 4:
+        raise ValueError(f"ADSR requires 4 integers")
+
+    a = int(args[0])
+    d = int(args[1])
+    sl = int(args[2])
+    sr = int(args[3])
+
+    errors = list()
+
     if a & 0b1111 != a:
-        raise BytecodeError("Invalid ADSR attack value")
+        errors.append("attack")
     if d & 0b111 != d:
-        raise BytecodeError("Invalid ADSR decay value")
+        errors.append("decay")
     if sl & 0b111 != sl:
-        raise BytecodeError("Invalid ADSR sustain level value")
+        errors.append("sustain level")
     if sr & 0b11111 != sr:
-        raise BytecodeError("Invalid ADSR sustain rate value")
+        errors.append("sustain rate")
+
+    if errors:
+        if len(errors) == 1:
+            raise ValueError(f"Invalid ADSR {errors[0]} value")
+        else:
+            raise ValueError(f"Invalid ADSR {', '.join(errors)} values")
+
+    return Adsr(
+        ((1 << 7) | (d << 4) | (a)),
+        ((sl << 5) | (sr)),
+    )
 
 
 def no_argument(s: str) -> tuple[()]:
@@ -141,16 +167,13 @@ def two_integer_arguments(s: str) -> tuple[int, int]:
     return int(args[0], 0), int(args[1], 0)
 
 
-def adsr_argument(s: str) -> tuple[int, int, int, int]:
+def adsr_argument(s: str) -> tuple[Adsr]:
     if "," in s:
         args = s.split(",")
     else:
         args = s.split(" ")
 
-    if len(args) != 4:
-        raise ValueError(f"ADSR instruction requires 4 arguments")
-
-    return tuple(int(a.strip()) for a in args)  # type: ignore
+    return (parse_adsr(args),)
 
 
 def optional_integer_argument(s: str) -> tuple[Optional[int]]:
@@ -440,12 +463,10 @@ class Bytecode:
         self.bytecode.append(opcode)
 
     @_instruction(adsr_argument)
-    def set_adsr(self, a: int, d: int, sl: int, sr: int) -> None:
-        validate_adsr(a, d, sl, sr)
-
+    def set_adsr(self, adsr: Adsr) -> None:
         self.bytecode.append(SET_ADSR)
-        self.bytecode.append((1 << 7) | (d << 4) | (a))
-        self.bytecode.append((sl << 5) | (sr))
+        self.bytecode.append(adsr.adsr1)
+        self.bytecode.append(adsr.adsr2)
 
     # ::TODO parse gain (after I figure out what it does)::
     @_instruction(integer_argument)

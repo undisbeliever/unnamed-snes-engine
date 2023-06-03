@@ -20,7 +20,7 @@ from .driver_constants import (
 from .samples import SEMITONES_PER_OCTAVE, PitchTable, build_pitch_table
 from .json_formats import SamplesJson
 from .bytecode import Bytecode, BcMappings, create_bc_mappings, N_OCTAVES, MAX_NESTED_LOOPS, MAX_LOOP_COUNT, MAX_PAN, MAX_VOLUME
-from .bytecode import validate_adsr
+from .bytecode import Adsr, parse_adsr
 
 from .json_formats import Instrument as SamplesJsonInstrument
 
@@ -100,7 +100,7 @@ class Instrument(NamedTuple):
     last_note: int
 
     # Override adsr or gain values
-    adsr: Optional[tuple[int, int, int, int]]
+    adsr: Optional[Adsr]
     gain: Optional[int]
 
 
@@ -375,18 +375,15 @@ def _parse_instrument_line(line: str, inst_map: dict[str, tuple[int, SamplesJson
     gain = None
 
     if args:
-        arg_name: Final = args[0]
+        arg_name: Final = args.pop(0)
         if arg_name == "adsr":
-            if len(args) != 5:
-                raise RuntimeError("adsr argument requires 4 integers")
-            adsr = int(args[1]), int(args[2]), int(args[3]), int(args[4])
-            validate_adsr(*adsr)
+            adsr = parse_adsr(args)
 
         elif arg_name == "gain":
-            if len(args) != 2:
+            if len(args) != 1:
                 raise RuntimeError("Invalid gain: expected 1 integer")
             # ::TODO parse gain::
-            gain = int(args[1], 0)
+            gain = int(args[0], 0)
             if gain < 0 or gain > 0xFF:
                 raise RuntimeError("Invalid gain byte")
         else:
@@ -1259,7 +1256,7 @@ class MmlChannelParser:
             self.bc.set_instrument_int(inst.instrument_id)
 
         if inst.adsr is not None and inst.adsr != old_adsr:
-            self.bc.set_adsr(*inst.adsr)
+            self.bc.set_adsr(inst.adsr)
 
         if inst.gain is not None and inst.gain != old_gain:
             self.bc.set_gain(inst.gain)
