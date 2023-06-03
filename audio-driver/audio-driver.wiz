@@ -1141,8 +1141,6 @@ func disable_echo(channelIndex : u8 in x) {
 
 
 func set_instrument(channelIndex : u8 in x, instrumentId : u8 in a) {
-    // Using addr,y addressing mode for `channels`, 1 cycle faster then transferring y to x.
-
     y = a = a & INSTRUMENT_MASK;
 
     channelSoA.instPitchOffset[x] = a = external_data.instruments.pitchOffset[y];
@@ -1161,6 +1159,36 @@ func set_instrument(channelIndex : u8 in x, instrumentId : u8 in a) {
     smp.dsp_addr++;
 
     smp.dsp_data = a = external_data.instruments.adsr2OrGain[y];
+
+    ^return process_next_bytecode(x);
+}
+
+
+
+func set_instrument_and_adsr_or_gain(channelIndex : u8 in x, instrumentId : u8 in a) {
+    y = a = a & INSTRUMENT_MASK;
+
+    channelSoA.instPitchOffset[x] = a = external_data.instruments.pitchOffset[y];
+
+    smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.SCRN as u8;
+    smp.dsp_data = a = external_data.instruments.scrn[y];
+
+    // Read ADSR/GAIN from `instructionPtr`.
+    y = 0;
+    smp.dsp_addr++;
+    smp.dsp_data = a = instructionPtr[y];
+
+    // Increment dsp_addr by 1 (ADSR2) if bit7 of `adsr1` is set
+    // Increment dsp_addr by 2 (GAIN)  if bit7 of `adsr1` is clear
+    if !negative {
+        smp.dsp_addr++;
+    }
+    smp.dsp_addr++;
+
+    // Must increment instructionPtr after negative test
+    instructionPtr++;
+    smp.dsp_data = a = instructionPtr[y];
+    instructionPtr++;
 
     ^return process_next_bytecode(x);
 }

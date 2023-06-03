@@ -61,9 +61,6 @@ let INSTRUCTIONS_WITH_ARGUMENTS = [
     portamento_up,
 
 
-    set_instrument,
-
-
     // parameter = number of ticks to wait.
     // NOTE: Does not send a keyoff event after resting.
     rest,
@@ -95,6 +92,18 @@ let INSTRUCTIONS_WITH_ARGUMENTS = [
     skip_last_loop_0,
     skip_last_loop_1,
     skip_last_loop_2,
+
+
+    // parameter = u8 instrument id
+    set_instrument,
+
+    // parameter = u8 instrument id, u8 adsr1, u8 adsr2OrGain
+    //
+    // ADSR/Gain is the same format as `InstrumentsSoa`.
+    //
+    // If bit 7 of `adsr1` is set, `adsr2OrGain` is written to the ADSR2 register
+    // If bit 7 of `adsr1` is clear, ADSR is disabled and `adsr2OrGain` is written to the GAIN register.
+    set_instrument_and_adsr_or_gain,
 
 
     // parameter = u16 value to send to the ADSR register
@@ -166,7 +175,6 @@ let NO_ARGUMENT_INSTRUCTIONS = [
 
 
     // padding
-    disable_channel,
     disable_channel,
 ];
 

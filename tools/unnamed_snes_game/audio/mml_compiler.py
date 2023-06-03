@@ -1238,28 +1238,25 @@ class MmlChannelParser:
         if inst is None:
             raise RuntimeError(f"Unknown instrument: {i}")
 
-        old_adsr: Final = self.instrument.adsr if self.instrument else None
-        old_gain: Final = self.instrument.gain if self.instrument else None
-
-        adsr_or_gain_changed: Final[bool] = inst.adsr != old_adsr or inst.gain != old_gain
-
-        emit_si_bc: Final[bool] = (
-            # First instrument command
-            self.instrument is None
-            # Instrument id changed
-            or inst.instrument_id != self.instrument.instrument_id
-            # ADSR/GAIN needs to be restored
-            or (inst.adsr is None and inst.gain is None and adsr_or_gain_changed)
-        )
-
-        if emit_si_bc:
-            self.bc.set_instrument_int(inst.instrument_id)
-
-        if inst.adsr is not None and inst.adsr != old_adsr:
-            self.bc.set_adsr(inst.adsr)
-
-        if inst.gain is not None and inst.gain != old_gain:
-            self.bc.set_gain(inst.gain)
+        if self.instrument is None or inst.instrument_id != self.instrument.instrument_id:
+            # No instrument or instrument_id changed
+            if inst.adsr is not None:
+                self.bc.set_instrument_and_adsr(inst.instrument_id, inst.adsr)
+            elif inst.gain is not None:
+                self.bc.set_instrument_and_gain(inst.instrument_id, inst.gain)
+            else:
+                self.bc.set_instrument(inst.instrument_id)
+        else:
+            # Instrument id is the same
+            if inst.adsr != self.instrument.adsr or inst.gain != self.instrument.gain:
+                # Adsr or gain changed
+                if inst.adsr is not None:
+                    self.bc.set_adsr(inst.adsr)
+                elif inst.gain is not None:
+                    self.bc.set_gain(inst.gain)
+                else:
+                    # inst uses ADSR/GAIN from samples JSON file
+                    self.bc.set_instrument(inst.instrument_id)
 
         self.instrument = inst
 

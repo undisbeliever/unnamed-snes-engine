@@ -5,7 +5,7 @@ import re
 import math
 from dataclasses import dataclass
 from collections import OrderedDict
-from typing import Any, Callable, Final, NamedTuple, Optional
+from typing import Any, Callable, Final, NamedTuple, Optional, Union
 
 from .json_formats import SamplesJson, Name, Instrument, NAME_REGEX
 from .driver_constants import MAX_N_SUBROUTINES, MIN_TICK_TIMER
@@ -18,46 +18,46 @@ N_NOTES: Final = N_OCTAVES * 12
 
 MAX_LOOP_COUNT: Final = 256
 
-
 # Opcode values MUST MATCH `src/bytecode.wiz`
 DISABLE_CHANNEL: Final = 0xFE
 
 PORTAMENTO_DOWN: Final = 0xC0
 PORTAMENTO_UP: Final = 0xC2
 
-SET_INSTRUMENT: Final = 0xC4
-REST: Final = 0xC6
-REST_KEYOFF: Final = 0xC8
-CALL_SUBROUTINE: Final = 0xCA
+REST: Final = 0xC4
+REST_KEYOFF: Final = 0xC6
+CALL_SUBROUTINE: Final = 0xC8
 
-START_LOOP_0: Final = 0xCC
-START_LOOP_1: Final = 0xCE
-START_LOOP_2: Final = 0xD0
-SKIP_LAST_LOOP_0: Final = 0xD2
-SKIP_LAST_LOOP_1: Final = 0xD4
-SKIP_LAST_LOOP_2: Final = 0xD6
+START_LOOP_0: Final = 0xCA
+START_LOOP_1: Final = 0xCC
+START_LOOP_2: Final = 0xCE
+SKIP_LAST_LOOP_0: Final = 0xD0
+SKIP_LAST_LOOP_1: Final = 0xD2
+SKIP_LAST_LOOP_2: Final = 0xD4
 
-SET_ADSR: Final = 0xD8
-SET_GAIN: Final = 0xDA
+SET_INSTRUMENT: Final = 0xD6
+SET_INSTRUMENT_AND_ADSR_OR_GAIN: Final = 0xD8
+SET_ADSR: Final = 0xDA
+SET_GAIN: Final = 0xDC
 
-SET_VOLUME: Final = 0xDC
-INC_VOLUME: Final = 0xDE
-DEC_VOLUME: Final = 0xE0
-SET_PAN: Final = 0xE2
-INC_PAN: Final = 0xE4
-DEC_PAN: Final = 0xE6
-SET_PAN_AND_VOLUME: Final = 0xE8
+SET_VOLUME: Final = 0xDE
+INC_VOLUME: Final = 0xE0
+DEC_VOLUME: Final = 0xE2
+SET_PAN: Final = 0xE4
+INC_PAN: Final = 0xE6
+DEC_PAN: Final = 0xE8
+SET_PAN_AND_VOLUME: Final = 0xEA
 
-SET_SONG_TICK_CLOCK = 0xEA
+SET_SONG_TICK_CLOCK = 0xEC
 
-END: Final = 0xEC
-RETURN_FROM_SUBROUTINE: Final = 0xEE
-END_LOOP_0: Final = 0xF0
-END_LOOP_1: Final = 0xF2
-END_LOOP_2: Final = 0xF4
+END: Final = 0xEE
+RETURN_FROM_SUBROUTINE: Final = 0xF0
+END_LOOP_0: Final = 0xF2
+END_LOOP_1: Final = 0xF4
+END_LOOP_2: Final = 0xF6
 
-ENABLE_ECHO: Final = 0xF6
-DISABLE_ECHO: Final = 0xF8
+ENABLE_ECHO: Final = 0xF8
+DISABLE_ECHO: Final = 0xFA
 
 
 assert PORTAMENTO_DOWN == N_NOTES * 2
@@ -138,6 +138,18 @@ def parse_adsr(args: list[str]) -> Adsr:
     )
 
 
+def split_arguments(s: str, expected_n_arguments: int) -> list[str]:
+    if "," in s:
+        args = [a.strip() for a in s.split(",")]
+    else:
+        args = s.split()
+
+    if len(args) != expected_n_arguments:
+        raise ValueError(f"Instruction requires {expected_n_arguments} arguments")
+
+    return args
+
+
 def no_argument(s: str) -> tuple[()]:
     if s:
         raise ValueError(f"Instruction has no argument")
@@ -156,24 +168,35 @@ def integer_argument(s: str) -> tuple[int]:
 
 
 def two_integer_arguments(s: str) -> tuple[int, int]:
-    if "," in s:
-        args = s.split(",")
-    else:
-        args = s.split(" ")
-
-    if len(args) != 2:
-        raise ValueError(f"Instruction requires 2 arguments")
+    args = split_arguments(s, 2)
 
     return int(args[0], 0), int(args[1], 0)
 
 
 def adsr_argument(s: str) -> tuple[Adsr]:
-    if "," in s:
-        args = s.split(",")
-    else:
-        args = s.split(" ")
+    args = split_arguments(s, 4)
 
     return (parse_adsr(args),)
+
+
+def name_and_adsr_arguments(s: str) -> tuple[Name, Adsr]:
+    args = split_arguments(s, 5)
+
+    name = args.pop(0)
+    if not NAME_REGEX.match(name):
+        raise ValueError(f"Expected a name: {name}")
+
+    return name, parse_adsr(args)
+
+
+def name_and_integer_arguments(s: str) -> tuple[Name, int]:
+    args = split_arguments(s, 2)
+
+    name = args[0]
+    if not NAME_REGEX.match(name):
+        raise ValueError(f"Expected a name: {name}")
+
+    return name, int(args[1])
 
 
 def optional_integer_argument(s: str) -> tuple[Optional[int]]:
@@ -367,17 +390,40 @@ class Bytecode:
         self.bytecode.append(length)
         self.bytecode.append((note_id << 1) | (key_off & 1))
 
+    def _get_instrument_id(self, instrument: Union[Name, int]) -> int:
+        if isinstance(instrument, int):
+            return instrument
+        else:
+            instrument_id = self.mappings.instruments.get(instrument)
+            if instrument_id is None:
+                raise BytecodeError(f"Unknown instrument: {instrument}")
+            return instrument_id
+
     @_instruction(name_argument)
-    def set_instrument(self, name: Name) -> None:
-        instrument_id = self.mappings.instruments.get(name)
-        if instrument_id is None:
-            raise BytecodeError(f"Unknown instrument: {name}")
+    def set_instrument(self, instrument: Union[Name, int]) -> None:
+        instrument_id = self._get_instrument_id(instrument)
+
         self.bytecode.append(SET_INSTRUMENT)
         self.bytecode.append(instrument_id)
 
-    def set_instrument_int(self, instrument_id: int) -> None:
-        self.bytecode.append(SET_INSTRUMENT)
+    @_instruction(name_and_adsr_arguments)
+    def set_instrument_and_adsr(self, instrument: Union[Name, int], adsr: Adsr) -> None:
+        instrument_id = self._get_instrument_id(instrument)
+
+        self.bytecode.append(SET_INSTRUMENT_AND_ADSR_OR_GAIN)
         self.bytecode.append(instrument_id)
+        self.bytecode.append(adsr.adsr1)
+        self.bytecode.append(adsr.adsr2)
+
+    # ::TODO parse gain (after I figure out what it does)::
+    @_instruction(name_and_integer_arguments)
+    def set_instrument_and_gain(self, instrument: Union[Name, int], gain: int) -> None:
+        instrument_id = self._get_instrument_id(instrument)
+
+        self.bytecode.append(SET_INSTRUMENT_AND_ADSR_OR_GAIN)
+        self.bytecode.append(instrument_id)
+        self.bytecode.append(0)
+        self.bytecode.append(gain)
 
     @_instruction(integer_argument)
     def rest(self, length: int) -> None:
