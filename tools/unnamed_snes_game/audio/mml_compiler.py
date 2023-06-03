@@ -1096,9 +1096,9 @@ class MmlChannelParser:
         self._play_note_with_quantization(note_id, tick_length, slur_note)
 
     def parse_n(self) -> None:
-        "Play midi note integer ID at default length"
+        "Play note integer ID at default length"
 
-        note_id: Final = self.tokenizer.parse_uint() - SEMITONES_PER_OCTAVE
+        note_id: Final = self.tokenizer.parse_uint()
         # Must test note_id here to ensure error message location is correct
         self.test_note_id(note_id)
 
