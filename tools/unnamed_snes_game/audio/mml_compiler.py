@@ -19,7 +19,8 @@ from .driver_constants import (
 )
 from .samples import SEMITONES_PER_OCTAVE, PitchTable, build_pitch_table
 from .json_formats import SamplesJson
-from .bytecode import Bytecode, BcMappings, create_bc_mappings, N_OCTAVES, MAX_NESTED_LOOPS, MAX_LOOP_COUNT, MAX_PAN, MAX_VOLUME
+from .bytecode import Bytecode, BcMappings, create_bc_mappings, N_OCTAVES, MAX_NESTED_LOOPS, MAX_LOOP_COUNT, MAX_PAN
+from .bytecode import MAX_VOLUME as MAX_FINE_VOLUME
 from .bytecode import Adsr, parse_adsr
 
 from .json_formats import Instrument as SamplesJsonInstrument
@@ -47,6 +48,13 @@ MIN_ZENLEN: Final = 4
 MAX_ZENLEN: Final = 255
 
 STARTING_DEFAULT_NOTE_LENGTH: Final = 4
+
+
+# Used to convert coarse volume (0-16) to fine volume (0-255)
+# (using 16 so v+ and v- commands will return to the same fine volume)
+COARSE_VOLUME_MULTIPLIER: Final = 16
+
+MAX_COARSE_VOLUME: Final = 16
 
 
 @dataclass
@@ -1297,9 +1305,17 @@ class MmlChannelParser:
             raise RuntimeError("Transpose out of range (-128 - +128)")
         self.semitone_offset += value
 
-    def parse_v(self) -> None:
-        "Volume"
-        v, is_v_relative = self._parse_volume_value()
+    def parse_coarse_volume(self) -> None:
+        "Parse volume (v)"
+        v, is_v_relative = self._parse_coarse_volume_value()
+        self._update_volume(v, is_v_relative)
+
+    def parse_fine_volume(self) -> None:
+        "Parse fine volume (V)"
+        v, is_v_relative = self._parse_fine_volume_value()
+        self._update_volume(v, is_v_relative)
+
+    def _update_volume(self, v: int, is_v_relative: bool) -> None:
         if not is_v_relative:
             if self._test_next_token_matches("p"):
                 p, is_p_relative = self._parse_pan_value()
@@ -1318,7 +1334,12 @@ class MmlChannelParser:
         p, is_p_relative = self._parse_pan_value()
         if not is_p_relative:
             if self._test_next_token_matches("v"):
-                v, is_v_relative = self._parse_volume_value()
+                # Coarse volume
+                v, is_v_relative = self._parse_coarse_volume_value()
+                self._set_pan_and_volume(p, is_p_relative, v, is_v_relative)
+            if self._test_next_token_matches("V"):
+                # Fine volume
+                v, is_v_relative = self._parse_fine_volume_value()
                 self._set_pan_and_volume(p, is_p_relative, v, is_v_relative)
             else:
                 self.bc.set_pan(p)
@@ -1329,13 +1350,26 @@ class MmlChannelParser:
             else:
                 self.bc.dec_pan(-p)
 
-    def _parse_volume_value(self) -> tuple[int, bool]:
+    def _parse_coarse_volume_value(self) -> tuple[int, bool]:
         v, is_v_relative = self.tokenizer.parse_relative_int()
 
         # Validating volume value here to ensure error message location is correct
         abs_v = abs(v)
-        if abs_v < 0 or abs_v > MAX_VOLUME:
-            raise RuntimeError(f"Volume out of range (1-{MAX_VOLUME})")
+        if abs_v < 0 or abs_v > MAX_COARSE_VOLUME:
+            raise RuntimeError(f"Volume out of range (1-{MAX_COARSE_VOLUME})")
+
+        if v == MAX_COARSE_VOLUME:
+            return MAX_FINE_VOLUME, is_v_relative
+        else:
+            return v * COARSE_VOLUME_MULTIPLIER, is_v_relative
+
+    def _parse_fine_volume_value(self) -> tuple[int, bool]:
+        v, is_v_relative = self.tokenizer.parse_relative_int()
+
+        # Validating volume value here to ensure error message location is correct
+        abs_v = abs(v)
+        if abs_v < 0 or abs_v > MAX_FINE_VOLUME:
+            raise RuntimeError(f"Volume out of range (1-{MAX_FINE_VOLUME})")
         return v, is_v_relative
 
     def _parse_pan_value(self) -> tuple[int, bool]:
@@ -1525,7 +1559,8 @@ class MmlChannelParser:
         "r": parse_r,
         ">": parse_increase_octave,
         "<": parse_decrease_octave,
-        "v": parse_v,
+        "v": parse_coarse_volume,
+        "V": parse_fine_volume,
         "p": parse_p,
         "Q": parse_quantize,
         "_": parse_underscore,
