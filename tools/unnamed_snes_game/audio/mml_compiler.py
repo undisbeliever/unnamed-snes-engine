@@ -1505,6 +1505,25 @@ class MmlChannelParser:
         p_ticks: Final = total_ticks - delay_ticks
         self._play_portamento(notes[0], notes[1], slur_note, speed, delay_ticks, p_ticks, after_ticks)
 
+    def parse_manual_vibrato(self) -> None:
+        """
+        Set the audio-driver vibrato values.
+
+        Format:
+            disable vibrato: ~0
+            set vibrato:     ~ quarter_wavelength_in_ticks, pitch_offset_per_tick
+        """
+        qw_ticks: Final = self.tokenizer.parse_uint()
+
+        if qw_ticks == 0:
+            self.bc.disable_vibrato()
+        else:
+            if not self._test_next_token_matches(","):
+                raise RuntimeError("~ requires 2 parameters: quarter_wavelength_ticks, pitch_offset_per_tick")
+            pitch_offset_per_tick: Final = self.tokenizer.parse_uint()
+
+            self.bc.set_vibrato(qw_ticks, pitch_offset_per_tick)
+
     def parse_echo(self) -> None:
         """
         Enable/Disable echo
@@ -1567,6 +1586,7 @@ class MmlChannelParser:
         "__": parse_double_underscore,
         "{{": parse_broken_chord,
         "{": parse_portamento,
+        "~": parse_manual_vibrato,
         "E": parse_echo,
         "t": parse_set_song_tempo,
         "T": parse_set_song_tick_clock,

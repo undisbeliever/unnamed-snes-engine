@@ -17,47 +17,52 @@ N_OCTAVES: Final = 8
 N_NOTES: Final = N_OCTAVES * 12
 
 MAX_LOOP_COUNT: Final = 256
+MAX_VIBRATO_QUARTER_WAVELENGTH_TICKS: Final = 0x100 / 4
+
 
 # Opcode values MUST MATCH `src/bytecode.wiz`
-DISABLE_CHANNEL: Final = 0xFE
 
 PORTAMENTO_DOWN: Final = 0xC0
 PORTAMENTO_UP: Final = 0xC2
 
-REST: Final = 0xC4
-REST_KEYOFF: Final = 0xC6
-CALL_SUBROUTINE: Final = 0xC8
+SET_VIBRATO: Final = 0xC4
 
-START_LOOP_0: Final = 0xCA
-START_LOOP_1: Final = 0xCC
-START_LOOP_2: Final = 0xCE
-SKIP_LAST_LOOP_0: Final = 0xD0
-SKIP_LAST_LOOP_1: Final = 0xD2
-SKIP_LAST_LOOP_2: Final = 0xD4
+REST: Final = 0xC6
+REST_KEYOFF: Final = 0xC8
+CALL_SUBROUTINE: Final = 0xCA
 
-SET_INSTRUMENT: Final = 0xD6
-SET_INSTRUMENT_AND_ADSR_OR_GAIN: Final = 0xD8
-SET_ADSR: Final = 0xDA
-SET_GAIN: Final = 0xDC
+START_LOOP_0: Final = 0xCC
+START_LOOP_1: Final = 0xCE
+START_LOOP_2: Final = 0xD0
+SKIP_LAST_LOOP_0: Final = 0xD2
+SKIP_LAST_LOOP_1: Final = 0xD4
+SKIP_LAST_LOOP_2: Final = 0xD6
 
-SET_VOLUME: Final = 0xDE
-INC_VOLUME: Final = 0xE0
-DEC_VOLUME: Final = 0xE2
-SET_PAN: Final = 0xE4
-INC_PAN: Final = 0xE6
-DEC_PAN: Final = 0xE8
-SET_PAN_AND_VOLUME: Final = 0xEA
+SET_INSTRUMENT: Final = 0xD8
+SET_INSTRUMENT_AND_ADSR_OR_GAIN: Final = 0xDA
+SET_ADSR: Final = 0xDC
+SET_GAIN: Final = 0xDE
 
-SET_SONG_TICK_CLOCK = 0xEC
+SET_VOLUME: Final = 0xE0
+INC_VOLUME: Final = 0xE2
+DEC_VOLUME: Final = 0xE4
+SET_PAN: Final = 0xE6
+INC_PAN: Final = 0xE8
+DEC_PAN: Final = 0xEA
+SET_PAN_AND_VOLUME: Final = 0xEC
 
-END: Final = 0xEE
-RETURN_FROM_SUBROUTINE: Final = 0xF0
-END_LOOP_0: Final = 0xF2
-END_LOOP_1: Final = 0xF4
-END_LOOP_2: Final = 0xF6
+SET_SONG_TICK_CLOCK = 0xEE
 
-ENABLE_ECHO: Final = 0xF8
-DISABLE_ECHO: Final = 0xFA
+END: Final = 0xF0
+RETURN_FROM_SUBROUTINE: Final = 0xF2
+END_LOOP_0: Final = 0xF4
+END_LOOP_1: Final = 0xF6
+END_LOOP_2: Final = 0xF8
+
+ENABLE_ECHO: Final = 0xFA
+DISABLE_ECHO: Final = 0xFC
+
+DISABLE_CHANNEL: Final = 0xFE
 
 
 assert PORTAMENTO_DOWN == N_NOTES * 2
@@ -389,6 +394,27 @@ class Bytecode:
         self.bytecode.append(speed)
         self.bytecode.append(length)
         self.bytecode.append((note_id << 1) | (key_off & 1))
+
+    @_instruction(two_integer_arguments)
+    def set_vibrato(self, quarter_wavelength_ticks: int, pitch_offset_per_tick: int) -> None:
+        if quarter_wavelength_ticks < 1 or quarter_wavelength_ticks > MAX_VIBRATO_QUARTER_WAVELENGTH_TICKS:
+            raise BytecodeError(
+                f"Vibrato quarter_wavelength_ticks out of range ({quarter_wavelength_ticks}, min: 1, max: {MAX_VIBRATO_QUARTER_WAVELENGTH_TICKS}"
+            )
+
+        if pitch_offset_per_tick < 1 or pitch_offset_per_tick > 0xFF:
+            raise BytecodeError(f"Vibrato pitch_offset_per_tick out of range ({pitch_offset_per_tick}, min: 1, max 255)")
+
+        self.bytecode.append(SET_VIBRATO)
+        self.bytecode.append(quarter_wavelength_ticks)
+        self.bytecode.append(pitch_offset_per_tick)
+
+    @_instruction(no_argument)
+    def disable_vibrato(self) -> None:
+        # ::MAYDO add a disable_vibrato bytecode instruction::
+        self.bytecode.append(SET_VIBRATO)
+        self.bytecode.append(0)
+        self.bytecode.append(0)
 
     def _get_instrument_id(self, instrument: Union[Name, int]) -> int:
         if isinstance(instrument, int):

@@ -61,6 +61,20 @@ let INSTRUCTIONS_WITH_ARGUMENTS = [
     portamento_up,
 
 
+    // parameters: 0ttttttt pppppppp
+    //       ttttttt = quarter wavelength ticks.  MUST BE >= 1 and <= 64.
+    //      pppppppp = pitch offset per tick.  MUST BE >= 1.
+    //
+    // If ttttttt is 0, vibrato is disabled.
+    //
+    // NOTES:
+    //  * The total wavelength of the vibrato is `0ttttttt * 4`.
+    //  * If `0ttttttt` is > 64, the vibrato is unbalanced and will slowly decrement the PITCH.
+    //  * Vibrato has no range checking and may overflow or underflow the PITCH register.
+    //  * Portamento overrides vibrato
+    set_vibrato,
+
+
     // parameter = number of ticks to wait.
     // NOTE: Does not send a keyoff event after resting.
     rest,
@@ -172,10 +186,6 @@ let NO_ARGUMENT_INSTRUCTIONS = [
 
     // Disable echo on this channel
     disable_echo,
-
-
-    // padding
-    disable_channel,
 ];
 
 }
