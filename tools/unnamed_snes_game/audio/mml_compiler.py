@@ -19,9 +19,21 @@ from .driver_constants import (
 )
 from .samples import SEMITONES_PER_OCTAVE, PitchTable, build_pitch_table
 from .json_formats import SamplesJson
-from .bytecode import Bytecode, BcMappings, create_bc_mappings, N_OCTAVES, MAX_NESTED_LOOPS, MAX_LOOP_COUNT, MAX_PAN
-from .bytecode import MAX_VOLUME as MAX_FINE_VOLUME
-from .bytecode import Adsr, parse_adsr
+from .bytecode import (
+    Bytecode,
+    BcMappings,
+    create_bc_mappings,
+    N_OCTAVES,
+    MAX_NESTED_LOOPS,
+    MAX_LOOP_COUNT,
+    MAX_PAN,
+    Adsr,
+    parse_adsr,
+    I8_MIN,
+    I8_MAX,
+    cast_i8,
+    MAX_VOLUME as MAX_FINE_VOLUME,
+)
 
 from .json_formats import Instrument as SamplesJsonInstrument
 
@@ -226,18 +238,6 @@ def split_lines(mml_text: str) -> MmlLines:
 
 HEADER_REGEX = re.compile(r"^#([^\s]+)\s+(.+)$")
 VALID_HEADERS = frozenset(("Title", "Composer", "Author", "Copyright", "Date", "License"))
-
-I8_MIN: Final = -128
-I8_MAX: Final = 127
-
-
-def cast_i8(i: int) -> int:
-    "Cast an i8 to a u8 with boundary checking."
-    if i < -128 or i > 127:
-        raise ValueError(f"i8 integer out of bounds: {i}")
-    if i < 0:
-        return i + 0x100
-    return i
 
 
 def parse_int_range(s: str, min_value: int, max_value: int) -> int:
@@ -1324,10 +1324,7 @@ class MmlChannelParser:
                 self.bc.set_volume(v)
         else:
             # v is relative
-            if v > 0:
-                self.bc.inc_volume(v)
-            else:
-                self.bc.dec_volume(-v)
+            self.bc.adjust_volume(v)
 
     def parse_p(self) -> None:
         "Pan"
@@ -1345,10 +1342,7 @@ class MmlChannelParser:
                 self.bc.set_pan(p)
         else:
             # p is relative
-            if p > 0:
-                self.bc.inc_pan(p)
-            else:
-                self.bc.dec_pan(-p)
+            self.bc.adjust_pan(p)
 
     def _parse_coarse_volume_value(self) -> tuple[int, bool]:
         v, is_v_relative = self.tokenizer.parse_relative_int()
@@ -1387,17 +1381,13 @@ class MmlChannelParser:
         else:
             if not is_v_relative:
                 self.bc.set_volume(v)
-            elif v > 0:
-                self.bc.inc_volume(v)
             else:
-                self.bc.dec_volume(-v)
+                self.bc.adjust_volume(v)
 
             if not is_p_relative:
                 self.bc.set_pan(p)
-            elif p > 0:
-                self.bc.inc_pan(p)
             else:
-                self.bc.dec_pan(-p)
+                self.bc.adjust_pan(p)
 
     def parse_increase_octave(self) -> None:
         self.octave = min(MAX_OCTAVE, self.octave + 1)

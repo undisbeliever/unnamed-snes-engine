@@ -16,7 +16,8 @@ from .driver_constants import (
     FIR_FILTER_SIZE,
     ECHO_BUFFER_MAX_EDL,
 )
-from .mml_compiler import MmlData, MetaData, ChannelData, cast_i8
+from .mml_compiler import MmlData, MetaData, ChannelData
+from .bytecode import cast_i8
 
 
 def song_header(mml_data: MmlData) -> bytes:

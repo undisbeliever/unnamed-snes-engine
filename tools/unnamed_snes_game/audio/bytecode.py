@@ -43,24 +43,22 @@ SET_INSTRUMENT_AND_ADSR_OR_GAIN: Final = 0xDA
 SET_ADSR: Final = 0xDC
 SET_GAIN: Final = 0xDE
 
-SET_VOLUME: Final = 0xE0
-INC_VOLUME: Final = 0xE2
-DEC_VOLUME: Final = 0xE4
-SET_PAN: Final = 0xE6
-INC_PAN: Final = 0xE8
-DEC_PAN: Final = 0xEA
-SET_PAN_AND_VOLUME: Final = 0xEC
+ADJUST_PAN: Final = 0xE0
+SET_PAN: Final = 0xE2
+SET_PAN_AND_VOLUME: Final = 0xE4
+ADJUST_VOLUME: Final = 0xE6
+SET_VOLUME: Final = 0xE8
 
-SET_SONG_TICK_CLOCK = 0xEE
+SET_SONG_TICK_CLOCK = 0xEA
 
-END: Final = 0xF0
-RETURN_FROM_SUBROUTINE: Final = 0xF2
-END_LOOP_0: Final = 0xF4
-END_LOOP_1: Final = 0xF6
-END_LOOP_2: Final = 0xF8
+END: Final = 0xEC
+RETURN_FROM_SUBROUTINE: Final = 0xEE
+END_LOOP_0: Final = 0xF0
+END_LOOP_1: Final = 0xF2
+END_LOOP_2: Final = 0xF4
 
-ENABLE_ECHO: Final = 0xFA
-DISABLE_ECHO: Final = 0xFC
+ENABLE_ECHO: Final = 0xF6
+DISABLE_ECHO: Final = 0xF8
 
 DISABLE_CHANNEL: Final = 0xFE
 
@@ -80,6 +78,19 @@ assert END_LOOP_2 == END_LOOP_1 + 2
 
 # Number of ticks between key-off and the next instruction
 KEY_OFF_TICK_DELAY = 1
+
+
+I8_MIN: Final = -128
+I8_MAX: Final = 127
+
+
+def cast_i8(i: int) -> int:
+    "Cast an i8 to a u8 with boundary checking."
+    if i < -128 or i > 127:
+        raise ValueError(f"i8 integer out of bounds: {i}")
+    if i < 0:
+        return i + 0x100
+    return i
 
 
 @dataclass
@@ -549,6 +560,13 @@ class Bytecode:
         self.bytecode.append(gain)
 
     @_instruction(integer_argument)
+    def adjust_volume(self, v: int) -> None:
+        if v < I8_MIN or v > I8_MAX:
+            raise BytecodeError(f"Volume adjust out of range ({I8_MIN} - {I8_MAX})")
+        self.bytecode.append(ADJUST_VOLUME)
+        self.bytecode.append(cast_i8(v))
+
+    @_instruction(integer_argument)
     def set_volume(self, v: int) -> None:
         if v < 0 or v > MAX_VOLUME:
             raise BytecodeError(f"Volume out of range (1-{MAX_VOLUME})")
@@ -556,38 +574,17 @@ class Bytecode:
         self.bytecode.append(v)
 
     @_instruction(integer_argument)
-    def inc_volume(self, v: int) -> None:
-        if v < 1 or v > MAX_VOLUME:
-            raise BytecodeError(f"Volume out of range (1-{MAX_VOLUME})")
-        self.bytecode.append(INC_VOLUME)
-        self.bytecode.append(v)
-
-    @_instruction(integer_argument)
-    def dec_volume(self, v: int) -> None:
-        if v < 1 or v > MAX_VOLUME:
-            raise BytecodeError(f"Volume out of range (1-{MAX_VOLUME})")
-        self.bytecode.append(DEC_VOLUME)
-        self.bytecode.append(v)
+    def adjust_pan(self, p: int) -> None:
+        if p < I8_MIN or p > I8_MAX:
+            raise BytecodeError(f"Pan adjust out of range ({I8_MIN} - {I8_MAX})")
+        self.bytecode.append(ADJUST_PAN)
+        self.bytecode.append(cast_i8(p))
 
     @_instruction(integer_argument)
     def set_pan(self, p: int) -> None:
         if p < 0 or p > MAX_PAN:
             raise BytecodeError(f"Pan out of range (0 - {MAX_PAN})")
         self.bytecode.append(SET_PAN)
-        self.bytecode.append(p)
-
-    @_instruction(integer_argument)
-    def inc_pan(self, p: int) -> None:
-        if p < 1 or p > MAX_PAN:
-            raise BytecodeError(f"Pan out of range (1 - {MAX_PAN})")
-        self.bytecode.append(INC_PAN)
-        self.bytecode.append(p)
-
-    @_instruction(integer_argument)
-    def dec_pan(self, p: int) -> None:
-        if p < 1 or p > MAX_PAN:
-            raise BytecodeError(f"Pan out of range (1 - {MAX_PAN})")
-        self.bytecode.append(DEC_PAN)
         self.bytecode.append(p)
 
     @_instruction(two_integer_arguments)
