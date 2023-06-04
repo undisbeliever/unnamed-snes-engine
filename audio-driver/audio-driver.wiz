@@ -895,33 +895,33 @@ func process_next_bytecode(channelIndex : u8 in x) {
     a = instructionPtr[y];
     instructionPtr++;
 
-    if a >= bytecode.N_PLAY_NOTE_INSTRUCTIONS {
-        y = a = a & 0b11111110;
+    goto bytecode._play_note if a < bytecode.N_PLAY_NOTE_INSTRUCTIONS;
 
-        // Push return address to the stack.
-        //
-        // This method uses the same number of CPU cycles (and the least amount of code space) as:
-        //   * `JMP[!abs+X]` plus saving/restoring X via a zeropage register (as there is no `TXY` or `TXY` instruction
-        //   * self modifying code (writing the return address of a JMP instruction)
-        //
 
-        push(a = ((&>:bytecode.InstructionTable[0] as u16 - bytecode.N_PLAY_NOTE_INSTRUCTIONS) as *u8)[y]);
-        push(a = ((&<:bytecode.InstructionTable[0] as u16 - bytecode.N_PLAY_NOTE_INSTRUCTIONS) as *u8)[y]);
+    // A is a non play-note bytecode
+    y = a = a & 0b11111110;
 
-        if y < bytecode.FIRST_NO_ARGUMENT_INSTRUCTION_OPCODE {
-            // Instruction has a parameter
-            y = 0;
-            a = instructionPtr[y];
-            instructionPtr++;
-        }
+    // Push return address to the stack.
+    //
+    // This method uses the same number of CPU cycles (and the least amount of code space) as:
+    //   * `JMP[!abs+X]` plus saving/restoring X via a zeropage register (as there is no `TXY` or `TXY` instruction
+    //   * self modifying code (writing the return address of a JMP instruction)
+    //
 
-        // Y MUST be 0 if the instruction has an argument
+    push(a = ((&>:bytecode.InstructionTable[0] as u16 - bytecode.N_PLAY_NOTE_INSTRUCTIONS) as *u8)[y]);
+    push(a = ((&<:bytecode.InstructionTable[0] as u16 - bytecode.N_PLAY_NOTE_INSTRUCTIONS) as *u8)[y]);
 
-        // Jump to the bytecode instruction routine that was just pushed onto the stack.
-        return;
+    if y < bytecode.FIRST_NO_ARGUMENT_INSTRUCTION_OPCODE {
+        // Instruction has a parameter
+        y = 0;
+        a = instructionPtr[y];
+        instructionPtr++;
     }
 
-    bytecode._play_note__inline(x, a);
+    // Y MUST be 0 if the instruction has an argument
+
+    // Jump to the bytecode instruction routine that was just pushed onto the stack.
+    return;
 }
 
 
@@ -946,7 +946,7 @@ let null_instruction = disable_channel as func(u8 in x, u8 in a);
 
 
 // KEEP: x
-inline func _play_note__inline(channelIndex : u8 in x, noteAndKeyOffBit : u8 in a) {
+func _play_note(channelIndex : u8 in x, noteAndKeyOffBit : u8 in a) {
     // carry = key-off after note ends bit
     a >>>= 1;
 
