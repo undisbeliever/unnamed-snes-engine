@@ -61,9 +61,9 @@ let INSTRUCTIONS_WITH_ARGUMENTS = [
     portamento_up,
 
 
-    // parameters: 0ttttttt pppppppp
-    //       ttttttt = quarter wavelength ticks.  MUST BE >= 1 and <= 64.
+    // parameters: pppppppp 0ttttttt
     //      pppppppp = pitch offset per tick.  MUST BE >= 1.
+    //       ttttttt = quarter wavelength ticks.  MUST BE <= 64.
     //
     // If ttttttt is 0, vibrato is disabled.
     //

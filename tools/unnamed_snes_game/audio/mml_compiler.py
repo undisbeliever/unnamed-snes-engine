@@ -1501,18 +1501,19 @@ class MmlChannelParser:
 
         Format:
             disable vibrato: ~0
-            set vibrato:     ~ quarter_wavelength_in_ticks, pitch_offset_per_tick
+            set vibrato:     ~ pitch_offset_per_tick, quarter_wavelength_in_ticks
         """
-        qw_ticks: Final = self.tokenizer.parse_uint()
+        pitch_offset_per_tick: Final = self.tokenizer.parse_uint()
 
-        if qw_ticks == 0:
+        if pitch_offset_per_tick == 0:
             self.bc.disable_vibrato()
         else:
+            # ::TODO find a good default quarter_wavelength_ticks value::
             if not self._test_next_token_matches(","):
-                raise RuntimeError("~ requires 2 parameters: quarter_wavelength_ticks, pitch_offset_per_tick")
-            pitch_offset_per_tick: Final = self.tokenizer.parse_uint()
+                raise RuntimeError("~ requires 2 parameters: pitch_offset_per_tick, quarter_wavelength_in_ticks")
+            quarter_wavelength_ticks: Final = self.tokenizer.parse_uint()
 
-            self.bc.set_vibrato(qw_ticks, pitch_offset_per_tick)
+            self.bc.set_vibrato(pitch_offset_per_tick, quarter_wavelength_ticks)
 
     def parse_echo(self) -> None:
         """

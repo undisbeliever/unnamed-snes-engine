@@ -407,18 +407,18 @@ class Bytecode:
         self.bytecode.append((note_id << 1) | (key_off & 1))
 
     @_instruction(two_integer_arguments)
-    def set_vibrato(self, quarter_wavelength_ticks: int, pitch_offset_per_tick: int) -> None:
+    def set_vibrato(self, pitch_offset_per_tick: int, quarter_wavelength_ticks: int) -> None:
+        if pitch_offset_per_tick < 1 or pitch_offset_per_tick > 0xFF:
+            raise BytecodeError(f"Vibrato pitch_offset_per_tick out of range ({pitch_offset_per_tick}, min: 1, max 255)")
+
         if quarter_wavelength_ticks < 1 or quarter_wavelength_ticks > MAX_VIBRATO_QUARTER_WAVELENGTH_TICKS:
             raise BytecodeError(
                 f"Vibrato quarter_wavelength_ticks out of range ({quarter_wavelength_ticks}, min: 1, max: {MAX_VIBRATO_QUARTER_WAVELENGTH_TICKS}"
             )
 
-        if pitch_offset_per_tick < 1 or pitch_offset_per_tick > 0xFF:
-            raise BytecodeError(f"Vibrato pitch_offset_per_tick out of range ({pitch_offset_per_tick}, min: 1, max 255)")
-
         self.bytecode.append(SET_VIBRATO)
-        self.bytecode.append(quarter_wavelength_ticks)
         self.bytecode.append(pitch_offset_per_tick)
+        self.bytecode.append(quarter_wavelength_ticks)
 
     @_instruction(no_argument)
     def disable_vibrato(self) -> None:
