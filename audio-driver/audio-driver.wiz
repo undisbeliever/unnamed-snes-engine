@@ -947,6 +947,22 @@ let null_instruction = disable_channel as func(u8 in x, u8 in a);
 
 
 
+// IN: Y = 0
+// KEEP: X
+#[fallthrough]
+func set_vibrato_depth_and_play_note(channelIndex : u8 in x, pitchOffsetPerTick: u8 in a) {
+    channelSoA.vibrato_pitchOffsetPerTick[x] = a;
+
+    // Read first byte of `_play_note`
+    // Y = 0
+    a = instructionPtr[y];
+    instructionPtr++;
+
+// Fallthrough
+}
+
+
+// Y unknown
 // KEEP: x
 func _play_note(channelIndex : u8 in x, noteAndKeyOffBit : u8 in a) {
     // carry = key-off after note ends bit

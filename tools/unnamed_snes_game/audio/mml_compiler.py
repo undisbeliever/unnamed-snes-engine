@@ -1017,6 +1017,33 @@ class MmlChannelParser:
             self.bc.play_note(note_id, False, MAX_PLAY_NOTE_TICKS)
             self._rest_after_play_note(tick_length - MAX_PLAY_NOTE_TICKS, key_off)
 
+    def _set_vibrato_and_play_note(self, vibrato: Optional[VibratoState], note_id: int, key_off: bool, tick_length: int) -> None:
+        # Vibrato interferes with portamento, no not slur a vibrato note into a portamento
+        self.prev_slured_note_id = None
+
+        self.tick_counter += tick_length
+
+        # Remember previous vibrato `qw_ticks` value when vibrato is disabled
+        if vibrato is None and self.vibrato_state is not None:
+            vibrato = VibratoState(0, self.vibrato_state.qw_ticks)
+
+        if self.vibrato_state != vibrato:
+            assert vibrato
+
+            if self.vibrato_state is not None and self.vibrato_state.qw_ticks == vibrato.qw_ticks:
+                # Vibrato wavelength unchanged, only set depth
+                self.bc.set_vibrato_depth_and_play_note(vibrato.po_per_tick, note_id, key_off, tick_length)
+
+            else:
+                # Need to set both vibrato parameters
+                self.bc.set_vibrato(vibrato.po_per_tick, vibrato.qw_ticks)
+                self.bc.play_note(note_id, key_off, tick_length)
+
+            self.vibrato_state = vibrato
+        else:
+            # Vibrato unchanged, just play the note
+            self.bc.play_note(note_id, key_off, tick_length)
+
     def _rest_after_play_note(self, ticks: int, key_off: bool) -> None:
         "IMPORTANT NOTE: Does not modify self.prev_slurred_note_id"
         assert ticks > 0
@@ -1137,16 +1164,17 @@ class MmlChannelParser:
             key_off = not slur_note
 
         if self.mp:
-            vibrato: Final = self._calculate_mp_vibrato_for_note_id(note_id)
+            vibrato = self._calculate_mp_vibrato_for_note_id(note_id)
 
-            if self.vibrato_state != vibrato:
-                if vibrato is not None:
-                    self.bc.set_vibrato(vibrato.po_per_tick, vibrato.qw_ticks)
-                else:
-                    self.bc.disable_vibrato()
-                self.vibrato_state = vibrato
+            if key_on_length <= MAX_PLAY_NOTE_TICKS:
+                self._set_vibrato_and_play_note(vibrato, note_id, key_off, key_on_length)
+            else:
+                self._set_vibrato_and_play_note(vibrato, note_id, False, MAX_PLAY_NOTE_TICKS)
+                self._rest_after_play_note(key_on_length - MAX_PLAY_NOTE_TICKS, key_off)
 
-        self._play_note(note_id, key_off, key_on_length)
+        else:
+            # No vibrato or manual vibrato
+            self._play_note(note_id, key_off, key_on_length)
 
         if key_off_length > 1:
             self._rest(key_off_length)

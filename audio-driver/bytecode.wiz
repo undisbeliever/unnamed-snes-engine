@@ -76,6 +76,19 @@ let INSTRUCTIONS_WITH_ARGUMENTS = [
     set_vibrato,
 
 
+    // parameters: pppppppp nnnnnnnO llllllll
+    //               pppppppp = pitch offset per tick.
+    //      nnnnnnnO llllllll = note to play (same format as play_note)
+    //
+    // If pppppppp is 0, vibrato is disabled.
+    //
+    // NOTES:
+    //  * No note_id range checking
+    //  * Assumes vibrato quarter wavelength is set by `set_vibrato`.
+    //    Vibrato quarter wavelength is not initialised on channel reset.
+    set_vibrato_depth_and_play_note,
+
+
     // parameter = number of ticks to wait.
     // NOTE: Does not send a keyoff event after resting.
     rest,
@@ -184,7 +197,6 @@ let NO_ARGUMENT_INSTRUCTIONS = [
 
 
     // Padding
-    disable_channel,
     disable_channel,
 ];
 

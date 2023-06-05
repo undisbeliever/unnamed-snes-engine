@@ -26,39 +26,40 @@ PORTAMENTO_DOWN: Final = 0xC0
 PORTAMENTO_UP: Final = 0xC2
 
 SET_VIBRATO: Final = 0xC4
+SET_VIBRATO_DEPTH_AND_PLAY_NOTE: Final = 0xC6
 
-REST: Final = 0xC6
-REST_KEYOFF: Final = 0xC8
-CALL_SUBROUTINE: Final = 0xCA
+REST: Final = 0xC8
+REST_KEYOFF: Final = 0xCA
+CALL_SUBROUTINE: Final = 0xCC
 
-START_LOOP_0: Final = 0xCC
-START_LOOP_1: Final = 0xCE
-START_LOOP_2: Final = 0xD0
-SKIP_LAST_LOOP_0: Final = 0xD2
-SKIP_LAST_LOOP_1: Final = 0xD4
-SKIP_LAST_LOOP_2: Final = 0xD6
+START_LOOP_0: Final = 0xCE
+START_LOOP_1: Final = 0xD0
+START_LOOP_2: Final = 0xD2
+SKIP_LAST_LOOP_0: Final = 0xD4
+SKIP_LAST_LOOP_1: Final = 0xD6
+SKIP_LAST_LOOP_2: Final = 0xD8
 
-SET_INSTRUMENT: Final = 0xD8
-SET_INSTRUMENT_AND_ADSR_OR_GAIN: Final = 0xDA
-SET_ADSR: Final = 0xDC
-SET_GAIN: Final = 0xDE
+SET_INSTRUMENT: Final = 0xDA
+SET_INSTRUMENT_AND_ADSR_OR_GAIN: Final = 0xDC
+SET_ADSR: Final = 0xDE
+SET_GAIN: Final = 0xE0
 
-ADJUST_PAN: Final = 0xE0
-SET_PAN: Final = 0xE2
-SET_PAN_AND_VOLUME: Final = 0xE4
-ADJUST_VOLUME: Final = 0xE6
-SET_VOLUME: Final = 0xE8
+ADJUST_PAN: Final = 0xE2
+SET_PAN: Final = 0xE4
+SET_PAN_AND_VOLUME: Final = 0xE6
+ADJUST_VOLUME: Final = 0xE8
+SET_VOLUME: Final = 0xEA
 
-SET_SONG_TICK_CLOCK = 0xEA
+SET_SONG_TICK_CLOCK = 0xEC
 
-END: Final = 0xEC
-RETURN_FROM_SUBROUTINE: Final = 0xEE
-END_LOOP_0: Final = 0xF0
-END_LOOP_1: Final = 0xF2
-END_LOOP_2: Final = 0xF4
+END: Final = 0xEE
+RETURN_FROM_SUBROUTINE: Final = 0xF0
+END_LOOP_0: Final = 0xF2
+END_LOOP_1: Final = 0xF4
+END_LOOP_2: Final = 0xF6
 
-ENABLE_ECHO: Final = 0xF6
-DISABLE_ECHO: Final = 0xF8
+ENABLE_ECHO: Final = 0xF8
+DISABLE_ECHO: Final = 0xFA
 
 DISABLE_CHANNEL: Final = 0xFE
 
@@ -262,14 +263,9 @@ def parse_note(note: str) -> int:
             )
 
 
-def play_note_argument(s: str) -> tuple[int, bool, int]:
-    if "," in s:
-        args = s.split(",")
-    else:
-        args = s.split()
-
+def _parse_play_note_arguments(args: list[str]) -> tuple[int, bool, int]:
     if not args:
-        raise ValueError("Missing argument")
+        raise ValueError("Missing play note argument")
     if len(args) > 3:
         raise ValueError("Too many arguments")
 
@@ -298,6 +294,28 @@ def play_note_argument(s: str) -> tuple[int, bool, int]:
         raise ValueError("Missing note length")
 
     return decoded_note, key_off, length
+
+
+def play_note_argument(s: str) -> tuple[int, bool, int]:
+    if "," in s:
+        args = s.split(",")
+    else:
+        args = s.split()
+    return _parse_play_note_arguments(args)
+
+
+def integer_and_play_note_argument(s: str) -> tuple[int, int, bool, int]:
+    if "," in s:
+        args = s.split(",")
+    else:
+        args = s.split()
+
+    if not args:
+        raise ValueError("Missing argument")
+
+    i = int(args.pop(0))
+
+    return i, *_parse_play_note_arguments(args)
 
 
 def portamento_argument(s: str) -> tuple[int, bool, int, int]:
@@ -419,6 +437,15 @@ class Bytecode:
         self.bytecode.append(SET_VIBRATO)
         self.bytecode.append(pitch_offset_per_tick)
         self.bytecode.append(quarter_wavelength_ticks)
+
+    @_instruction(integer_and_play_note_argument)
+    def set_vibrato_depth_and_play_note(self, pitch_offset_per_tick: int, note_id: int, key_off: bool, length: int) -> None:
+        if pitch_offset_per_tick < 0 or pitch_offset_per_tick > 0xFF:
+            raise BytecodeError(f"Vibrato pitch_offset_per_tick out of range ({pitch_offset_per_tick}, min: 0, max 255)")
+
+        self.bytecode.append(SET_VIBRATO_DEPTH_AND_PLAY_NOTE)
+        self.bytecode.append(pitch_offset_per_tick)
+        self.play_note(note_id, key_off, length)
 
     @_instruction(no_argument)
     def disable_vibrato(self) -> None:
