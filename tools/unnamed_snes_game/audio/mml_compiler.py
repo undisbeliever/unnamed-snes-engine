@@ -33,6 +33,7 @@ from .bytecode import (
     I8_MAX,
     cast_i8,
     MAX_VOLUME as MAX_FINE_VOLUME,
+    MAX_VIBRATO_QUARTER_WAVELENGTH_TICKS,
 )
 
 from .json_formats import Instrument as SamplesJsonInstrument
@@ -463,7 +464,7 @@ class Note(NamedTuple):
 
 
 class Tokenizer:
-    TWO_CHARACTER_TOKENS: Final = frozenset(("__", "{{", "}}"))
+    TWO_CHARACTER_TOKENS: Final = frozenset(("__", "{{", "}}", "MP"))
 
     def __init__(self, lines: list[Line]):
         self.lines: Final = lines
@@ -720,12 +721,26 @@ class Tokenizer:
         return NoteLength(is_clock_value, length, dot_count)
 
 
+class MpSettings(NamedTuple):
+    # Vibrato depth in cents
+    depth_in_cents: int
+    # Quarter Wavelength in ticks
+    qw_ticks: int
+
+
+class VibratoState(NamedTuple):
+    # Pitch offset per tick
+    po_per_tick: int
+    # Quarter Wavelength in ticks
+    qw_ticks: int
+
+
 @dataclass
 class LoopState:
     loop_count: int
     # Tick counter at the start of the loop
     tc_start_of_loop: int
-    # Tick counter at the optional skip_last_loop token (`:`)
+    # Tick counter at the optional skip_last_loop token (``)
     tc_skip_last_loop: Optional[int]
 
 
@@ -760,6 +775,9 @@ class MmlChannelParser:
 
         # Note id of the previously slurred note (if any)
         self.prev_slured_note_id: Optional[int] = None
+
+        self.mp: Optional[MpSettings] = None
+        self.vibrato_state: Optional[VibratoState] = None
 
         self.tick_counter: int = 0
 
@@ -1071,8 +1089,35 @@ class MmlChannelParser:
             return True
         return False
 
-    def _play_note_with_quantization(self, note_id: int, tick_length: int, slur_note: bool) -> None:
-        key_off = not slur_note
+    def _calculate_mp_vibrato_for_note_id(self, note_id: int) -> Optional[VibratoState]:
+        if self.mp is None:
+            return None
+
+        if self.mp.depth_in_cents == 0:
+            return None
+
+        if self.instrument is None:
+            raise RuntimeError("Cannot add vibrato to note unless an instrument is set")
+
+        assert self.mp.qw_ticks > 0
+        assert self.mp.depth_in_cents > 0
+
+        pitch: Final = self.pitch_table.pitch_for_note(self.instrument.instrument_id, note_id)
+
+        # Calculate the minimum and maximum pitch of the vibrato.
+        # This produces more accurate results when cents is very large (ie, 800)
+        p1: Final[float] = pitch * 2 ** (-(self.mp.depth_in_cents / 2) / 1200)
+        p2: Final[float] = pitch * 2 ** ((self.mp.depth_in_cents / 2) / 1200)
+
+        po_per_tick: int = round((p2 - p1) / (self.mp.qw_ticks * 2))
+
+        if po_per_tick < 1:
+            po_per_tick = 1
+
+        return VibratoState(po_per_tick=po_per_tick, qw_ticks=self.mp.qw_ticks)
+
+    def _play_note_with_quantization_and_mp(self, note_id: int, tick_length: int, slur_note: bool) -> None:
+        key_off_length = 0
 
         if self.quantization and not slur_note:
             assert 0 < self.quantization < MAX_QUANTIZATION, "Invalid quantization value"
@@ -1080,14 +1125,31 @@ class MmlChannelParser:
             # -1 for the key-off tick in the `play_note` bytecode instruction
             key_on_length = tick_length * self.quantization // MAX_QUANTIZATION + 1
             key_off_length = tick_length - key_on_length
+            key_off = True
 
-            if key_on_length > 1 and key_off_length > 1:
-                self._play_note(note_id, True, key_on_length)
-                self._rest(key_off_length)
-            else:
-                self._play_note(note_id, key_off, tick_length)
+            if key_on_length <= 1 or key_off_length <= 1:
+                key_on_length = tick_length
+                key_off_length = 0
+                key_off = not slur_note
         else:
-            self._play_note(note_id, key_off, tick_length)
+            key_on_length = tick_length
+            key_off_length = 0
+            key_off = not slur_note
+
+        if self.mp:
+            vibrato: Final = self._calculate_mp_vibrato_for_note_id(note_id)
+
+            if self.vibrato_state != vibrato:
+                if vibrato is not None:
+                    self.bc.set_vibrato(vibrato.po_per_tick, vibrato.qw_ticks)
+                else:
+                    self.bc.disable_vibrato()
+                self.vibrato_state = vibrato
+
+        self._play_note(note_id, key_off, key_on_length)
+
+        if key_off_length > 1:
+            self._rest(key_off_length)
 
     def parse_note(self, note: Note) -> None:
         # Must calculate note_id here to ensure error message location is correct
@@ -1098,7 +1160,7 @@ class MmlChannelParser:
 
         tick_length: Final = note_length + tie_length
 
-        self._play_note_with_quantization(note_id, tick_length, slur_note)
+        self._play_note_with_quantization_and_mp(note_id, tick_length, slur_note)
 
     def parse_n(self) -> None:
         "Play note integer ID at default length"
@@ -1111,7 +1173,7 @@ class MmlChannelParser:
 
         tick_length: Final = self.default_length_ticks + tie_length
 
-        self._play_note_with_quantization(note_id, tick_length, slur_note)
+        self._play_note_with_quantization_and_mp(note_id, tick_length, slur_note)
 
     def parse_r(self) -> None:
         ticks = self.parse_note_length()
@@ -1176,6 +1238,10 @@ class MmlChannelParser:
 
         if n_nested_loops > self.max_nested_loops:
             self.max_nested_loops = n_nested_loops
+
+        # Reset vibrato state
+        # Ensure `_play_note_mp()` will emit a new `set_vibrato` command at the start of each loop
+        self.vibrato_state = None
 
         if loop_count < 2 or loop_count > MAX_LOOP_COUNT:
             # Ignore loop count errors here so error message location is at the end of the loop
@@ -1502,11 +1568,18 @@ class MmlChannelParser:
         Format:
             disable vibrato: ~0
             set vibrato:     ~ pitch_offset_per_tick, quarter_wavelength_in_ticks
+
+        NOTE: enabling manual vibrato disables MP vibrato.
         """
+
+        # Disable MP vibrato
+        self.mp = None
+
         pitch_offset_per_tick: Final = self.tokenizer.parse_uint()
 
         if pitch_offset_per_tick == 0:
             self.bc.disable_vibrato()
+            self.vibrato_state = None
         else:
             # ::TODO find a good default quarter_wavelength_ticks value::
             if not self._test_next_token_matches(","):
@@ -1514,6 +1587,34 @@ class MmlChannelParser:
             quarter_wavelength_ticks: Final = self.tokenizer.parse_uint()
 
             self.bc.set_vibrato(pitch_offset_per_tick, quarter_wavelength_ticks)
+            self.vibrato_state = VibratoState(po_per_tick=pitch_offset_per_tick, qw_ticks=quarter_wavelength_ticks)
+
+    def parse_mp_vibrato(self) -> None:
+        # ::TODO better description::
+        """
+        Relative vibrato setting.
+
+        Format:
+            disable MP vibrato: MP 0
+            enable MP vibrato:  MP depth_in_cents, quarter_wavelength_in_ticks
+
+        NOTE: Not immediate.  Only takes effect on the next play_note token.
+        """
+        # ::TODO find a good default quarter_wavelength_ticks value::
+
+        depth_in_cents: Final = self.tokenizer.parse_uint()
+
+        if depth_in_cents == 0:
+            self.mp = MpSettings(0, 0)
+        else:
+            if not self._test_next_token_matches(","):
+                raise RuntimeError("MP requires 2 parameters: depth_in_cents, quarter_wavelength_in_ticks")
+
+            quarter_wavelength_per_tick: Final = self.tokenizer.parse_uint()
+            if quarter_wavelength_per_tick < 1 or quarter_wavelength_per_tick > MAX_VIBRATO_QUARTER_WAVELENGTH_TICKS:
+                raise RuntimeError(f"quarter_wavelength_per_tick out of bounds (1 - {MAX_VIBRATO_QUARTER_WAVELENGTH_TICKS})")
+
+            self.mp = MpSettings(depth_in_cents=depth_in_cents, qw_ticks=quarter_wavelength_per_tick)
 
     def parse_echo(self) -> None:
         """
@@ -1578,6 +1679,7 @@ class MmlChannelParser:
         "{{": parse_broken_chord,
         "{": parse_portamento,
         "~": parse_manual_vibrato,
+        "MP": parse_mp_vibrato,
         "E": parse_echo,
         "t": parse_set_song_tempo,
         "T": parse_set_song_tick_clock,
