@@ -62,14 +62,15 @@ let INSTRUCTIONS_WITH_ARGUMENTS = [
 
 
     // parameters: pppppppp 0ttttttt
-    //      pppppppp = pitch offset per tick.  MUST BE >= 1.
-    //       ttttttt = quarter wavelength ticks.  MUST BE <= 64.
+    //      pppppppp = pitch offset per tick.
+    //       ttttttt = quarter wavelength ticks.  MUST BE >= 1 and <= 64.
     //
-    // If ttttttt is 0, vibrato is disabled.
+    // If pppppppp is 0, vibrato is disabled.
     //
     // NOTES:
-    //  * The total wavelength of the vibrato is `0ttttttt * 4`.
-    //  * If `0ttttttt` is > 64, the vibrato is unbalanced and will slowly decrement the PITCH.
+    //  * The total wavelength of the vibrato is `ttttttt * 4`.
+    //  * If `ttttttt` is 0, the vibrato is unbalanced and will slowly increment the PITCH.
+    //  * If `ttttttt` is > 64, the vibrato is unbalanced and will slowly decrement the PITCH.
     //  * Vibrato has no range checking and may overflow or underflow the PITCH register.
     //  * Portamento overrides vibrato
     set_vibrato,

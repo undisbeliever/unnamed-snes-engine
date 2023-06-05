@@ -153,11 +153,16 @@ in zeropage {
         var portamento_target_h : [u8 ; N_CHANNELS];
 
 
-        // Used to determine:
-        //  1. If vibrato is active
-        //  2. The vibrato pitch shift direction for the current vibrato tick counter
+
+        // Vibrato PITCH offset per tick.
         //
-        // If this variable is 0, vibrato is disabled.
+        // If this value is 0, vibrato is disabled.
+        //
+        // (pitch change/tick)
+        var vibrato_pitchOffsetPerTick : [u8 ; N_CHANNELS];
+
+
+        // Used to determine the vibrato pitch shift direction for the current vibrato tick counter.
         //
         // This variable is equal to `vibrato_waveLengthInTicks / 2`
         var vibrato_directionComparator : [u8 ; N_CHANNELS];
@@ -182,10 +187,6 @@ in zeropage {
         //
         // This variable is equal to `4 * vibrato_tickCounterStart`
         var vibrato_waveLengthInTicks : [u8 ; N_CHANNELS];
-
-        // Vibrato PITCH offset
-        // (pitch change/tick)
-        var vibrato_pitchOffset : [u8 ; N_CHANNELS];
     }
 }
 
@@ -672,7 +673,7 @@ func __reset_channel(channelIndex : u8 in x) {
     channelSoA.portamento_direction[x] = a as i8;
 
     // Disable vibrato
-    channelSoA.vibrato_directionComparator[x] = a;
+    channelSoA.vibrato_pitchOffsetPerTick[x] = a;
 
 
     // Set keyOnMask.  The next play-note instruction will queue a KON event.
@@ -797,34 +798,35 @@ var _target_h : u8 in zpTmp;
         // Vibrato
         // (not active during portamento)
 
-        a = channelSoA.vibrato_directionComparator[x];
+        y = channelSoA.vibrato_pitchOffsetPerTick[x];
         if !zero {
+            smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.PITCH_L as u8;
+
             // Determine the vibrato direction
+            a = channelSoA.vibrato_directionComparator[x];
             cmp(a, channelSoA.vibrato_tickCounter[x]);
 
-            smp.dsp_addr = a = ChannelVoiceOffset[x] | VoiceDspAddr.PITCH_L as u8;
-            // carry unchanged.
-
-            if carry {
-                // Subtract from PITCH_L
-                // carry set
-                smp.dsp_data = a = smp.dsp_data -# channelSoA.vibrato_pitchOffset[x];
-
-                if !carry {
-                    // Decrement PITCH_H
-                    smp.dsp_addr++;
-                    smp.dsp_data--;
-                }
-            }
-            else {
-                // Add to PITCH_L
+            if !carry {
+                // Add Y to PITCH_L
                 // carry clear
-                smp.dsp_data = a = smp.dsp_data +# channelSoA.vibrato_pitchOffset[x];
+                smp.dsp_data = a = y +# smp.dsp_data;
 
                 if carry {
                     // Increment PITCH_H
                     smp.dsp_addr++;
                     smp.dsp_data++;
+                }
+            }
+            else {
+                // Subtract pitchOffsetPerTick from PITCH_L
+                // (uses 1 less byte than reverse subtract Y, with the same CPU cycle count)
+                // carry set
+                smp.dsp_data = a = smp.dsp_data -# channelSoA.vibrato_pitchOffsetPerTick[x];
+
+                if !carry {
+                    // Decrement PITCH_H
+                    smp.dsp_addr++;
+                    smp.dsp_data--;
                 }
             }
 
@@ -1052,7 +1054,7 @@ func __portamento(channelIndex : u8 in x, direction : u8 in a) {
 // IN: Y = 0
 // KEEP: X
 func set_vibrato(channelIndex : u8 in x, pitchOffsetPerTick: u8 in a) {
-    channelSoA.vibrato_pitchOffset[x] = a;
+    channelSoA.vibrato_pitchOffsetPerTick[x] = a;
 
 
     // Read quarterWavelengthInTicks parameter
@@ -1086,7 +1088,7 @@ func disable_channel(channelIndex : u8 in x) {
     channelSoA.portamento_direction[x] = a as i8;
 
     // Disable vibrato
-    channelSoA.vibrato_directionComparator[x] = a;
+    channelSoA.vibrato_pitchOffsetPerTick[x] = a;
 
 
     // Send key-off event
