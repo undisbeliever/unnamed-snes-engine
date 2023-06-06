@@ -1136,9 +1136,14 @@ func end(channelIndex : u8 in x) {
 }
 
 
+// IN: Y = 0
 // KEEP: X
 func call_subroutine(channelIndex : u8 in x, subroutineId : u8 in a) {
 var _subroutineId : u8 in zpTmp;
+
+    // Disable vibrato
+    // Y = 0
+    channelSoA.vibrato_pitchOffsetPerTick[x] = y;
 
     _subroutineId = a;
 
@@ -1162,6 +1167,11 @@ var _subroutineId : u8 in zpTmp;
 
 // KEEP: X
 func return_from_subroutine(channelIndex : u8 in x) {
+    // Disable vibrato
+    // Y IS NOT 0
+    // (no stz instruction)
+    channelSoA.vibrato_pitchOffsetPerTick[x] = a = 0;
+
     a = channelSoA.returnInstPtr_l[x];
     y = channelSoA.returnInstPtr_h[x];
 

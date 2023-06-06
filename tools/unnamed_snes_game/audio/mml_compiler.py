@@ -1243,6 +1243,9 @@ class MmlChannelParser:
                 if s.last_instrument is not None:
                     self.instrument = s.last_instrument
 
+                # Calling a subroutine and returning from a subroutine disables vibrato
+                self.vibrato_state = None
+
             else:
                 self.add_error(f"Unknown subroutine {i}")
         else:
