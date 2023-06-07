@@ -83,6 +83,18 @@ class MmlError:
             return f"{self.line_number}: {self.message}"
 
 
+class ErrorList:
+    def __init__(self) -> None:
+        self.errors: list[MmlError] = list()
+        self._pos: tuple[int, Optional[int]] = 0, None
+
+    def add_error(self, message: str) -> None:
+        self.errors.append(MmlError(message, *self._pos))
+
+    def set_pos(self, p: tuple[int, int]) -> None:
+        self._pos = p
+
+
 class CompileError(RuntimeError):
     def __init__(self, errors: list[MmlError]):
         self.errors = errors
@@ -744,27 +756,20 @@ class LoopState:
     tc_skip_last_loop: Optional[int]
 
 
-class MmlChannelParser:
+class MmlCommands:
     def __init__(
         self,
-        input_lines: list[Line],
         channel_name: str,
+        is_subroutine: bool,
         metadata: MetaData,
-        instruments: OrderedDict[str, Instrument],
-        subroutines: Optional[list[ChannelData]],
         pitch_table: PitchTable,
         bc_mappings: BcMappings,
-        error_list: list[MmlError],
+        error_list: ErrorList,
     ):
-        self.tokenizer: Final = Tokenizer(input_lines)
         self.channel_name: Final = channel_name
-        self.is_subroutine: Final = subroutines is None
-        self.subroutines: Final = subroutines
-        self.instruments: Final = instruments
+        self.is_subroutine: Final = is_subroutine
         self.pitch_table: Final = pitch_table
         self.bc: Final = Bytecode(bc_mappings, is_subroutine=self.is_subroutine, is_sound_effect=False)
-
-        self.error_list: Final = error_list
 
         self.zenlen: int = metadata.zenlen
 
@@ -794,80 +799,7 @@ class MmlChannelParser:
         # Do not show a "Cannot play a note before setting an instrument" error in subroutine
         self.show_missing_set_instrument_error = not self.is_subroutine
 
-        self.set_error_pos()
-
-    def set_error_pos(self) -> None:
-        # Set the error location for any errors created with `add_error()`
-        self._pos = self.tokenizer.get_pos()
-
-    def add_error(self, message: str) -> None:
-        self.error_list.append(MmlError(message, *self._pos))
-
-    def _parse_list_of_pitches(self, end_token: str) -> list[int]:
-        note_ids = list()
-
-        while True:
-            self.set_error_pos()
-
-            if (p := self.tokenizer.parse_optional_pitch()) is not None:
-                try:
-                    note_ids.append(self.calculate_note_id(p))
-                except Exception as e:
-                    self.add_error(str(e))
-
-            elif t := self.tokenizer.next_token():
-                if t == end_token:
-                    break
-                elif t == "o":
-                    self.parse_o()
-                elif t == ">":
-                    self.parse_increase_octave()
-                elif t == "<":
-                    self.parse_decrease_octave()
-                else:
-                    self.add_error(f"Unknown token: {t}")
-
-            else:
-                # Line ended early
-                raise RuntimeError("Missing `{end_token}`")
-
-        return note_ids
-
-    def _parse_tie_and_slur(self) -> tuple[int, bool]:
-        """Returns: tie_length (in ticks), slur_note"""
-        tie_length = 0
-        slur_note = False
-
-        while t := self._test_next_token_matches_multiple(r"lo><^&"):
-            # Allow note length and octave change before tick/slur
-            if t == "l":
-                self.parse_l()
-            elif t == "o":
-                self.parse_o()
-            elif t == ">":
-                self.parse_increase_octave()
-            elif t == "<":
-                self.parse_decrease_octave()
-
-            elif t == "^":
-                # Extend tick_length on ties ('^')
-                try:
-                    tie_length += self.parse_note_length()
-                except Exception as e:
-                    self.add_error(str(e))
-
-            elif t == "&":
-                # Slur or tie
-
-                nl = self.parse_optional_note_length()
-                if nl is not None:
-                    # This is a tie, extend the tick length
-                    tie_length += nl
-                else:
-                    # This is a slur
-                    slur_note = True
-
-        return tie_length, slur_note
+        self.add_error: Final = error_list.add_error
 
     def calculate_note_id(self, note: int) -> int:
         note_id: Final = note + self.octave * SEMITONES_PER_OCTAVE + self.semitone_offset
@@ -917,32 +849,19 @@ class MmlChannelParser:
 
             return ticks
 
-    def parse_note_length(self) -> int:
-        nl = self.tokenizer.parse_optional_note_length()
-        if nl is None:
-            return self.default_length_ticks
-        return self.calculate_note_length(nl)
-
-    def parse_optional_note_length(self) -> Optional[int]:
-        nl = self.tokenizer.parse_optional_note_length()
-        if nl is None:
-            return None
-        return self.calculate_note_length(nl)
-
-    def parse_change_whole_note_length(self) -> None:
+    def set_zenlen(self, z: int) -> None:
         """
         Change zenlen (AKA: whole note length) value.
 
         NOTE: This command resets the default note length.
         NOTE: This command changes the zenlen for the current channel/macro only.
         """
-        z = self.tokenizer.parse_uint()
         if z < MIN_ZENLEN or z > MAX_ZENLEN:
             raise ValueError(f"zenlen out of bounds ({MIN_ZENLEN}-{MAX_ZENLEN})")
         self.zenlen = z
         self.default_length_ticks = z // STARTING_DEFAULT_NOTE_LENGTH
 
-    def _play_portamento(
+    def play_portamento(
         self,
         note1_id: int,
         note2_id: int,
@@ -1045,7 +964,7 @@ class MmlChannelParser:
             self.bc.play_note(note_id, key_off, tick_length)
 
     def _rest_after_play_note(self, ticks: int, key_off: bool) -> None:
-        "IMPORTANT NOTE: Does not modify self.prev_slurred_note_id"
+        "IMPORTANT NOTE: Does not modify self.prev_slurred_note_id if key_off is false"
         assert ticks > 0
 
         if key_off:
@@ -1062,7 +981,7 @@ class MmlChannelParser:
         else:
             self.bc.rest(ticks)
 
-    def _rest(self, ticks: int) -> None:
+    def rest(self, ticks: int) -> None:
         assert ticks > 0
 
         self.prev_slured_note_id = None
@@ -1073,48 +992,6 @@ class MmlChannelParser:
             t = min(MAX_REST_TICKS, ticks)
             ticks -= t
             self.bc.rest(t)
-
-    def _test_next_token_matches(self, token: str) -> bool:
-        """
-        Tests if the next token is `token`.
-
-        Also advances the tokenizer to a new line and sets the error_pos (if token matches).
-        """
-        self.tokenizer.skip_new_line()
-        if self.tokenizer.peek_next_token() == token:
-            self.set_error_pos()
-            t = self.tokenizer.next_token()
-            assert t == token
-            return True
-        return False
-
-    def _test_next_token_matches_multiple(self, tokens: Union[str | list[str]]) -> Optional[str]:
-        """
-        Tests if the next token is a character in `tokens`.  Returns the token
-
-        Also advances the tokenizer to a new line and sets the error_pos (if token matches).
-        """
-        self.tokenizer.skip_new_line()
-
-        t = self.tokenizer.peek_next_token()
-        if t and t in tokens:
-            self.set_error_pos()
-            nt = self.tokenizer.next_token()
-            assert nt == t
-            return t
-        return None
-
-    def _test_next_token_matches_no_newline(self, token: str) -> bool:
-        """
-        Tests if the next token is `token` without advancing to the next line.
-        Also sets the error_pos (if the token matches).
-        """
-        if self.tokenizer.peek_next_token() == token:
-            self.set_error_pos()
-            t = self.tokenizer.next_token()
-            assert t == token
-            return True
-        return False
 
     def _calculate_mp_vibrato_for_note_id(self, note_id: int) -> Optional[VibratoState]:
         if self.mp is None:
@@ -1143,7 +1020,7 @@ class MmlChannelParser:
 
         return VibratoState(po_per_tick=po_per_tick, qw_ticks=self.mp.qw_ticks)
 
-    def _play_note_with_quantization_and_mp(self, note_id: int, tick_length: int, slur_note: bool) -> None:
+    def play_note_with_quantization_and_mp(self, note_id: int, tick_length: int, slur_note: bool) -> None:
         key_off_length = 0
 
         if self.quantization and not slur_note:
@@ -1177,90 +1054,39 @@ class MmlChannelParser:
             self._play_note(note_id, key_off, key_on_length)
 
         if key_off_length > 1:
-            self._rest(key_off_length)
+            self.rest(key_off_length)
 
-    def parse_note(self, note: Note) -> None:
-        # Must calculate note_id here to ensure error message location is correct
-        note_id = self.calculate_note_id(note.note)
+    def call_subroutine(self, s: ChannelData) -> None:
+        if self.is_subroutine:
+            raise RuntimeError("Cannot call a subroutine inside a subroutine")
 
-        note_length = self.calculate_note_length(note.length)
-        tie_length, slur_note = self._parse_tie_and_slur()
+        s_index = self.bc.mappings.subroutines.get(s.name)
 
-        tick_length: Final = note_length + tie_length
+        if s_index is None:
+            raise RuntimeError(f"Unknown subroutine {s.name}")
 
-        self._play_note_with_quantization_and_mp(note_id, tick_length, slur_note)
+        n_nested_loops: Final = len(self.loop_stack) + s.max_nested_loops
 
-    def parse_n(self) -> None:
-        "Play note integer ID at default length"
+        if n_nested_loops > self.max_nested_loops:
+            self.max_nested_loops = n_nested_loops
 
-        note_id: Final = self.tokenizer.parse_uint()
-        # Must test note_id here to ensure error message location is correct
-        self.test_note_id(note_id)
+        if n_nested_loops > MAX_NESTED_LOOPS:
+            self.add_error(
+                f"Too many nested loops when calling subroutine {s.name} (requires: {n_nested_loops}, max: {MAX_NESTED_LOOPS})"
+            )
 
-        tie_length, slur_note = self._parse_tie_and_slur()
+        self.bc.call_subroutine_int(s_index)
 
-        tick_length: Final = self.default_length_ticks + tie_length
+        self.tick_counter += s.tick_counter
 
-        self._play_note_with_quantization_and_mp(note_id, tick_length, slur_note)
+        # Subroutine changed the current instrument
+        if s.last_instrument is not None:
+            self.instrument = s.last_instrument
 
-    def parse_r(self) -> None:
-        ticks = self.parse_note_length()
+        # Calling a subroutine and returning from a subroutine disables vibrato
+        self.vibrato_state = None
 
-        # Combine multiple "r" tokens
-        while self._test_next_token_matches("r"):
-            ticks += self.parse_note_length()
-
-        self._rest(ticks)
-
-    def parse_exclamation_mark(self) -> None:
-        "Call subroutine"
-
-        i = self.tokenizer.parse_identifier()
-
-        if not self.is_subroutine:
-            assert self.subroutines is not None
-
-            s_index = self.bc.mappings.subroutines.get(i)
-
-            if s_index is not None:
-                s: Final = self.subroutines[s_index]
-
-                n_nested_loops: Final = len(self.loop_stack) + s.max_nested_loops
-
-                if n_nested_loops > self.max_nested_loops:
-                    self.max_nested_loops = n_nested_loops
-
-                if n_nested_loops > MAX_NESTED_LOOPS:
-                    self.add_error(
-                        f"Too many nested loops when calling subroutine {i} (requires: {n_nested_loops}, max: {MAX_NESTED_LOOPS})"
-                    )
-
-                self.bc.call_subroutine_int(s_index)
-
-                self.tick_counter += s.tick_counter
-
-                # Subroutine changed the current instrument
-                if s.last_instrument is not None:
-                    self.instrument = s.last_instrument
-
-                # Calling a subroutine and returning from a subroutine disables vibrato
-                self.vibrato_state = None
-
-            else:
-                self.add_error(f"Unknown subroutine {i}")
-        else:
-            self.add_error("Cannot call a subroutine inside a subroutine")
-
-    def parse_start_loop(self) -> None:
-        found_end, loop_count = self.tokenizer.read_loop_end_count()
-        if not found_end:
-            raise RuntimeError("Cannot find end of loop")
-        self._start_loop(loop_count)
-
-    def _start_loop(self, loop_count: Optional[int]) -> None:
-        if loop_count is None:
-            loop_count = 2
-
+    def start_loop(self, loop_count: int) -> None:
         if loop_count < 2 or loop_count > MAX_LOOP_COUNT:
             self.add_error(f"Loop count is out of range (2 - {MAX_LOOP_COUNT})")
 
@@ -1279,7 +1105,7 @@ class MmlChannelParser:
             loop_count = 2
         self.bc.start_loop(loop_count)
 
-    def parse_skip_last_loop(self) -> None:
+    def skip_last_loop(self) -> None:
         if not self.loop_stack:
             raise RuntimeError("Not in a loop")
 
@@ -1290,16 +1116,11 @@ class MmlChannelParser:
 
         self.bc.skip_last_loop()
 
-    def parse_end_loop(self) -> None:
-        loop_count: Final = self.tokenizer.parse_optional_uint()
-
+    def end_loop(self, loop_count: int) -> None:
         if not self.loop_stack:
             raise RuntimeError("Loop stack empty (missing start of loop)")
 
         ls: Final = self.loop_stack[-1]
-
-        if loop_count is None:
-            raise RuntimeError("Missing loop count")
 
         if loop_count < 2 or loop_count > MAX_LOOP_COUNT:
             # Adding error message here ensures error location is correct
@@ -1309,9 +1130,9 @@ class MmlChannelParser:
             # This should not happen.  Check `Tokenizer.read_loop_end_count()`
             self.add_error(f"SOMETHING WENT WRONG: loop_count != expected_loop_count")
 
-        self._end_loop()
+        self.__end_loop()
 
-    def _end_loop(self) -> None:
+    def __end_loop(self) -> None:
         n_nested_loops: Final = len(self.loop_stack)
 
         ls: Final = self.loop_stack.pop()
@@ -1334,15 +1155,7 @@ class MmlChannelParser:
         if n_nested_loops < MAX_NESTED_LOOPS:
             self.bc.end_loop()
 
-    def parse_at(self) -> None:
-        "Set Instrument"
-
-        i: Final = self.tokenizer.parse_identifier()
-
-        inst: Final = self.instruments.get(i)
-        if inst is None:
-            raise RuntimeError(f"Unknown instrument: {i}")
-
+    def set_instrument(self, inst: Instrument) -> None:
         if self.instrument is None or inst.instrument_id != self.instrument.instrument_id:
             # No instrument or instrument_id changed
             if inst.adsr is not None:
@@ -1365,12 +1178,10 @@ class MmlChannelParser:
 
         self.instrument = inst
 
-    def parse_l(self) -> None:
-        "Change default note length"
-        self.default_length_ticks = self.parse_note_length()
+    def set_default_length(self, nl: NoteLength) -> None:
+        self.default_length_ticks = self.calculate_note_length(nl)
 
-    def parse_quantize(self) -> None:
-        q = self.tokenizer.parse_uint()
+    def set_quantize(self, q: int) -> None:
         if q < 1 or q > MAX_QUANTIZATION:
             raise ValueError(f"Quantization out of bounds (1-{MAX_QUANTIZATION})")
         if q == MAX_QUANTIZATION:
@@ -1379,67 +1190,443 @@ class MmlChannelParser:
         else:
             self.quantization = q
 
-    def parse_o(self) -> None:
-        "Set octave"
-        o = self.tokenizer.parse_uint()
+    def set_octave(self, o: int) -> None:
         self.octave = min(MAX_OCTAVE, max(MIN_OCTAVE, o))
-
         if o < MIN_OCTAVE or o > MAX_OCTAVE:
             raise RuntimeError(f"Octave out of range (min: {MIN_OCTAVE}, max: {MAX_OCTAVE})")
 
-    def parse_underscore(self) -> None:
-        "Transpose"
-        value, is_relative = self.tokenizer.parse_relative_int()
+    def increase_octave(self) -> None:
+        self.octave = min(MAX_OCTAVE, self.octave + 1)
+
+    def decrease_octave(self) -> None:
+        self.octave = max(MIN_OCTAVE, self.octave - 1)
+
+    def transpose(self, value: int) -> None:
         if value < -128 or value > 128:
             raise RuntimeError("Transpose out of range (-128 - +128)")
         self.semitone_offset = value
 
-    def parse_double_underscore(self) -> None:
-        "Relative transpose"
-        # Relative setting
-        value, is_relative = self.tokenizer.parse_relative_int()
+    def relative_transpose(self, value: int) -> None:
         if value < -128 or value > 128:
             raise RuntimeError("Transpose out of range (-128 - +128)")
         self.semitone_offset += value
 
-    def parse_coarse_volume(self) -> None:
-        "Parse volume (v)"
-        v, is_v_relative = self._parse_coarse_volume_value()
-        self._update_volume(v, is_v_relative)
-
-    def parse_fine_volume(self) -> None:
-        "Parse fine volume (V)"
-        v, is_v_relative = self._parse_fine_volume_value()
-        self._update_volume(v, is_v_relative)
-
-    def _update_volume(self, v: int, is_v_relative: bool) -> None:
-        if not is_v_relative:
-            if self._test_next_token_matches("p"):
-                p, is_p_relative = self._parse_pan_value()
-                self._set_pan_and_volume(p, is_p_relative, v, is_v_relative)
-            else:
-                self.bc.set_volume(v)
+    def set_pan_and_volume(self, p: int, is_p_relative: bool, v: int, is_v_relative: bool) -> None:
+        if not is_p_relative and not is_v_relative:
+            self.bc.set_pan_and_volume(p, v)
         else:
-            # v is relative
+            if not is_v_relative:
+                self.bc.set_volume(v)
+            else:
+                self.bc.adjust_volume(v)
+
+            if not is_p_relative:
+                self.bc.set_pan(p)
+            else:
+                self.bc.adjust_pan(p)
+
+    def set_volume(self, v: int, is_v_relative: bool) -> None:
+        if not is_v_relative:
+            self.bc.set_volume(v)
+        else:
             self.bc.adjust_volume(v)
 
-    def parse_p(self) -> None:
-        "Pan"
-        p, is_p_relative = self._parse_pan_value()
+    def set_pan(self, p: int, is_p_relative: bool) -> None:
         if not is_p_relative:
-            if self._test_next_token_matches("v"):
-                # Coarse volume
-                v, is_v_relative = self._parse_coarse_volume_value()
-                self._set_pan_and_volume(p, is_p_relative, v, is_v_relative)
-            if self._test_next_token_matches("V"):
-                # Fine volume
-                v, is_v_relative = self._parse_fine_volume_value()
-                self._set_pan_and_volume(p, is_p_relative, v, is_v_relative)
-            else:
-                self.bc.set_pan(p)
+            self.bc.set_pan(p)
         else:
-            # p is relative
             self.bc.adjust_pan(p)
+
+    def broken_chord(self, chord_notes: list[int], total_length: int, note_length: int, tie: bool) -> None:
+        if len(chord_notes) < 2:
+            self.add_error("Expected 2 or more pitches in a broken chord")
+
+        expected_tick_counter: Final = self.tick_counter + total_length
+
+        # If tie is true, a keyoff note is added to the end of the loop
+        notes_in_loop = total_length // note_length - int(tie)
+
+        # `ticks_remaining` cannot be 1, remove a note to from the loop to prevent this from happening
+        if note_length == 1:
+            notes_in_loop -= 1
+
+        n_loops = notes_in_loop // len(chord_notes)
+        break_point: Final = notes_in_loop % len(chord_notes)
+        keyoff: Final = not tie
+
+        if break_point != 0:
+            n_loops += 1
+
+        if n_loops < 2:
+            raise RuntimeError("Broken chord total length too short (a minimum of 2 loops are required)")
+
+        self.start_loop(n_loops)
+
+        for i, n in enumerate(chord_notes):
+            if i == break_point and break_point > 0:
+                self.skip_last_loop()
+            self._play_note(n, keyoff, note_length)
+
+        self.__end_loop()
+
+        ticks_remaining: Final = expected_tick_counter - self.tick_counter
+        if ticks_remaining > 0:
+            # The last note to play is always a keyoff note
+            next_note = chord_notes[(break_point + 1) % len(chord_notes)]
+            self._play_note(next_note, True, ticks_remaining)
+
+        if self.tick_counter != expected_tick_counter:
+            raise RuntimeError("Broken chord tick_count mismatch")
+
+    def set_manual_vibrato(self, pitch_offset_per_tick: int, quarter_wavelength_ticks: int) -> None:
+        # Disable MP vibrato
+        self.mp = None
+
+        if pitch_offset_per_tick == 0:
+            self.bc.disable_vibrato()
+            self.vibrato_state = None
+        else:
+            self.bc.set_vibrato(pitch_offset_per_tick, quarter_wavelength_ticks)
+            self.vibrato_state = VibratoState(po_per_tick=pitch_offset_per_tick, qw_ticks=quarter_wavelength_ticks)
+
+    def set_mp_vibrato(self, depth_in_cents: int, quarter_wavelength_in_ticks: int) -> None:
+        # NOTE: MP is not immediate.  Only takes effect on the next play_note token.
+
+        if depth_in_cents == 0:
+            # Disable vibrato
+            self.mp = MpSettings(0, 0)
+
+        else:
+            if quarter_wavelength_in_ticks < 1 or quarter_wavelength_in_ticks > MAX_VIBRATO_QUARTER_WAVELENGTH_TICKS:
+                raise RuntimeError(f"quarter_wavelength_in_ticks out of bounds (1 - {MAX_VIBRATO_QUARTER_WAVELENGTH_TICKS})")
+            self.mp = MpSettings(depth_in_cents=depth_in_cents, qw_ticks=quarter_wavelength_in_ticks)
+
+    def set_echo(self, echo: bool) -> None:
+        """
+        Enable/Disable echo
+        """
+        if echo:
+            self.bc.enable_echo()
+        else:
+            self.bc.disable_echo()
+
+    def set_song_tempo(self, bpm: int) -> None:
+        """
+        Set song tempo
+        """
+        t: Final = bpm_to_tick_timer(bpm)
+        self.bc.set_song_tick_clock(t)
+
+    def set_song_tick_clock(self, t: int) -> None:
+        """
+        Set the song's timer0 register value
+        """
+        self.bc.set_song_tick_clock(t)
+
+    def set_loop_point(self) -> None:
+        if self.is_subroutine:
+            raise RuntimeError("Cannot set loop point in a subroutine")
+
+        if self.loop_point is not None:
+            raise RuntimeError("Cannot set loop point, loop point already set")
+
+        self.loop_point = len(self.bc.bytecode)
+        self.loop_point_tick_counter = self.tick_counter
+
+    def end(self) -> ChannelData:
+        "Finalise bytecode and return ChannelData"
+
+        if self.loop_stack:
+            self.add_error("Missing loop end ]")
+
+        if self.loop_point is not None:
+            if self.loop_point_tick_counter == self.tick_counter:
+                self.add_error("Expected at least one note or rest after the loop point (L)")
+
+        if self.is_subroutine:
+            self.bc.return_from_subroutine()
+        else:
+            self.bc.end()
+
+        return ChannelData(
+            name=self.channel_name,
+            bytecode=self.bc.bytecode,
+            loop_point=self.loop_point,
+            tick_counter=self.tick_counter,
+            max_nested_loops=self.max_nested_loops,
+            last_instrument=self.instrument,
+        )
+
+
+class MmlParser:
+    def __init__(
+        self,
+        tokenizer: Tokenizer,
+        mml: MmlCommands,
+        instruments: OrderedDict[str, Instrument],
+        subroutines: Optional[list[ChannelData]],
+        error_list: ErrorList,
+    ):
+        self.tokenizer: Final = tokenizer
+        self.mml: Final = mml
+        self.instruments: Final = instruments
+        self.subroutines: Final = subroutines
+        self._error_list: Final = error_list
+
+        self.add_error: Final = error_list.add_error
+
+    # ::Move these three things outside the class::
+    def _set_error_pos(self) -> None:
+        self._error_list.set_pos(self.tokenizer.get_pos())
+
+    #
+    # parser helpers
+    #
+
+    def _parse_note_length(self) -> int:
+        nl = self.tokenizer.parse_optional_note_length()
+        if nl is None:
+            return self.mml.default_length_ticks
+        return self.mml.calculate_note_length(nl)
+
+    def _parse_optional_note_length(self) -> Optional[int]:
+        nl = self.tokenizer.parse_optional_note_length()
+        if nl is None:
+            return None
+        return self.mml.calculate_note_length(nl)
+
+    def _parse_two_ints_or_off(self, error_message: str) -> tuple[int, int]:
+        i1 = self.tokenizer.parse_uint()
+        if i1 == 0:
+            return 0, 0
+        else:
+            if not self._test_next_token_matches(","):
+                raise RuntimeError(error_message)
+
+            i2 = self.tokenizer.parse_uint()
+
+            return i1, i2
+
+    def _test_next_token_matches(self, token: str) -> bool:
+        """
+        Tests if the next token is `token`.
+
+        Also advances the tokenizer to a new line and sets the error_pos (if token matches).
+        """
+        self.tokenizer.skip_new_line()
+        if self.tokenizer.peek_next_token() == token:
+            self._set_error_pos()
+            t = self.tokenizer.next_token()
+            assert t == token
+            return True
+        return False
+
+    def _test_next_token_matches_multiple(self, tokens: Union[str | list[str]]) -> Optional[str]:
+        """
+        Tests if the next token is a character in `tokens`.  Returns the token
+
+        Also advances the tokenizer to a new line and sets the error_pos (if token matches).
+        """
+        self.tokenizer.skip_new_line()
+
+        t = self.tokenizer.peek_next_token()
+        if t and t in tokens:
+            self._set_error_pos()
+            nt = self.tokenizer.next_token()
+            assert nt == t
+            return t
+        return None
+
+    def _test_next_token_matches_no_newline(self, token: str) -> bool:
+        """
+        Tests if the next token is `token` without advancing to the next line.
+        Also sets the error_pos (if the token matches).
+        """
+        if self.tokenizer.peek_next_token() == token:
+            self._set_error_pos()
+            t = self.tokenizer.next_token()
+            assert t == token
+            return True
+        return False
+
+    #
+    # note settings
+    #
+
+    def parse_change_whole_note_length(self) -> None:
+        z = self.tokenizer.parse_uint()
+        self.mml.set_zenlen(z)
+
+    def parse_set_octave(self) -> None:
+        o = self.tokenizer.parse_uint()
+        self.mml.set_octave(o)
+
+    def parse_increase_octave(self) -> None:
+        self.mml.increase_octave()
+
+    def parse_decrease_octave(self) -> None:
+        self.mml.decrease_octave()
+
+    def parse_transpose(self) -> None:
+        v, is_relative = self.tokenizer.parse_relative_int()
+        self.mml.transpose(v)
+
+    def parse_relative_transpose(self) -> None:
+        v, is_relative = self.tokenizer.parse_relative_int()
+        self.mml.relative_transpose(v)
+
+    def parse_quantize(self) -> None:
+        q = self.tokenizer.parse_uint()
+        self.mml.set_quantize(q)
+
+    def parse_set_default_length(self) -> None:
+        nl = self.tokenizer.parse_optional_note_length()
+        if nl is None:
+            raise RuntimeError("Missing note length")
+        self.mml.set_default_length(nl)
+
+    def parse_set_instrument(self) -> None:
+        i: Final = self.tokenizer.parse_identifier()
+
+        inst: Final = self.instruments.get(i)
+        if inst is None:
+            raise RuntimeError(f"Unknown instrument: {i}")
+
+        self.mml.set_instrument(inst)
+
+    def parse_manual_vibrato(self) -> None:
+        """
+        Set the audio-driver vibrato values.
+
+        Format:
+            disable vibrato: ~0
+            set vibrato:     ~ pitch_offset_per_tick, quarter_wavelength_in_ticks
+
+        NOTE: enabling manual vibrato disables MP vibrato.
+        """
+        # ::TODO find a good default quarter_wavelength_ticks value::
+        pitch_offset_per_tick, quarter_wavelength_ticks = self._parse_two_ints_or_off(
+            "~ requires 2 parameters: pitch_offset_per_tick, quarter_wavelength_in_ticks"
+        )
+        self.mml.set_manual_vibrato(pitch_offset_per_tick, quarter_wavelength_ticks)
+
+    def parse_mp_vibrato(self) -> None:
+        # ::TODO better description::
+        """
+        Relative vibrato setting.
+
+        Format:
+            disable MP vibrato: MP 0
+            enable MP vibrato:  MP depth_in_cents, quarter_wavelength_in_ticks
+
+        NOTE: Not immediate.  Only takes effect on the next play_note token.
+        """
+        # ::TODO find a good default quarter_wavelength_ticks value::
+
+        depth_in_cents, quarter_wavelength_in_ticks = self._parse_two_ints_or_off(
+            "MP requires 2 parameters: depth_in_cents, quarter_wavelength_in_ticks"
+        )
+        self.mml.set_mp_vibrato(depth_in_cents, quarter_wavelength_in_ticks)
+
+    #
+    # Note playing commands
+    #
+
+    def parse_note(self, note: Note) -> None:
+        # Must calculate note_id here to ensure error message location is correct
+        note_id = self.mml.calculate_note_id(note.note)
+
+        note_length = self.mml.calculate_note_length(note.length)
+        tie_length, slur_note = self._parse_tie_and_slur()
+
+        tick_length: Final = note_length + tie_length
+
+        self.mml.play_note_with_quantization_and_mp(note_id, tick_length, slur_note)
+
+    def parse_play_note_id(self) -> None:
+        "Play note integer ID at default length"
+
+        note_id: Final = self.tokenizer.parse_uint()
+        # Must test note_id here to ensure error message location is correct
+        self.mml.test_note_id(note_id)
+
+        tie_length, slur_note = self._parse_tie_and_slur()
+
+        tick_length: Final = self.mml.default_length_ticks + tie_length
+
+        self.mml.play_note_with_quantization_and_mp(note_id, tick_length, slur_note)
+
+    def parse_broken_chord(self) -> None:
+        chord_notes: Final = self._parse_list_of_pitches("}}")
+
+        end_token_pos: Final = self.tokenizer.get_pos()
+
+        total_length: Final = self._parse_note_length()
+
+        note_length = 1
+        tie = True
+        if self._test_next_token_matches_no_newline(","):
+            nl = self.tokenizer.parse_optional_note_length()
+            if nl:
+                note_length = self.mml.calculate_note_length(nl)
+
+            if self._test_next_token_matches_no_newline(","):
+                tie = self.tokenizer.parse_bool()
+
+        # Show any MML errors on the "}}" token
+        self._error_list.set_pos(end_token_pos)
+
+        self.mml.broken_chord(chord_notes, total_length, note_length, tie)
+
+    def parse_portamento(self) -> None:
+        notes: Final = self._parse_list_of_pitches("}")
+
+        end_token_pos: Final = self.tokenizer.get_pos()
+
+        total_ticks: Final = self._parse_note_length()
+
+        delay_ticks = 0
+        speed = None
+
+        if self._test_next_token_matches_no_newline(","):
+            nl = self.tokenizer.parse_optional_note_length()
+
+            if nl:
+                delay_ticks = self.mml.calculate_note_length(nl)
+                if delay_ticks >= total_ticks:
+                    self.add_error("Portamento delay must be < portamento length")
+                    delay_ticks = 0
+
+            if self._test_next_token_matches_no_newline(","):
+                speed = self.tokenizer.parse_uint()
+            else:
+                # Only show "Missing delay length" error if there is no third parameter
+                if nl is None:
+                    self.add_error("Missing delay length")
+
+        after_ticks, slur_note = self._parse_tie_and_slur()
+
+        if len(notes) != 2:
+            raise RuntimeError("Only two notes are allowed in a portamento")
+
+        # Show any MML errors on the "}}" token
+        self._error_list.set_pos(end_token_pos)
+
+        portamento_ticks: Final = total_ticks - delay_ticks
+        self.mml.play_portamento(notes[0], notes[1], slur_note, speed, delay_ticks, portamento_ticks, after_ticks)
+
+    def parse_rest(self) -> None:
+        ticks = self._parse_note_length()
+
+        # Combine multiple "r" tokens
+        while self._test_next_token_matches("r"):
+            ticks += self._parse_note_length()
+
+        self.mml.rest(ticks)
+
+    #
+    # Pan, volume and echo
+    #
 
     def _parse_coarse_volume_value(self) -> tuple[int, bool]:
         v, is_v_relative = self.tokenizer.parse_relative_int()
@@ -1472,214 +1659,97 @@ class MmlChannelParser:
             raise RuntimeError(f"Pan out of range (1-{MAX_PAN})")
         return p, is_p_relative
 
-    def _set_pan_and_volume(self, p: int, is_p_relative: bool, v: int, is_v_relative: bool) -> None:
-        if not is_p_relative and not is_v_relative:
-            self.bc.set_pan_and_volume(p, v)
+    def parse_pan(self) -> None:
+        p, is_p_relative = self._parse_pan_value()
+        if self._test_next_token_matches("v"):
+            # Coarse volume
+            v, is_v_relative = self._parse_coarse_volume_value()
+            self.mml.set_pan_and_volume(p, is_p_relative, v, is_v_relative)
+        elif self._test_next_token_matches("V"):
+            # Fine volume
+            v, is_v_relative = self._parse_fine_volume_value()
+            self.mml.set_pan_and_volume(p, is_p_relative, v, is_v_relative)
         else:
-            if not is_v_relative:
-                self.bc.set_volume(v)
-            else:
-                self.bc.adjust_volume(v)
+            self.mml.set_pan(p, is_p_relative)
 
-            if not is_p_relative:
-                self.bc.set_pan(p)
-            else:
-                self.bc.adjust_pan(p)
-
-    def parse_increase_octave(self) -> None:
-        self.octave = min(MAX_OCTAVE, self.octave + 1)
-
-    def parse_decrease_octave(self) -> None:
-        self.octave = max(MIN_OCTAVE, self.octave - 1)
-
-    def parse_broken_chord(self) -> None:
-        chord_notes: Final = self._parse_list_of_pitches("}}")
-
-        if len(chord_notes) < 2:
-            self.add_error("Expected 2 or more pitches in a broken chord")
-
-        chord_end_pos: Final = self._pos
-
-        total_length: Final = self.parse_note_length()
-
-        note_length = 1
-        tie = True
-        if self._test_next_token_matches_no_newline(","):
-            self.set_error_pos()
-            nl = self.tokenizer.parse_optional_note_length()
-            if nl:
-                note_length = self.calculate_note_length(nl)
-
-            if self._test_next_token_matches_no_newline(","):
-                self.set_error_pos()
-                tie = self.tokenizer.parse_bool()
-
-        # Ensure error message for loop errors are at the correct location
-        self._pos = chord_end_pos
-
-        expected_tick_counter: Final = self.tick_counter + total_length
-
-        # If tie is true, a keyoff note is added to the end of the loop
-        notes_in_loop = total_length // note_length - int(tie)
-
-        # `ticks_remaining` cannot be 1, remove a note to from the loop to prevent this from happening
-        if note_length == 1:
-            notes_in_loop -= 1
-
-        n_loops = notes_in_loop // len(chord_notes)
-        break_point: Final = notes_in_loop % len(chord_notes)
-        keyoff: Final = not tie
-
-        if break_point != 0:
-            n_loops += 1
-
-        if n_loops < 2:
-            raise RuntimeError("Broken chord total length too short (a minimum of 2 loops are required)")
-
-        self._start_loop(n_loops)
-
-        for i, n in enumerate(chord_notes):
-            if i == break_point and break_point > 0:
-                self.parse_skip_last_loop()
-            self._play_note(n, keyoff, note_length)
-
-        self._end_loop()
-
-        ticks_remaining: Final = expected_tick_counter - self.tick_counter
-        if ticks_remaining > 0:
-            # The last note to play is always a keyoff note
-            next_note = chord_notes[(break_point + 1) % len(chord_notes)]
-            self._play_note(next_note, True, ticks_remaining)
-
-        if self.tick_counter != expected_tick_counter:
-            raise RuntimeError("Broken chord tick_count mismatch")
-
-    def parse_portamento(self) -> None:
-        portamento_start_pos: Final = self._pos
-
-        notes: Final = self._parse_list_of_pitches("}")
-
-        total_ticks: Final = self.parse_note_length()
-        delay_ticks = 0
-        speed = None
-
-        if self._test_next_token_matches_no_newline(","):
-            self.set_error_pos()
-            nl = self.tokenizer.parse_optional_note_length()
-
-            if nl:
-                delay_ticks = self.calculate_note_length(nl)
-                if delay_ticks >= total_ticks:
-                    self.add_error("Portamento delay must be < portamento length")
-                    delay_ticks = 0
-
-            if self._test_next_token_matches_no_newline(","):
-                self.set_error_pos()
-                speed = self.tokenizer.parse_uint()
-            else:
-                # Only show "Missing delay length" error if there is no third parameter
-                if nl is None:
-                    self.add_error("Missing delay length")
-
-        after_ticks, slur_note = self._parse_tie_and_slur()
-
-        if len(notes) != 2:
-            raise RuntimeError("Only two notes are allowed in a portamento")
-
-        # Ensure error message at the correct location
-        self._pos = portamento_start_pos
-
-        p_ticks: Final = total_ticks - delay_ticks
-        self._play_portamento(notes[0], notes[1], slur_note, speed, delay_ticks, p_ticks, after_ticks)
-
-    def parse_manual_vibrato(self) -> None:
-        """
-        Set the audio-driver vibrato values.
-
-        Format:
-            disable vibrato: ~0
-            set vibrato:     ~ pitch_offset_per_tick, quarter_wavelength_in_ticks
-
-        NOTE: enabling manual vibrato disables MP vibrato.
-        """
-
-        # Disable MP vibrato
-        self.mp = None
-
-        pitch_offset_per_tick: Final = self.tokenizer.parse_uint()
-
-        if pitch_offset_per_tick == 0:
-            self.bc.disable_vibrato()
-            self.vibrato_state = None
+    def parse_coarse_volume(self) -> None:
+        v, is_v_relative = self._parse_coarse_volume_value()
+        if self._test_next_token_matches("p"):
+            p, is_p_relative = self._parse_pan_value()
+            self.mml.set_pan_and_volume(p, is_p_relative, v, is_v_relative)
         else:
-            # ::TODO find a good default quarter_wavelength_ticks value::
-            if not self._test_next_token_matches(","):
-                raise RuntimeError("~ requires 2 parameters: pitch_offset_per_tick, quarter_wavelength_in_ticks")
-            quarter_wavelength_ticks: Final = self.tokenizer.parse_uint()
+            self.mml.set_volume(v, is_v_relative)
 
-            self.bc.set_vibrato(pitch_offset_per_tick, quarter_wavelength_ticks)
-            self.vibrato_state = VibratoState(po_per_tick=pitch_offset_per_tick, qw_ticks=quarter_wavelength_ticks)
-
-    def parse_mp_vibrato(self) -> None:
-        # ::TODO better description::
-        """
-        Relative vibrato setting.
-
-        Format:
-            disable MP vibrato: MP 0
-            enable MP vibrato:  MP depth_in_cents, quarter_wavelength_in_ticks
-
-        NOTE: Not immediate.  Only takes effect on the next play_note token.
-        """
-        # ::TODO find a good default quarter_wavelength_ticks value::
-
-        depth_in_cents: Final = self.tokenizer.parse_uint()
-
-        if depth_in_cents == 0:
-            self.mp = MpSettings(0, 0)
+    def parse_fine_volume(self) -> None:
+        v, is_v_relative = self._parse_fine_volume_value()
+        if self._test_next_token_matches("p"):
+            p, is_p_relative = self._parse_pan_value()
+            self.mml.set_pan_and_volume(p, is_p_relative, v, is_v_relative)
         else:
-            if not self._test_next_token_matches(","):
-                raise RuntimeError("MP requires 2 parameters: depth_in_cents, quarter_wavelength_in_ticks")
-
-            quarter_wavelength_per_tick: Final = self.tokenizer.parse_uint()
-            if quarter_wavelength_per_tick < 1 or quarter_wavelength_per_tick > MAX_VIBRATO_QUARTER_WAVELENGTH_TICKS:
-                raise RuntimeError(f"quarter_wavelength_per_tick out of bounds (1 - {MAX_VIBRATO_QUARTER_WAVELENGTH_TICKS})")
-
-            self.mp = MpSettings(depth_in_cents=depth_in_cents, qw_ticks=quarter_wavelength_per_tick)
+            self.mml.set_volume(v, is_v_relative)
 
     def parse_echo(self) -> None:
-        """
-        Enable/Disable echo
-        """
         b: Final = self.tokenizer.parse_optional_bool(True)
-        if b:
-            self.bc.enable_echo()
-        else:
-            self.bc.disable_echo()
+
+        self.mml.set_echo(b)
+
+    #
+    # Global commands
+    #
 
     def parse_set_song_tempo(self) -> None:
-        """
-        Set song tempo
-        """
-        t: Final = bpm_to_tick_timer(self.tokenizer.parse_uint())
-        self.bc.set_song_tick_clock(t)
+        t = self.tokenizer.parse_uint()
+
+        self.mml.set_song_tempo(t)
 
     def parse_set_song_tick_clock(self) -> None:
-        """
-        Set the song's timer0 register value
-        """
-        t: Final = self.tokenizer.parse_uint()
-        self.bc.set_song_tick_clock(t)
+        t = self.tokenizer.parse_uint()
+
+        self.mml.set_song_tick_clock(t)
 
     def parse_set_loop_point(self) -> None:
-        if self.is_subroutine:
-            raise RuntimeError("Cannot set loop point in a subroutine")
+        self.mml.set_loop_point()
 
-        if self.loop_point is not None:
-            raise RuntimeError("Cannot set loop point, loop point already set")
+    #
+    # Control
+    #
 
-        self.loop_point = len(self.bc.bytecode)
-        self.loop_point_tick_counter = self.tick_counter
+    def parse_start_loop(self) -> None:
+        found_end, loop_count = self.tokenizer.read_loop_end_count()
+        if not found_end:
+            raise RuntimeError("Cannot find end of loop")
+        if loop_count is None:
+            raise RuntimeError("Missing loop count")
+        self.mml.start_loop(loop_count)
+
+    def parse_skip_last_loop(self) -> None:
+        self.mml.skip_last_loop()
+
+    def parse_end_loop(self) -> None:
+        loop_count: Final = self.tokenizer.parse_uint()
+
+        if loop_count is None:
+            raise RuntimeError("Missing loop count")
+        self.mml.end_loop(loop_count)
+
+    def parse_call_subroutine(self) -> None:
+        s_name: Final = self.tokenizer.parse_identifier()
+
+        if self.subroutines is None:
+            raise RuntimeError("Cannot call a subroutine inside a subroutine")
+
+        # ::TODO find a better way to do this::
+        s_index: Final = self.mml.bc.mappings.subroutines.get(s_name)
+        if s_index is None:
+            raise RuntimeError(f"Unknown subroutine {s_name}")
+
+        s: Final = self.subroutines[s_index]
+
+        self.mml.call_subroutine(s)
+
+    #
+    # Misc
+    #
 
     def parse_divider(self) -> None:
         """
@@ -1688,25 +1758,91 @@ class MmlChannelParser:
         """
         pass
 
+    def _parse_list_of_pitches(self, end_token: str) -> list[int]:
+        note_ids = list()
+
+        while True:
+            self._set_error_pos()
+
+            if (p := self.tokenizer.parse_optional_pitch()) is not None:
+                try:
+                    note_ids.append(self.mml.calculate_note_id(p))
+                except Exception as e:
+                    self.add_error(str(e))
+
+            elif t := self.tokenizer.next_token():
+                if t == end_token:
+                    break
+                elif t == "o":
+                    self.parse_set_octave()
+                elif t == ">":
+                    self.parse_increase_octave()
+                elif t == "<":
+                    self.parse_decrease_octave()
+                else:
+                    self.add_error(f"Unknown token: {t}")
+
+            else:
+                # Line ended early
+                raise RuntimeError("Missing `{end_token}`")
+
+        return note_ids
+
+    def _parse_tie_and_slur(self) -> tuple[int, bool]:
+        """Returns: tie_length (in ticks), slur_note"""
+        tie_length = 0
+        slur_note = False
+
+        while t := self._test_next_token_matches_multiple(r"lo><^&"):
+            # Allow note length and octave change before tick/slur
+            if t == "l":
+                self.parse_set_default_length()
+            elif t == "o":
+                self.parse_set_octave()
+            elif t == ">":
+                self.parse_increase_octave()
+            elif t == "<":
+                self.parse_decrease_octave()
+
+            elif t == "^":
+                # Extend tick_length on ties ('^')
+                try:
+                    tie_length += self._parse_note_length()
+                except Exception as e:
+                    self.add_error(str(e))
+
+            elif t == "&":
+                # Slur or tie
+
+                nl = self._parse_optional_note_length()
+                if nl is not None:
+                    # This is a tie, extend the tick length
+                    tie_length += nl
+                else:
+                    # This is a slur
+                    slur_note = True
+
+        return tie_length, slur_note
+
     PARSERS: Final = {
-        "!": parse_exclamation_mark,
+        "!": parse_call_subroutine,
         "[": parse_start_loop,
         ":": parse_skip_last_loop,
         "]": parse_end_loop,
-        "@": parse_at,
+        "@": parse_set_instrument,
         "C": parse_change_whole_note_length,
-        "n": parse_n,
-        "l": parse_l,
-        "o": parse_o,
-        "r": parse_r,
+        "n": parse_play_note_id,
+        "l": parse_set_default_length,
+        "r": parse_rest,
+        "o": parse_set_octave,
         ">": parse_increase_octave,
         "<": parse_decrease_octave,
         "v": parse_coarse_volume,
         "V": parse_fine_volume,
-        "p": parse_p,
+        "p": parse_pan,
         "Q": parse_quantize,
-        "_": parse_underscore,
-        "__": parse_double_underscore,
+        "_": parse_transpose,
+        "__": parse_relative_transpose,
         "{{": parse_broken_chord,
         "{": parse_portamento,
         "~": parse_manual_vibrato,
@@ -1721,7 +1857,7 @@ class MmlChannelParser:
     def parse_mml(self) -> None:
         while not self.tokenizer.at_end():
             self.tokenizer.skip_new_line()
-            self.set_error_pos()
+            self._set_error_pos()
 
             try:
                 if note := self.tokenizer.parse_optional_note():
@@ -1737,28 +1873,6 @@ class MmlChannelParser:
             except Exception as e:
                 self.add_error(str(e))
 
-        if self.loop_stack:
-            self.add_error("Missing loop end ]")
-
-        if self.loop_point is not None:
-            if self.loop_point_tick_counter == self.tick_counter:
-                self.add_error("Expected at least one note or rest after the loop point (L)")
-
-        if self.is_subroutine:
-            self.bc.return_from_subroutine()
-        else:
-            self.bc.end()
-
-    def channel_data(self) -> ChannelData:
-        return ChannelData(
-            name=self.channel_name,
-            bytecode=self.bc.bytecode,
-            loop_point=self.loop_point,
-            tick_counter=self.tick_counter,
-            max_nested_loops=self.max_nested_loops,
-            last_instrument=self.instrument,
-        )
-
 
 def parse_mml_subroutine(
     channel_lines: list[Line],
@@ -1767,11 +1881,16 @@ def parse_mml_subroutine(
     instruments: OrderedDict[str, Instrument],
     pitch_table: PitchTable,
     bc_mappings: BcMappings,
-    error_list: list[MmlError],
+    error_list: ErrorList,
 ) -> ChannelData:
-    parser = MmlChannelParser(channel_lines, channel_name, metadata, instruments, None, pitch_table, bc_mappings, error_list)
+    mml = MmlCommands(channel_name, True, metadata, pitch_table, bc_mappings, error_list)
+
+    tokenizer = Tokenizer(channel_lines)
+    parser = MmlParser(tokenizer, mml, instruments, None, error_list)
+
     parser.parse_mml()
-    return parser.channel_data()
+
+    return mml.end()
 
 
 def parse_mml_channel(
@@ -1782,11 +1901,16 @@ def parse_mml_channel(
     subroutines: list[ChannelData],
     pitch_table: PitchTable,
     bc_mappings: BcMappings,
-    error_list: list[MmlError],
+    error_list: ErrorList,
 ) -> ChannelData:
-    parser = MmlChannelParser(channel_lines, channel_name, metadata, instruments, subroutines, pitch_table, bc_mappings, error_list)
+    mml = MmlCommands(channel_name, False, metadata, pitch_table, bc_mappings, error_list)
+
+    tokenizer = Tokenizer(channel_lines)
+    parser = MmlParser(tokenizer, mml, instruments, subroutines, error_list)
+
     parser.parse_mml()
-    return parser.channel_data()
+
+    return mml.end()
 
 
 def compile_mml(mml_text: str, samples: SamplesJson) -> MmlData:
@@ -1794,9 +1918,9 @@ def compile_mml(mml_text: str, samples: SamplesJson) -> MmlData:
 
     mml_lines: Final = split_lines(mml_text)
 
-    error_list: Final[list[MmlError]] = list()
+    error_list: Final = ErrorList()
 
-    metadata: Final = parse_headers(mml_lines.headers, error_list)
+    metadata: Final = parse_headers(mml_lines.headers, error_list.errors)
 
     instruments: Final = parse_instruments(mml_lines.instruments, samples)
 
@@ -1818,7 +1942,7 @@ def compile_mml(mml_text: str, samples: SamplesJson) -> MmlData:
                 parse_mml_channel(c_lines, channel_name, metadata, instruments, subroutines, pitch_table, bc_mappings, error_list)
             )
 
-    if error_list:
-        raise CompileError(error_list)
+    if error_list.errors:
+        raise CompileError(error_list.errors)
 
     return MmlData(metadata, instruments, subroutines, channels)
