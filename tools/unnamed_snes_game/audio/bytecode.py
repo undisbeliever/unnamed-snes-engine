@@ -395,7 +395,7 @@ class Bytecode:
         self.mappings: Final = mappings
         self.is_subroutine: Final = is_subroutine
         self.is_sound_effect: Final = is_sound_effect
-        self.bytecode = bytearray()
+        self._bytecode = bytearray()
 
         self._tick_counter: int = 0
 
@@ -430,14 +430,20 @@ class Bytecode:
     def get_tick_counter(self) -> int:
         return self._tick_counter
 
+    def get_bytecode_size(self) -> int:
+        return len(self._bytecode)
+
+    def get_bytecode(self) -> bytes:
+        return bytes(self._bytecode)
+
     @_instruction(play_note_argument)
     def play_note(self, note_id: int, key_off: bool, length: int) -> None:
         if note_id < 0 or note_id > N_NOTES:
             raise BytecodeError("note is out of range")
         bc_length: Final = self.__length_argument(length, key_off)
 
-        self.bytecode.append((note_id << 1) | (key_off & 1))
-        self.bytecode.append(bc_length)
+        self._bytecode.append((note_id << 1) | (key_off & 1))
+        self._bytecode.append(bc_length)
 
     @_instruction(portamento_argument)
     def portamento(self, note_id: int, key_off: bool, velocity: int, length: int) -> None:
@@ -456,10 +462,10 @@ class Bytecode:
         else:
             opcode = PORTAMENTO_UP
 
-        self.bytecode.append(opcode)
-        self.bytecode.append(speed)
-        self.bytecode.append(bc_length)
-        self.bytecode.append((note_id << 1) | (key_off & 1))
+        self._bytecode.append(opcode)
+        self._bytecode.append(speed)
+        self._bytecode.append(bc_length)
+        self._bytecode.append((note_id << 1) | (key_off & 1))
 
     @_instruction(two_integer_arguments)
     def set_vibrato(self, pitch_offset_per_tick: int, quarter_wavelength_ticks: int) -> None:
@@ -471,25 +477,25 @@ class Bytecode:
                 f"Vibrato quarter_wavelength_ticks out of range ({quarter_wavelength_ticks}, min: 1, max: {MAX_VIBRATO_QUARTER_WAVELENGTH_TICKS}"
             )
 
-        self.bytecode.append(SET_VIBRATO)
-        self.bytecode.append(pitch_offset_per_tick)
-        self.bytecode.append(quarter_wavelength_ticks)
+        self._bytecode.append(SET_VIBRATO)
+        self._bytecode.append(pitch_offset_per_tick)
+        self._bytecode.append(quarter_wavelength_ticks)
 
     @_instruction(integer_and_play_note_argument)
     def set_vibrato_depth_and_play_note(self, pitch_offset_per_tick: int, note_id: int, key_off: bool, length: int) -> None:
         if pitch_offset_per_tick < 0 or pitch_offset_per_tick > 0xFF:
             raise BytecodeError(f"Vibrato pitch_offset_per_tick out of range ({pitch_offset_per_tick}, min: 0, max 255)")
 
-        self.bytecode.append(SET_VIBRATO_DEPTH_AND_PLAY_NOTE)
-        self.bytecode.append(pitch_offset_per_tick)
+        self._bytecode.append(SET_VIBRATO_DEPTH_AND_PLAY_NOTE)
+        self._bytecode.append(pitch_offset_per_tick)
         self.play_note(note_id, key_off, length)
 
     @_instruction(no_argument)
     def disable_vibrato(self) -> None:
         # ::MAYDO add a disable_vibrato bytecode instruction::
-        self.bytecode.append(SET_VIBRATO)
-        self.bytecode.append(0)
-        self.bytecode.append(0)
+        self._bytecode.append(SET_VIBRATO)
+        self._bytecode.append(0)
+        self._bytecode.append(0)
 
     def _get_instrument_id(self, instrument: Union[Name, int]) -> int:
         if isinstance(instrument, int):
@@ -504,39 +510,39 @@ class Bytecode:
     def set_instrument(self, instrument: Union[Name, int]) -> None:
         instrument_id = self._get_instrument_id(instrument)
 
-        self.bytecode.append(SET_INSTRUMENT)
-        self.bytecode.append(instrument_id)
+        self._bytecode.append(SET_INSTRUMENT)
+        self._bytecode.append(instrument_id)
 
     @_instruction(name_and_adsr_arguments)
     def set_instrument_and_adsr(self, instrument: Union[Name, int], adsr: Adsr) -> None:
         instrument_id = self._get_instrument_id(instrument)
 
-        self.bytecode.append(SET_INSTRUMENT_AND_ADSR_OR_GAIN)
-        self.bytecode.append(instrument_id)
-        self.bytecode.append(adsr.adsr1)
-        self.bytecode.append(adsr.adsr2)
+        self._bytecode.append(SET_INSTRUMENT_AND_ADSR_OR_GAIN)
+        self._bytecode.append(instrument_id)
+        self._bytecode.append(adsr.adsr1)
+        self._bytecode.append(adsr.adsr2)
 
     # ::TODO parse gain (after I figure out what it does)::
     @_instruction(name_and_integer_arguments)
     def set_instrument_and_gain(self, instrument: Union[Name, int], gain: int) -> None:
         instrument_id = self._get_instrument_id(instrument)
 
-        self.bytecode.append(SET_INSTRUMENT_AND_ADSR_OR_GAIN)
-        self.bytecode.append(instrument_id)
-        self.bytecode.append(0)
-        self.bytecode.append(gain)
+        self._bytecode.append(SET_INSTRUMENT_AND_ADSR_OR_GAIN)
+        self._bytecode.append(instrument_id)
+        self._bytecode.append(0)
+        self._bytecode.append(gain)
 
     @_instruction(integer_argument)
     def rest(self, length: int) -> None:
         bc_length: Final = self.__length_argument(length, False)
-        self.bytecode.append(REST)
-        self.bytecode.append(bc_length)
+        self._bytecode.append(REST)
+        self._bytecode.append(bc_length)
 
     @_instruction(integer_argument)
     def rest_keyoff(self, length: int) -> None:
         bc_length: Final = self.__length_argument(length, True)
-        self.bytecode.append(REST_KEYOFF)
-        self.bytecode.append(bc_length)
+        self._bytecode.append(REST_KEYOFF)
+        self._bytecode.append(bc_length)
 
     def _loop_id(self) -> int:
         """
@@ -580,8 +586,8 @@ class Bytecode:
 
         assert loop_id >= 0 and loop_id < MAX_LOOP_COUNT
         opcode: Final = START_LOOP_0 + loop_id * 2
-        self.bytecode.append(opcode)
-        self.bytecode.append(loop_count)
+        self._bytecode.append(opcode)
+        self._bytecode.append(loop_count)
 
     @_instruction(no_argument)
     def skip_last_loop(self) -> None:
@@ -595,12 +601,12 @@ class Bytecode:
 
         assert loop_id >= 0 and loop_id < MAX_LOOP_COUNT
         opcode: Final = SKIP_LAST_LOOP_0 + loop_id * 2
-        self.bytecode.append(opcode)
-        self.bytecode.append(0)  # Will be added later in the `end_loop` instruction
+        self._bytecode.append(opcode)
+        self._bytecode.append(0)  # Will be added later in the `end_loop` instruction
 
         # Save location of instruction argument for the `end_loop` instruction
         # Done last to ensure `skip_last_loop_pos` is only set if the `SKIP_LAST_LOOP_*` instruction is written to bytecode.
-        loop_state.skip_last_loop_pos = len(self.bytecode) - 1
+        loop_state.skip_last_loop_pos = len(self._bytecode) - 1
         loop_state.tick_counter_at_skip_last_loop = self._tick_counter
 
     @_instruction(no_argument)
@@ -635,57 +641,57 @@ class Bytecode:
         # Write the parameter of the `skip_last_loop` instruction (if required)
         if loop_state.skip_last_loop_pos is not None:
             skip_last_loop_pos: Final[int] = loop_state.skip_last_loop_pos
-            assert self.bytecode[skip_last_loop_pos - 1] == SKIP_LAST_LOOP_0 + loop_id * 2
-            to_skip = len(self.bytecode) - skip_last_loop_pos
+            assert self._bytecode[skip_last_loop_pos - 1] == SKIP_LAST_LOOP_0 + loop_id * 2
+            to_skip = len(self._bytecode) - skip_last_loop_pos
             if to_skip < 1 or to_skip > 256:
                 raise BytecodeError(f"skip_last_loop parameter out of bounds: {to_skip}")
-            self.bytecode[skip_last_loop_pos] = to_skip
+            self._bytecode[skip_last_loop_pos] = to_skip
 
         assert loop_id >= 0 and loop_id < MAX_LOOP_COUNT
         opcode: Final = END_LOOP_0 + loop_id * 2
-        self.bytecode.append(opcode)
+        self._bytecode.append(opcode)
 
     @_instruction(adsr_argument)
     def set_adsr(self, adsr: Adsr) -> None:
-        self.bytecode.append(SET_ADSR)
-        self.bytecode.append(adsr.adsr1)
-        self.bytecode.append(adsr.adsr2)
+        self._bytecode.append(SET_ADSR)
+        self._bytecode.append(adsr.adsr1)
+        self._bytecode.append(adsr.adsr2)
 
     # ::TODO parse gain (after I figure out what it does)::
     @_instruction(integer_argument)
     def set_gain(self, gain: int) -> None:
         if gain < 0 or gain > 0xFF:
             raise BytecodeError("Invalid GAIN value")
-        self.bytecode.append(SET_GAIN)
-        self.bytecode.append(gain)
+        self._bytecode.append(SET_GAIN)
+        self._bytecode.append(gain)
 
     @_instruction(integer_argument)
     def adjust_volume(self, v: int) -> None:
         if v < I8_MIN or v > I8_MAX:
             raise BytecodeError(f"Volume adjust out of range ({I8_MIN} - {I8_MAX})")
-        self.bytecode.append(ADJUST_VOLUME)
-        self.bytecode.append(cast_i8(v))
+        self._bytecode.append(ADJUST_VOLUME)
+        self._bytecode.append(cast_i8(v))
 
     @_instruction(integer_argument)
     def set_volume(self, v: int) -> None:
         if v < 0 or v > MAX_VOLUME:
             raise BytecodeError(f"Volume out of range (1-{MAX_VOLUME})")
-        self.bytecode.append(SET_VOLUME)
-        self.bytecode.append(v)
+        self._bytecode.append(SET_VOLUME)
+        self._bytecode.append(v)
 
     @_instruction(integer_argument)
     def adjust_pan(self, p: int) -> None:
         if p < I8_MIN or p > I8_MAX:
             raise BytecodeError(f"Pan adjust out of range ({I8_MIN} - {I8_MAX})")
-        self.bytecode.append(ADJUST_PAN)
-        self.bytecode.append(cast_i8(p))
+        self._bytecode.append(ADJUST_PAN)
+        self._bytecode.append(cast_i8(p))
 
     @_instruction(integer_argument)
     def set_pan(self, p: int) -> None:
         if p < 0 or p > MAX_PAN:
             raise BytecodeError(f"Pan out of range (0 - {MAX_PAN})")
-        self.bytecode.append(SET_PAN)
-        self.bytecode.append(p)
+        self._bytecode.append(SET_PAN)
+        self._bytecode.append(p)
 
     @_instruction(two_integer_arguments)
     def set_pan_and_volume(self, p: int, v: int) -> None:
@@ -693,17 +699,17 @@ class Bytecode:
             raise BytecodeError(f"Pan out of range (0 - {MAX_PAN})")
         if v < 0 or v > 255:
             raise BytecodeError(f"Volume out of range")
-        self.bytecode.append(SET_PAN_AND_VOLUME)
-        self.bytecode.append(p)
-        self.bytecode.append(v)
+        self._bytecode.append(SET_PAN_AND_VOLUME)
+        self._bytecode.append(p)
+        self._bytecode.append(v)
 
     @_instruction(no_argument)
     def disable_channel(self) -> None:
-        self.bytecode.append(DISABLE_CHANNEL)
+        self._bytecode.append(DISABLE_CHANNEL)
 
     @_instruction(no_argument)
     def end(self) -> None:
-        self.bytecode.append(END)
+        self._bytecode.append(END)
 
     @_instruction(name_argument)
     def call_subroutine(self, s: Union[Name, BcSubroutine]) -> None:
@@ -726,14 +732,14 @@ class Bytecode:
 
         self._tick_counter += subroutine.tick_counter
 
-        self.bytecode.append(CALL_SUBROUTINE)
-        self.bytecode.append(subroutine.subroutine_id)
+        self._bytecode.append(CALL_SUBROUTINE)
+        self._bytecode.append(subroutine.subroutine_id)
 
     @_instruction(no_argument)
     def return_from_subroutine(self) -> None:
         if not self.is_subroutine:
             raise BytecodeError("Not a subroutine")
-        self.bytecode.append(RETURN_FROM_SUBROUTINE)
+        self._bytecode.append(RETURN_FROM_SUBROUTINE)
 
     @_instruction(integer_argument)
     def set_song_tick_clock(self, timer: int) -> None:
@@ -742,13 +748,13 @@ class Bytecode:
 
         if timer < MIN_TICK_TIMER or timer > 0xFF:
             raise BytecodeError(f"timer0 value out of range: {timer} (min: {MIN_TICK_TIMER}, max: {0xff})")
-        self.bytecode.append(SET_SONG_TICK_CLOCK)
-        self.bytecode.append(timer)
+        self._bytecode.append(SET_SONG_TICK_CLOCK)
+        self._bytecode.append(timer)
 
     @_instruction(no_argument)
     def enable_echo(self) -> None:
-        self.bytecode.append(ENABLE_ECHO)
+        self._bytecode.append(ENABLE_ECHO)
 
     @_instruction(no_argument)
     def disable_echo(self) -> None:
-        self.bytecode.append(DISABLE_ECHO)
+        self._bytecode.append(DISABLE_ECHO)

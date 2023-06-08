@@ -1295,7 +1295,7 @@ class MmlCommands:
         if self.loop_point is not None:
             raise RuntimeError("Cannot set loop point, loop point already set")
 
-        self.loop_point = len(self.bc.bytecode)
+        self.loop_point = self.bc.get_bytecode_size()
         self.loop_point_tick_counter = self.bc.get_tick_counter()
 
     def end(self) -> ChannelData:
@@ -1327,7 +1327,7 @@ class MmlCommands:
 
         return ChannelData(
             name=self.channel_name,
-            bytecode=self.bc.bytecode,
+            bytecode=self.bc.get_bytecode(),
             loop_point=self.loop_point,
             tick_counter=tick_counter,
             max_nested_loops=self.max_nested_loops,

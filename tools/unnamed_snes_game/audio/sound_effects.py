@@ -40,7 +40,7 @@ def compile_sound_effect(sfx: str, samples_input: SamplesJson) -> bytes:
     if errors:
         raise RuntimeError(f"{len(errors)} errors compiling sound effects\n    " + "\n    ".join(errors))
 
-    return bc.bytecode
+    return bc.get_bytecode()
 
 
 def compile_sound_effects_file(lines: Sequence[str], filename: str, bcMappings: BcMappings) -> dict[Name, bytes]:
@@ -69,9 +69,12 @@ def compile_sound_effects_file(lines: Sequence[str], filename: str, bcMappings: 
                     if current_bc and prev_line != END_INSTRUCTION:
                         add_error(f"The sound effect must end with a `(END_INSTRUCTION)` instruction")
 
+                    if current_bc:
+                        assert current_sfx
+                        sound_effects[current_sfx] = current_bc.get_bytecode()
+
                     current_sfx = m.group(1)
                     current_bc = Bytecode(bcMappings, is_subroutine=False, is_sound_effect=True)
-                    sound_effects[current_sfx] = current_bc.bytecode
                 else:
                     if current_bc:
                         current_bc.parse_line(line)
@@ -84,6 +87,10 @@ def compile_sound_effects_file(lines: Sequence[str], filename: str, bcMappings: 
 
     if current_bc and prev_line != END_INSTRUCTION:
         add_error(f"The sound effect must end with a `{END_INSTRUCTION}` instruction")
+
+    if current_bc:
+        assert current_sfx
+        sound_effects[current_sfx] = current_bc.get_bytecode()
 
     if errors:
         raise RuntimeError(f"{len(errors)} errors compiling sound effects\n    " + "\n    ".join(errors))
