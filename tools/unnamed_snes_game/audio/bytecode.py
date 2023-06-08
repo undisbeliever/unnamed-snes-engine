@@ -384,6 +384,8 @@ def __bytecode_class(cls: type["Bytecode"]) -> type:
     return cls
 
 
+# If any method of this class raises an Exception, the `bytecode` and `get_tick_counter()` values
+# are invalid and must not be used.
 @__bytecode_class
 class Bytecode:
     # Populated by the __bytecode_class decorator
