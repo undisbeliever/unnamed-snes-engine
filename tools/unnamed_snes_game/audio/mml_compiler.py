@@ -753,10 +753,6 @@ class VibratoState(NamedTuple):
 @dataclass
 class LoopState:
     loop_count: int
-    # Tick counter at the start of the loop
-    tc_start_of_loop: int
-    # Tick counter at the optional skip_last_loop token (``)
-    tc_skip_last_loop: Optional[int]
 
 
 class MmlCommands:
@@ -787,8 +783,6 @@ class MmlCommands:
 
         self.mp: Optional[MpSettings] = None
         self.vibrato_state: Optional[VibratoState] = None
-
-        self.tick_counter: int = 0
 
         # Bytecode offset to loop to after an `end` instruction
         self.loop_point: Optional[int] = None
@@ -911,10 +905,8 @@ class MmlCommands:
             )
 
         if note2_ticks < MAX_PLAY_NOTE_TICKS:
-            self.tick_counter += note2_ticks
             self.bc.portamento(note2_id, key_off, pitch_velocity, note2_ticks)
         else:
-            self.tick_counter += MAX_PLAY_NOTE_TICKS
             self.bc.portamento(note2_id, False, pitch_velocity, MAX_PLAY_NOTE_TICKS)
             self._rest_after_play_note(note2_ticks - MAX_PLAY_NOTE_TICKS, key_off)
 
@@ -932,19 +924,15 @@ class MmlCommands:
             self.prev_slured_note_id = None
 
         if tick_length <= MAX_PLAY_NOTE_TICKS:
-            self.tick_counter += tick_length
             self.bc.play_note(note_id, key_off, tick_length)
         else:
             # Cannot play note in a single instruction
-            self.tick_counter += MAX_PLAY_NOTE_TICKS
             self.bc.play_note(note_id, False, MAX_PLAY_NOTE_TICKS)
             self._rest_after_play_note(tick_length - MAX_PLAY_NOTE_TICKS, key_off)
 
     def _set_vibrato_and_play_note(self, vibrato: Optional[VibratoState], note_id: int, key_off: bool, tick_length: int) -> None:
         # Vibrato interferes with portamento, no not slur a vibrato note into a portamento
         self.prev_slured_note_id = None
-
-        self.tick_counter += tick_length
 
         # Remember previous vibrato `qw_ticks` value when vibrato is disabled
         if vibrato is None and self.vibrato_state is not None:
@@ -974,8 +962,6 @@ class MmlCommands:
         if key_off:
             self.prev_slured_note_id = None
 
-        self.tick_counter += ticks
-
         while ticks > MAX_REST_TICKS:
             self.bc.rest(MAX_REST_TICKS)
             ticks -= MAX_REST_TICKS
@@ -989,8 +975,6 @@ class MmlCommands:
         assert ticks > 0
 
         self.prev_slured_note_id = None
-
-        self.tick_counter += ticks
 
         while ticks > 0:
             t = min(MAX_REST_TICKS, ticks)
@@ -1079,8 +1063,6 @@ class MmlCommands:
 
         self.bc.call_subroutine(s.bc_subroutine)
 
-        self.tick_counter += s.tick_counter
-
         # Subroutine changed the current instrument
         if s.last_instrument is not None:
             self.instrument = s.last_instrument
@@ -1092,7 +1074,7 @@ class MmlCommands:
         if loop_count < 2 or loop_count > MAX_LOOP_COUNT:
             self.add_error(f"Loop count is out of range (2 - {MAX_LOOP_COUNT})")
 
-        self.loop_stack.append(LoopState(loop_count, self.tick_counter, None))
+        self.loop_stack.append(LoopState(loop_count))
         n_nested_loops = len(self.loop_stack)
 
         if n_nested_loops > self.max_nested_loops:
@@ -1110,11 +1092,6 @@ class MmlCommands:
     def skip_last_loop(self) -> None:
         if not self.loop_stack:
             raise RuntimeError("Not in a loop")
-
-        if self.loop_stack[-1].tc_skip_last_loop is not None:
-            raise RuntimeError("Only one skip last loop `:` token is allowed per loop")
-
-        self.loop_stack[-1].tc_skip_last_loop = self.tick_counter
 
         self.bc.skip_last_loop()
 
@@ -1138,20 +1115,6 @@ class MmlCommands:
         n_nested_loops: Final = len(self.loop_stack)
 
         ls: Final = self.loop_stack.pop()
-
-        ticks_in_loop: Final = self.tick_counter - ls.tc_start_of_loop
-        if ticks_in_loop <= 0:
-            self.add_error("Loop does not play a note or rest")
-
-        if ls.tc_skip_last_loop is not None:
-            ticks_in_last_loop = ls.tc_skip_last_loop - ls.tc_start_of_loop
-        else:
-            ticks_in_last_loop = ticks_in_loop
-
-        if ticks_in_loop > 0 and ls.loop_count > 2:
-            self.tick_counter += ticks_in_loop * (ls.loop_count - 2)
-        if ticks_in_last_loop > 0:
-            self.tick_counter += ticks_in_last_loop
 
         # If statement ensures the "too many nested loops" error is only outputted once
         if n_nested_loops < MAX_NESTED_LOOPS:
@@ -1243,7 +1206,7 @@ class MmlCommands:
         if len(chord_notes) < 2:
             self.add_error("Expected 2 or more pitches in a broken chord")
 
-        expected_tick_counter: Final = self.tick_counter + total_length
+        expected_tick_counter: Final = self.bc.get_tick_counter() + total_length
 
         # If tie is true, a keyoff note is added to the end of the loop
         notes_in_loop = total_length // note_length - int(tie)
@@ -1271,13 +1234,13 @@ class MmlCommands:
 
         self.__end_loop()
 
-        ticks_remaining: Final = expected_tick_counter - self.tick_counter
+        ticks_remaining: Final = expected_tick_counter - self.bc.get_tick_counter()
         if ticks_remaining > 0:
             # The last note to play is always a keyoff note
             next_note = chord_notes[(break_point + 1) % len(chord_notes)]
             self._play_note(next_note, True, ticks_remaining)
 
-        if self.tick_counter != expected_tick_counter:
+        if self.bc.get_tick_counter() != expected_tick_counter:
             raise RuntimeError("Broken chord tick_count mismatch")
 
     def set_manual_vibrato(self, pitch_offset_per_tick: int, quarter_wavelength_ticks: int) -> None:
@@ -1333,16 +1296,18 @@ class MmlCommands:
             raise RuntimeError("Cannot set loop point, loop point already set")
 
         self.loop_point = len(self.bc.bytecode)
-        self.loop_point_tick_counter = self.tick_counter
+        self.loop_point_tick_counter = self.bc.get_tick_counter()
 
     def end(self) -> ChannelData:
         "Finalise bytecode and return ChannelData"
+
+        tick_counter: Final = self.bc.get_tick_counter()
 
         if self.loop_stack:
             self.add_error("Missing loop end ]")
 
         if self.loop_point is not None:
-            if self.loop_point_tick_counter == self.tick_counter:
+            if self.loop_point_tick_counter == tick_counter:
                 self.add_error("Expected at least one note or rest after the loop point (L)")
 
         if self.is_subroutine:
@@ -1355,6 +1320,7 @@ class MmlCommands:
             bc_subroutine = BcSubroutine(
                 name=self.channel_name,
                 subroutine_id=self.subroutine_id,
+                tick_counter=tick_counter,
             )
         else:
             bc_subroutine = None
@@ -1363,7 +1329,7 @@ class MmlCommands:
             name=self.channel_name,
             bytecode=self.bc.bytecode,
             loop_point=self.loop_point,
-            tick_counter=self.tick_counter,
+            tick_counter=tick_counter,
             max_nested_loops=self.max_nested_loops,
             last_instrument=self.instrument,
             bc_subroutine=bc_subroutine,

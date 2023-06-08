@@ -97,6 +97,7 @@ def cast_i8(i: int) -> int:
 class BcSubroutine(NamedTuple):
     name: Name
     subroutine_id: int
+    tick_counter: int
 
 
 @dataclass
@@ -351,6 +352,17 @@ def portamento_argument(s: str) -> tuple[int, bool, int, int]:
     return decoded_note, key_off, velocity, length
 
 
+@dataclass
+class LoopState:
+    loop_count: int
+    # Tick counter at the start of the loop
+    tick_counter_at_start: int
+    # Tick counter at the optional `skip_last_loop` instruction
+    tick_counter_at_skip_last_loop: Optional[int]
+    # Location of the parameter of the `skip_last_loop` instruction in `Bytecode.bytecode` for each loop (if any).
+    skip_last_loop_pos: Optional[int]
+
+
 def _instruction(argument_parser: Callable[[str], Any]) -> Callable[..., Callable[..., None]]:
     def decorator(f: Callable[..., None]) -> Callable[..., None]:
         f.__instruction_argument_parser = argument_parser  # type: ignore
@@ -383,9 +395,24 @@ class Bytecode:
         self.is_sound_effect: Final = is_sound_effect
         self.bytecode = bytearray()
 
-        # Location of the parameter of the `skip_last_loop` instruction (if any) for each loop.
+        self._tick_counter: int = 0
+
         # Also used to determine the number of nested loops
-        self.skip_last_loop_pos: list[Optional[int]] = list()
+        self._loop_stack: list[LoopState] = list()
+
+    def __length_argument(self, length: int, key_off: bool) -> int:
+        # Clamp length to ensure `_tick_counter` will always increment, even on error.
+        self._tick_counter += max(length, 1)
+
+        if key_off:
+            length -= KEY_OFF_TICK_DELAY
+
+        if length <= 0:
+            raise BytecodeError("Note length is too short")
+        if length > 0x100:
+            raise BytecodeError("Note length is too long")
+
+        return length & 0xFF
 
     # NOTE: line must not contain any comments
     def parse_line(self, line: str) -> None:
@@ -398,11 +425,14 @@ class Bytecode:
         arg_parser, inst = arg_parser_and_inst
         inst(self, *arg_parser(argument))
 
+    def get_tick_counter(self) -> int:
+        return self._tick_counter
+
     @_instruction(play_note_argument)
     def play_note(self, note_id: int, key_off: bool, length: int) -> None:
         if note_id < 0 or note_id > N_NOTES:
             raise BytecodeError("note is out of range")
-        bc_length: Final = _length_argument(length, key_off)
+        bc_length: Final = self.__length_argument(length, key_off)
 
         self.bytecode.append((note_id << 1) | (key_off & 1))
         self.bytecode.append(bc_length)
@@ -417,7 +447,7 @@ class Bytecode:
             raise BytecodeError("portamento velocity cannot be 0")
         if speed > 0xFF:
             raise BytecodeError(f"portamento velocity is out of range ({speed}, max: 255 per tick)")
-        bc_length: Final = _length_argument(length, key_off)
+        bc_length: Final = self.__length_argument(length, key_off)
 
         if velocity < 0:
             opcode = PORTAMENTO_DOWN
@@ -496,13 +526,13 @@ class Bytecode:
 
     @_instruction(integer_argument)
     def rest(self, length: int) -> None:
-        bc_length: Final = _length_argument(length, False)
+        bc_length: Final = self.__length_argument(length, False)
         self.bytecode.append(REST)
         self.bytecode.append(bc_length)
 
     @_instruction(integer_argument)
     def rest_keyoff(self, length: int) -> None:
-        bc_length: Final = _length_argument(length, True)
+        bc_length: Final = self.__length_argument(length, True)
         self.bytecode.append(REST_KEYOFF)
         self.bytecode.append(bc_length)
 
@@ -515,7 +545,7 @@ class Bytecode:
         When starting a new loop, this method MUST be called after `skip_last_loop_pos` is appended.
         """
 
-        n_loops: Final = len(self.skip_last_loop_pos)
+        n_loops: Final = len(self._loop_stack)
 
         if n_loops <= 0:
             raise BytecodeError("Not in a loop")
@@ -530,7 +560,14 @@ class Bytecode:
 
     @_instruction(integer_argument)
     def start_loop(self, loop_count: int) -> None:
-        self.skip_last_loop_pos.append(None)
+        self._loop_stack.append(
+            LoopState(
+                loop_count=loop_count,
+                tick_counter_at_start=self._tick_counter,
+                tick_counter_at_skip_last_loop=None,
+                skip_last_loop_pos=None,
+            )
+        )
         loop_id: Final = self._loop_id()
 
         if loop_count < 1 or loop_count > 256:
@@ -539,6 +576,7 @@ class Bytecode:
         if loop_count == 256:
             loop_count = 0
 
+        assert loop_id >= 0 and loop_id < MAX_LOOP_COUNT
         opcode: Final = START_LOOP_0 + loop_id * 2
         self.bytecode.append(opcode)
         self.bytecode.append(loop_count)
@@ -547,15 +585,21 @@ class Bytecode:
     def skip_last_loop(self) -> None:
         loop_id: Final = self._loop_id()
 
-        if self.skip_last_loop_pos[-1] is not None:
+        loop_state: Final = self._loop_stack[-1]
+        if loop_state.tick_counter_at_skip_last_loop is not None or loop_state.tick_counter_at_skip_last_loop is not None:
             raise BytecodeError("Only one `skip_last_loop` instruction is allowed per loop")
+        if self._tick_counter == loop_state.tick_counter_at_start:
+            raise BytecodeError("Expected at least one note or rest before skip_last_loop")
 
-        # Save location of instruction argument for the `end_loop` instruction
-        self.skip_last_loop_pos[-1] = len(self.bytecode) + 1
-
+        assert loop_id >= 0 and loop_id < MAX_LOOP_COUNT
         opcode: Final = SKIP_LAST_LOOP_0 + loop_id * 2
         self.bytecode.append(opcode)
         self.bytecode.append(0)  # Will be added later in the `end_loop` instruction
+
+        # Save location of instruction argument for the `end_loop` instruction
+        # Done last to ensure `skip_last_loop_pos` is only set if the `SKIP_LAST_LOOP_*` instruction is written to bytecode.
+        loop_state.skip_last_loop_pos = len(self.bytecode) - 1
+        loop_state.tick_counter_at_skip_last_loop = self._tick_counter
 
     @_instruction(no_argument)
     def end_loop(self) -> None:
@@ -563,17 +607,39 @@ class Bytecode:
             loop_id: Final = self._loop_id()
         finally:
             # Ensure loop stack is popped if _loop_id() raises an exception
-            skip_last_loop_pos: Final = self.skip_last_loop_pos.pop()
+            if self._loop_stack:
+                loop_state: Final = self._loop_stack.pop()
+
+        assert loop_state is not None
+
+        # Increment _tick_counter
+        ticks_in_loop: Final = self._tick_counter - loop_state.tick_counter_at_start
+        if ticks_in_loop <= 0:
+            raise BytecodeError("Loop does not play a note or rest")
+
+        # Ticks skipped in the last loop (`skip_last_loop`)
+        if loop_state.tick_counter_at_skip_last_loop is not None:
+            ticks_skipped = self._tick_counter - loop_state.tick_counter_at_skip_last_loop
+        else:
+            ticks_skipped = 0
+
+        # This should not happen
+        if ticks_skipped < 0 or ticks_skipped >= ticks_in_loop:
+            raise BytecodeError("Invalid skip_last_loop position")
+
+        if loop_state.loop_count > 0:
+            self._tick_counter = ticks_in_loop * loop_state.loop_count - ticks_skipped
 
         # Write the parameter of the `skip_last_loop` instruction (if required)
-        if skip_last_loop_pos is not None:
+        if loop_state.skip_last_loop_pos is not None:
+            skip_last_loop_pos: Final[int] = loop_state.skip_last_loop_pos
             assert self.bytecode[skip_last_loop_pos - 1] == SKIP_LAST_LOOP_0 + loop_id * 2
             to_skip = len(self.bytecode) - skip_last_loop_pos
             if to_skip < 1 or to_skip > 256:
                 raise BytecodeError(f"skip_last_loop parameter out of bounds: {to_skip}")
             self.bytecode[skip_last_loop_pos] = to_skip
 
-        assert loop_id >= 0
+        assert loop_id >= 0 and loop_id < MAX_LOOP_COUNT
         opcode: Final = END_LOOP_0 + loop_id * 2
         self.bytecode.append(opcode)
 
@@ -653,6 +719,11 @@ class Bytecode:
         if subroutine.subroutine_id < 0 or subroutine.subroutine_id > MAX_N_SUBROUTINES:
             raise BytecodeError("Invalid subroutine id")
 
+        if subroutine.tick_counter < 0:
+            raise BytecodeError("Invalid subroutine tick_counter")
+
+        self._tick_counter += subroutine.tick_counter
+
         self.bytecode.append(CALL_SUBROUTINE)
         self.bytecode.append(subroutine.subroutine_id)
 
@@ -679,14 +750,3 @@ class Bytecode:
     @_instruction(no_argument)
     def disable_echo(self) -> None:
         self.bytecode.append(DISABLE_ECHO)
-
-
-def _length_argument(length: int, key_off: bool) -> int:
-    if key_off:
-        length -= KEY_OFF_TICK_DELAY
-
-    if length <= 0:
-        raise BytecodeError("Note length is too short")
-    if length > 0x100:
-        raise BytecodeError("Note length is too long")
-    return length & 0xFF
