@@ -141,6 +141,7 @@ def dummy_sfx_song_header() -> bytes:
                     tick_counter=0,
                     max_nested_loops=0,
                     last_instrument=None,
+                    bc_subroutine=None,
                 )
             ],
         )

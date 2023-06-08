@@ -21,6 +21,7 @@ from .samples import SEMITONES_PER_OCTAVE, PitchTable, build_pitch_table
 from .json_formats import SamplesJson
 from .bytecode import (
     Bytecode,
+    BcSubroutine,
     BcMappings,
     create_bc_mappings,
     N_OCTAVES,
@@ -145,6 +146,8 @@ class ChannelData(NamedTuple):
     tick_counter: int
     max_nested_loops: int
     last_instrument: Optional[Instrument]
+
+    bc_subroutine: Optional[BcSubroutine]
 
 
 class MmlData(NamedTuple):
@@ -760,14 +763,15 @@ class MmlCommands:
     def __init__(
         self,
         channel_name: str,
-        is_subroutine: bool,
+        subroutine_id: Optional[int],
         metadata: MetaData,
         pitch_table: PitchTable,
         bc_mappings: BcMappings,
         error_list: ErrorList,
     ):
         self.channel_name: Final = channel_name
-        self.is_subroutine: Final = is_subroutine
+        self.is_subroutine: Final = subroutine_id is not None
+        self.subroutine_id: Final = subroutine_id
         self.pitch_table: Final = pitch_table
         self.bc: Final = Bytecode(bc_mappings, is_subroutine=self.is_subroutine, is_sound_effect=False)
 
@@ -1060,10 +1064,8 @@ class MmlCommands:
         if self.is_subroutine:
             raise RuntimeError("Cannot call a subroutine inside a subroutine")
 
-        s_index = self.bc.mappings.subroutines.get(s.name)
-
-        if s_index is None:
-            raise RuntimeError(f"Unknown subroutine {s.name}")
+        if s.bc_subroutine is None:
+            raise RuntimeError("s is not a subroutine")
 
         n_nested_loops: Final = len(self.loop_stack) + s.max_nested_loops
 
@@ -1075,7 +1077,7 @@ class MmlCommands:
                 f"Too many nested loops when calling subroutine {s.name} (requires: {n_nested_loops}, max: {MAX_NESTED_LOOPS})"
             )
 
-        self.bc.call_subroutine_int(s_index)
+        self.bc.call_subroutine(s.bc_subroutine)
 
         self.tick_counter += s.tick_counter
 
@@ -1348,6 +1350,15 @@ class MmlCommands:
         else:
             self.bc.end()
 
+        if self.is_subroutine:
+            assert self.subroutine_id is not None
+            bc_subroutine = BcSubroutine(
+                name=self.channel_name,
+                subroutine_id=self.subroutine_id,
+            )
+        else:
+            bc_subroutine = None
+
         return ChannelData(
             name=self.channel_name,
             bytecode=self.bc.bytecode,
@@ -1355,6 +1366,7 @@ class MmlCommands:
             tick_counter=self.tick_counter,
             max_nested_loops=self.max_nested_loops,
             last_instrument=self.instrument,
+            bc_subroutine=bc_subroutine,
         )
 
 
@@ -1364,7 +1376,7 @@ class MmlParser:
         tokenizer: Tokenizer,
         mml: MmlCommands,
         instruments: OrderedDict[str, Instrument],
-        subroutines: Optional[list[ChannelData]],
+        subroutines: Optional[dict[str, ChannelData]],
         error_list: ErrorList,
     ):
         self.tokenizer: Final = tokenizer
@@ -1738,12 +1750,9 @@ class MmlParser:
         if self.subroutines is None:
             raise RuntimeError("Cannot call a subroutine inside a subroutine")
 
-        # ::TODO find a better way to do this::
-        s_index: Final = self.mml.bc.mappings.subroutines.get(s_name)
-        if s_index is None:
-            raise RuntimeError(f"Unknown subroutine {s_name}")
-
-        s: Final = self.subroutines[s_index]
+        s = self.subroutines.get(s_name)
+        if s is None:
+            raise RuntimeError(f"Cannot find subroutine {s_name}")
 
         self.mml.call_subroutine(s)
 
@@ -1877,13 +1886,14 @@ class MmlParser:
 def parse_mml_subroutine(
     channel_lines: list[Line],
     channel_name: str,
+    subroutine_id: int,
     metadata: MetaData,
     instruments: OrderedDict[str, Instrument],
     pitch_table: PitchTable,
     bc_mappings: BcMappings,
     error_list: ErrorList,
 ) -> ChannelData:
-    mml = MmlCommands(channel_name, True, metadata, pitch_table, bc_mappings, error_list)
+    mml = MmlCommands(channel_name, subroutine_id, metadata, pitch_table, bc_mappings, error_list)
 
     tokenizer = Tokenizer(channel_lines)
     parser = MmlParser(tokenizer, mml, instruments, None, error_list)
@@ -1898,12 +1908,12 @@ def parse_mml_channel(
     channel_name: str,
     metadata: MetaData,
     instruments: OrderedDict[str, Instrument],
-    subroutines: list[ChannelData],
+    subroutines: dict[str, ChannelData],
     pitch_table: PitchTable,
     bc_mappings: BcMappings,
     error_list: ErrorList,
 ) -> ChannelData:
-    mml = MmlCommands(channel_name, False, metadata, pitch_table, bc_mappings, error_list)
+    mml = MmlCommands(channel_name, None, metadata, pitch_table, bc_mappings, error_list)
 
     tokenizer = Tokenizer(channel_lines)
     parser = MmlParser(tokenizer, mml, instruments, subroutines, error_list)
@@ -1927,19 +1937,20 @@ def compile_mml(mml_text: str, samples: SamplesJson) -> MmlData:
     bc_mappings: Final = create_bc_mappings(samples)
 
     subroutines: Final = list()
-    for s_name, c_lines in mml_lines.subroutines.items():
-        subroutines.append(parse_mml_subroutine(c_lines, s_name, metadata, instruments, pitch_table, bc_mappings, error_list))
+    for i, s in enumerate(mml_lines.subroutines.items()):
+        s_name, c_lines = s
+        subroutines.append(parse_mml_subroutine(c_lines, s_name, i, metadata, instruments, pitch_table, bc_mappings, error_list))
 
-    # add subroutines to bc_mappings
-    for i, s_name in enumerate(mml_lines.subroutines.keys()):
-        bc_mappings.subroutines[s_name] = i
+    # No need to add subroutines to `bc_mappings`.
+    # This subroutine map is used instead (`ChannelData` contains `BcSubroutine`).
+    subroutine_map: Final = {s.name: s for s in subroutines}
 
     channels: Final = list()
     for i, c_lines in enumerate(mml_lines.channels):
         if c_lines:
             channel_name = chr(FIRST_CHANNEL_ORD + i)
             channels.append(
-                parse_mml_channel(c_lines, channel_name, metadata, instruments, subroutines, pitch_table, bc_mappings, error_list)
+                parse_mml_channel(c_lines, channel_name, metadata, instruments, subroutine_map, pitch_table, bc_mappings, error_list)
             )
 
     if error_list.errors:

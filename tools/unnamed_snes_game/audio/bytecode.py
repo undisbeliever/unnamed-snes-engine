@@ -94,10 +94,15 @@ def cast_i8(i: int) -> int:
     return i
 
 
+class BcSubroutine(NamedTuple):
+    name: Name
+    subroutine_id: int
+
+
 @dataclass
 class BcMappings:
     instruments: dict[Name, int]
-    subroutines: dict[Name, int]
+    subroutines: dict[Name, BcSubroutine]
 
 
 def _instrument_mapping(instruments: list[Instrument]) -> OrderedDict[Name, int]:
@@ -633,23 +638,23 @@ class Bytecode:
         self.bytecode.append(END)
 
     @_instruction(name_argument)
-    def call_subroutine(self, name: Name) -> None:
+    def call_subroutine(self, s: Union[Name, BcSubroutine]) -> None:
         if self.is_subroutine:
             raise BytecodeError("Cannot call a subroutine in a subroutine")
-        subroutine_id = self.mappings.subroutines.get(name)
-        if subroutine_id is None:
-            raise BytecodeError(f"Unknown subroutine: {name}")
-        assert subroutine_id < 128
-        self.bytecode.append(CALL_SUBROUTINE)
-        self.bytecode.append(subroutine_id)
 
-    def call_subroutine_int(self, subroutine_id: int) -> None:
-        if self.is_subroutine:
-            raise BytecodeError("Cannot call a subroutine in a subroutine")
-        if subroutine_id < 0 or subroutine_id >= MAX_N_SUBROUTINES:
-            raise BytecodeError("Subroutine id out of bounds")
+        if isinstance(s, BcSubroutine):
+            subroutine = s
+        else:
+            sr = self.mappings.subroutines.get(s)
+            if sr is None:
+                raise BytecodeError(f"Unknown subroutine: {s}")
+            subroutine = sr
+
+        if subroutine.subroutine_id < 0 or subroutine.subroutine_id > MAX_N_SUBROUTINES:
+            raise BytecodeError("Invalid subroutine id")
+
         self.bytecode.append(CALL_SUBROUTINE)
-        self.bytecode.append(subroutine_id)
+        self.bytecode.append(subroutine.subroutine_id)
 
     @_instruction(no_argument)
     def return_from_subroutine(self) -> None:
