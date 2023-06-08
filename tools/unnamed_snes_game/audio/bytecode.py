@@ -402,10 +402,10 @@ class Bytecode:
     def play_note(self, note_id: int, key_off: bool, length: int) -> None:
         if note_id < 0 or note_id > N_NOTES:
             raise BytecodeError("note is out of range")
-        length = test_length_argument(length)
+        bc_length: Final = _length_argument(length, key_off)
 
         self.bytecode.append((note_id << 1) | (key_off & 1))
-        self.bytecode.append(length)
+        self.bytecode.append(bc_length)
 
     @_instruction(portamento_argument)
     def portamento(self, note_id: int, key_off: bool, velocity: int, length: int) -> None:
@@ -417,7 +417,7 @@ class Bytecode:
             raise BytecodeError("portamento velocity cannot be 0")
         if speed > 0xFF:
             raise BytecodeError(f"portamento velocity is out of range ({speed}, max: 255 per tick)")
-        length = test_length_argument(length)
+        bc_length: Final = _length_argument(length, key_off)
 
         if velocity < 0:
             opcode = PORTAMENTO_DOWN
@@ -426,7 +426,7 @@ class Bytecode:
 
         self.bytecode.append(opcode)
         self.bytecode.append(speed)
-        self.bytecode.append(length)
+        self.bytecode.append(bc_length)
         self.bytecode.append((note_id << 1) | (key_off & 1))
 
     @_instruction(two_integer_arguments)
@@ -496,15 +496,15 @@ class Bytecode:
 
     @_instruction(integer_argument)
     def rest(self, length: int) -> None:
-        length = test_length_argument(length)
+        bc_length: Final = _length_argument(length, False)
         self.bytecode.append(REST)
-        self.bytecode.append(length)
+        self.bytecode.append(bc_length)
 
     @_instruction(integer_argument)
     def rest_keyoff(self, length: int) -> None:
-        length = test_length_argument(length - KEY_OFF_TICK_DELAY)
+        bc_length: Final = _length_argument(length, True)
         self.bytecode.append(REST_KEYOFF)
-        self.bytecode.append(length)
+        self.bytecode.append(bc_length)
 
     def _loop_id(self) -> int:
         """
@@ -681,7 +681,10 @@ class Bytecode:
         self.bytecode.append(DISABLE_ECHO)
 
 
-def test_length_argument(length: int) -> int:
+def _length_argument(length: int, key_off: bool) -> int:
+    if key_off:
+        length -= KEY_OFF_TICK_DELAY
+
     if length <= 0:
         raise BytecodeError("Note length is too short")
     if length > 0x100:
