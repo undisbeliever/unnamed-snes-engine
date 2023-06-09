@@ -1543,7 +1543,7 @@ class MmlParser:
 
         total_length: Final = self._parse_note_length()
 
-        note_length = 1
+        note_length = None
         tie = True
         if self._test_next_token_matches_no_newline(","):
             nl = self.tokenizer.parse_optional_note_length()
@@ -1552,6 +1552,12 @@ class MmlParser:
 
             if self._test_next_token_matches_no_newline(","):
                 tie = self.tokenizer.parse_bool()
+
+        if note_length is None:
+            if tie:
+                note_length = 1
+            else:
+                note_length = 2
 
         # Show any MML errors on the "}}" token
         self._error_list.set_pos(end_token_pos)
