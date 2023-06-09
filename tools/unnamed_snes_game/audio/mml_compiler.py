@@ -737,7 +737,7 @@ class Tokenizer:
 
 
 class MpSettings(NamedTuple):
-    # Vibrato depth in cents
+    # Vibrato depth in cents either side of the note (half-extent)
     depth_in_cents: int
     # Quarter Wavelength in ticks
     qw_ticks: int
@@ -997,9 +997,9 @@ class MmlCommands:
         pitch: Final = self.pitch_table.pitch_for_note(self.instrument.instrument_id, note_id)
 
         # Calculate the minimum and maximum pitch of the vibrato.
-        # This produces more accurate results when cents is very large (ie, 800)
-        p1: Final[float] = pitch * 2 ** (-(self.mp.depth_in_cents / 2) / 1200)
-        p2: Final[float] = pitch * 2 ** ((self.mp.depth_in_cents / 2) / 1200)
+        # This produces more accurate results when cents is very large (ie, 400)
+        p1: Final[float] = pitch * 2 ** (-self.mp.depth_in_cents / 1200)
+        p2: Final[float] = pitch * 2 ** (self.mp.depth_in_cents / 1200)
 
         po_per_tick: int = round((p2 - p1) / (self.mp.qw_ticks * 2))
 
@@ -1496,6 +1496,8 @@ class MmlParser:
         Format:
             disable MP vibrato: MP 0
             enable MP vibrato:  MP depth_in_cents, quarter_wavelength_in_ticks
+
+        depth_in_cents = depth of the vibrato, in cents either side of the note (half-extent)
 
         NOTE: Not immediate.  Only takes effect on the next play_note token.
         """
