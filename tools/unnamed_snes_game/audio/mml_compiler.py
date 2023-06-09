@@ -1203,8 +1203,8 @@ class MmlCommands:
             self.bc.adjust_pan(p)
 
     def broken_chord(self, chord_notes: list[int], total_length: int, note_length: int, tie: bool) -> None:
-        if len(chord_notes) < 2:
-            raise RuntimeError("Expected 2 or more pitches in a broken chord")
+        if len(chord_notes) < 1:
+            raise RuntimeError("Expected at least one pitch in a broken chord")
 
         if tie is False and note_length < 2:
             raise RuntimeError("Broken chord note_length is too short (minimum of 2 ticks per note when tie is 0)")
