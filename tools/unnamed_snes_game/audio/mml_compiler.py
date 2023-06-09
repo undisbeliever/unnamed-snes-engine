@@ -1204,7 +1204,13 @@ class MmlCommands:
 
     def broken_chord(self, chord_notes: list[int], total_length: int, note_length: int, tie: bool) -> None:
         if len(chord_notes) < 2:
-            self.add_error("Expected 2 or more pitches in a broken chord")
+            raise RuntimeError("Expected 2 or more pitches in a broken chord")
+
+        if tie is False and note_length < 2:
+            raise RuntimeError("Broken chord note_length is too short (minimum of 2 ticks per note when tie is 0)")
+
+        if tie and note_length < 1:
+            raise RuntimeError("Broken chord note_length is too short (minimum of 1 tick per note when tie is 1)")
 
         expected_tick_counter: Final = self.bc.get_tick_counter() + total_length
 
@@ -1227,10 +1233,14 @@ class MmlCommands:
 
         self.start_loop(n_loops)
 
-        for i, n in enumerate(chord_notes):
-            if i == break_point and break_point > 0:
-                self.skip_last_loop()
-            self._play_note(n, keyoff, note_length)
+        try:
+            for i, n in enumerate(chord_notes):
+                if i == break_point and break_point > 0:
+                    self.skip_last_loop()
+                self._play_note(n, keyoff, note_length)
+        except Exception as e:
+            # Must catch any errors inside the loop to prevent a confusing "Missing loop end ]" error message.
+            self.add_error(str(e))
 
         self.__end_loop()
 
