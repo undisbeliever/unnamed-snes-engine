@@ -434,6 +434,9 @@ class Bytecode:
         return len(self._bytecode)
 
     def get_bytecode(self) -> bytes:
+        if self._loop_stack:
+            raise BytecodeError(f"Cannot output bytecode: There are {len(self._loop_stack)} open loops")
+
         return bytes(self._bytecode)
 
     @_instruction(play_note_argument)
