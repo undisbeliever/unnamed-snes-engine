@@ -1214,12 +1214,19 @@ class MmlCommands:
 
         expected_tick_counter: Final = self.bc.get_tick_counter() + total_length
 
-        # If tie is true, a keyoff note is added to the end of the loop
-        notes_in_loop = total_length // note_length - int(tie)
+        # Number of ticks in the note played outside the loop (if any)
+        last_note_ticks = total_length % note_length
+        if tie and last_note_ticks == 0:
+            # If tie is True, a keyoff note is requited after the loop
+            last_note_ticks += note_length
 
-        # `ticks_remaining` cannot be 1, remove a note to from the loop to prevent this from happening
-        if note_length == 1:
-            notes_in_loop -= 1
+        if last_note_ticks == 1:
+            # The last note must not be 1 tick long
+            last_note_ticks += note_length
+
+        notes_in_loop: Final = (total_length - last_note_ticks) // note_length
+
+        assert notes_in_loop * note_length + last_note_ticks == total_length
 
         n_loops = notes_in_loop // len(chord_notes)
         break_point: Final = notes_in_loop % len(chord_notes)
@@ -1244,11 +1251,10 @@ class MmlCommands:
 
         self.__end_loop()
 
-        ticks_remaining: Final = expected_tick_counter - self.bc.get_tick_counter()
-        if ticks_remaining > 0:
+        if last_note_ticks > 0:
             # The last note to play is always a keyoff note
             next_note = chord_notes[break_point]
-            self._play_note(next_note, True, ticks_remaining)
+            self._play_note(next_note, True, last_note_ticks)
 
         if self.bc.get_tick_counter() != expected_tick_counter:
             raise RuntimeError("Broken chord tick_count mismatch")
