@@ -457,7 +457,8 @@ NOTE_MAP: Final = {
 }
 WHITESPACE_REGEX: Final = re.compile(r"\s+")
 UINT_REGEX: Final = re.compile(r"[0-9]+")
-RELATIVE_INT_REGEX: Final = re.compile(r"[+-]?[0-9]+")
+INC_OR_DEC_INT_REGEX: Final = re.compile(r"[+-][0-9]+")
+MAYBE_RELATIVE_INT_REGEX: Final = re.compile(r"[+-]?[0-9]+")
 IDENTIFIER_REGEX: Final = re.compile(r"[0-9]+|([^0-9][^\s]*(\s|$))")
 NOTE_REGEX: Final = re.compile(r"([a-g](?:\-+|\++)?)\s*(%?)([0-9]*)(\.*)")
 PITCH_REGEX: Final = re.compile(r"([a-g](?:\-+|\++)?)\s*([0-9]*)(\.*)")
@@ -647,10 +648,16 @@ class Tokenizer:
         else:
             return None
 
-    def parse_relative_int(self) -> tuple[int, bool]:
+    def parse_increment_or_decrement_int(self) -> int:
+        m = self.parse_regex(INC_OR_DEC_INT_REGEX)
+        if not m:
+            raise RuntimeError("Expected -number or +number")
+        return int(m.group(0))
+
+    def parse_maybe_relative_int(self) -> tuple[int, bool]:
         """Returns (value, is_relative)"""
 
-        m = self.parse_regex(RELATIVE_INT_REGEX)
+        m = self.parse_regex(MAYBE_RELATIVE_INT_REGEX)
         if not m:
             raise RuntimeError("Cannot parse integer, expected a decimal digit, - or +")
 
@@ -1462,11 +1469,11 @@ class MmlParser:
         self.mml.decrease_octave()
 
     def parse_transpose(self) -> None:
-        v, is_relative = self.tokenizer.parse_relative_int()
+        v = self.tokenizer.parse_increment_or_decrement_int()
         self.mml.transpose(v)
 
     def parse_relative_transpose(self) -> None:
-        v, is_relative = self.tokenizer.parse_relative_int()
+        v = self.tokenizer.parse_increment_or_decrement_int()
         self.mml.relative_transpose(v)
 
     def parse_quantize(self) -> None:
@@ -1631,7 +1638,7 @@ class MmlParser:
     #
 
     def _parse_coarse_volume_value(self) -> tuple[int, bool]:
-        v, is_v_relative = self.tokenizer.parse_relative_int()
+        v, is_v_relative = self.tokenizer.parse_maybe_relative_int()
 
         # Validating volume value here to ensure error message location is correct
         abs_v = abs(v)
@@ -1644,7 +1651,7 @@ class MmlParser:
             return v * COARSE_VOLUME_MULTIPLIER, is_v_relative
 
     def _parse_fine_volume_value(self) -> tuple[int, bool]:
-        v, is_v_relative = self.tokenizer.parse_relative_int()
+        v, is_v_relative = self.tokenizer.parse_maybe_relative_int()
 
         # Validating volume value here to ensure error message location is correct
         abs_v = abs(v)
@@ -1653,7 +1660,7 @@ class MmlParser:
         return v, is_v_relative
 
     def _parse_pan_value(self) -> tuple[int, bool]:
-        p, is_p_relative = self.tokenizer.parse_relative_int()
+        p, is_p_relative = self.tokenizer.parse_maybe_relative_int()
 
         # Validating pan value here to ensure error message location is correct
         abs_p = abs(p)
