@@ -1454,38 +1454,47 @@ class MmlParser:
     # note settings
     #
 
+    # C <uint>
     def parse_change_whole_note_length(self) -> None:
         z = self.tokenizer.parse_uint()
         self.mml.set_zenlen(z)
 
+    # o <uint>
     def parse_set_octave(self) -> None:
         o = self.tokenizer.parse_uint()
         self.mml.set_octave(o)
 
+    # >
     def parse_increase_octave(self) -> None:
         self.mml.increase_octave()
 
+    # <
     def parse_decrease_octave(self) -> None:
         self.mml.decrease_octave()
 
+    # _<+-uint>
     def parse_transpose(self) -> None:
         v = self.tokenizer.parse_increment_or_decrement_int()
         self.mml.transpose(v)
 
+    # __<+-uint>
     def parse_relative_transpose(self) -> None:
         v = self.tokenizer.parse_increment_or_decrement_int()
         self.mml.relative_transpose(v)
 
+    # Q<1-8>
     def parse_quantize(self) -> None:
         q = self.tokenizer.parse_uint()
         self.mml.set_quantize(q)
 
+    # l<length>
     def parse_set_default_length(self) -> None:
         nl = self.tokenizer.parse_optional_note_length()
         if nl is None:
             raise RuntimeError("Missing note length")
         self.mml.set_default_length(nl)
 
+    # @<id>
     def parse_set_instrument(self) -> None:
         i: Final = self.tokenizer.parse_identifier()
 
@@ -1495,35 +1504,20 @@ class MmlParser:
 
         self.mml.set_instrument(inst)
 
+    # ~0 = disable vibrato
+    # ~<pitch_offset_per_tick>,<quarter_wavelength_in_ticks>
     def parse_manual_vibrato(self) -> None:
-        """
-        Set the audio-driver vibrato values.
-
-        Format:
-            disable vibrato: ~0
-            set vibrato:     ~ pitch_offset_per_tick, quarter_wavelength_in_ticks
-
-        NOTE: enabling manual vibrato disables MP vibrato.
-        """
         # ::TODO find a good default quarter_wavelength_ticks value::
         pitch_offset_per_tick, quarter_wavelength_ticks = self._parse_two_ints_or_off(
             "~ requires 2 parameters: pitch_offset_per_tick, quarter_wavelength_in_ticks"
         )
         self.mml.set_manual_vibrato(pitch_offset_per_tick, quarter_wavelength_ticks)
 
+    # MP0 = disable MP vibrato
+    # MP<depth_in_cents>,<quarter_wavelength_in_ticks>
+    #
+    # NOTE: Not immediate.  Only takes effect on the next play_note token.
     def parse_mp_vibrato(self) -> None:
-        # ::TODO better description::
-        """
-        Relative vibrato setting.
-
-        Format:
-            disable MP vibrato: MP 0
-            enable MP vibrato:  MP depth_in_cents, quarter_wavelength_in_ticks
-
-        depth_in_cents = depth of the vibrato, in cents either side of the note (half-extent)
-
-        NOTE: Not immediate.  Only takes effect on the next play_note token.
-        """
         # ::TODO find a good default quarter_wavelength_ticks value::
 
         depth_in_cents, quarter_wavelength_in_ticks = self._parse_two_ints_or_off(
@@ -1546,6 +1540,7 @@ class MmlParser:
 
         self.mml.play_note_with_quantization_and_mp(note_id, tick_length, slur_note)
 
+    # n<uint>
     def parse_play_note_id(self) -> None:
         "Play note integer ID at default length"
 
@@ -1559,6 +1554,7 @@ class MmlParser:
 
         self.mml.play_note_with_quantization_and_mp(note_id, tick_length, slur_note)
 
+    # {{<pitch list>}} [total_length] [, note_length] [, tie(bool)]
     def parse_broken_chord(self) -> None:
         chord_notes: Final = self._parse_list_of_pitches("}}")
 
@@ -1587,6 +1583,7 @@ class MmlParser:
 
         self.mml.broken_chord(chord_notes, total_length, note_length, tie)
 
+    # {<pitch1> <pitch2>} [total_length] [, delay_length] [, portamento_speed]
     def parse_portamento(self) -> None:
         notes: Final = self._parse_list_of_pitches("}")
 
@@ -1624,6 +1621,7 @@ class MmlParser:
         portamento_ticks: Final = total_ticks - delay_ticks
         self.mml.play_portamento(notes[0], notes[1], slur_note, speed, delay_ticks, portamento_ticks, after_ticks)
 
+    # r[length]
     def parse_rest(self) -> None:
         ticks = self._parse_note_length()
 
@@ -1668,6 +1666,9 @@ class MmlParser:
             raise RuntimeError(f"Pan out of range (1-{MAX_PAN})")
         return p, is_p_relative
 
+    # p<uint>
+    # p+<uint>
+    # p-<uint>
     def parse_pan(self) -> None:
         p, is_p_relative = self._parse_pan_value()
         if self._test_next_token_matches("v"):
@@ -1681,6 +1682,9 @@ class MmlParser:
         else:
             self.mml.set_pan(p, is_p_relative)
 
+    # v<uint>
+    # v+<uint>
+    # v-<uint>
     def parse_coarse_volume(self) -> None:
         v, is_v_relative = self._parse_coarse_volume_value()
         if self._test_next_token_matches("p"):
@@ -1689,6 +1693,9 @@ class MmlParser:
         else:
             self.mml.set_volume(v, is_v_relative)
 
+    # V<uint>
+    # V+<uint>
+    # V-<uint>
     def parse_fine_volume(self) -> None:
         v, is_v_relative = self._parse_fine_volume_value()
         if self._test_next_token_matches("p"):
@@ -1697,6 +1704,8 @@ class MmlParser:
         else:
             self.mml.set_volume(v, is_v_relative)
 
+    # E or E1 = enable echo
+    # E0 = disable echo
     def parse_echo(self) -> None:
         b: Final = self.tokenizer.parse_optional_bool(True)
 
@@ -1706,16 +1715,19 @@ class MmlParser:
     # Global commands
     #
 
+    # t<uint>
     def parse_set_song_tempo(self) -> None:
         t = self.tokenizer.parse_uint()
 
         self.mml.set_song_tempo(t)
 
+    # T<uint>
     def parse_set_song_tick_clock(self) -> None:
         t = self.tokenizer.parse_uint()
 
         self.mml.set_song_tick_clock(t)
 
+    # L
     def parse_set_loop_point(self) -> None:
         self.mml.set_loop_point()
 
@@ -1723,6 +1735,7 @@ class MmlParser:
     # Control
     #
 
+    # [
     def parse_start_loop(self) -> None:
         found_end, loop_count = self.tokenizer.read_loop_end_count()
         if not found_end:
@@ -1731,9 +1744,11 @@ class MmlParser:
             raise RuntimeError("Missing loop count")
         self.mml.start_loop(loop_count)
 
+    # :
     def parse_skip_last_loop(self) -> None:
         self.mml.skip_last_loop()
 
+    # ]<uint>
     def parse_end_loop(self) -> None:
         loop_count: Final = self.tokenizer.parse_uint()
 
@@ -1741,6 +1756,7 @@ class MmlParser:
             raise RuntimeError("Missing loop count")
         self.mml.end_loop(loop_count)
 
+    # !<id>
     def parse_call_subroutine(self) -> None:
         s_name: Final = self.tokenizer.parse_identifier()
 
@@ -1757,6 +1773,7 @@ class MmlParser:
     # Misc
     #
 
+    # |
     def parse_divider(self) -> None:
         """
         Skip divider (pipe `|`) tokens.
