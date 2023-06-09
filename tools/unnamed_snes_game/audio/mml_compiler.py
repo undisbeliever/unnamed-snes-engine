@@ -1247,7 +1247,7 @@ class MmlCommands:
         ticks_remaining: Final = expected_tick_counter - self.bc.get_tick_counter()
         if ticks_remaining > 0:
             # The last note to play is always a keyoff note
-            next_note = chord_notes[(break_point + 1) % len(chord_notes)]
+            next_note = chord_notes[break_point]
             self._play_note(next_note, True, ticks_remaining)
 
         if self.bc.get_tick_counter() != expected_tick_counter:
