@@ -683,6 +683,11 @@ func __reset_channel(channelIndex : u8 in x) {
     // Mark channel as active
     test_and_set(a, activeChannels);
 
+    // Disable echo
+    // A = voice bit
+    smp.dsp_addr = GlobalDspAddr.EON as u8;
+    test_and_clear(a, smp.dsp_data);
+
 
     // Reset channel volume
     channelSoA.volume[x] = a = STARTING_VOLUME;
