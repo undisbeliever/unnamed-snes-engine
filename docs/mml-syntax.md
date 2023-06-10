@@ -209,6 +209,7 @@ Optional parameters are enclosed in `[]`.
  * `V+<1..127>` - Increment volume (finely)
  * `p<0..128>` - Set pan
     * A pan of 0 will output to the left speaker only.  A pan of 128 will output to the right speaker only.  The default pan is 128 (centered)
+    * Panning is disabled if the stereo flag is false (mono output).
  * `p-<1..128>` - Decrement pan (pan to the left)
  * `p+<1..127>` - Increment pan (pan to the right)
  * `E` - Enable echo
