@@ -37,7 +37,8 @@ Echo values:
     * This value must be a multiple of 16
     * The echo buffer requires `EchoLenth / 16 * 2048` bytes of Audio-RAM.
     * The echo buffer is placed at the end of Audio-RAM.
-    * The default `EchoLength` value is 0
+    * An `EchoLength` of 0 does not disable the echo buffer.  When `EchoLength` is 0, 256 bytes of Audio-RAM will be allocated to the echo buffer and the echo buffer is 4 bytes in size.
+    * The default `EchoLength` value is 0.
  * `#FirFilter` - FIR filter (`C0` - `C7` S-DSP registers)
     * The FIR filter must contain 8 space separated values.
     * Values prefixed with a `$` are hexadecimal ($00-$FF)
@@ -301,6 +302,8 @@ This audio engine was designed to be simple, to that effect the following limita
  * All songs and sound effects use the same samples (no sample swapping).
  * A subroutine cannot call a subroutine.
  * A maximum of 3 loops can be nested at once (including any subroutines that are called).
+ * The echo buffer is always active, even if `#EchoLength` is 0.
+ * A 250ms delay is required to initialize and clear the echo buffer before it can be written to.  All songs will be delayed a minimum of 250ms before the song starts, even if the song does not use echo.
 
 
 To simplify and speedup the SPC-700 code:
