@@ -31,6 +31,11 @@ def clamp_s4(i: int) -> int:
     return bound(i, -8, 7)
 
 
+def clamp_s16(i: int) -> int:
+    """Clamp i to a 16 bit signed integer."""
+    return bound(i, -32768, 32767)
+
+
 # Contains 16 int16 sample
 SampleBlock: TypeAlias = Sequence[int]
 
@@ -88,7 +93,7 @@ def __encode(
         n = clamp_s4((s - offset) // div)
 
         prev2 = prev1
-        prev1 = (n * div) + offset
+        prev1 = clamp_s16((n * div) + offset)
 
         nibbles.append(n)
         decoded.append(prev1)
