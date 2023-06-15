@@ -172,7 +172,7 @@ def parse_arguments() -> argparse.Namespace:
     g.add_argument("-l", "--loop", action="store_true", help="Set the loop flag")
     g.add_argument("-n", "--no-loop", action="store_true", help="Do not set the loop flag")
 
-    g.add_argument("--dupe-block-hack", action="store_int")
+    parser.add_argument("--dupe-block-hack", type=int)
 
     parser.add_argument("wav_file", action="store", help="wav file input")
 
