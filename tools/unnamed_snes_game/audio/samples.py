@@ -2,7 +2,6 @@
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
 import math
-import struct
 import os.path
 from collections import OrderedDict
 
@@ -19,10 +18,16 @@ from .json_formats import SamplesJson, Instrument, Filename, Name
 # ===========
 
 
+# Offset (within brr_data) for the BRR directory
+class BrrOffset(NamedTuple):
+    start: int
+    loop_point: int
+
+
 class BrrData(NamedTuple):
-    instrument_scrn_table: bytes
-    brr_directory: bytes
     brr_data: bytes
+    dir_offsets: list[BrrOffset]
+    instrument_scrn: bytes
 
 
 # Returns data, loop_offset
@@ -113,9 +118,9 @@ def _load_sample(filename: Filename, loop_flag: bool, loop_point: Optional[int],
 
 
 def _compile_brr_samples(instruments: list[Instrument]) -> BrrData:
-    instrument_scrn_table = bytearray()
-    brr_directory = bytearray()
     brr_data = bytearray()
+    dir_offsets: list[BrrOffset] = list()
+    instrument_scrn = bytearray()
 
     # Mapping of wave files and loop points to sample directory ids
     # filename, loop flag, loop_point => sample directory id
@@ -130,41 +135,29 @@ def _compile_brr_samples(instruments: list[Instrument]) -> BrrData:
             if sample_id is None:
                 sample_data, loop_offset = _load_sample(*key)
 
-                brr_addr = len(brr_data) + BRR_DATA_ADDRESS
+                sample_id = len(dir_offsets) + STARTING_SCRN
+
+                dir_offsets.append(BrrOffset(len(brr_data), len(brr_data) + loop_offset))
 
                 brr_data.extend(sample_data)
 
-                dir_item = struct.pack("<2H", brr_addr, brr_addr + loop_offset)
-                assert len(dir_item) == BYTES_PER_SAMPLE_DIRECTORY_ITEM
-                brr_directory.extend(dir_item)
-
-                sample_id = len(brr_directory) // BYTES_PER_SAMPLE_DIRECTORY_ITEM - 1
-
                 scrn_map[key] = sample_id
 
-            instrument_scrn_table.append(sample_id)
+            instrument_scrn.append(sample_id)
         except Exception as e:
             errors.append(f"ERROR in Instrument {i} {inst.name}: {e}")
 
     if len(brr_data) >= MAX_COMMON_DATA_SIZE:
         errors.append(f"Too many BRR samples.  ({len(brr_data)} bytes, max is {MAX_COMMON_DATA_SIZE}")
 
-    # Pad `brr_directory`
-    directory_padding = BRR_DIRECTORY_SIZE - len(brr_directory)
-    if directory_padding < 0:
-        errors.append(
-            f"Too many items in the sample directory. (The directory is {len(brr_directory)} bytes, max is {N_BRR_SAMPLES_IN_DIRECTORY})"
-        )
-    elif directory_padding > 0:
-        brr_directory += bytes(directory_padding)
+    if len(dir_offsets) > MAX_DIR_ITEMS:
+        errors.append(f"Too many items in the sample directory. ({len(dir_offsets)}, max is {MAX_DIR_ITEMS})")
 
     if errors:
         error_string = "\n    ".join(errors)
         raise ValueError(f"{len(errors)} errors compiling brr samples:\n    {error_string}")
 
-    assert len(brr_directory) == BRR_DIRECTORY_SIZE
-
-    return BrrData(instrument_scrn_table=instrument_scrn_table, brr_directory=brr_directory, brr_data=brr_data)
+    return BrrData(brr_data=brr_data, dir_offsets=dir_offsets, instrument_scrn=instrument_scrn)
 
 
 # Pitch Table
@@ -338,8 +331,8 @@ def validate_instrument_input(instruments: list[Instrument]) -> None:
     if len(instruments) <= 0:
         raise ValueError("Expected at least one instrument")
 
-    if len(instruments) > N_INSTRUMENTS:
-        raise ValueError(f"Too many instruments (max: {N_INSTRUMENTS})")
+    if len(instruments) > MAX_INSTRUMENTS:
+        raise ValueError(f"Too many instruments (max: {MAX_INSTRUMENTS})")
 
     for i, inst in enumerate(instruments):
 
@@ -382,19 +375,16 @@ def _mask_pitch_offset(i: int) -> int:
 
 
 def _instruments_soa_data(instruments: list[Instrument], instrument_scrn: bytes, pitch_table: PitchTable) -> bytes:
-    padding_count: Final = N_INSTRUMENTS - len(instruments)
-    assert padding_count >= 0
-
-    padding: Final = bytes(padding_count)
-
     out = bytearray()
 
-    # order MUST match `InstrumentsSoA` in `src/audio-driver.wiz`
+    # order MUST match `InstrumentsSoA` in `src/data-formats.wiz`
 
     # scrn (Sample source)
     assert len(instrument_scrn) == len(instruments)
     out += instrument_scrn
-    out += padding
+
+    # pitch_offset
+    out += bytes(_mask_pitch_offset(i) for i in pitch_table.instrument_offsets)
 
     # adsr1
     for i in instruments:
@@ -402,7 +392,6 @@ def _instruments_soa_data(instruments: list[Instrument], instrument_scrn: bytes,
             out.append((1 << 7) | (i.adsr.decay << 4) | (i.adsr.attack))
         else:
             out.append(0)
-    out += padding
 
     # adsr2OrGain
     for i in instruments:
@@ -412,19 +401,17 @@ def _instruments_soa_data(instruments: list[Instrument], instrument_scrn: bytes,
             out.append(i.gain)
         else:
             out.append(0)
-    out += padding
 
-    # pitch_offset
-    out += bytes(_mask_pitch_offset(i) for i in pitch_table.instrument_offsets)
-    out += padding
-
-    assert len(out) == N_INSTRUMENTS * N_FIELDS_IN_INSTRUMENTS_SOA
+    assert len(out) == len(instruments) * 4
 
     return out
 
 
 class SampleAndInstrumentData(NamedTuple):
-    header: bytes
+    n_instruments: int
+    pitch_table: bytes
+    dir_offsets: list[BrrOffset]
+    instruments_soa: bytes
     brr_data: bytes
 
 
@@ -437,11 +424,10 @@ def build_sample_and_instrument_data(samplesInput: SamplesJson) -> SampleAndInst
 
     pitch_table: Final = build_pitch_table(samplesInput)
 
-    header = bytearray()
-    header += samples.brr_directory
-    header += _pitch_table_data(pitch_table)
-    header += _instruments_soa_data(instruments, samples.instrument_scrn_table, pitch_table)
-
-    assert len(header) == SAMPLE_AND_INSTRUMENT_HEADER_SIZE
-
-    return SampleAndInstrumentData(header, samples.brr_data)
+    return SampleAndInstrumentData(
+        n_instruments=len(instruments),
+        pitch_table=_pitch_table_data(pitch_table),
+        dir_offsets=samples.dir_offsets,
+        instruments_soa=_instruments_soa_data(instruments, samples.instrument_scrn, pitch_table),
+        brr_data=samples.brr_data,
+    )

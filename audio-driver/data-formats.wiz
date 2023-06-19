@@ -19,17 +19,14 @@ let N_SFX_CHANNELS = N_CHANNELS - N_MUSIC_CHANNELS;
 let SONG_CHANNEL_MASK = (1 << N_MUSIC_CHANNELS) - 1;
 let SFX_CHANNEL_MASK = SONG_CHANNEL_MASK ^ 0xff;
 
-
-let N_BRR_SAMPLES   = 64;
-let N_INSTRUMENTS   = 64;
-let N_SOUND_EFFECTS = 128;
-
-
-let INSTRUMENT_MASK = N_INSTRUMENTS - 1;
-let SOUND_EFFECT_MASK = N_SOUND_EFFECTS - 1;
-
-
 let STARTING_VOLUME = 96;
+
+// The first valid SCRN value
+let STARTING_SCRN = 1;
+
+let MAX_DIR_ITEMS = 0x100 - STARTING_SCRN;
+let MAX_INSTRUMENTS = 0x100;
+let MAX_SOUND_EFFECTS = 192;
 
 
 
@@ -41,31 +38,46 @@ struct DirItem {
     loop  : *const u8
 };
 
-struct InstrumentsSoA {
-    scrn            : [u8 ; N_INSTRUMENTS],
-    adsr1           : [u8 ; N_INSTRUMENTS],
-
-    // This variable is either:
-    //   * ADSR2 if bit 7 of `adsr1` is set
-    //   * GAIN if bit 7 of `adsr1` is clear
-    adsr2OrGain     : [u8 ; N_INSTRUMENTS],
-
-    // offset between note c0 and `ExternalData.pitchTable[0]`
-    // (pitchOffset + note is allowed to overflow and underflow)
-    pitchOffset    : [u8 ; N_INSTRUMENTS],
-};
-
-struct ExternalData {
-    brrDirectory   : [DirItem ; N_BRR_SAMPLES],
-
+struct CommonDataHeader {
     pitchTable_l   : [u8; 256],
     pitchTable_h   : [u8; 256],
 
-    instruments    : InstrumentsSoA,
+    // MUST BE <= MAX_DIR_ITEMS
+    nDirItems      : u8,
 
-    // The address of the sound effect bytecode.
-    soundEffects_l : [u8; N_SOUND_EFFECTS],
-    soundEffects_h : [u8; N_SOUND_EFFECTS],
+    nInstruments   : u8,
+
+    // MUST BE <= MAX_SOUND_EFFECTS
+    nSoundEffects  : u8,
+
+    _padding       : u8,
+
+
+    // After the header is common data.
+
+    //  BRR Directory:  [DirItem ; nDirItems]
+    //
+    //      NOTE: The first valid SCRN value is 1.
+    //          SCRN value 0 is invalid.
+
+    //  Instruments SoA
+    //      instrument_scrn        : [u8 ; nInstruments]
+    //
+    //      instrument_pitchOffset : [u8 ; nInstruments]
+    //          This variable is either:
+    //              * ADSR2 if bit 7 of `adsr1` is set
+    //              * GAIN if bit 7 of `adsr1` is clear
+    //
+    //          instrument_adsr1       : [u8 ; nInstruments]
+    //
+    //          instrument_adsr2OrGain ; [u8 ; nInstruments]
+    //              offset between note c0 and `CommonDataHeader.pitchTable[0]`
+    //              (pitchOffset + note is allowed to overflow and underflow)
+
+    //  Sound Effects SoA
+    //      soundEffects_l : [u8 ; nSoundEffects]
+    //      soundEffects_h : [u8 ; nSoundEffects]
+    //          The address of the sound effect bytecode.
 };
 
 
