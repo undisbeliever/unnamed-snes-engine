@@ -110,7 +110,7 @@ in zeropage {
 
 
         // Address to return to in a `return_from_subroutine` bytecode
-        var returnInstPtr_l : [u8 ; N_CHANNELS];
+        // (The low-byte of returnInstPtr is in firstpage)
         var returnInstPtr_h : [u8 ; N_CHANNELS];
 
 
@@ -198,6 +198,10 @@ in firstpage {
         // If `instructionPtrAfterEnd_h` is 0, the channel does not loop and will instead stop.
         var instructionPtrAfterEnd_l : [u8 ; N_CHANNELS];
         var instructionPtrAfterEnd_h : [u8 ; N_CHANNELS];
+
+        // Address to return to in a `return_from_subroutine` bytecode
+        // (The high-byte of returnInstPtr is in zeropage)
+        var returnInstPtr_l : [u8 ; N_CHANNELS];
     }
 }
 
