@@ -40,20 +40,11 @@ def _read_filename(s: Any, dirname: str) -> Name:
     return os.path.join(dirname, s)
 
 
-def _read_int(v: Union[str, int, float]) -> int:
-    if type(v) == int:
-        return v
-    elif type(v) == str:
-        return int(v, 0)
-    else:
-        raise ValueError(f"Expectd an integer got {v}")
-
-
 def _read_optional_int(v: Union[str, int, float, None]) -> Optional[int]:
     if v is None:
         return None
     else:
-        return _read_int(v)
+        return int(v)
 
 
 #
@@ -112,7 +103,7 @@ def _read_optional_adsr(s: Optional[str]) -> Optional[Adsr]:
         raise ValueError("ADSR: Expected 4 integers")
 
     try:
-        return Adsr(int(values[0], 0), int(values[1], 0), int(values[2], 0), int(values[3], 0))
+        return Adsr(int(values[0]), int(values[1]), int(values[2]), int(values[3]))
     except ValueError as e:
         raise ValueError(f"ADSR: {e}")
 
@@ -140,8 +131,8 @@ def _read_instruments(json_input: dict[str, list[dict[str, Any]]], filename: Fil
                 dupe_block_hack=_read_optional_int(ji.get("dupe_block_hack")),
                 freq=float(ji["freq"]),
                 loop_point=_read_optional_int(ji.get("loop_point")),
-                first_octave=_read_int(ji["first_octave"]),
-                last_octave=_read_int(ji["last_octave"]),
+                first_octave=int(ji["first_octave"]),
+                last_octave=int(ji["last_octave"]),
                 adsr=_read_optional_adsr(ji.get("adsr")),
                 gain=_read_optional_int(ji.get("gain")),
             )
