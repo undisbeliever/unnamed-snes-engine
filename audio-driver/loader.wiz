@@ -62,11 +62,12 @@ func start_loader() {
 
         // Get the address to store the data
         // MUST NOT USE X
-        a = 0;
         if x == LoaderDataType.CODE as u8 {
+            a = <:CODE_ADDR;
             y = >:CODE_ADDR;
         }
         else if x == LoaderDataType.COMMON_DATA as u8 {
+            a = <:COMMON_DATA_ADDR;
             y = >:COMMON_DATA_ADDR;
         }
         else {

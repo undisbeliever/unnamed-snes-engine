@@ -21,10 +21,7 @@ let SFX_CHANNEL_MASK = SONG_CHANNEL_MASK ^ 0xff;
 
 let STARTING_VOLUME = 96;
 
-// The first valid SCRN value
-let STARTING_SCRN = 1;
-
-let MAX_DIR_ITEMS = 0x100 - STARTING_SCRN;
+let MAX_DIR_ITEMS = 0x100;
 let MAX_INSTRUMENTS = 0x100;
 let MAX_SOUND_EFFECTS = 192;
 
@@ -38,11 +35,10 @@ struct DirItem {
     loop  : *const u8
 };
 
-struct CommonDataHeader {
-    pitchTable_l   : [u8; 256],
-    pitchTable_h   : [u8; 256],
 
-    // MUST BE <= MAX_DIR_ITEMS
+// Assumes `sizeof(CommonDataHeader) + COMMON_DATA_ADDR` is page aligned.
+
+struct CommonDataHeader {
     nDirItems      : u8,
 
     nInstruments   : u8,
@@ -50,15 +46,19 @@ struct CommonDataHeader {
     // MUST BE <= MAX_SOUND_EFFECTS
     nSoundEffects  : u8,
 
-    _padding       : u8,
+    // Padding required to ensure `COMMON_DATA_ADDR` is even
+    // (The loader only works with even starting addresses)
+    _padding: u8,
+
+
+    // These fields will be page-aligned
+    pitchTable_l   : [u8; 256],
+    pitchTable_h   : [u8; 256],
 
 
     // After the header is common data.
 
     //  BRR Directory:  [DirItem ; nDirItems]
-    //
-    //      NOTE: The first valid SCRN value is 1.
-    //          SCRN value 0 is invalid.
 
     //  Instruments SoA
     //      instrument_scrn        : [u8 ; nInstruments]

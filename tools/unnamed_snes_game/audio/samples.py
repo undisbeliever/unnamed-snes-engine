@@ -135,7 +135,7 @@ def _compile_brr_samples(instruments: list[Instrument]) -> BrrData:
             if sample_id is None:
                 sample_data, loop_offset = _load_sample(*key)
 
-                sample_id = len(dir_offsets) + STARTING_SCRN
+                sample_id = len(dir_offsets)
 
                 dir_offsets.append(BrrOffset(len(brr_data), len(brr_data) + loop_offset))
 

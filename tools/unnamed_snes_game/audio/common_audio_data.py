@@ -42,15 +42,15 @@ def build_common_data(samples_input: SamplesJson, mappings: Mappings, sfx_file: 
     sfx_data_addr: Final = brr_data_addr + len(samples_and_instruments.brr_data)
 
     out = bytearray()
-    out += samples_and_instruments.pitch_table
-
     out.append(n_dir_items)
     out.append(n_instruments)
     out.append(n_sound_effects)
     out.append(0)  # padding
+    out += samples_and_instruments.pitch_table
 
     assert len(out) == COMMON_DATA_HEADER_SIZE
 
+    assert (COMMON_DATA_HEADER_ADDR + len(out)) & 0xFF == 0, "BRR directory not page aligned"
     for d in samples_and_instruments.dir_offsets:
         out += struct.pack("<2H", d.start + brr_data_addr, d.loop_point + brr_data_addr)
 

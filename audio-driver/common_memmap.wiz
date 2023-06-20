@@ -15,7 +15,9 @@ let FIRSTPAGE_SIZE = LOADER_ADDR - 0x100 - 0x10;
 let STACK_SIZE = 0x200 - LOADER_ADDR - LOADER_SIZE;
 let STACK_BOTTOM_ADDR = 0x200 - STACK_SIZE;
 
-let COMMON_DATA_ADDR = 0x800;
+// The -4 ensures the pitch-table and BRR directory is page aligned
+// `COMMON_DATA_ADDR` MUST be an even address (The loader only works with even addresses).
+let COMMON_DATA_ADDR = 0x800 - 4;
 
 let CODE_ADDR = 0x200;
 let CODE_SIZE = COMMON_DATA_ADDR - CODE_ADDR;

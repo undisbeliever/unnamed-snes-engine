@@ -20,8 +20,7 @@ N_FIELDS_IN_INSTRUMENTS_SOA: Final = 4
 
 
 # These values MUST match `src/audio-driver.wiz`
-STARTING_SCRN: Final = 1
-MAX_DIR_ITEMS: Final = 256 - STARTING_SCRN
+MAX_DIR_ITEMS: Final = 256
 MAX_INSTRUMENTS: Final = 256
 MAX_SOUND_EFFECTS: Final = 192
 
@@ -29,8 +28,8 @@ N_PITCHES_IN_PITCH_TABLE: Final = 256
 
 
 # These values MUST match `src/audio-driver.wiz`
-COMMON_DATA_HEADER_ADDR: Final[Addr] = 0x800
-COMMON_DATA_HEADER_SIZE: Final = N_PITCHES_IN_PITCH_TABLE * 2 + 4
+COMMON_DATA_HEADER_ADDR: Final[Addr] = 0x800 - 4
+COMMON_DATA_HEADER_SIZE: Final = 4 + (2 * N_PITCHES_IN_PITCH_TABLE)
 
 COMMON_DATA_BYTES_PER_DIR: Final = 4
 COMMON_DATA_BYTES_PER_INSTRUMENT: Final = 4
@@ -38,7 +37,8 @@ COMMON_DATA_BYTES_PER_SOUND_EFFECT: Final = 2
 
 MAX_COMMON_DATA_SIZE: Final = 0xD000
 
-assert COMMON_DATA_HEADER_ADDR & 0xFF == 0
+assert COMMON_DATA_HEADER_ADDR % 2 == 0, "Loader requires an even common data address"
+assert (COMMON_DATA_HEADER_ADDR + COMMON_DATA_HEADER_SIZE) & 0xFF == 0
 
 # Song constants
 
