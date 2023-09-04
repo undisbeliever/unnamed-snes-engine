@@ -128,6 +128,11 @@ class SpritesheetError(MultilineError):
             e.print_indented(fp)
 
 
+SmallOrLargeTileData = bytes
+
+EngineAabb = tuple[int, int, int, int]
+
+
 class FrameLocation(NamedTuple):
     is_clone: bool
     flip: Optional[str]
@@ -140,6 +145,41 @@ class FrameLocation(NamedTuple):
     hurtbox: Optional[Aabb]
 
 
+class ObjectTile(NamedTuple):
+    tile_data: SmallOrLargeTileData
+    palette_id: int
+
+    def is_large_tile(self) -> bool:
+        return len(self.tile_data) == 16 * 16
+
+
+class FrameData(NamedTuple):
+    hitbox: EngineAabb
+    hurtbox: EngineAabb
+    pattern: MsPattern
+    x_offset: int
+    y_offset: int
+    order: int
+    objects: list[ObjectTile]
+
+
+class FramesetData(NamedTuple):
+    name: Name
+    ms_export_order: Name
+    shadow_size: Name
+    tile_hitbox: TileHitbox
+    pattern: Name
+    frames: list[FrameData]
+    # engine animation data
+    animations: list[bytes]
+
+
+class TileCharAttr(NamedTuple):
+    tile_id: int
+    hflip: bool
+    vflip: bool
+
+
 # MsFramesetFormat and MsFsData intermediate
 class MsFsEntry(NamedTuple):
     fullname: ScopedName
@@ -148,6 +188,12 @@ class MsFsEntry(NamedTuple):
     pattern: Name
     frames: list[bytes]
     animations: list[bytes]
+
+
+#
+# Tileset
+# =======
+#
 
 
 class Tileset:
@@ -177,12 +223,14 @@ class Tileset:
         self.small_tile_pos: int = 4
         self.small_tile_offset: int = 0
 
-        self.small_tiles_map: dict[SmallTileData, tuple[int, bool, bool]] = dict()
-        self.large_tiles_map: dict[LargeTileData, tuple[int, bool, bool]] = dict()
+        self._tile_map: dict[SmallOrLargeTileData, TileCharAttr] = dict()
 
         self.first_large_tile_pos: Final = self.large_tile_pos
 
-    def get_tiles(self) -> list[LargeTileData]:
+    def tile_map(self) -> dict[SmallOrLargeTileData, TileCharAttr]:
+        return self._tile_map
+
+    def get_tiles(self) -> list[SmallTileData]:
         if self.large_tile_pos == self.first_large_tile_pos:
             raise ValueError("No tiles in tileset")
 
@@ -231,7 +279,7 @@ class Tileset:
 
     _SMALL_TILE_OFFSETS = [0x00, 0x01, 0x10, 0x11]
 
-    def add_small_tile(self, tile_data: SmallTileData) -> int:
+    def _new_small_tile(self, tile_data: SmallTileData) -> int:
         assert len(tile_data) == 64
 
         tile_pos = self._allocate_small_tile()
@@ -240,7 +288,7 @@ class Tileset:
 
         return tile_pos + self.tile_id_offset
 
-    def add_large_tile(self, small_tiles: tuple[SmallTileData, SmallTileData, SmallTileData, SmallTileData]) -> int:
+    def _new_large_tile(self, small_tiles: tuple[SmallTileData, SmallTileData, SmallTileData, SmallTileData]) -> int:
         assert all(len(st) == 64 for st in small_tiles)
 
         tile_pos = self._allocate_large_tile()
@@ -252,43 +300,37 @@ class Tileset:
 
         return tile_pos + self.tile_id_offset
 
-    def add_or_get_small_tile(self, tile_data: SmallTileData) -> tuple[int, bool, bool]:
+    def add_small_tile(self, tile_data: SmallTileData) -> None:
         assert len(tile_data) == 64
 
-        match = self.small_tiles_map.get(tile_data)
-        if match is None:
-            tile_id = self.add_small_tile(tile_data)
-
-            match = (tile_id, False, False)
+        if tile_data not in self._tile_map:
+            tile_id = self._new_small_tile(tile_data)
 
             h_tile_data = hflip_tile(tile_data)
             v_tile_data = vflip_tile(tile_data)
             hv_tile_data = vflip_tile(h_tile_data)
 
-            self.small_tiles_map[tile_data] = match
-            self.small_tiles_map.setdefault(h_tile_data, (tile_id, True, False))
-            self.small_tiles_map.setdefault(v_tile_data, (tile_id, False, True))
-            self.small_tiles_map.setdefault(hv_tile_data, (tile_id, True, True))
+            self._tile_map[tile_data] = TileCharAttr(tile_id, False, False)
+            self._tile_map.setdefault(h_tile_data, TileCharAttr(tile_id, True, False))
+            self._tile_map.setdefault(v_tile_data, TileCharAttr(tile_id, False, True))
+            self._tile_map.setdefault(hv_tile_data, TileCharAttr(tile_id, True, True))
 
-        return match
+    def add_large_tile(self, tile_data: LargeTileData) -> None:
+        assert len(tile_data) == 256
 
-    def add_or_get_large_tile(self, tile_data: LargeTileData) -> tuple[int, bool, bool]:
-        match = self.large_tiles_map.get(tile_data)
-        if match is None:
+        if tile_data not in self._tile_map:
             small_tiles = split_large_tile(tile_data)
 
-            tile_id = self.add_large_tile(small_tiles)
-
-            match = (tile_id, False, False)
+            tile_id = self._new_large_tile(small_tiles)
 
             h_tile_data = hflip_large_tile(tile_data)
             v_tile_data = vflip_large_tile(tile_data)
             hv_tile_data = vflip_large_tile(h_tile_data)
 
-            self.large_tiles_map[tile_data] = match
-            self.large_tiles_map.setdefault(h_tile_data, (tile_id, True, False))
-            self.large_tiles_map.setdefault(v_tile_data, (tile_id, False, True))
-            self.large_tiles_map.setdefault(hv_tile_data, (tile_id, True, True))
+            self._tile_map[tile_data] = TileCharAttr(tile_id, False, False)
+            self._tile_map.setdefault(h_tile_data, TileCharAttr(tile_id, True, False))
+            self._tile_map.setdefault(v_tile_data, TileCharAttr(tile_id, False, True))
+            self._tile_map.setdefault(hv_tile_data, TileCharAttr(tile_id, True, True))
 
             for i, st in enumerate(small_tiles):
                 small_tile_id = tile_id + self._SMALL_TILE_OFFSETS[i]
@@ -297,12 +339,39 @@ class Tileset:
                 v_st = vflip_tile(st)
                 hv_st = vflip_tile(h_st)
 
-                self.small_tiles_map[st] = (small_tile_id, False, False)
-                self.small_tiles_map.setdefault(h_st, (small_tile_id, True, False))
-                self.small_tiles_map.setdefault(v_st, (small_tile_id, False, True))
-                self.small_tiles_map.setdefault(hv_st, (small_tile_id, True, True))
+                self._tile_map[st] = TileCharAttr(small_tile_id, False, False)
+                self._tile_map.setdefault(h_st, TileCharAttr(small_tile_id, True, False))
+                self._tile_map.setdefault(v_st, TileCharAttr(small_tile_id, False, True))
+                self._tile_map.setdefault(hv_st, TileCharAttr(small_tile_id, True, True))
 
-        return match
+
+def build_static_tileset(
+    framesets: list[FramesetData], ms_input: MsSpritesheet
+) -> tuple[list[SmallTileData], dict[SmallOrLargeTileData, TileCharAttr]]:
+    tileset = Tileset(ms_input.first_tile, ms_input.end_tile)
+
+    # Process the small tiles after the large tiles have been added to the tileset.
+    # This will deduplicate the small tiles that exist in large tiles.
+    small_tiles = list()
+
+    for fs in framesets:
+        for f in fs.frames:
+            for t in f.objects:
+                if t.is_large_tile():
+                    tileset.add_large_tile(t.tile_data)
+                else:
+                    small_tiles.append(t.tile_data)
+
+    for st in small_tiles:
+        tileset.add_small_tile(st)
+
+    return (tileset.get_tiles(), tileset.tile_map())
+
+
+#
+# FramesetData and FrameData
+# ==========================
+#
 
 
 def i8_cast(i: int) -> int:
@@ -314,7 +383,7 @@ def i8_cast(i: int) -> int:
 NO_AABB_VALUE = 0x80
 
 
-def add_i8aabb(data: bytearray, box: Optional[Aabb], fs: MsFrameset) -> None:
+def i8aabb(box: Optional[Aabb], fs: MsFrameset) -> EngineAabb:
     if box is not None:
         if box.x < 0 or box.y < 0 or box.width <= 0 or box.height <= 0:
             raise ValueError(f"AABB box is invalid: { box }")
@@ -335,16 +404,20 @@ def add_i8aabb(data: bytearray, box: Optional[Aabb], fs: MsFrameset) -> None:
     else:
         x1 = x2 = y1 = y2 = NO_AABB_VALUE
 
-    data.extend((x1, x2, y1, y2))
+    return (x1, x2, y1, y2)
 
 
 def extract_frame(
-    fl: FrameLocation, frame_name: Name, image: PIL.Image.Image, palettes_map: list[PaletteMap], tileset: Tileset, fs: MsFrameset
-) -> bytes:
+    fl: FrameLocation, frame_name: Name, image: PIL.Image.Image, palettes_map: list[PaletteMap], fs: MsFrameset
+) -> FrameData:
     assert fl.x_offset is not None and fl.y_offset is not None
 
     pattern: Final = fl.pattern
     assert pattern
+
+    # ::TODO continue if this function causes an error::
+    hitbox = i8aabb(fl.hitbox, fs)
+    hurtbox = i8aabb(fl.hurtbox, fs)
 
     image_x: Final = fl.frame_x + fl.x_offset
     image_y: Final = fl.frame_y + fl.y_offset
@@ -358,14 +431,7 @@ def extract_frame(
     objects_outside_frame = list()
     tiles_with_no_palettes = list()
 
-    data = bytearray()
-
-    add_i8aabb(data, fl.hitbox, fs)
-    add_i8aabb(data, fl.hurtbox, fs)
-
-    data.append(pattern.id)
-    data.append(x_offset)
-    data.append(y_offset)
+    objects = list()
 
     for o in pattern.objects:
         tile_id, hflip, vflip = 0, False, False
@@ -381,26 +447,20 @@ def extract_frame(
             tile = extract_small_tile(image, x, y)
             palette_id, pal_map = get_palette_id(tile, palettes_map)
             if pal_map:
+                assert palette_id is not None
                 tile_data = bytes([pal_map[c] for c in tile])
-                tile_id, hflip, vflip = tileset.add_or_get_small_tile(tile_data)
+                objects.append(ObjectTile(tile_data, palette_id))
             else:
                 tiles_with_no_palettes.append(TileError(x, y, 8))
-                palette_id = 0
         else:
             tile = extract_large_tile(image, x, y)
             palette_id, pal_map = get_palette_id(tile, palettes_map)
             if pal_map:
+                assert palette_id is not None
                 tile_data = bytes([pal_map[c] for c in tile])
-                tile_id, hflip, vflip = tileset.add_or_get_large_tile(tile_data)
+                objects.append(ObjectTile(tile_data, palette_id))
             else:
                 tiles_with_no_palettes.append(TileError(x, y, 16))
-                palette_id = 0
-
-        assert tile_id < 512
-        assert palette_id is not None
-
-        data.append(tile_id & 0xFF)
-        data.append((tile_id >> 8) | ((palette_id & 7) << 1) | ((fs.order & 3) << 4) | (bool(hflip) << 6) | (bool(vflip) << 7))
 
     if objects_outside_frame:
         raise FrameError(frame_name, "Objects outside frame", objects_outside_frame)
@@ -408,24 +468,33 @@ def extract_frame(
     if tiles_with_no_palettes:
         raise FrameError(frame_name, "Cannot find palette for object tiles", tiles_with_no_palettes)
 
-    return data
+    assert len(objects) == len(pattern.objects)
+
+    return FrameData(
+        hitbox=hitbox,
+        hurtbox=hurtbox,
+        pattern=pattern,
+        x_offset=x_offset,
+        y_offset=y_offset,
+        order=fs.order,
+        objects=objects,
+    )
 
 
-def build_frame_data(
+def build_frameset_data(
     frame_locations: dict[Name, FrameLocation],
     fs: MsFrameset,
     image: PIL.Image.Image,
-    tiles: Tileset,
     palettes_map: list[PaletteMap],
     transparent_color: SnesColor,
-) -> tuple[dict[Name, bytes], set[Name]]:
+) -> tuple[dict[Name, FrameData], set[Name]]:
     errors: list[Union[str, FrameError, AnimationError]] = list()
 
     image_hflip: Optional[PIL.Image.Image] = None
     image_vflip: Optional[PIL.Image.Image] = None
     image_hvflip: Optional[PIL.Image.Image] = None
 
-    frames: dict[Name, bytes] = dict()
+    frames: dict[Name, FrameData] = dict()
     patterns_used: set[Name] = set()
 
     for frame_name, fl in frame_locations.items():
@@ -453,7 +522,7 @@ def build_frame_data(
         try:
             patterns_used.add(fl.pattern.name)
 
-            frames[frame_name] = extract_frame(fl, frame_name, frame_image, palettes_map, tiles, fs)
+            frames[frame_name] = extract_frame(fl, frame_name, frame_image, palettes_map, fs)
 
         except FrameError as e:
             errors.append(e)
@@ -699,21 +768,20 @@ def build_frameset(
     fs: MsFrameset,
     ms_export_orders: MsExportOrder,
     ms_dir: Filename,
-    tiles: Tileset,
     palettes_map: list[PaletteMap],
     transparent_color: SnesColor,
     spritesheet_name: Name,
-) -> MsFsEntry:
+) -> FramesetData:
     errors: list[Union[str, FrameError, AnimationError]] = list()
 
     image = load_image(ms_dir, fs.source)
 
     frame_locations = extract_frame_locations(fs, ms_export_orders, image.width, image.height)
 
-    frames, patterns_used = build_frame_data(frame_locations, fs, image, tiles, palettes_map, transparent_color)
+    frames, patterns_used = build_frameset_data(frame_locations, fs, image, palettes_map, transparent_color)
     animations: dict[Name, bytes] = dict()
 
-    exported_frames: list[bytes] = list()
+    exported_frames: list[FrameData] = list()
     exported_frame_ids: dict[Name, int] = dict()
 
     ms_export_orders.shadow_sizes[fs.shadow_size]
@@ -796,9 +864,7 @@ def build_frameset(
 
     assert not errors
 
-    return build_msfs_entry(
-        spritesheet_name, fs.name, fs.ms_export_order, shadow_size, tile_hitbox, pattern_name, exported_frames, eo_animations
-    )
+    return FramesetData(fs.name, fs.ms_export_order, shadow_size, tile_hitbox, pattern_name, exported_frames, eo_animations)
 
 
 #
@@ -807,30 +873,61 @@ def build_frameset(
 #
 
 
+def build_engine_frame_data(frame: FrameData, tile_map: dict[SmallOrLargeTileData, TileCharAttr]) -> bytes:
+    data = bytearray()
+
+    data.extend(frame.hitbox)
+    data.extend(frame.hurtbox)
+
+    data.append(frame.pattern.id)
+    data.append(frame.x_offset)
+    data.append(frame.y_offset)
+
+    for o in frame.objects:
+        t = tile_map[o.tile_data]
+        assert 0 <= t.tile_id <= 511
+
+        data.append(t.tile_id & 0xFF)
+        data.append(
+            (t.tile_id >> 8) | ((o.palette_id & 7) << 1) | ((frame.order & 3) << 4) | (bool(t.hflip) << 6) | (bool(t.vflip) << 7)
+        )
+
+    return data
+
+
 def build_msfs_entry(
-    spritesheet_name: Name,
-    fs_name: Name,
-    ms_export_order: Name,
-    shadow_size: Name,
-    tile_hitbox: TileHitbox,
-    pattern: Name,
-    frames: list[bytes],
-    animations: list[bytes],
+    fs: FramesetData, frames: list[bytes], spritesheet_name: Name, tile_map: dict[SmallOrLargeTileData, TileCharAttr]
 ) -> MsFsEntry:
     header = bytearray().zfill(3)
 
-    header[0] = SHADOW_SIZES[shadow_size]
-    header[1] = tile_hitbox[0]
-    header[2] = tile_hitbox[1]
+    header[0] = SHADOW_SIZES[fs.shadow_size]
+    header[1] = fs.tile_hitbox[0]
+    header[2] = fs.tile_hitbox[1]
 
     return MsFsEntry(
-        fullname=f"{ spritesheet_name }.{ fs_name }",
-        ms_export_order=ms_export_order,
+        fullname=f"{ spritesheet_name }.{ fs.name }",
+        ms_export_order=fs.ms_export_order,
         header=header,
-        pattern=pattern,
+        pattern=fs.pattern,
         frames=frames,
-        animations=animations,
+        animations=fs.animations,
     )
+
+
+def build_static_msfs_entries(
+    framesets: list[FramesetData], ms_input: MsSpritesheet, tile_map: dict[SmallOrLargeTileData, TileCharAttr]
+) -> list[MsFsEntry]:
+    spritesheet_name: Final = ms_input.name
+
+    return [
+        build_msfs_entry(
+            fs,
+            [build_engine_frame_data(f, tile_map) for f in fs.frames],
+            spritesheet_name,
+            tile_map,
+        )
+        for fs in framesets
+    ]
 
 
 def build_ms_fs_data(
@@ -947,14 +1044,12 @@ def convert_spritesheet(ms_input: MsSpritesheet, ms_export_orders: MsExportOrder
     palettes_map, palette_data = load_palette(ms_dir, ms_input.palette)
     transparent_color = get_transparent_color(palette_data)
 
-    tileset = Tileset(ms_input.first_tile, ms_input.end_tile)
-
-    msfs_entries = list()
+    framesets = list()
     errors: list[FramesetError] = list()
 
     for fs in ms_input.framesets.values():
         try:
-            msfs_entries.append(build_frameset(fs, ms_export_orders, ms_dir, tileset, palettes_map, transparent_color, ms_input.name))
+            framesets.append(build_frameset(fs, ms_export_orders, ms_dir, palettes_map, transparent_color, ms_input.name))
         except FramesetError as e:
             errors.append(e)
         except Exception as e:
@@ -963,7 +1058,11 @@ def convert_spritesheet(ms_input: MsSpritesheet, ms_export_orders: MsExportOrder
     if errors:
         raise SpritesheetError(errors, ms_dir)
 
-    bin_data = generate_ppu_data(ms_input, tileset.get_tiles(), palette_data)
+    tileset_data, tile_map = build_static_tileset(framesets, ms_input)
+
+    msfs_entries = build_static_msfs_entries(framesets, ms_input, tile_map)
+
+    bin_data = generate_ppu_data(ms_input, tileset_data, palette_data)
 
     assert not errors
 
