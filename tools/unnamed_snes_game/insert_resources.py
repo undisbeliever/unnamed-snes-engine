@@ -86,6 +86,23 @@ def validate_sfc_file(sfc_data: bytes, symbols: dict[str, int], mappings: Mappin
             raise ValueError(f"sfc file contains resource data")
 
 
+class ResourceUsage(NamedTuple):
+    memory_map: MemoryMap
+    resource_bank_end: list[int]
+
+    def summary(self) -> str:
+        n_banks: Final = len(self.resource_bank_end)
+        bank_start: Final = self.memory_map.mode.bank_start
+        bank_size: Final = self.memory_map.mode.bank_size
+
+        total_size: Final = n_banks * bank_size
+        total_used: Final = sum(self.resource_bank_end) - bank_start * n_banks
+        total_remaining: Final = total_size - total_used
+        percent_used: Final = total_used / total_size * 100
+
+        return f"{total_used} bytes used, {total_remaining} bytes free ({percent_used:0.1f}% full)"
+
+
 class ResourceInserter:
     BANK_END = 0x10000
     BLANK_RESOURCE_ENTRY = bytes(5)
@@ -95,6 +112,8 @@ class ResourceInserter:
 
         self.view: memoryview = sfc_view
         self.symbols: dict[str, int] = symbols
+
+        self.memory_map: Final = memory_map
 
         # Assume HiRom mapping
         self.address_to_rom_offset: Callable[[Address], RomOffset] = memory_map.mode.address_to_rom_offset
@@ -107,6 +126,9 @@ class ResourceInserter:
         self.bank_positions: list[int] = [self.bank_start] * memory_map.n_resource_banks
 
         validate_sfc_file(sfc_view, symbols, mappings)
+
+    def usage_table(self) -> ResourceUsage:
+        return ResourceUsage(self.memory_map, self.bank_positions.copy())
 
     def label_offset(self, label: str) -> RomOffset:
         return self.address_to_rom_offset(self.symbols[label])
@@ -231,7 +253,7 @@ class ResourceInserter:
         self.insert_blob_into_start_of_bank(bank_offset, room_data_blob)
 
 
-def insert_resources(sfc_view: memoryview, data_store: DataStore) -> None:
+def insert_resources(sfc_view: memoryview, data_store: DataStore) -> ResourceUsage:
     # sfc_view is a memoryview of a bytearray containing the SFC file
 
     # ::TODO confirm sfc_view is the correct file::
@@ -257,6 +279,8 @@ def insert_resources(sfc_view: memoryview, data_store: DataStore) -> None:
     # Disable resources-over-usb2snes
     if USE_RESOURCES_OVER_USB2SNES_LABEL in symbols:
         ri.insert_blob_at_label(USE_RESOURCES_OVER_USB2SNES_LABEL, bytes(1))
+
+    return ri.usage_table()
 
 
 def update_checksum(sfc_view: memoryview, memory_map: MemoryMap) -> None:
@@ -325,7 +349,9 @@ def compile_data(resources_directory: Filename, symbols_file: Filename, n_proces
         return None
 
 
-def insert_resources_into_binary(resources_dir: Filename, symbols: Filename, sfc_input: Filename, n_processes: Optional[int]) -> bytes:
+def insert_resources_into_binary(
+    resources_dir: Filename, symbols: Filename, sfc_input: Filename, n_processes: Optional[int]
+) -> tuple[bytes, ResourceUsage]:
     data_store = compile_data(resources_dir, symbols, n_processes)
     if data_store is None:
         raise RuntimeError("Error compiling resources")
@@ -333,7 +359,8 @@ def insert_resources_into_binary(resources_dir: Filename, symbols: Filename, sfc
     sfc_data = bytearray(read_binary_file(sfc_input, 4 * 1024 * 1024))
     sfc_memoryview = memoryview(sfc_data)
 
-    insert_resources(sfc_memoryview, data_store)
+    usage = insert_resources(sfc_memoryview, data_store)
+
     update_checksum(sfc_memoryview, data_store.get_mappings().memory_map)
 
-    return sfc_data
+    return sfc_data, usage

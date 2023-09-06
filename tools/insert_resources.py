@@ -10,13 +10,17 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("-o", "--output", required=True, help="sfc output file")
     parser.add_argument("-j", "--processes", required=False, type=int, default=None, help="Number of processors to use (default=all)")
+    parser.add_argument("-p", "--print-usage", action="store_true", help="Print resource usage")
     parser.add_argument("resources_directory", help="resources directory")
     parser.add_argument("symbols_file", help="symbols input file")
     parser.add_argument("sfc_input", help="sfc input file (unmodified)")
 
     args = parser.parse_args()
 
-    sfc_data = insert_resources_into_binary(args.resources_directory, args.symbols_file, args.sfc_input, args.processes)
+    sfc_data, usage = insert_resources_into_binary(args.resources_directory, args.symbols_file, args.sfc_input, args.processes)
+
+    if args.print_usage:
+        print(usage.summary())
 
     with open(args.output, "wb") as fp:
         fp.write(sfc_data)

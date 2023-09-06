@@ -98,7 +98,7 @@ all: $(BINARY) $(MLB_FILE)
 
 
 $(BINARY): $(INTERMEDIATE_BINARY) $(TOOLS_DIR)/insert_resources.py $(COMMON_PYTHON_SCRIPTS) $(RESOURCES_SRC)
-	$(PYTHON3) '$(TOOLS_DIR)/insert_resources.py' -o '$(BINARY)' '$(RESOURCES_DIR)' '$(INTERMEDIATE_BINARY:.sfc=.sym)' '$(INTERMEDIATE_BINARY)'
+	$(PYTHON3) '$(TOOLS_DIR)/insert_resources.py' --print-usage -o '$(BINARY)' '$(RESOURCES_DIR)' '$(INTERMEDIATE_BINARY:.sfc=.sym)' '$(INTERMEDIATE_BINARY)'
 
 
 $(MLB_FILE): $(INTERMEDIATE_BINARY) $(AUDIO_DRIVER_BINARIES) $(TOOLS_DIR)/sym_to_mlb.py
