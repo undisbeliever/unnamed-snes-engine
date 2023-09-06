@@ -739,14 +739,12 @@ class ResourcesOverUsb2Snes:
 
         self.expected_entity_rom_data_size: int = n_entities * ENTITY_ROM_DATA_BYTES_PER_ENTITY
 
-        self.max_data_size: int = min(memory_map.mode.bank_size, 0xFFFF)
-
-        assert self.max_data_size > MAX_COMMAND_SIZE * 2
-
         # Steal `MAX_COMMAND_SIZE` bytes from the end of the self.response_data_offset and use it for commands.
         # ::TODO find a proper place to put the command block::
-        self.max_data_size -= MAX_COMMAND_SIZE
+        self.max_data_size: int = memory_map.mode.bank_size - MAX_COMMAND_SIZE
         self.command_offset: int = self.response_data_offset + self.max_data_size
+
+        assert self.max_data_size > MAX_COMMAND_SIZE * 2
 
         self.not_room_counter: int = self.data_store.get_not_room_counter()
 
