@@ -28,7 +28,7 @@ namespace player {
 
 
 // Address of the player's `metasprites.MsFramesetFormat` data
-let MS_FS_DATA_ADDR = 0x0000;
+let MS_FS_DATA_ADDR = 0x8000;
 
 
 

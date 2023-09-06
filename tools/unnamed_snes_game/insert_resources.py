@@ -115,7 +115,6 @@ class ResourceInserter:
 
         self.memory_map: Final = memory_map
 
-        # Assume HiRom mapping
         self.address_to_rom_offset: Callable[[Address], RomOffset] = memory_map.mode.address_to_rom_offset
         self.bank_start: int = memory_map.mode.bank_start
         self.bank_size: int = memory_map.mode.bank_size
