@@ -6,6 +6,9 @@ import "ui";
 import "joypad";
 import "rng";
 
+import "gen/ms-drawing-functions";
+
+import "engine/entity_api";
 import "engine/game/gamestate";
 import "engine/resources/resources";
 
@@ -27,6 +30,8 @@ namespace engine_hooks {
 #[mem8, idx16]
 inline func wait_frame__vblank__inline() {
     ui.transfer_buffer__vblank();
+
+    metasprites.dynamic_tiles.transfer_Player_tiles__vblank__inline(player.dynamicMsFrameAddr);
 }
 
 

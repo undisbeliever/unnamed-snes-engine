@@ -12,7 +12,8 @@ from .ansi_color import NoAnsiColors, AnsiColors
 
 # Offset between the first_resource_bank and the named data banks
 MS_FS_DATA_BANK_OFFSET = 0
-ROOM_DATA_BANK_OFFSET = 1
+DYNAMIC_SPRITE_TILES_BANK_OFFSET = 1
+ROOM_DATA_BANK_OFFSET = 2
 
 # Reuse Room Data Bank for resources_over_usb2snes response data
 USB2SNES_DATA_BANK_OFFSET = ROOM_DATA_BANK_OFFSET
@@ -103,6 +104,24 @@ class RomData:
         i = 0
         for d in data_list:
             addr = self.insert_data(d) & 0xFFFF
+
+            table[i] = addr & 0xFF
+            table[i + 1] = addr >> 8
+
+            i += 2
+
+        assert i == table_size
+
+        return table_addr
+
+    # Dynamic Metasprite data stores tile addresses before the frame data but the frame table must point to the frame data.
+    def insert_ms_frame_addr_table(self, data_list: list[tuple[bytes, int]]) -> int:
+        table_size = len(data_list) * 2
+        table, table_addr = self.allocate(table_size)
+
+        i = 0
+        for data, offset in data_list:
+            addr = (self.insert_data(data) + offset) & 0xFFFF
 
             table[i] = addr & 0xFF
             table[i + 1] = addr >> 8

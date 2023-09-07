@@ -40,6 +40,7 @@ from .json_formats import (
     MsPattern,
     Aabb,
     TileHitbox,
+    MseoDynamicMsFsSettings,
     MsAnimation,
     MsLayout,
     MsFrameset,
@@ -50,6 +51,7 @@ from .json_formats import (
 
 
 TILE_DATA_BPP = 4
+BLANK_SMALL_TILE: Final = bytes(64)
 
 # MUST match `ShadowSize` enum in `src/metasprites.wiz`
 SHADOW_SIZES: dict[str, int] = {
@@ -128,6 +130,9 @@ class SpritesheetError(MultilineError):
             e.print_indented(fp)
 
 
+# 16 bit Address
+WordAddr = int
+
 SmallOrLargeTileData = bytes
 
 EngineAabb = tuple[int, int, int, int]
@@ -154,6 +159,7 @@ class ObjectTile(NamedTuple):
 
 
 class FrameData(NamedTuple):
+    name: Name
     hitbox: EngineAabb
     hurtbox: EngineAabb
     pattern: MsPattern
@@ -165,6 +171,7 @@ class FrameData(NamedTuple):
 
 class FramesetData(NamedTuple):
     name: Name
+    frameset: MsFrameset
     ms_export_order: Name
     shadow_size: Name
     tile_hitbox: TileHitbox
@@ -179,6 +186,15 @@ class TileCharAttr(NamedTuple):
     hflip: bool
     vflip: bool
 
+    def new_hflip(self) -> "TileCharAttr":
+        return TileCharAttr(self.tile_id, not self.hflip, self.vflip)
+
+    def new_vflip(self) -> "TileCharAttr":
+        return TileCharAttr(self.tile_id, self.hflip, not self.vflip)
+
+    def new_hvflip(self) -> "TileCharAttr":
+        return TileCharAttr(self.tile_id, not self.hflip, not self.vflip)
+
 
 # MsFramesetFormat and MsFsData intermediate
 class MsFsEntry(NamedTuple):
@@ -186,28 +202,45 @@ class MsFsEntry(NamedTuple):
     ms_export_order: Name
     header: bytes
     pattern: Name
-    frames: list[bytes]
+
+    # `int` is an offset into `bytes` that points to the start of the MsDataFormat data
+    #   0 for static tileset frames
+    #   2*nTiles for dynamic tile frames
+    #
+    # (data, offset)
+    frames: list[tuple[bytes, int]]
+
     animations: list[bytes]
 
 
-#
-# Tileset
-# =======
-#
+class DynamicMsSpritesheet(NamedTuple):
+    tile_data: bytes
+    msfs_entries: list[MsFsEntry]
 
 
-class Tileset:
+#
+# Static Tileset
+# ==============
+#
+
+SMALL_TILE_OFFSETS: Final = (0x00, 0x01, 0x10, 0x11)
+
+
+def validate_start_and_end_tile(starting_tile_id: int, end_tile_id: int) -> None:
+    assert starting_tile_id < 512
+    assert end_tile_id <= 512
+    assert starting_tile_id < end_tile_id
+
+    assert starting_tile_id & 0x01 == 0, "starting_tile is not on an even row"
+    assert starting_tile_id & 0x10 == 0, "starting_tile is not on an even column"
+
+    assert end_tile_id & 0x01 == 0, "end_tile is not on an even row"
+    assert end_tile_id & 0x10 == 0, "end_tile is not on an even column"
+
+
+class StaticTileset:
     def __init__(self, starting_tile_id: int, end_tile_id: int):
-        assert starting_tile_id < 512
-        assert end_tile_id <= 512
-        assert starting_tile_id < end_tile_id
-
-        assert starting_tile_id & 0x01 == 0, "starting_tile is not on an even row"
-        assert starting_tile_id & 0x10 == 0, "starting_tile is not on an even column"
-
-        assert end_tile_id & 0x01 == 0, "end_tile is not on an even row"
-        assert end_tile_id & 0x10 == 0, "end_tile is not on an even column"
-
+        validate_start_and_end_tile(starting_tile_id, end_tile_id)
         self.starting_tile_id: Final = starting_tile_id
         self.end_tile_id: Final = end_tile_id
 
@@ -272,12 +305,10 @@ class Tileset:
             self.small_tile_pos = 0
             self.small_tile_offset = self._allocate_large_tile()
 
-        tile_pos = self.small_tile_offset + self._SMALL_TILE_OFFSETS[self.small_tile_pos]
+        tile_pos = self.small_tile_offset + SMALL_TILE_OFFSETS[self.small_tile_pos]
         self.small_tile_pos += 1
 
         return tile_pos
-
-    _SMALL_TILE_OFFSETS = [0x00, 0x01, 0x10, 0x11]
 
     def _new_small_tile(self, tile_data: SmallTileData) -> int:
         assert len(tile_data) == 64
@@ -333,7 +364,7 @@ class Tileset:
             self._tile_map.setdefault(hv_tile_data, TileCharAttr(tile_id, True, True))
 
             for i, st in enumerate(small_tiles):
-                small_tile_id = tile_id + self._SMALL_TILE_OFFSETS[i]
+                small_tile_id = tile_id + SMALL_TILE_OFFSETS[i]
 
                 h_st = hflip_tile(st)
                 v_st = vflip_tile(st)
@@ -348,7 +379,7 @@ class Tileset:
 def build_static_tileset(
     framesets: list[FramesetData], ms_input: MsSpritesheet
 ) -> tuple[list[SmallTileData], dict[SmallOrLargeTileData, TileCharAttr]]:
-    tileset = Tileset(ms_input.first_tile, ms_input.end_tile)
+    tileset = StaticTileset(ms_input.first_tile, ms_input.end_tile)
 
     # Process the small tiles after the large tiles have been added to the tileset.
     # This will deduplicate the small tiles that exist in large tiles.
@@ -366,6 +397,195 @@ def build_static_tileset(
         tileset.add_small_tile(st)
 
     return (tileset.get_tiles(), tileset.tile_map())
+
+
+#
+# Dynamic Tiles
+# =============
+#
+
+
+# Validated dynamic MetaSprite frameset tile settings
+class DynamicFsTileSettings(NamedTuple):
+    first_tile_id: int
+    n_large_tiles: int
+
+
+def build_dynamic_tile_settings(dtl: MseoDynamicMsFsSettings) -> DynamicFsTileSettings:
+    end_tile_id = dtl.first_tile_id + dtl.n_large_tiles * 2
+
+    if dtl.first_tile_id // 16 != end_tile_id // 16:
+        raise RuntimeError("Only a single row of dynamic MetaSprite tiles is supported")
+
+    validate_start_and_end_tile(dtl.first_tile_id, end_tile_id)
+
+    return DynamicFsTileSettings(
+        first_tile_id=dtl.first_tile_id,
+        n_large_tiles=dtl.n_large_tiles,
+    )
+
+
+# The dynamic MetaSprite tiles stores in the ROM (separate from the tiles used in a frame)
+# Tiles are stored in the start of a memory bank and only use 16 bit addresses.
+class DynamicTileStore:
+    def __init__(self, map_mode: MemoryMapMode):
+        self.start_addr: Final = map_mode.bank_start
+        self.max_tiles: Final = map_mode.bank_size / 128
+
+        # Tiles are stored in tile16 format (top-left, top-right, bottom-left, bottom-right) order.
+        self._tiles: Final[list[SmallTileData]] = list()
+
+        # Tile map is (tile_addr, hflip, vflip)
+        self._tile_addr_map: Final[dict[LargeTileData, tuple[WordAddr, bool, bool]]] = dict()
+
+    def tile_data(self) -> list[SmallTileData]:
+        assert len(self._tiles) % 4 == 0
+
+        if len(self._tiles) > self.max_tiles:
+            raise ValueError(f"Too many dynamic metasprite tiles ({len(self._tiles)}, max {self.max_tiles})")
+
+        return self._tiles
+
+    def tile_map(self) -> dict[LargeTileData, tuple[WordAddr, bool, bool]]:
+        return self._tile_addr_map
+
+    def get_or_add_large_tile(self, large_tile: LargeTileData) -> tuple[WordAddr, bool, bool]:
+        assert len(large_tile) == 256
+
+        out = self._tile_addr_map.get(large_tile)
+        if out is None:
+            tile_addr: Final = self.start_addr + len(self._tiles) * 32
+            small_tiles: Final = split_large_tile(large_tile)
+
+            assert len(self._tiles) % 4 == 0
+            self._tiles.extend(small_tiles)
+
+            h_tile_data = hflip_large_tile(large_tile)
+            v_tile_data = vflip_large_tile(large_tile)
+            hv_tile_data = vflip_large_tile(h_tile_data)
+
+            out = (tile_addr, False, False)
+            self._tile_addr_map[large_tile] = out
+            self._tile_addr_map.setdefault(h_tile_data, (tile_addr, True, False))
+            self._tile_addr_map.setdefault(v_tile_data, (tile_addr, False, True))
+            self._tile_addr_map.setdefault(hv_tile_data, (tile_addr, True, True))
+        return out
+
+    def add_small_tiles(self, small_tiles: list[SmallTileData]) -> WordAddr:
+        tile_addr: Final = self.start_addr + len(self._tiles) * 32
+
+        assert len(small_tiles) == 4
+        self._tiles.extend(small_tiles)
+
+        return tile_addr
+
+
+class DynamicFrameTiles:
+    def __init__(self, settings: DynamicFsTileSettings, tile_store: DynamicTileStore):
+        self.settings: Final = settings
+
+        self._tile_store: Final = tile_store
+
+        self._pending_small_tiles: Final[list[SmallTileData]] = list()
+        self._n_small_tiles = 0
+
+        self._tile16_addresses: Final[list[WordAddr]] = list()
+        self._tile_map: Final[dict[SmallOrLargeTileData, TileCharAttr]] = dict()
+
+    def tile_map(self) -> dict[SmallOrLargeTileData, TileCharAttr]:
+        return self._tile_map
+
+    def tile_addresses(self) -> list[WordAddr]:
+        if len(self._tile16_addresses) > self.settings.n_large_tiles:
+            raise RuntimeError(f"Too many tile16 tiles: {len(self._tile16_addresses)}, max {self.settings.n_large_tiles}")
+
+        return self._tile16_addresses
+
+    def add_large_tile(self, large_tile: LargeTileData) -> None:
+        assert self._n_small_tiles == 0
+
+        if large_tile not in self._tile_map:
+            tile_id: Final = self.settings.first_tile_id + len(self._tile16_addresses) * 2
+
+            tile_addr, hflip, vflip = self._tile_store.get_or_add_large_tile(large_tile)
+            self._tile16_addresses.append(tile_addr)
+
+            h_large_tile = hflip_large_tile(large_tile)
+            v_large_tile = vflip_large_tile(large_tile)
+            hv_large_tile = vflip_large_tile(h_large_tile)
+
+            out = TileCharAttr(tile_id, hflip, vflip)
+            self._tile_map[large_tile] = out
+            self._tile_map.setdefault(h_large_tile, out.new_hflip())
+            self._tile_map.setdefault(v_large_tile, out.new_vflip())
+            self._tile_map.setdefault(hv_large_tile, out.new_hvflip())
+
+            small_tiles = split_large_tile(large_tile)
+            for i, st in enumerate(small_tiles):
+                small_tile_id = tile_id + SMALL_TILE_OFFSETS[i]
+
+                h_st = hflip_tile(st)
+                v_st = vflip_tile(st)
+                hv_st = vflip_tile(h_st)
+
+                st_out = TileCharAttr(small_tile_id, hflip, vflip)
+                self._tile_map.setdefault(st, st_out)
+                self._tile_map.setdefault(h_st, st_out.new_hflip())
+                self._tile_map.setdefault(v_st, st_out.new_vflip())
+                self._tile_map.setdefault(hv_st, st_out.new_hvflip())
+
+    # This function MUST be called after all of the large tiles have been added
+    def add_small_tile(self, small_tile: SmallTileData) -> None:
+        if small_tile not in self._tile_map:
+            self._n_small_tiles += 1
+
+            tile_id: Final = (
+                self.settings.first_tile_id + len(self._tile16_addresses) * 2 + SMALL_TILE_OFFSETS[len(self._pending_small_tiles)]
+            )
+
+            self._pending_small_tiles.append(small_tile)
+            if len(self._pending_small_tiles) == 4:
+                self.commit_pending_small_tiles()
+
+            h_small_tile = hflip_tile(small_tile)
+            v_small_tile = vflip_tile(small_tile)
+            hv_small_tile = vflip_tile(h_small_tile)
+
+            self._tile_map[small_tile] = TileCharAttr(tile_id, False, False)
+            self._tile_map.setdefault(h_small_tile, TileCharAttr(tile_id, True, False))
+            self._tile_map.setdefault(v_small_tile, TileCharAttr(tile_id, False, True))
+            self._tile_map.setdefault(hv_small_tile, TileCharAttr(tile_id, True, True))
+
+    def commit_pending_small_tiles(self) -> None:
+        if len(self._pending_small_tiles) != 0:
+            while len(self._pending_small_tiles) < 4:
+                self._pending_small_tiles.append(BLANK_SMALL_TILE)
+
+            tile16_addr: Final = self._tile_store.add_small_tiles(self._pending_small_tiles)
+            self._tile16_addresses.append(tile16_addr)
+            self._pending_small_tiles.clear()
+
+
+def dynamic_tiles_for_frame(frame: FrameData, settings: DynamicFsTileSettings, tile_store: DynamicTileStore) -> DynamicFrameTiles:
+    dft: Final = DynamicFrameTiles(settings, tile_store)
+
+    # Process the small tiles after the large tiles
+    # NOTE: small tiles are only deduplicated if they were previously used in the frame.
+    # (Optimize towards decreased VRAM usage over ROM)
+    small_tiles = list()
+
+    for o in frame.objects:
+        if o.is_large_tile():
+            dft.add_large_tile(o.tile_data)
+        else:
+            small_tiles.append(o.tile_data)
+
+    for st in small_tiles:
+        dft.add_small_tile(st)
+
+    dft.commit_pending_small_tiles()
+
+    return dft
 
 
 #
@@ -471,6 +691,7 @@ def extract_frame(
     assert len(objects) == len(pattern.objects)
 
     return FrameData(
+        name=frame_name,
         hitbox=hitbox,
         hurtbox=hurtbox,
         pattern=pattern,
@@ -864,7 +1085,7 @@ def build_frameset(
 
     assert not errors
 
-    return FramesetData(fs.name, fs.ms_export_order, shadow_size, tile_hitbox, pattern_name, exported_frames, eo_animations)
+    return FramesetData(fs.name, fs, fs.ms_export_order, shadow_size, tile_hitbox, pattern_name, exported_frames, eo_animations)
 
 
 #
@@ -873,8 +1094,19 @@ def build_frameset(
 #
 
 
-def build_engine_frame_data(frame: FrameData, tile_map: dict[SmallOrLargeTileData, TileCharAttr]) -> bytes:
+def build_engine_frame_data(
+    frame: FrameData, tile_map: dict[SmallOrLargeTileData, TileCharAttr], dynamic_tiles: Optional[list[WordAddr]]
+) -> tuple[bytes, int]:
     data = bytearray()
+
+    if dynamic_tiles is not None:
+        assert len(dynamic_tiles) > 0
+
+        for addr in reversed(dynamic_tiles):
+            data.append(addr & 0xFF)
+            data.append(addr >> 8)
+
+    offset: Final = len(data)
 
     data.extend(frame.hitbox)
     data.extend(frame.hurtbox)
@@ -892,12 +1124,10 @@ def build_engine_frame_data(frame: FrameData, tile_map: dict[SmallOrLargeTileDat
             (t.tile_id >> 8) | ((o.palette_id & 7) << 1) | ((frame.order & 3) << 4) | (bool(t.hflip) << 6) | (bool(t.vflip) << 7)
         )
 
-    return data
+    return data, offset
 
 
-def build_msfs_entry(
-    fs: FramesetData, frames: list[bytes], spritesheet_name: Name, tile_map: dict[SmallOrLargeTileData, TileCharAttr]
-) -> MsFsEntry:
+def build_msfs_entry(fs: FramesetData, frames: list[tuple[bytes, int]], spritesheet_name: Name) -> MsFsEntry:
     header = bytearray().zfill(3)
 
     header[0] = SHADOW_SIZES[fs.shadow_size]
@@ -922,18 +1152,57 @@ def build_static_msfs_entries(
     return [
         build_msfs_entry(
             fs,
-            [build_engine_frame_data(f, tile_map) for f in fs.frames],
+            [build_engine_frame_data(f, tile_map, None) for f in fs.frames],
             spritesheet_name,
-            tile_map,
         )
         for fs in framesets
     ]
 
 
+def build_dynamic_msfs_entry(
+    frameset: FramesetData, tile_store: DynamicTileStore, ms_input: MsSpritesheet, ms_export_orders: MsExportOrder
+) -> MsFsEntry:
+    frames: list[tuple[bytes, int]] = list()
+
+    # ::TODO check max number of tiles in the frameset::
+
+    tile_locations = ms_export_orders.dynamic_metasprites.get(frameset.name)
+    if tile_locations is None:
+        raise FramesetError(
+            frameset.frameset,
+            f"Cannot build dynamic metasprite tiles: `{frameset.name}` not found in `ms_export_orders.dynamic_metasprites`",
+        )
+
+    try:
+        tile_settings = build_dynamic_tile_settings(tile_locations)
+    except Exception as e:
+        raise FramesetError(frameset.frameset, f"Cannot build dynamic metasprite tiles: {e}")
+
+    errors: list[Union[str, FrameError, AnimationError]] = list()
+
+    for f in frameset.frames:
+        try:
+            dft = dynamic_tiles_for_frame(f, tile_settings, tile_store)
+            frame_data = build_engine_frame_data(f, dft.tile_map(), dft.tile_addresses())
+            frames.append(frame_data)
+        except Exception as e:
+            errors.append(FrameError(f.name, str(e)))
+
+    if errors:
+        raise FramesetError(frameset.frameset, errors)
+
+    return build_msfs_entry(frameset, frames, ms_input.name)
+
+
 def build_ms_fs_data(
-    spritesheets: list[list[MsFsEntry]], symbols: dict[str, int], mapmode: MemoryMapMode
+    dynamic_spritesheet: DynamicMsSpritesheet,
+    static_spritesheets: list[list[MsFsEntry]],
+    symbols: dict[str, int],
+    mapmode: MemoryMapMode,
 ) -> tuple[RomData, dict[ScopedName, tuple[int, Name]]]:
     # Return: tuple(rom_data, dict fs_fullname -> tuple(addr, export_order))
+
+    spritesheets: Final = [dynamic_spritesheet.msfs_entries] + static_spritesheets
 
     MS_FRAMESET_FORMAT_SIZE = 9
 
@@ -951,7 +1220,7 @@ def build_ms_fs_data(
         for fs in framesets:
             fs_addr = fs_table_addr + fs_pos
 
-            frame_table_addr = rom_data.insert_data_addr_table(fs.frames)
+            frame_table_addr = rom_data.insert_ms_frame_addr_table(fs.frames)
             animation_table_addr = rom_data.insert_data_addr_table(fs.animations)
 
             drawing_function = symbols[f"metasprites.drawing_functions.{ fs.pattern }"] & 0xFFFF
@@ -974,7 +1243,7 @@ def build_ms_fs_data(
     assert fs_pos == n_framesets * MS_FRAMESET_FORMAT_SIZE
 
     # Ensure player data is the first item
-    if fs_map["common.Player"][0] != mapmode.bank_start:
+    if fs_map["dynamic.Player"][0] != mapmode.bank_start:
         raise RuntimeError("The first MetaSprite FrameSet MUST be the player")
 
     return rom_data, fs_map
@@ -1038,9 +1307,9 @@ def generate_ppu_data(ms_input: MsSpritesheet, tileset: list[SmallTileData], pal
     return data
 
 
-def convert_spritesheet(ms_input: MsSpritesheet, ms_export_orders: MsExportOrder, ms_dir: Filename) -> tuple[bytes, list[MsFsEntry]]:
-    # Returns tuple (binary_data, msfs_entries)
-
+def _extract_frameset_data(
+    ms_input: MsSpritesheet, ms_export_orders: MsExportOrder, ms_dir: Filename
+) -> tuple[list[FramesetData], bytes]:
     palettes_map, palette_data = load_palette(ms_dir, ms_input.palette)
     transparent_color = get_transparent_color(palette_data)
 
@@ -1058,12 +1327,44 @@ def convert_spritesheet(ms_input: MsSpritesheet, ms_export_orders: MsExportOrder
     if errors:
         raise SpritesheetError(errors, ms_dir)
 
+    return framesets, palette_data
+
+
+def convert_static_spritesheet(
+    ms_input: MsSpritesheet, ms_export_orders: MsExportOrder, ms_dir: Filename
+) -> tuple[bytes, list[MsFsEntry]]:
+    framesets, palette_data = _extract_frameset_data(ms_input, ms_export_orders, ms_dir)
+
     tileset_data, tile_map = build_static_tileset(framesets, ms_input)
 
     msfs_entries = build_static_msfs_entries(framesets, ms_input, tile_map)
 
     bin_data = generate_ppu_data(ms_input, tileset_data, palette_data)
 
-    assert not errors
-
     return bin_data, msfs_entries
+
+
+def convert_dynamic_spritesheet(
+    ms_input: MsSpritesheet, ms_export_orders: MsExportOrder, ms_dir: Filename, map_mode: MemoryMapMode
+) -> DynamicMsSpritesheet:
+    framesets, palette_data = _extract_frameset_data(ms_input, ms_export_orders, ms_dir)
+
+    tile_store = DynamicTileStore(map_mode)
+
+    msfs_entries = list()
+    errors: list[FramesetError] = list()
+
+    for fs in framesets:
+        try:
+            msfs_entries.append(build_dynamic_msfs_entry(fs, tile_store, ms_input, ms_export_orders))
+        except FramesetError as e:
+            errors.append(e)
+        except Exception as e:
+            errors.append(FramesetError(fs.frameset, f"{ type(e).__name__ }({ e })"))
+
+    tile_data = convert_snes_tileset(tile_store.tile_data(), TILE_DATA_BPP)
+
+    if errors:
+        raise SpritesheetError(errors, ms_dir)
+
+    return DynamicMsSpritesheet(tile_data, msfs_entries)

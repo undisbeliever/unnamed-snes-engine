@@ -118,6 +118,16 @@ namespace MsDataFormat {
 }
 
 
+// Dynamic MetaSprite tile word addresses are stored before the MsDataFormat data in reverse order.
+// This allows the same `msFrameAddr` value to point to both frame data and the tile-address table.
+//
+// KEEP: XX
+#[mem16, idx16]
+inline func __get_dynamic_ms_tile_addr__inline(msFrameAddr: u16 in xx, let i: u16) : u16 in aa {
+    let offset = (i + 1) * 2;
+    return ((MsDataFormat._base as u24 - offset as u24) as far *u16)[unaligned xx];
+}
+
 
 // MetaSprite Animation Data in ROM
 namespace AnimationDataFormat {
@@ -361,6 +371,49 @@ inline func update_oam__vblank() {
     DAS0 = xx = sizeof(typeof(buffer)) + sizeof(typeof(hiTableBuffer));
 
     MDMAEN = a = MDMAEN_DMA0;
+}
+
+
+
+// REQUIRES: VBlank
+// Uses DMA channel 0
+//
+// KEEP: XX
+//
+// Called by the auto-generated ms-drawing-functions.wiz
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func __transfer_dynamic_metasprites__vblank__inline(msFrameAddr : u16 in xx, let first_tile_id: u16, let n_large_tiles: u16) {
+
+    let BYTES_PER_DMA = 32 * 2;
+
+    VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+
+    dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_TWO, <:&VMDATA);
+    A1B0 = a = a = resources.DYNAMIC_SPRITE_TILES_DATA_BANK;
+
+    inline for let i in 0 .. (n_large_tiles - 1) {
+        let VRAM_ADDR = (first_tile_id + 2 * i) * 16 + VRAM_OBJ_WADDR;
+
+        // Transfer the first half of the large sprite tile
+        VMADD = yy = VRAM_ADDR;
+        DAS0 = yy = BYTES_PER_DMA;
+
+        mem16();
+        #[mem16] {
+            A1T0 = aa = __get_dynamic_ms_tile_addr__inline(xx, i);
+        }
+        mem8();
+
+        MDMAEN = a = MDMAEN_DMA0;
+
+        // Transfer the second half of the large sprite tile
+        DAS0 = yy;
+        VMADD = yy = VRAM_ADDR + 0x0100;
+
+        MDMAEN = a = MDMAEN_DMA0;
+    }
 }
 
 

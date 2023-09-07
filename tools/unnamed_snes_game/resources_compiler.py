@@ -18,7 +18,7 @@ from typing import cast, final, Any, Callable, ClassVar, Final, Iterable, NamedT
 from .common import ResourceType
 from .entity_data import create_entity_rom_data
 from .mt_tileset import convert_mt_tileset
-from .metasprite import convert_spritesheet, MsFsEntry, build_ms_fs_data
+from .metasprite import convert_static_spritesheet, convert_dynamic_spritesheet, build_ms_fs_data, MsFsEntry, DynamicMsSpritesheet
 from .rooms import get_list_of_tmx_files, extract_room_id, compile_room
 from .other_resources import convert_tiles, convert_bg_image
 from .audio.common_audio_data import build_common_data as build_common_audio_data
@@ -84,7 +84,8 @@ class ErrorKey(NamedTuple):
     r_id: Union[int, SharedInputType]
 
 
-MS_FS_AND_ENTITY_ERROR_KEY: Final = ErrorKey(None, -1)
+DYNAMIC_METASPRITES_ERROR_KEY: Final = ErrorKey(None, -1)
+MS_FS_AND_ENTITY_ERROR_KEY: Final = ErrorKey(None, -2)
 
 
 class NonResourceError(NamedTuple):
@@ -104,6 +105,11 @@ class ResourceError(BaseResourceData):
 
 def create_resource_error(r_type: Optional[ResourceType], r_id: int, r_name: Name, error: Exception) -> ResourceError:
     return ResourceError(r_type, r_id, r_name, ErrorKey(r_type, r_id), error)
+
+
+# Used to signal the dynamic metasprites were recompiled
+class DynamicMetaspriteToken(NamedTuple):
+    pass
 
 
 # Thread Safety: This class MUST ONLY be accessed via method calls.
@@ -126,6 +132,7 @@ class DataStore:
 
             self._errors: OrderedDict[ErrorKey, Union[ResourceError, NonResourceError]] = OrderedDict()
 
+            self._dynamic_ms_data: Optional[DynamicMsSpritesheet] = None
             self._msfs_lists: list[Optional[list[MsFsEntry]]] = list()
 
             self._msfs_and_entity_data: Optional[MsFsAndEntityOutput] = None
@@ -148,6 +155,7 @@ class DataStore:
             self._msfs_lists = [None] * len(mappings.ms_spritesheets)
             self._rooms = [None] * self.ROOMS_PER_WORLD
 
+            self._dynamic_ms_data = None
             self._msfs_and_entity_data = None
             self._msfs_and_entity_data_valid = False
 
@@ -162,6 +170,9 @@ class DataStore:
                     self._resources[rt] = [None] * n_resources
                 else:
                     self._rooms = [None] * self.ROOMS_PER_WORLD
+
+                if rt == ResourceType.ms_spritesheets:
+                    self._dynamic_ms_data = None
 
             self._msfs_and_entity_data = None
             self._msfs_and_entity_data_valid = False
@@ -206,6 +217,18 @@ class DataStore:
             else:
                 e_key: Final = ErrorKey(c.resource_type, c.resource_id)
                 self._errors.pop(e_key, None)
+
+    def set_dyanamic_ms_data(self, ms: Union[DynamicMsSpritesheet, NonResourceError]) -> None:
+        with self._lock:
+            if isinstance(ms, DynamicMsSpritesheet):
+                self._dynamic_ms_data = ms
+                self._errors.pop(DYNAMIC_METASPRITES_ERROR_KEY, None)
+            else:
+                assert ms.error_key == DYNAMIC_METASPRITES_ERROR_KEY
+                self._dynamic_ms_data = None
+                self._errors[ms.error_key] = ms
+            self._msfa_and_entity_rom_data = None
+            self._msfs_and_entity_data_valid = False
 
     def set_msfs_and_entity_data(self, me: Optional[MsFsAndEntityOutput]) -> None:
         with self._lock:
@@ -253,6 +276,10 @@ class DataStore:
     def mark_msfs_and_entity_data_valid(self) -> None:
         with self._lock:
             self._msfs_and_entity_data_valid = True
+
+    def get_dynamic_ms_data(self) -> Optional[DynamicMsSpritesheet]:
+        with self._lock:
+            return self._dynamic_ms_data
 
     def get_msfs_and_entity_data(self) -> Optional[MsFsAndEntityOutput]:
         with self._lock:
@@ -473,7 +500,7 @@ class MsSpritesheetCompiler(BaseResourceCompiler):
 
             ms_input = load_metasprites_json(json_filename)
 
-            data, msfs_entries = convert_spritesheet(ms_input, self._shared_input.ms_export_order, ms_dir)
+            data, msfs_entries = convert_static_spritesheet(ms_input, self._shared_input.ms_export_order, ms_dir)
 
             return MetaSpriteResourceData(self.resource_type, resource_id, r_name, data, msfs_entries)
         except Exception as e:
@@ -614,6 +641,32 @@ class RoomCompiler:
             return create_resource_error(None, room_id, name, e)
 
 
+class DynamicMetaspriteCompiler:
+    def __init__(self, shared_input: SharedInput) -> None:
+        self._shared_input: Final = shared_input
+        self.ms_dir: Final = "dynamic-metasprites"
+        self.ms_dir_slash: Final = self.ms_dir + os.path.sep
+        self.json_filename: Final = os.path.join(self.ms_dir, "_metasprites.json")
+
+    def test_filename_is_resource(self, filename: Filename) -> bool:
+        return filename.startswith(self.ms_dir_slash)
+
+    def compile(self) -> Union[DynamicMsSpritesheet, NonResourceError]:
+        assert self._shared_input.mappings
+        assert self._shared_input.ms_export_order
+
+        try:
+            ms_input = load_metasprites_json(self.json_filename)
+            return convert_dynamic_spritesheet(
+                ms_input,
+                self._shared_input.ms_export_order,
+                self.ms_dir,
+                self._shared_input.mappings.memory_map.mode,
+            )
+        except Exception as e:
+            return NonResourceError(DYNAMIC_METASPRITES_ERROR_KEY, "Dynamic Metasprites", e)
+
+
 def _build_st_rt_map(
     *compilers: Union[BaseResourceCompiler, RoomCompiler]
 ) -> dict[SharedInputType, frozenset[Optional[ResourceType]]]:
@@ -662,6 +715,7 @@ class ProjectCompiler:
             SongCompiler(self.__shared_input),
         )
         self.__room_compiler: Final = RoomCompiler(self.__shared_input)
+        self.__dynamic_ms_compiler: Final = DynamicMetaspriteCompiler(self.__shared_input)
 
         assert len(self.__resource_compilers) == len(ResourceType)
 
@@ -693,7 +747,7 @@ class ProjectCompiler:
         for s_type in SharedInputType:
             self._shared_input_file_changed(s_type)
 
-    def file_changed(self, filename: Filename) -> Optional[BaseResourceData | SharedInputType]:
+    def file_changed(self, filename: Filename) -> Optional[BaseResourceData | DynamicMetaspriteToken | SharedInputType]:
         if filename == self.__shared_input.symbols_filename:
             s_type: Optional[SharedInputType] = SharedInputType.SYMBOLS
         else:
@@ -711,6 +765,11 @@ class ProjectCompiler:
                     co = self.__room_compiler.compile_room(filename)
                 else:
                     self._log_cannot_compile_si_error(filename)
+
+            elif self.__dynamic_ms_compiler.test_filename_is_resource(filename):
+                self.__compile_dynamic_metasprites()
+                return DynamicMetaspriteToken()
+
             else:
                 for c in self.__resource_compilers:
                     r_id = c.test_filename_is_resource(filename)
@@ -788,23 +847,31 @@ class ProjectCompiler:
             self.__compile_resource_lists(self.__res_lists_waiting_on_shared_input)
             self.__res_lists_waiting_on_shared_input.clear()
 
+    def __compile_dynamic_metasprites(self) -> None:
+        self.log_message(f"Compiling dynamic metasprites")
+        d = self.__dynamic_ms_compiler.compile()
+        if isinstance(d, NonResourceError):
+            self.log_error(d.error)
+        self.data_store.set_dyanamic_ms_data(d)
+
     def __compile_msfs_and_entity_data(self) -> None:
         if self.__shared_input.mappings is None or self.__shared_input.entities is None or self.__shared_input.symbols is None:
             self._log_cannot_compile_si_error("MsFs and Entity Data")
             self.data_store.set_msfs_and_entity_data(None)
             return
 
+        dynamic_ms_data: Final = self.data_store.get_dynamic_ms_data()
         optional_msfs_lists: Final = self.data_store.get_msfs_lists()
 
-        if any(entry_list is None for entry_list in optional_msfs_lists):
+        if dynamic_ms_data is None or any(entry_list is None for entry_list in optional_msfs_lists):
             e = ValueError("Cannot compile MsFs data.  There is an error in a MS Spritesheet.")
             self.log_error(e)
             data = MsFsAndEntityOutput(error=e)
         else:
             try:
-                msfs_lists = cast(list[list[MsFsEntry]], optional_msfs_lists)
+                static_msfs_lists = cast(list[list[MsFsEntry]], optional_msfs_lists)
                 rom_data, ms_map = build_ms_fs_data(
-                    msfs_lists, self.__shared_input.symbols, self.__shared_input.mappings.memory_map.mode
+                    dynamic_ms_data, static_msfs_lists, self.__shared_input.symbols, self.__shared_input.mappings.memory_map.mode
                 )
                 ms_fs_data = bytes(rom_data.data())
                 entity_rom_data = create_entity_rom_data(self.__shared_input.entities, self.__shared_input.symbols, ms_map)
@@ -848,5 +915,8 @@ class ProjectCompiler:
                     self.data_store.insert_data(co)
                     if isinstance(co, ResourceError):
                         self.log_error(co)
+
+        if ResourceType.ms_spritesheets in to_recompile:
+            self.__compile_dynamic_metasprites()
 
         self.__compile_msfs_and_entity_data()

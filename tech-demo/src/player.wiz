@@ -219,6 +219,12 @@ var itemAboveHead_msFrameAddr @ &entities.SoA.var_3[0] : u16;
 }
 
 
+in lowram {
+    // low-ram mirror of the MetaSprite frame
+    // Used in VBlank to load the player's dynamic metasprite tiles
+    var dynamicMsFrameAddr: u16;
+}
+
 
 
 // CODE
@@ -394,6 +400,8 @@ func ms_draw_function(msFrame : u16 in yy, ms_xPos : u16 in metasprites.xPos, ms
 // Safe (for now) - MS drawing functions do not use zpTmp variables.
 var _tmpX : u16 in zpTmp_word_0;
 var _tmpY : u16 in zpTmp_word_1;
+
+    dynamicMsFrameAddr = yy;
 
     // I need to save a copy of metasprite position
     // Required when holding items during room transitions (cannot calculate metasprite position from player position).

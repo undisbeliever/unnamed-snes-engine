@@ -503,10 +503,16 @@ class MsAnimationExportOrder(NamedTuple):
     animations: list[Name]
 
 
+class MseoDynamicMsFsSettings(NamedTuple):
+    first_tile_id: int
+    n_large_tiles: int
+
+
 class MsExportOrder(NamedTuple):
     patterns: OrderedDict[Name, MsPattern]
     shadow_sizes: OrderedDict[Name, int]
     animation_lists: OrderedDict[Name, MsAnimationExportOrder]
+    dynamic_metasprites: OrderedDict[Name, MseoDynamicMsFsSettings]
 
 
 class _MSEO_Helper(_Helper):
@@ -533,6 +539,21 @@ class _MSEO_Helper(_Helper):
 
         return out
 
+    def get_dynamic_metasprites(self, key: str) -> OrderedDict[Name, MseoDynamicMsFsSettings]:
+        out = OrderedDict()
+
+        for name, jh in self.iterate_dict_of_dicts(key):
+            item = MseoDynamicMsFsSettings(
+                first_tile_id=jh.get_int("first_tile_id"),
+                n_large_tiles=jh.get_int("n_large_tiles"),
+            )
+
+            if name in out:
+                self._raise_error(f"Duplicate name: { name }", key)
+            out[name] = item
+
+        return out
+
 
 def load_ms_export_order_json(filename: Filename) -> MsExportOrder:
     jh = _load_json_file(filename, _MSEO_Helper)
@@ -547,6 +568,7 @@ def load_ms_export_order_json(filename: Filename) -> MsExportOrder:
         patterns=patterns,
         shadow_sizes=jh.get_name_list_mapping("shadow_sizes"),
         animation_lists=jh.get_animation_eo_lists("animation_lists"),
+        dynamic_metasprites=jh.get_dynamic_metasprites("dynamic_metasprites"),
     )
 
 

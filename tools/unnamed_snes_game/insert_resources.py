@@ -8,7 +8,13 @@ import sys
 import os.path
 from typing import Callable, Final, NamedTuple, Optional, Union
 
-from .common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET, ResourceType, USE_RESOURCES_OVER_USB2SNES_LABEL
+from .common import (
+    MS_FS_DATA_BANK_OFFSET,
+    DYNAMIC_SPRITE_TILES_BANK_OFFSET,
+    ROOM_DATA_BANK_OFFSET,
+    ResourceType,
+    USE_RESOURCES_OVER_USB2SNES_LABEL,
+)
 from .common import print_error
 from .json_formats import Name, Filename, Mappings, MemoryMap
 from .entity_data import ENTITY_ROM_DATA_LABEL, validate_entity_rom_data_symbols, expected_blank_entity_rom_data
@@ -259,8 +265,9 @@ def insert_resources(sfc_view: memoryview, data_store: DataStore) -> ResourceUsa
 
     mappings, symbols, n_entities = data_store.get_mappings_symbols_and_n_entities()
     msfs_entity_data: Final = data_store.get_msfs_and_entity_data()
+    dynamic_ms_data: Final = data_store.get_dynamic_ms_data()
 
-    assert msfs_entity_data and msfs_entity_data.msfs_data and msfs_entity_data.entity_rom_data
+    assert msfs_entity_data and msfs_entity_data.msfs_data and msfs_entity_data.entity_rom_data and dynamic_ms_data
 
     validate_entity_rom_data_symbols(symbols, n_entities)
 
@@ -270,6 +277,7 @@ def insert_resources(sfc_view: memoryview, data_store: DataStore) -> ResourceUsa
     ri.insert_room_data(ROOM_DATA_BANK_OFFSET, data_store.get_data_for_all_rooms())
 
     ri.insert_blob_into_start_of_bank(MS_FS_DATA_BANK_OFFSET, msfs_entity_data.msfs_data)
+    ri.insert_blob_into_start_of_bank(DYNAMIC_SPRITE_TILES_BANK_OFFSET, dynamic_ms_data.tile_data)
     ri.insert_blob_at_label(ENTITY_ROM_DATA_LABEL, msfs_entity_data.entity_rom_data)
 
     for r_type in ResourceType:

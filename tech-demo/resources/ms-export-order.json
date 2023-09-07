@@ -225,6 +225,12 @@
     "smoke": [
       "ground", "small", "explosion"
     ]
+  },
+  "dynamic_metasprites": {
+    "Player": {
+      "first_tile_id": 2,
+      "n_large_tiles": 2
+    }
   }
 }
 

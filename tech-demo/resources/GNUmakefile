@@ -1,5 +1,5 @@
 
-METASPRITES_SRC  := $(wildcard metasprites/*/*.aseprite)
+METASPRITES_SRC  := $(wildcard metasprites/*/*.aseprite dynamic-metasprites/*.aseprite)
 METASPRITES	 := $(patsubst %.aseprite,%.png,$(METASPRITES_SRC))
 
 IMAGES_SRC       := $(wildcard */*.aseprite)
@@ -15,6 +15,9 @@ all: $(METASPRITES) $(IMAGES)
 
 
 metasprites/%.png: metasprites/%.aseprite
+	aseprite --batch "$<" --sheet-type "rows" --sheet-width 128px --sheet "$@"
+
+dynamic-metasprites/%.png: dynamic-metasprites/%.aseprite
 	aseprite --batch "$<" --sheet-type "rows" --sheet-width 128px --sheet "$@"
 
 

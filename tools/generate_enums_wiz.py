@@ -18,7 +18,13 @@ from unnamed_snes_game.json_formats import (
     MemoryMap,
     GameMode,
 )
-from unnamed_snes_game.common import MS_FS_DATA_BANK_OFFSET, ROOM_DATA_BANK_OFFSET, USB2SNES_DATA_BANK_OFFSET, ResourceType
+from unnamed_snes_game.common import (
+    MS_FS_DATA_BANK_OFFSET,
+    ROOM_DATA_BANK_OFFSET,
+    DYNAMIC_SPRITE_TILES_BANK_OFFSET,
+    USB2SNES_DATA_BANK_OFFSET,
+    ResourceType,
+)
 
 
 def room_id_for_name(room_name: RoomName) -> int:
@@ -66,6 +72,9 @@ def generate_wiz_code(mappings: Mappings) -> str:
         out.write("namespace resources {\n\n")
 
         out.write(f"let MS_FS_DATA_BANK = { mappings.memory_map.first_resource_bank + MS_FS_DATA_BANK_OFFSET };\n")
+        out.write(
+            f"let DYNAMIC_SPRITE_TILES_DATA_BANK = { mappings.memory_map.first_resource_bank + DYNAMIC_SPRITE_TILES_BANK_OFFSET };\n"
+        )
         out.write(f"let ROOM_DATA_BANK = { mappings.memory_map.first_resource_bank + ROOM_DATA_BANK_OFFSET };\n\n")
 
         out.write(f"let _STARTING_ROOM = { room_id_for_name(mappings.starting_room) };\n\n")
