@@ -1,4 +1,22 @@
 {
+  "palettes": {
+    "title_screen": {
+      "source": "palettes/title-screen.png",
+      "n_rows": 2
+    },
+    "game_over": {
+      "source": "palettes/game-over.png",
+      "n_rows": 6
+    },
+    "credits": {
+      "source": "palettes/credits.png",
+      "n_rows": 4
+    },
+    "dungeon": {
+      "source": "palettes/dungeon.png",
+      "n_rows": 8
+    }
+  },
   "tiles": {
     "ui": {
       "format": "2bpp",
@@ -17,31 +35,31 @@
     "title_screen": {
       "format": "2bpp",
       "source": "images/title-screen.png",
-      "palette": "images/title-screen-palette.png",
+      "palette": "title_screen",
       "tile_priority": 1
     },
     "game_over": {
       "format": "2bpp",
       "source": "images/game-over.png",
-      "palette": "images/game-over-palette.png",
+      "palette": "game_over",
       "tile_priority": 1
     },
     "credits": {
       "format": "2bpp",
       "source": "images/credits.png",
-      "palette": "images/credits-palette.png",
+      "palette": "credits",
       "tile_priority": 1
     },
     "licenses_bg1": {
       "format": "2bpp",
       "source": "images/licenses-bg1.png",
-      "palette": "images/licenses-palette.png",
+      "palette": "credits",
       "tile_priority": 1
     },
     "licenses_bg2": {
       "format": "2bpp",
       "source": "images/licenses-bg2.png",
-      "palette": "images/licenses-palette.png",
+      "palette": "credits",
       "tile_priority": 1
     }
   }

@@ -258,6 +258,8 @@ def convert_tilemap_and_tileset(
 ) -> tuple[TileMap, list[SmallTileData]]:
     # Returns a tuple(tilemap, tileset)
 
+    assert len(palettes_map) <= 8
+
     invalid_tiles = list()
 
     tilemap: list[TileMapEntry] = list()
@@ -353,6 +355,20 @@ def create_tilemap_data_high(tilemap: Union[TileMap, Sequence[TileMapEntry]], de
         )
 
     return data
+
+
+def image_and_palette_map_to_snes(
+    image: PIL.Image.Image, image_filename: Filename, palettes_map: list[PaletteMap], bpp: int
+) -> tuple[TileMap, bytes]:
+    # Return (tilemap, tile_data)
+
+    tilemap, tileset = convert_tilemap_and_tileset(
+        extract_small_tile_grid(image), image_filename, palettes_map, image.width // 8, image.height // 8
+    )
+
+    tile_data = convert_snes_tileset(tileset, bpp)
+
+    return tilemap, tile_data
 
 
 def image_to_snes(

@@ -9,12 +9,13 @@ from collections import OrderedDict
 from typing import Any, Callable, Final, Iterable, NamedTuple, Optional
 
 from .common import print_error
+from .palette import PaletteColors
 
 from .snes import (
     extract_tiles_from_paletted_image,
     convert_mode7_tileset,
     convert_snes_tileset,
-    image_to_snes,
+    image_and_palette_map_to_snes,
     create_tilemap_data,
     SmallTileData,
 )
@@ -74,33 +75,29 @@ NAMETABLE_SIZE_BYTES: Final = 32 * 32 * 2
 VALID_BGI_HEADER_TM_SIZES: Final = (1, 2, 4)
 
 
-def convert_bg_image(bgi: BackgroundImageInput) -> bytes:
+def convert_bg_image(bgi: BackgroundImageInput, palettes: dict[Name, PaletteColors]) -> bytes:
     bpp = BI_BPP_FORMATS[bgi.format]
 
     with PIL.Image.open(bgi.source) as image:
         image.load()
 
-    with PIL.Image.open(bgi.palette) as pal_image:
-        pal_image.load()
+    pal = palettes.get(bgi.palette)
+    if pal is None:
+        raise RuntimeError(f"Cannot load palette {bgi.palette}")
 
-    tilemap, tile_data, palette_data = image_to_snes(image, bgi.source, pal_image, bpp)
+    tilemap, tile_data = image_and_palette_map_to_snes(image, bgi.source, pal.create_map(bpp), bpp)
 
     tilemap_data = create_tilemap_data(tilemap, bgi.tile_priority)
-
-    n_palette_rows = len(palette_data) // 32
-    assert len(palette_data) % 32 == 0
-    assert 1 < n_palette_rows < 8
 
     tm_size = len(tilemap_data) // NAMETABLE_SIZE_BYTES
 
     if tm_size not in VALID_BGI_HEADER_TM_SIZES:
         raise ValueError(f"Invalid number of nametables, expected { VALID_BGI_HEADER_TM_SIZES }, got { tm_size }.")
 
-    header_byte = (n_palette_rows << 4) | (tm_size << 2)
+    header_byte = tm_size << 3
 
     out = bytearray()
     out.append(header_byte)
-    out += palette_data
     out += tilemap_data
     out += tile_data
 

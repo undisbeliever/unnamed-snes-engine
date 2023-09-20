@@ -1,0 +1,57 @@
+// Copyright (c) 2023, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "../registers";
+
+import "resources";
+
+import "dma";
+
+import "gen/enums";
+
+
+namespace palette {
+
+struct _DataFormat {
+    n_colors : u8,
+};
+
+
+in code {
+
+
+// REQUIRES: Force-Blank
+// Uses DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+func load_palette__forceblank(paletteId : resources.palettes in a) {
+var _res : resources.ResourceEntry in resources.res;
+
+    _res = resources.load_palette(a as resources.palettes);
+
+    aa = direct_page;
+    a = *_res.farPtr;
+    mem16();
+    #[mem16] {
+        // DMA size
+        yy = aa = aa << 1;
+
+        // carry clear
+        // DMA address
+        xx = aa = *(&_res.farPtr as *u16) +# sizeof(_DataFormat);
+    }
+    mem8();
+
+    a = #:_res.farPtr;
+
+    CGADD = 0;
+    ^return dma.transfer_to_cgram__forceblank(a, xx, yy);
+}
+
+}
+
+}
+
+

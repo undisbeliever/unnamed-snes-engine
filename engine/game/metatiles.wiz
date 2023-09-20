@@ -8,6 +8,7 @@ import "room";
 import "../wait-frame";
 import "../resources/dma";
 import "../resources/resources";
+import "../resources/palette";
 
 import "../entity_api";
 
@@ -58,7 +59,7 @@ struct _Tileset {
 struct _DataFormat {
     ram_data : _Tileset,
 
-    palette_data : [u16 ; 128],
+    palette : resources.palettes,
 
     tile_data : u8,
 };
@@ -152,15 +153,14 @@ var _res : resources.ResourceEntry in resources.res;
     // Transfer header to WorkRAM
     resources.transfer_resource_header_to_wram7e(_res, &tileset as u16, sizeof(_Tileset));
 
-    dma.set_dma0_source__res_plus_offset(_res, offsetof(_DataFormat, palette_data));
-
-    // Transfer palette to CGRAM
-    CGADD = 0;
-    dma.continue_transfer_to_cgram__forceblank(256);
-
     // Transfer tiles to VRAM
     VMADD = xx = VRAM_BG1_TILES_WADDR;
+    dma.set_dma0_source__res_plus_offset(_res, offsetof(_DataFormat, tile_data));
     dma.transfer_remaining_res_data_to_vram__forceblank(_res);
+
+    // Transfer palette (must be done after resources data is processed);
+    yy = offsetof(_DataFormat, palette);
+    ^return palette.load_palette__forceblank(_res.farPtr[yy] as resources.palettes);
 }
 
 

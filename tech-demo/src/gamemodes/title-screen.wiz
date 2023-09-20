@@ -9,6 +9,7 @@ import "engine/audio";
 import "engine/gamemodes";
 import "engine/wait-frame";
 import "engine/resources/resources";
+import "engine/resources/palette";
 
 import "../joypad";
 
@@ -88,6 +89,7 @@ inline func setup_ppu() {
     TM = a = TM_BG1;
 
     resources.load_bg_image_resource_into_vram(resources.bg_images.title_screen, VRAM_BG1_MAP_WADDR, VRAM_BG1_TILES_WADDR);
+    palette.load_palette__forceblank(resources.palettes.title_screen);
 }
 
 }

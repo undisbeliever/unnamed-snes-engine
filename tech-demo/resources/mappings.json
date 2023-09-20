@@ -6,6 +6,12 @@
    "n_resource_banks": 6
  },
 
+ "palettes": [
+   "title_screen",
+   "game_over",
+   "credits",
+   "dungeon"
+ ],
  "mt_tilesets": [
    "dungeon"
  ],

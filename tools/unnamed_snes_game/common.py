@@ -27,11 +27,12 @@ USE_RESOURCES_OVER_USB2SNES_LABEL = "resources.UseResourcesOverUsb2Snes"
 # enum fields MUST be plural
 @unique
 class ResourceType(IntEnum):
-    mt_tilesets = 0
-    ms_spritesheets = 1
-    tiles = 2
-    bg_images = 3
-    songs = 4
+    palettes = 0
+    mt_tilesets = 1
+    ms_spritesheets = 2
+    tiles = 3
+    bg_images = 4
+    songs = 5
 
 
 def lorom_address_to_rom_offset(addr: int) -> int:
