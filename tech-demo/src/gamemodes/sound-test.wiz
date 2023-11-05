@@ -92,7 +92,6 @@ let JOYH_CONFIRM = joypad.JOYH.B | joypad.JOYH.Y | joypad.JOYH.START;
         // ::TODO check if common data has changed and reload it::
 
         x = _menuOption;
-
         a = joypad.pressed_h;
         if a & JOYH_CONFIRM != 0 {
             if x == Options.PLAY_SFX as u8 || x == Options.SFX_PAN as u8 {
@@ -107,6 +106,7 @@ let JOYH_CONFIRM = joypad.JOYH.B | joypad.JOYH.Y | joypad.JOYH.START;
         }
 
         x = _menuOption;
+        a = joypad.pressed_h;
         if a & joypad.JOYH.DOWN != 0 {
             x++;
             if x >= N_OPTIONS {
