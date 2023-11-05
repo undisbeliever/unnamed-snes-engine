@@ -86,6 +86,32 @@ namespace IO {
         //  * parameter0: sound effect id (not bounds checked)
         //  * parameter1: pan (0-128) (not bounds checked)
         PLAY_SOUND_EFFECT   = 4,
+
+        // reserved
+
+        // Stop all active sound effects
+        STOP_SOUND_EFFECTS = 8,
+
+        // Set the main volume
+        //  * parameter0: signed i8 volume
+        //
+        // NOTE: The main volume is reset whenever a new song is loaded.
+        SET_MAIN_VOLUME = 10,
+
+        // Enables or disable channels.
+        //  * parameter0: A bitmask of the 8 channels that can send key-on events
+        //
+        // Useful for disabling channels in a song.
+        //
+        // NOTE: The enabled channels bitmask is reset whenever a new song is loaded.
+        SET_ENABLED_CHANNELS = 12,
+
+        // Set the song tempo.
+        //  * parameter0: The new S-DSP TIMER_0 register value
+        //    (MUST be >= MIN_TICK_CLOCK 64, is bounds checked)
+        //
+        // NOTE: The song can still change the tempo.
+        SET_SONG_TEMPO = 14,
     };
 }
 
@@ -272,6 +298,121 @@ inline func process_sfx_queue__inline() {
         sfxQueue = a = 0xff;
     }
 }
+
+
+// Send a `PAUSE` command to the audio driver.
+//
+// NOTE: May not send the IO command.  Check the return value.
+//
+// DB = 0x80
+#[mem8, idx8]
+func pause() : bool in carry {
+    return __send_io_command_no_parameter(IO.Command.PAUSE);
+}
+
+
+// Send an `UNPAUSE` command to the audio driver.
+//
+// NOTE: May not send the IO command.  Check the return value.
+//
+// DB = 0x80
+#[mem8, idx8]
+func unpause() : bool in carry {
+    return __send_io_command_no_parameter(IO.Command.UNPAUSE);
+}
+
+
+// Send a `STOP_SOUND_EFFECTS` command to the audio driver.
+//
+// NOTE: May not send the IO command.  Check the return value.
+//
+// DB = 0x80
+#[mem8, idx8]
+func stop_sound_effects() : bool in carry {
+    return __send_io_command_no_parameter(IO.Command.STOP_SOUND_EFFECTS);
+}
+
+
+// Send a `SET_MAIN_VOLUME` command to the audio driver.
+//
+// NOTE: May not send the IO command.  Check the return value.
+//
+// DB = 0x80
+#[mem8, idx8]
+func set_main_volume(volume: u8 in a) : bool in carry {
+    return __send_io_command_with_parameter(IO.Command.SET_MAIN_VOLUME, a);
+}
+
+
+// Send a `SET_ENABLED_CHANNELS` command to the audio driver.
+//
+// NOTE: May not send the IO command.  Check the return value.
+//
+// DB = 0x80
+#[mem8, idx8]
+func set_enabled_channels(volume: u8 in a) : bool in carry {
+    return __send_io_command_with_parameter(IO.Command.SET_ENABLED_CHANNELS, a);
+}
+
+
+// Send a `SET_SONG_TEMPO` command to the audio driver.
+//
+// NOTE: May not send the IO command.  Check the return value.
+//
+// DB = 0x80
+#[mem8, idx8]
+func set_song_tempo(volume: u8 in a) : bool in carry {
+    return __send_io_command_with_parameter(IO.Command.SET_SONG_TEMPO, a);
+}
+
+
+
+// Send an IO command (with a parameter) to the audio driver.
+//
+// NOTE: May not send the IO command. Check the return value.
+//
+// NOTE: Cannot be used to send play_sound_effect commands.  Use the sound effect queue instead.
+//
+// DB = 0x80
+#[mem8, idx8]
+func __send_io_command_with_parameter(command : IO.Command in x, parameter0: u8 in a) : bool in carry {
+var _command : IO.Command in zpTmp_byte_0;
+
+    y = a;
+
+    a = _songLoaded;
+    if !zero {
+        a = previousCommand;
+        if a == IO.ToScpu.command_ack {
+            _command = x as IO.Command;
+
+            // Wait until the previous command has been acknowledged
+            a = previousCommand;
+            do {
+            } while a != IO.ToScpu.command_ack;
+
+
+            // Extract and change the i bits (to create a new command byte)
+            a &= IO.ToDriver.COMMAND_I_MASK;
+            a ^= IO.ToDriver.COMMAND_I_MASK;
+
+            a |= _command as u8;
+
+            IO.ToDriver.parameter0 = y;
+            IO.ToDriver.command = a;
+
+            previousCommand = a;
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// Send an IO command with no parameter
+// WARNING: will send the x register value to the audio driver.
+let __send_io_command_no_parameter = __send_io_command_with_parameter as func(command : IO.Command in a): bool in carry;
 
 
 
