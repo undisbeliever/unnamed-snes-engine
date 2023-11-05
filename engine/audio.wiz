@@ -324,6 +324,12 @@ func load_blank_song() {
 func load_song(songId : u8 in a) {
 var _res : resources.ResourceEntry in resources.res;
 
+    // Fixes badly glitching audio when `songId` >= N_SONGS.
+    // (When `songId` >= N_SONGS, it erroneously loads the common-audio-data as song-data)
+    if a >= resources.N_SONGS {
+        a = 0;
+    }
+
     push8(a);
 
     a =_common_audio_data_loaded;
