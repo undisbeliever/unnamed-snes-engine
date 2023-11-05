@@ -23,10 +23,65 @@ let LOADER_ARAM_ADDR = 0x160;
 
 // MUST match `audio-driver/src/io-commands.wiz`
 namespace IO {
-    extern writeonly command_id @ &APUIO_OUT_0 : u8;
-    extern const command_id_ack @ &APUIO_IN_0 : u8;
+    namespace ToDriver {
+        // The command to execute.
+        //
+        //      iii0ccci
+        //          ccc = command
+        //            0 = reserved for future expansion
+        //            i = command id, MUST be different on every command.
+        //                Used to detect when a new command has been sent to the driver.
+        //
+        // NOTES:
+        //  * The command will only be execute if the `command` byte has changed.
+        //  * This value MUST be written last.
+        //  * The command and parameter bytes MUST NOT change unless the previous command
+        //    has been acknowledged.
+        extern writeonly command @ &APUIO_OUT_0 : u8;
 
-    extern writeonly command @ &APUIO_OUT_1 : u8;
+        let N_COMMANDS = 8;
+        let COMMAND_MASK   = 0b00001110;
+        let COMMAND_I_MASK = 0b11100001;
+
+        // The two command parameter bytes
+        extern writeonly parameter0 @ &APUIO_OUT_1 : u8;
+        extern writeonly parameter1 @ &APUIO_OUT_2 : u8;
+
+
+        // When the `SWITCH_TO_LOADER_BIT` bit of this IO Port is set, the audio
+        // driver will stop and then execute the loader.
+        extern writeonly switch_to_loader @ &APUIO_OUT_3 : u8;
+
+        let SWITCH_TO_LOADER_BIT = 5;
+        let SWITCH_TO_LOADER_MASK = 1 << (SWITCH_TO_LOADER_BIT);
+    }
+
+    namespace ToScpu {
+        // Command acknowledgment
+        //
+        // Acknowledgment of the command.
+        //
+        // After the command has been executed, the `IO.ToDriver.command` w
+        extern const command_ack @ &APUIO_IN_0 : u8;
+    }
+
+    // MUST match CommandFunctionTable in `audio-driver.wiz`.
+    enum Command : u8 {
+        // Stop song and sound effect execution.
+        // * Commands will still be executed when the audio-driver is paused
+        // * The audio driver starts paused unless the `LoaderDataType.PLAY_SONG_BIT` is set.
+        PAUSE               = 0,
+
+        // Unpauses the audio driver.
+        //
+        // * Resets the S-SMP timer counters,
+        //   can cause issues if the S-CPU spams `UNPAUSE` commands.
+        UNPAUSE             = 2,
+
+        // Play a sound effect
+        //  * parameter0: sound effect id (not bounds checked)
+        PLAY_SOUND_EFFECT   = 4,
+    };
 }
 
 // MUST match `audio-driver/src/io-commands.wiz`
@@ -35,14 +90,6 @@ enum LoaderDataType : u8 {
     COMMON_DATA      = 1,
     MONO_SONG_DATA   = 0x02,
     STEREO_SONG_DATA = 0x82,
-};
-
-
-// MUST match `audio-driver/io-commands.wiz`
-enum IoCommand : u8 {
-    // commands 0-127: Play sound effect.
-
-    EXECUTE_LOADER = 0x80 | 'L',
 };
 
 
@@ -64,8 +111,8 @@ in zeropage {
     // NOTE: If sfxQueue > MAX_N_SOUND_EFFECTS.  No sound effect will be played.
     var sfxQueue : u8;
 
-    // The `command_id` of the previous command send to the S-SMP audio driver.
-    var previousCommandId : u8;
+    // The previous `IO.ToDriver.command` sent to the S-SMP audio driver.
+    var previousCommand : u8;
 }
 
 
@@ -130,9 +177,9 @@ inline func _reset_sfx_queue__inline() {
     // Reset the SFX queue
     sfxQueue = a = 0xff;
 
-    // Start audio driver.
-    IO.command_id = 0;
-    previousCommandId = 0;
+    a = IO.Command.UNPAUSE as u8;
+    IO.ToDriver.command = a;
+    previousCommand = a;
 }
 
 
@@ -156,26 +203,36 @@ func queue_sound_effect(effect_id : sound_effects in a) {
 
 
 
-// Process sound effects
+// Process sound effects.
 //
 // MUST be called once per frame.
+//
+// ASSUMES: A song is loaded into the audio driver
 //
 // DB = 0x80
 #[mem8, idx8]
 inline func process_sfx_queue__inline() {
-    // Assumes MAX_N_SOUND_EFFECTS == 128
-    a = sfxQueue;
-    if !negative {
-        x = previousCommandId;
-        if x == IO.command_id_ack {
+    // Assumes MAX_N_SOUND_EFFECTS < 256
+    x = sfxQueue;
+    if x != 0xff {
+        a = previousCommand;
+        if a == IO.ToScpu.command_ack {
             // The previous command executed successfully.
             // Send a new command.
 
-            IO.command = a;
+            // Bit trick to change the i bits and set the play sound effect command
 
-            x++;
-            IO.command_id = x;
-            previousCommandId = x;
+            // a = previousCommand
+            // Clear the non i bits of commands
+            a &= IO.ToDriver.COMMAND_I_MASK as u8;
+            //  Change the i bits and set the play sound effect command
+            a ^= IO.ToDriver.COMMAND_I_MASK | (IO.Command.PLAY_SOUND_EFFECT as u8);
+
+            // parameter 0 = sfx_id
+            IO.ToDriver.parameter0 = x;
+
+            IO.ToDriver.command = a;
+            previousCommand = a;
 
             // Reset the SFX queue
             sfxQueue = a = 0xff;
@@ -235,17 +292,8 @@ func __send_execute_loader_command() {
    if !zero {
         idx8();
         #[idx8] {
-            x = previousCommandId;
-
-            // Wait until the previous command has been acknowledged
-            do {
-            } while x != IO.command_id_ack;
-            x++;
-
-            IO.command = a = IoCommand.EXECUTE_LOADER as u8;
-            IO.command_id = x;
-
-            previousCommandId = x;
+            a = IO.ToDriver.SWITCH_TO_LOADER_MASK;
+            IO.ToDriver.switch_to_loader = a;
         }
         idx16();
     }
@@ -386,7 +434,8 @@ func __transfer_data_to_loader(_res : resources.ResourceEntry in resources.res, 
 
 
     // End of data transfer
-    APUIO_OUT_3 = a = 0xff;
+    // MUST NOT set `IO.ToDriver.SWITCH_TO_LOADER_BIT`
+    APUIO_OUT_3 = a = 0x80;
 
     // Must wait for the end of the input as `_reset_sfx_queue__inline()` writes to IO port 0.
     do {
