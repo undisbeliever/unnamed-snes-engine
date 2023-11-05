@@ -207,36 +207,37 @@ func queue_sound_effect(effect_id : sound_effects in a) {
 //
 // MUST be called once per frame.
 //
-// ASSUMES: A song is loaded into the audio driver
-//
 // DB = 0x80
 #[mem8, idx8]
 inline func process_sfx_queue__inline() {
     // Assumes MAX_N_SOUND_EFFECTS < 256
     x = sfxQueue;
     if x != 0xff {
-        a = previousCommand;
-        if a == IO.ToScpu.command_ack {
-            // The previous command executed successfully.
-            // Send a new command.
+        a = _songLoaded;
+        if !zero {
+            a = previousCommand;
+            if a == IO.ToScpu.command_ack {
+                // The previous command executed successfully.
+                // Send a new command.
 
-            // Bit trick to change the i bits and set the play sound effect command
+                // Bit trick to change the i bits and set the play sound effect command
 
-            // a = previousCommand
-            // Clear the non i bits of commands
-            a &= IO.ToDriver.COMMAND_I_MASK as u8;
-            //  Change the i bits and set the play sound effect command
-            a ^= IO.ToDriver.COMMAND_I_MASK | (IO.Command.PLAY_SOUND_EFFECT as u8);
+                // a = previousCommand
+                // Clear the non i bits of commands
+                a &= IO.ToDriver.COMMAND_I_MASK as u8;
+                //  Change the i bits and set the play sound effect command
+                a ^= IO.ToDriver.COMMAND_I_MASK | (IO.Command.PLAY_SOUND_EFFECT as u8);
 
-            // parameter 0 = sfx_id
-            IO.ToDriver.parameter0 = x;
+                // parameter 0 = sfx_id
+                IO.ToDriver.parameter0 = x;
 
-            IO.ToDriver.command = a;
-            previousCommand = a;
-
-            // Reset the SFX queue
-            sfxQueue = a = 0xff;
+                IO.ToDriver.command = a;
+                previousCommand = a;
+            }
         }
+
+        // Reset the SFX queue
+        sfxQueue = a = 0xff;
     }
 }
 
