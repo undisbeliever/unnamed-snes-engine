@@ -25,17 +25,18 @@ in code {
 
 enum Options : u8 {
     PLAY_SFX,
+    SFX_PAN,
     PLAY_SONG,
     QUIT,
 };
-let N_OPTIONS = 3;
+let N_OPTIONS = 4;
 
 in rodata0 {
     const Text = "Sound Text\n"
                ~ "  \x03 Play SFX:     \xc2\xff\n"
-               ~ "  \x04 Play Song:    n/a\n"
-               ~ "\n"
-               ~ "  \x05 Quit\n";
+               ~ "  \x04 SFX PAN:      \xc2\xfe\n"
+               ~ "  \x05 Play Song:    n/a\n"
+               ~ "  \x06 Quit\n";
 }
 
 
@@ -79,21 +80,23 @@ func exec() {
 inline func process__inline() {
 var _menuOption : u8 in textbox.selectedMenuItem;
 var _sfxId @ &textbox.firstU16parameter : u8;
+var _sfxPan @ &textbox.secondU16parameter : u8;
 
 let JOYH_CONFIRM = joypad.JOYH.B | joypad.JOYH.Y | joypad.JOYH.START;
 
     _menuOption = 0;
     _sfxId = 0;
+    _sfxPan = y = audio.CENTER_PAN;
 
-    while true {
+    ^while true {
         // ::TODO check if common data has changed and reload it::
 
         x = _menuOption;
 
         a = joypad.pressed_h;
         if a & JOYH_CONFIRM != 0 {
-            if x == Options.PLAY_SFX as u8 {
-                audio.queue_sound_effect(_sfxId as sound_effects);
+            if x == Options.PLAY_SFX as u8 || x == Options.SFX_PAN as u8 {
+                audio.queue_panned_sound_effect(_sfxId as sound_effects, _sfxPan);
             }
             else if x == Options.PLAY_SONG as u8 {
                 // ::TODO implement::
@@ -102,40 +105,59 @@ let JOYH_CONFIRM = joypad.JOYH.B | joypad.JOYH.Y | joypad.JOYH.START;
                 break;
             }
         }
-        else {
-            if a & joypad.JOYH.DOWN != 0 {
-                x++;
-                if x >= N_OPTIONS {
-                    x = 0;
+
+        x = _menuOption;
+        if a & joypad.JOYH.DOWN != 0 {
+            x++;
+            if x >= N_OPTIONS {
+                x = 0;
+            }
+        }
+        else if a & joypad.JOYH.UP != 0 {
+            x--;
+            if negative {
+                x = N_OPTIONS - 1;
+            }
+        }
+        _menuOption = x;
+
+        if x == Options.PLAY_SFX as u8 {
+            y = _sfxId;
+
+            a = joypad.pressed_h;
+            if a & joypad.JOYH.LEFT != 0 {
+                y--;
+                if y == -1 as u8 {
+                    y = 0;
                 }
             }
-            else if a & joypad.JOYH.UP != 0 {
-                x--;
+            else if a & joypad.JOYH.RIGHT != 0 {
+                y++;
+                if y >= N_SOUND_EFFECTS {
+                    y = N_SOUND_EFFECTS;
+                }
+            }
+            _sfxId = y;
+        }
+        else if x == Options.SFX_PAN as u8 {
+            y = _sfxPan;
+
+            a = joypad.current_h;
+            if a & joypad.JOYH.LEFT != 0 {
+                y--;
+                y--;
                 if negative {
-                    x = N_OPTIONS - 1;
+                    y = 0;
                 }
             }
-            else if a & joypad.JOYH.LEFT_RIGHT != 0 {
-                if a & joypad.JOYH.RIGHT != 0 {
-                    a = 1;
-                }
-                else {
-                    a = -1 as u8;
-                }
-
-                if x == Options.PLAY_SFX as u8 {
-                    a += _sfxId;
-                    if a == -1 as u8 {
-                        a = N_SOUND_EFFECTS - 1;
-                    }
-                    if a >= N_SOUND_EFFECTS {
-                        a = 0;
-                    }
-                    _sfxId = a;
+            else if a & joypad.JOYH.RIGHT != 0 {
+                y++;
+                y++;
+                if y >= audio.MAX_PAN {
+                    y = audio.MAX_PAN;
                 }
             }
-
-            _menuOption = x;
+            _sfxPan = y;
         }
 
         idx16();

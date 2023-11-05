@@ -20,6 +20,10 @@ namespace audio {
 // MUST match LOADER_ADDR in `audio-driver/src/common_memmap.wiz`
 let LOADER_ARAM_ADDR = 0x160;
 
+// Maximum pan value (100% to the right)
+let MAX_PAN = 128;
+let CENTER_PAN = MAX_PAN / 2;
+
 
 // MUST match `audio-driver/src/io-commands.wiz`
 namespace IO {
@@ -80,6 +84,7 @@ namespace IO {
 
         // Play a sound effect
         //  * parameter0: sound effect id (not bounds checked)
+        //  * parameter1: pan (0-128) (not bounds checked)
         PLAY_SOUND_EFFECT   = 4,
     };
 }
@@ -110,6 +115,10 @@ in zeropage {
     //
     // NOTE: If sfxQueue > N_SOUND_EFFECTS.  No sound effect will be played.
     var sfxQueue : u8;
+
+    // The pan value for the next sound effect to play.
+    var sfxQueuePan : u8;
+
 
     // The previous `IO.ToDriver.command` sent to the S-SMP audio driver.
     var previousCommand : u8;
@@ -184,20 +193,36 @@ inline func _reset_sfx_queue__inline() {
 
 
 
-// Queue the next sound effect to play.
+// Queue the next sound effect to play, without panning (center pan).
 //
 // NOTE: Only 1 sound effect can be played at a time
 // NOTE: Lower sound effect IDs take priority over higher sound effect IDs.
 //
-// KEEP: X and Y
+// KEEP: Y
+//
+// DB access zero-page
+#[fallthrough, mem8, idx8]
+func queue_sound_effect(effect_id : sound_effects in a) {
+    x = CENTER_PAN;
+}
+
+
+
+// Queue the next sound effect to play, with panning.
+//
+// NOTE: Only 1 sound effect can be played at a time
+// NOTE: Lower sound effect IDs take priority over higher sound effect IDs.
+//
+// KEEP: Y
 //
 // DB access zero-page
 #[mem8, idx8]
-func queue_sound_effect(effect_id : sound_effects in a) {
+func queue_panned_sound_effect(effect_id : sound_effects in a, pan: u8 in x) {
     // MUST NOT modify zpTmp variables.
 
     if a < sfxQueue {
         sfxQueue = a;
+        sfxQueuePan = x;
     }
 }
 
@@ -230,6 +255,13 @@ inline func process_sfx_queue__inline() {
 
                 // parameter 0 = sfx_id
                 IO.ToDriver.parameter0 = x;
+
+                // parameter 1 = pan
+                y = sfxQueuePan;
+                if y >= MAX_PAN + 1 {
+                    y = CENTER_PAN;
+                }
+                IO.ToDriver.parameter1 = y;
 
                 IO.ToDriver.command = a;
                 previousCommand = a;

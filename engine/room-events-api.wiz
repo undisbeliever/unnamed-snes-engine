@@ -206,6 +206,7 @@ func unlock_door(doorLocation : u8 in y) : bool in carry {
 // Audio functions
 import "audio";
 let queue_sound_effect = audio.queue_sound_effect;
+let queue_panned_sound_effect = audio.queue_panned_sound_effect;
 
 
 // Entity-loop
