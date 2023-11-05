@@ -48,7 +48,7 @@ endif
 
 
 ENGINE_SRC_DIR := $(ENGINE_DIR)/engine
-AUDIO_SRC_DIR  := $(ENGINE_DIR)/audio-driver
+AUDIO_SRC_DIR  := $(ENGINE_DIR)/terrific-audio-driver/audio-driver/src/
 TOOLS_DIR      := $(ENGINE_DIR)/tools
 WIZ_DIR        := $(ENGINE_DIR)/wiz
 
@@ -137,8 +137,8 @@ ifneq ($(.SHELLSTATUS), 0)
 endif
 
 
-$(GEN_DIR)/enums.wiz: $(RESOURCES_DIR)/mappings.json $(TOOLS_DIR)/generate_enums_wiz.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) '$(TOOLS_DIR)/generate_enums_wiz.py' -o '$@' '$(RESOURCES_DIR)/mappings.json'
+$(GEN_DIR)/enums.wiz: $(RESOURCES_DIR)/mappings.json $(RESOURCES_DIR)/audio/project.json $(TOOLS_DIR)/generate_enums_wiz.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) '$(TOOLS_DIR)/generate_enums_wiz.py' -o '$@' '$(RESOURCES_DIR)/mappings.json' '$(RESOURCES_DIR)/audio/project.json'
 
 $(GEN_DIR)/function-tables.wiz: $(RESOURCES_DIR)/mappings.json $(RESOURCES_DIR)/entities.json $(TOOLS_DIR)/generate_function_tables_wiz.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) '$(TOOLS_DIR)/generate_function_tables_wiz.py' -o '$@' '$(RESOURCES_DIR)/mappings.json' '$(RESOURCES_DIR)/entities.json'

@@ -6,18 +6,12 @@
 
     play_note           d4 8
 
-    disable_channel
-
-
 
 === menu_select ===
     set_instrument  sawtooth
 
     play_note       c+4  16
     play_note       b-4  96
-
-    disable_channel
-
 
 
 === explosion_hurt_player ===
@@ -49,9 +43,6 @@
     play_note  f1 no_keyoff 8
     portamento c1 keyoff -8 48
 
-    disable_channel
-
-
 
 === explosion_hurt_enemy ===
     set_volume 192
@@ -70,9 +61,6 @@
 
     play_note  f1 no_keyoff 8
     portamento c1 keyoff -8 48
-
-    disable_channel
-
 
 
 === explosion ===
@@ -94,9 +82,6 @@
     play_note  f1 no_keyoff 8
     portamento c1 keyoff -8 48
 
-    disable_channel
-
-
 === player_heal ===
     ; high pitch, same waveform as player_hurt
 
@@ -107,9 +92,6 @@
     play_note e5 4
     rest 4
     play_note d6 4
-
-    disable_channel
-
 
 
 === player_hurt_low_health ===
@@ -131,9 +113,6 @@
         play_note  g5 keyoff 8
     end_loop
 
-    disable_channel
-
-
 
 === player_hurt ===
 
@@ -144,9 +123,6 @@
     play_note  f3 no_keyoff 4
     portamento c2 no_keyoff -25 8
     portamento c1 keyoff -90 8
-
-    disable_channel
-
 
 
 
@@ -160,9 +136,6 @@
     play_note  c+2 8
     play_note  e1  8
 
-    disable_channel
-
-
 
 === door_open_with_key ===
     set_volume 255
@@ -172,9 +145,6 @@
     play_note  a5 6
     rest 2
     play_note  f5 8
-
-    disable_channel
-
 
 
 === door_open ===
@@ -187,9 +157,6 @@
     portamento c3 no_keyoff +4 16
     portamento c3 keyoff +40 8
 
-    disable_channel
-
-
 
 === jump_or_bounce ===
 
@@ -201,9 +168,6 @@
     portamento c3 no_keyoff -30 8
     portamento g3 keyoff +20 20
 
-    disable_channel
-
-
 === collect_item ===
     set_volume 192
 
@@ -211,9 +175,6 @@
 
     play_note  f5 no_keyoff 12
     play_note  c+5 keyoff 24
-
-    disable_channel
-
 
 
 === pickup_bomb ===
@@ -227,9 +188,6 @@
     portamento c3 no_keyoff +2 16
     portamento g5 keyoff +60 20
 
-    disable_channel
-
-
 === throw_bomb ===
 
     set_volume 92
@@ -240,9 +198,6 @@
     play_note g+4 no_keyoff 4
     portamento c1 no_keyoff -2 20
     portamento c1 keyoff -60 20
-
-    disable_channel
-
 
 
 === statue_spawns_enemy ===
@@ -258,9 +213,6 @@
     play_note g+4 no_keyoff 6
     play_note c5 keyoff 6
 
-    disable_channel
-
-
 
 === spawn_enemy_with_smoke ===
    set_volume 64
@@ -273,9 +225,6 @@
         portamento c1 no_keyoff -15 4
         portamento c6 no_keyoff +40 4
     end_loop
-
-    disable_channel
-
 
 
 === key_spawns ===
@@ -291,9 +240,6 @@
     play_note a5  16
     play_note e6  24
 
-    disable_channel
-
-
 
 === key_hits_ground ===
 
@@ -307,9 +253,6 @@
     set_volume 48
 
     play_note b6 8
-
-    disable_channel
-
 
 === enemy_poof ===
 
@@ -332,9 +275,6 @@
         portamento c6 no_keyoff +30 2
     end_loop
 
-    disable_channel
-
-
 === enemy_hurt ===
 
     ; ::TODO improve (a lot)::
@@ -347,9 +287,6 @@
     play_note a3 no_keyoff 8
     play_note c3 keyoff 4
 
-    disable_channel
-
-
 
 === sword_swing ===
 
@@ -361,9 +298,6 @@
     portamento c6 no_keyoff +10 5
     portamento c6 no_keyoff +40 10
 
-    disable_channel
-
-
 
 === sword_hit_shield ===
 
@@ -374,9 +308,6 @@
     play_note f6 no_keyoff 2
     portamento c6 keyoff -15 12
 
-    disable_channel
-
-
 
 === sword_hit_bolt ===
 
@@ -386,9 +317,6 @@
 
     play_note c6 no_keyoff 2
     portamento c4 keyoff -50 8
-
-    disable_channel
-
 
 
 === sword_hit_rook ===
@@ -407,9 +335,6 @@
     play_note f--3  no_keyoff 2
     play_note f---3 no_keyoff 2
 
-    disable_channel
-
-
 === arrow_hit_shield ===
 
     set_volume 80
@@ -418,9 +343,6 @@
 
     play_note f6 no_keyoff 2
     portamento c6 keyoff -15 12
-
-    disable_channel
-
 
 
 === rook_hits_ground ===
@@ -454,9 +376,6 @@
     play_note  c2 no_keyoff 1
     play_note  e1 2
 
-    disable_channel
-
-
 
 === boss_shake ===
     set_volume 96
@@ -467,9 +386,6 @@
     play_note  e4 no_keyoff 4
     play_note  c5 no_keyoff 8
 
-    disable_channel
-
-
 === boss_rising ===
     set_volume 96
 
@@ -479,9 +395,6 @@
         play_note  b4 no_keyoff 3
         play_note  c5 no_keyoff 3
     end_loop
-
-    disable_channel
-
 
 
 === boss_bomb_disabled ===
@@ -499,9 +412,6 @@
 
     play_note  c4 keyoff 16
 
-    disable_channel
-
-
 
 === bounce_off_wall ===
     set_volume 80
@@ -510,9 +420,6 @@
 
     play_note  b-2 no_keyoff 2
     play_note  e3 4
-
-    disable_channel
-
 
 
 === bolt_hits_wall ===
@@ -523,9 +430,6 @@
     play_note  c3 no_keyoff 8
     play_note  e2 4
 
-    disable_channel
-
-
 
 === crossbow_fires_bolt ===
 
@@ -535,7 +439,4 @@
 
     play_note  e-5 no_keyoff 1
     portamento g6 keyoff +90 15
-
-    disable_channel
-
 

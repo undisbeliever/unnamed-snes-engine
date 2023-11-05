@@ -454,7 +454,7 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
                 self.signals.set_fs_watcher_status("Running")
                 self.signals.sfc_file_changed()
 
-            if r == SharedInputType.AUDIO_SAMPLES:
+            if r == SharedInputType.AUDIO_PROJECT:
                 self.signals.send_command(COMMON_AUDIO_DATA_CHANGED_COMMAND)
 
             if self.rebuild_required:

@@ -17,11 +17,11 @@ namespace audio {
 
 // Address to store the loader (in Audio-RAM).
 // Address (in Audio-RAM) to execute after loading the Loader.
-// MUST match LOADER_ADDR in `audio/src/common_memmap.wiz`
+// MUST match LOADER_ADDR in `audio-driver/src/common_memmap.wiz`
 let LOADER_ARAM_ADDR = 0x160;
 
 
-// MUST match `audio-driver/io-commands.wiz`
+// MUST match `audio-driver/src/io-commands.wiz`
 namespace IO {
     extern writeonly command_id @ &APUIO_OUT_0 : u8;
     extern const command_id_ack @ &APUIO_IN_0 : u8;
@@ -29,13 +29,12 @@ namespace IO {
     extern writeonly command @ &APUIO_OUT_1 : u8;
 }
 
-// MUST match `audio-driver/loader.wiz`
+// MUST match `audio-driver/src/io-commands.wiz`
 enum LoaderDataType : u8 {
-    // These values cannot be 0 or negative.
-    CODE             = 'C',
-    COMMON_DATA      = 'D',
-    MONO_SONG_DATA   = 'M',
-    STEREO_SONG_DATA = 'S',
+    CODE             = 0,
+    COMMON_DATA      = 1,
+    MONO_SONG_DATA   = 0x02,
+    STEREO_SONG_DATA = 0x82,
 };
 
 
