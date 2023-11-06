@@ -52,21 +52,46 @@ namespace IO {
         extern writeonly parameter1 @ &APUIO_OUT_2 : u8;
 
 
-        // When the `SWITCH_TO_LOADER_BIT` bit of this IO Port is set, the audio
-        // driver will stop and then execute the loader.
+        // Writing `SWITCH_TO_LOADER` to this port should stop execution and start the loader.
+        //
+        // If the audio-driver is running; if the `_SWITCH_TO_LOADER_BIT` is set,
+        // the audio driver will stop and execute the loader.
+        //
+        // If the loader is in the middle of a transfer and both the `_SWITCH_TO_LOADER_BIT`
+        // and MSB (bit 7) bits are set, the loader will restart.
         extern writeonly switch_to_loader @ &APUIO_OUT_3 : u8;
 
-        let SWITCH_TO_LOADER_BIT = 5;
-        let SWITCH_TO_LOADER_MASK = 1 << (SWITCH_TO_LOADER_BIT);
+        let _SWITCH_TO_LOADER_BIT = 5;
+        let SWITCH_TO_LOADER = 0x80 | (1 << _SWITCH_TO_LOADER_BIT);
     }
 
     namespace ToScpu {
-        // Command acknowledgment
+        // Audio driver command acknowledgment.
         //
-        // Acknowledgment of the command.
+        // Acknowledgment of the `ToDriver.command` byte.  Not used in the loader.
         //
-        // After the command has been executed, the `IO.ToDriver.command` w
+        // After the command has been processed, the `IO.ToDriver.command` value will be written to this port.
         extern const command_ack @ &APUIO_IN_0 : u8;
+
+
+        // The mode the S-SMP is currently executing.
+        //
+        // Used by both the loader and the audio-driver.
+        //
+        // NOTE: The IPL sets this value after at has cleared the zero-page.
+        //       Do not read this value immediately after reset.
+        //       Make sure enough time has passed for the IPL to set IO Port 1
+        //       to 0xbb before reading this port.
+        extern const mode @ &APUIO_IN_1 : u8;
+
+        // The S-SMP is at the start of the IPL, waiting for the ready signal.
+        let MODE_IPL = 0xbb;
+
+        // The S-SMP is running the loader.
+        let MODE_LOADER = 0x4c;         // 'L', Loader.LOADER_READY_L
+
+        // The S-SMP is running the audio-driver.
+        let MODE_AUDIO_DRIVER = 0x61 ;  // 'a'
     }
 
     // MUST match CommandFunctionTable in `audio-driver.wiz`.
@@ -447,7 +472,7 @@ func _load_common_data_if_required__inline() {
 func _transfer_common_audio_data() {
 var _res : resources.ResourceEntry in resources.res;
 
-    __send_execute_loader_command();
+    __send_switch_to_loader_command();
 
     _res = resources.load_songs_resource(resources.songs.__null__common_data__);
     __transfer_data_to_loader(_res, LoaderDataType.COMMON_DATA);
@@ -457,20 +482,12 @@ var _res : resources.ResourceEntry in resources.res;
 
 
 
-// Send am EXECUTE_LOADER command to the audio-driver if the song is playing
+// Send a *switch-to-loader* command to the audio-driver or loader
 //
 // DB = 0x80
 #[mem8, idx16]
-func __send_execute_loader_command() {
-   a = _songLoaded;
-   if !zero {
-        idx8();
-        #[idx8] {
-            a = IO.ToDriver.SWITCH_TO_LOADER_MASK;
-            IO.ToDriver.switch_to_loader = a;
-        }
-        idx16();
-    }
+func __send_switch_to_loader_command() {
+    IO.ToDriver.switch_to_loader = a = IO.ToDriver.SWITCH_TO_LOADER;
 
     // Audio Driver is no longer active.
     _songLoaded = 0;
@@ -537,7 +554,7 @@ var _res : resources.ResourceEntry in resources.res;
 func _transfer_song_data(_res : resources.ResourceEntry in resources.res) {
     // ::TODO silence or fadeout the current song before loading the next one::
 
-    __send_execute_loader_command();
+    __send_switch_to_loader_command();
 
     a = monoFlag;
     if !zero {
@@ -565,14 +582,14 @@ func _transfer_song_data(_res : resources.ResourceEntry in resources.res) {
 func __transfer_data_to_loader(_res : resources.ResourceEntry in resources.res, type : LoaderDataType in a) {
 
     // Wait until loader is ready
-    xx = ('R' as u16) | ('D' as u16 << 8);
+    xx = ('L' as u16) | ('D' as u16 << 8);
     do {
     } while xx != APUIO_IN_32;
 
 
     // Send the ready signal and the LoaderDataType.
-    APUIO_OUT_0 = a;
-    APUIO_OUT_2 = a = 'R';
+    APUIO_OUT_1 = a;
+    APUIO_OUT_2 = a = 'L';
     APUIO_OUT_3 = a = 'D';
 
 
@@ -589,14 +606,14 @@ func __transfer_data_to_loader(_res : resources.ResourceEntry in resources.res, 
 
     // Wait for acknowledgement from the LoaderDataType
     do {
-        a = APUIO_IN_2;
+        a = APUIO_IN_3;
     } while !zero;
 
     yy = 0;
     do {
-        APUIO_OUT_0 = a = _res.farPtr[yy];
-        yy++;
         APUIO_OUT_1 = a = _res.farPtr[yy];
+        yy++;
+        APUIO_OUT_2 = a = _res.farPtr[yy];
 
         // Tell S-SMP the data is ready
         // `APUIO_OUT_3` cannot be negative.  A negative value on port-3 means end-of-data.
