@@ -706,7 +706,7 @@ class AudioProject(NamedTuple):
     sound_effect_file: Filename
 
 
-def load_audio_project_json(filename: Filename) -> AudioProject:
+def load_audio_project(filename: Filename) -> AudioProject:
     jh = _load_json_file(filename, _Helper)
 
     dirname = os.path.dirname(filename)

@@ -11,7 +11,7 @@ from typing import TextIO, Sequence
 from unnamed_snes_game.json_formats import (
     RoomName,
     load_mappings_json,
-    load_audio_project_json,
+    load_audio_project,
     Name,
     Mappings,
     AudioProject,
@@ -100,7 +100,7 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("-o", "--output", required=True, help="wiz output file")
     parser.add_argument("mappings_json_file", action="store", help="mappings json file input")
-    parser.add_argument("audio_project_json_file", action="store", help="audio project json file")
+    parser.add_argument("audio_project_file", action="store", help="terrific audio project file")
 
     args = parser.parse_args()
 
@@ -111,7 +111,7 @@ def main() -> None:
     args = parse_arguments()
 
     mappings = load_mappings_json(args.mappings_json_file)
-    audio_project = load_audio_project_json(args.audio_project_json_file)
+    audio_project = load_audio_project(args.audio_project_file)
 
     out = generate_wiz_code(mappings, audio_project)
 

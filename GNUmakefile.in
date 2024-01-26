@@ -137,8 +137,8 @@ ifneq ($(.SHELLSTATUS), 0)
 endif
 
 
-$(GEN_DIR)/enums.wiz: $(RESOURCES_DIR)/mappings.json $(RESOURCES_DIR)/audio/project.json $(TOOLS_DIR)/generate_enums_wiz.py $(COMMON_PYTHON_SCRIPTS)
-	$(PYTHON3) '$(TOOLS_DIR)/generate_enums_wiz.py' -o '$@' '$(RESOURCES_DIR)/mappings.json' '$(RESOURCES_DIR)/audio/project.json'
+$(GEN_DIR)/enums.wiz: $(RESOURCES_DIR)/mappings.json $(RESOURCES_DIR)/audio/project.terrificaudio $(TOOLS_DIR)/generate_enums_wiz.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) '$(TOOLS_DIR)/generate_enums_wiz.py' -o '$@' '$(RESOURCES_DIR)/mappings.json' '$(RESOURCES_DIR)/audio/project.terrificaudio'
 
 $(GEN_DIR)/function-tables.wiz: $(RESOURCES_DIR)/mappings.json $(RESOURCES_DIR)/entities.json $(TOOLS_DIR)/generate_function_tables_wiz.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) '$(TOOLS_DIR)/generate_function_tables_wiz.py' -o '$@' '$(RESOURCES_DIR)/mappings.json' '$(RESOURCES_DIR)/entities.json'

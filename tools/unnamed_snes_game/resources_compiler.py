@@ -24,7 +24,7 @@ from .other_resources import convert_tiles, convert_bg_image
 from .audio import AudioCompiler, COMMON_AUDIO_DATA_RESOURCE_NAME
 
 from .json_formats import load_mappings_json, load_entities_json, load_ms_export_order_json, load_other_resources_json
-from .json_formats import load_metasprites_json, load_audio_project_json
+from .json_formats import load_metasprites_json, load_audio_project
 from .json_formats import Name, ScopedName, Filename, JsonError, MemoryMap, Mappings, EntitiesJson
 from .json_formats import MsExportOrder, OtherResources, TilesInput, BackgroundImageInput, AudioProject
 
@@ -331,7 +331,7 @@ class SharedInput:
             case SharedInputType.MS_EXPORT_ORDER:
                 _load("ms_export_order", MS_EXPORT_ORDER_FILENAME, load_ms_export_order_json)
             case SharedInputType.AUDIO_PROJECT:
-                _load("audio_project", AUDIO_PROJECT_FILENAME, load_audio_project_json)
+                _load("audio_project", AUDIO_PROJECT_FILENAME, load_audio_project)
             case SharedInputType.SYMBOLS:
                 _load("symbols", self.symbols_filename, read_symbols_file)
             case other:
@@ -342,7 +342,7 @@ MAPPINGS_FILENAME: Final = "mappings.json"
 ENTITIES_FILENAME: Final = "entities.json"
 OTHER_RESOURCES_FILENAME: Final = "other-resources.json"
 MS_EXPORT_ORDER_FILENAME: Final = "ms-export-order.json"
-AUDIO_PROJECT_FILENAME: Final = "audio/project.json"
+AUDIO_PROJECT_FILENAME: Final = "audio/project.terrificaudio"
 
 
 SHARED_INPUT_FILENAME_MAP: Final = {
