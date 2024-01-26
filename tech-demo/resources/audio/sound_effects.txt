@@ -292,12 +292,11 @@
 
     set_volume 64
 
-    set_instrument_and_adsr noise       6 1 6 28
+    set_instrument_and_adsr noise       8 5 4 24
 
-    play_note f+3 no_keyoff 2
-    portamento c6 no_keyoff +10 5
-    portamento c6 no_keyoff +40 10
-
+    play_note f+3 no_keyoff      2
+    portamento c6 no_keyoff +10  5
+    portamento c6 keyoff    +40 10
 
 === sword_hit_shield ===
 
