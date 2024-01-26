@@ -321,7 +321,7 @@
 
 === sword_hit_rook ===
 
-    ; Sounds like a "invalid" combined with a high pitch ting.
+    ; Sounds like an invalid-command sfx combined with a high pitch ting.
     ; Not the sound I wanted, but it conveys the "You cannot do this" feeling I am after.
 
     set_volume 80
