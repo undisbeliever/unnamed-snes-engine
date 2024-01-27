@@ -162,12 +162,11 @@ MAX_COMMAND_SIZE: Final = 8192
 MAX_COMMAND_DATA_SIZE: Final = MAX_COMMAND_SIZE - 4
 
 
-# Order MUST MATCH Rou2sCommands in `src/rou2s-commands.wiz`
+# Order MUST MATCH Rou2sCommands in `engine/resources/rou2s-commands.wiz`
 @unique
 class Rou2sCommands(Enum):
     # Skipping `null`.  `auto()` starts at 1
     COMMON_AUDIO_DATA_CHANGED = auto()
-    UPLOAD_SONG = auto()
 
 
 class Command(NamedTuple):
