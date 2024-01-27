@@ -33,7 +33,7 @@ let N_OPTIONS = 4;
 
 in rodata0 {
     const Text = "Sound Text\n"
-               ~ "  \x03 Play SFX:     \xc2\xff\n"
+               ~ "  \x03 Play SFX:     \xc2\xfd\n"
                ~ "  \x04 SFX PAN:      \xc2\xfe\n"
                ~ "  \x05 Play Song:    n/a\n"
                ~ "  \x06 Quit\n";
