@@ -28,7 +28,8 @@
  ],
 
  "songs": [
-   "__null__common_data__"
+   "__null__common_data__",
+   "timing_test"
  ],
 
  "interactive_tile_functions": [

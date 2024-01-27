@@ -1,7 +1,7 @@
 {
   "_about": {
     "file_type": "Terrific Audio Driver project file",
-    "version": "0.0.0"
+    "version": "0.0.6"
   },
   "instruments": [
     {
@@ -11,7 +11,7 @@
       "loop": "none",
       "first_octave": 1,
       "last_octave": 6,
-      "envelope": "gain 127",
+      "envelope": "gain F127",
       "comment": "This sample creates noise by BRR overflow"
     },
     {
@@ -59,6 +59,7 @@
       "comment": null
     }
   ],
+  "samples": [],
   "sound_effects": [
     "menu_cursor",
     "menu_select",
@@ -94,5 +95,10 @@
     "crossbow_fires_bolt"
   ],
   "sound_effect_file": "sound_effects.txt",
-  "songs": []
+  "songs": [
+    {
+      "name": "timing_test",
+      "source": "songs/timing_test.mml"
+    }
+  ]
 }
