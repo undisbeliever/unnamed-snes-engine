@@ -83,34 +83,37 @@ var _sfxId @ &textbox.firstU16parameter : u8;
 var _sfxPan @ &textbox.secondU16parameter : u8;
 var _songId @ &textbox.thirdU16parameter : u8;
 
-let JOYH_CONFIRM = joypad.JOYH.B | joypad.JOYH.Y | joypad.JOYH.START;
+let JOYH_CONFIRM = joypad.JOYH.B | joypad.JOYH.Y;
 
     _menuOption = 0;
     _sfxId = 0;
     _sfxPan = y = audio.CENTER_PAN;
 
     ^while true {
+        wait_frame();
+
         // ::TODO check if common data has changed and reload it::
 
         x = _menuOption;
         a = joypad.pressed_h;
+        if a & joypad.JOYH.START != 0 {
+            carry = audio.is_song_playing();
+            if carry {
+                audio.queue_command_no_parameter(audio.Command.PAUSE);
+                continue;
+            }
+            else {
+                audio.queue_command_no_parameter(audio.Command.UNPAUSE);
+                continue;
+            }
+        }
+
         if a & JOYH_CONFIRM != 0 {
             if x == Options.PLAY_SFX as u8 || x == Options.SFX_PAN as u8 {
                 audio.queue_panned_sound_effect(_sfxId as sound_effects, _sfxPan);
             }
             else if x == Options.PLAY_SONG as u8 {
-                a = _songId;
-
-                push16(0x7e80);
-                data_bank = pop8();
-            // DB = 0x80
-                idx16();
-                #[idx16] {
-                    audio.load_song(a);
-                }
-                idx8();
-                data_bank = pop8();
-            // DB = 0x7e
+                audio.load_song(_songId as resources.songs);
             }
             else {
                 ^break;
@@ -195,8 +198,6 @@ let JOYH_CONFIRM = joypad.JOYH.B | joypad.JOYH.Y | joypad.JOYH.START;
             textbox.print_textbox(#:far &Text, &Text as u16);
         }
         mem8_idx8();
-
-        wait_frame();
     }
 }
 

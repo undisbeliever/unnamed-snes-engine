@@ -7,6 +7,7 @@ import "../registers";
 import "rou2s-commands";
 
 import "resources";
+import "../audio";
 import "../game/room";
 import "../common/reset";
 
@@ -158,6 +159,29 @@ func __send_request(type : u8 in x, resourceId : u8 in y) : u8 in a{
         extern var __request_type @ &request.request_type : u8;
         extern var __resource_id  @ &request.resource_id  : u8;
     }
+
+    push8(data_bank);
+
+    push8(program_bank);
+    data_bank = pop8();
+// DB access registers
+
+    // Flush any pending audio transfers
+    // ::TODO create a separate buffer for audio data::
+    push8(x);
+    push8(y);
+
+    idx16();
+    #[idx16] {
+        audio.finish_loading_data();
+    }
+    mem8_idx8();
+
+    y = pop8();
+    x = pop8();
+
+    data_bank = pop8();
+// DB = unknown
 
     // This function MUST ONLY use long addressing
 

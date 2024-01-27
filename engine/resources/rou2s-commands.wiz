@@ -131,9 +131,7 @@ func null() {
 //
 // DB = 0x7e
 #[mem8, idx16]
-func common_audio_data_changed() {
-    audio.mark_common_audio_data_changed();
-}
+let common_audio_data_changed = audio.reload_common_audio_data;
 
 }
 }

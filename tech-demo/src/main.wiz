@@ -54,6 +54,7 @@ inline func main__inline() {
     idx16();
 
     audio.setup__inline();
+    audio.set_stereo();
 
     metasprites.setup__forceblank();
 
