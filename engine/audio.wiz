@@ -26,11 +26,11 @@ let MAX_PAN = 128;
 let CENTER_PAN = MAX_PAN / 2;
 
 
-// MUST BE > 2
+// MUST BE > 0
 let MIN_TRANSFER_PER_FRAME = 32;
 // The loader can transfer ~850 bytes per 60Hz frame SlowROM or FastROM
 let MAX_TRANSFER_PER_FRAME = 800;
-// MUST BE > 2
+// MUST BE > 0
 let DEFAULT_TRANSFER_PER_FRAME = 256;
 
 let N_SONGS = resources.N_SONGS;
@@ -211,9 +211,9 @@ in lowram {
     var _flags : u8;
 
 
-    // Maximum number of bytes to transfer on per `Process` call
+    // Number of bytes to transfer on per `Process` call
     //
-    // MUST be > 2
+    // MUST be > 0
     var _bytesToTransferPerFrame : u16;
 }
 
@@ -228,6 +228,9 @@ in lowram {
 
     // The remaining number of bytes to transfer
     var _dataToTransfer_size : u16;
+
+    // The previous value written to the loader spinLock.
+    var _dataToTransfer_prevSpinLock : u8;
 }
 
 
@@ -911,6 +914,9 @@ func check_ready_and_send_loader_data_type(loader_data_type : u8 in a) : bool in
         APUIO_OUT_2 = a = 'L';
         APUIO_OUT_3 = a = 'D';
 
+        // The S-CPU must wait for the loader to write 0 to the spinlock before transferring data.
+        _dataToTransfer_prevSpinLock = 0;
+
         return true;
     }
     return false;
@@ -950,10 +956,12 @@ func transfer_data() : bool in carry {
     extern const _DP_APUIO_IN_3 @ &APUIO_IN_3 as u8 : u8;
 
     // Early exit if the Loader is not ready.
-    // This also prevents a freeze if the loader has crashed/glitched.
-    // This also doubles as a lock for the final transfer of the previous transfer.
-    a = APUIO_IN_3;
-    if !zero {
+    // This test doubles as a lock for the previous transfer.
+    //
+    // This also prevents a freeze in `process()` if the loader has crashed/glitched.
+    // (`finish_loading_data()` will freeze if the loader has crashed/glitched.
+    a = _dataToTransfer_prevSpinLock;
+    if a != APUIO_IN_3 {
         return false;
     }
 
@@ -971,14 +979,11 @@ func transfer_data() : bool in carry {
         aa++;   // required
         aa >>>= 1;
 
+        // Prevent corrupting all of audio-RAM if n_loops == 0
         if zero {
             aa++;
         }
         xx = aa;
-
-        // If `xx` is 1 then this MUST be the last transfer (ie, `_dataToTransfer_size` MUST BE `<= 2`).
-        //
-        // If `_bytesToTransferPerFrame < 3`, the spinLock will not increment and the data will never be loaded into Audio-RAM.
     }
     mem8();
 
@@ -996,34 +1001,32 @@ func transfer_data() : bool in carry {
         yy++;
         _DP_APUIO_OUT_2 = a = (0 as *u8)[yy];
 
-        xx--;
-        break if zero;
-
         // Increment the spinLock value.
         //
-        // The upper 4 bits of the spinlock should be clear.
-        // Cannot be 0.
-        //   Zero is used for the final word transfer (after this while loop).
-        //   Zero is used by the Loader-Ready test at the start of this function.
+        // The upper 4 bits of the spinlock must be clear.
+        // Cannot be 0.  Zero is used to spinlock the loader init before this loop starts
+        //               (see Loader Step 3 in `terrific-audio-driver/audio-driver/src/io-commands.wiz`)
+        //
+        // yy = address of the data, it should always increment by 2.
         a = y & 7;
         a++;
         _DP_APUIO_OUT_3 = a;
 
         yy++;
 
+        xx--;
+        break if zero;
+
         // Spinloop until the S-SMP has acknowledged the transfer
         do {
         } while a != _DP_APUIO_IN_3;
     }
-    yy++;
-
-    // Tell the S-SMP the data is ready
-    // The loop does not set `_DP_APUIO_OUT_3` on the last word.
-    // Using 0 here so the Loader-Ready test can be used as a lock on the next transfer.
-    _DP_APUIO_OUT_3 = 0;
 
     data_bank = pop8();
 // DB access registers
+
+    // yy = end of data
+    _dataToTransfer_prevSpinLock = a;
 
     mem16();
     #[mem16] {
@@ -1052,9 +1055,9 @@ func transfer_data() : bool in carry {
         // End of data transfer
 
         // Wait for Loader to acknowledge the last write
+        a = _dataToTransfer_prevSpinLock;
         do {
-            a = APUIO_IN_3;
-        } while !zero;
+        } while a != APUIO_IN_3;
 
         // 0x80 = no more data to transfer
         // MUST NOT set `IO.ToDriver.SWITCH_TO_LOADER_BIT`
