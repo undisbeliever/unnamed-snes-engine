@@ -28,7 +28,7 @@ let CENTER_PAN = MAX_PAN / 2;
 
 // MUST BE > 2
 let MIN_TRANSFER_PER_FRAME = 32;
-// The loader can transfer ~830 bytes per 60Hz frame SlowROM and ~850 bytes per 60Hz frame FastROM
+// The loader can transfer ~850 bytes per 60Hz frame SlowROM or FastROM
 let MAX_TRANSFER_PER_FRAME = 800;
 // MUST BE > 2
 let DEFAULT_TRANSFER_PER_FRAME = 256;
@@ -222,17 +222,12 @@ in lowram {
 // Queue 1 - remaining data to transfer into Audio-RAM
 //
 // Used by the `LOADING_*` states.
-in zeropage {
+in lowram {
     // A pointer to the remaining data to transfer
     var _dataToTransfer_ptr : far *u8;
-}
 
-in lowram {
     // The remaining number of bytes to transfer
     var _dataToTransfer_size : u16;
-
-    // The previous value written to the loader spinLock.
-    var _dataToTransfer_prevSpinLock : u8;
 }
 
 
@@ -928,7 +923,7 @@ func check_ready_and_send_loader_data_type(loader_data_type : u8 in a) : bool in
 // DB access registers
 #[mem8, idx16]
 func set_data_to_transfer(bank_: u8 in a, addr: u16 in xx, size: u16 in yy) {
-    #:_dataToTransfer_ptr = a;
+    *(&#:_dataToTransfer_ptr as *u8) = a;
     *(&_dataToTransfer_ptr as *u16) = xx;
     _dataToTransfer_size = yy;
 }
@@ -946,6 +941,14 @@ func set_data_to_transfer(bank_: u8 in a, addr: u16 in xx, size: u16 in yy) {
 // DB access registers
 #[mem8, idx16]
 func transfer_data() : bool in carry {
+    // APUIO register aliases for zeropage access
+    //
+    // Accessible when D = 0x2100
+    extern writeonly _DP_APUIO_OUT_1 @ &APUIO_OUT_1 as u8 : u8;
+    extern writeonly _DP_APUIO_OUT_2 @ &APUIO_OUT_2 as u8 : u8;
+    extern writeonly _DP_APUIO_OUT_3 @ &APUIO_OUT_3 as u8 : u8;
+    extern const _DP_APUIO_IN_3 @ &APUIO_IN_3 as u8 : u8;
+
     // Early exit if the Loader is not ready.
     // This also prevents a freeze if the loader has crashed/glitched.
     // This also doubles as a lock for the final transfer of the previous transfer.
@@ -954,8 +957,13 @@ func transfer_data() : bool in carry {
         return false;
     }
 
+    push8(data_bank);
+
     mem16();
     #[mem16] {
+        direct_page = aa = 0x2100;
+    // DP = 0x2100
+
         aa = _dataToTransfer_size;
         if aa >= _bytesToTransferPerFrame {
             aa = _bytesToTransferPerFrame;
@@ -974,57 +982,58 @@ func transfer_data() : bool in carry {
     }
     mem8();
 
-    // Set the next `APUIO_OUT_3` spinLock value.
-    a = 1;
-    swap_bytes(aa);
+    a = *(&#:_dataToTransfer_ptr as *u8);
+    yy = *(&_dataToTransfer_ptr as *u16);
 
-    // high byte of C (B) = next spinLock value to write to `APUIO_OUT_3`.
+    push8(a);
+    data_bank = pop8();
+// DB = dataToTransfer bank
+
     // xx = number of words to write
-    yy = 0;
+    // yy = data address (using yy to force addr,y addressing mode)
     while true {
-        APUIO_OUT_1 = a = _dataToTransfer_ptr[yy];
+        _DP_APUIO_OUT_1 = a = (0 as *u8)[yy];
         yy++;
-        APUIO_OUT_2 = a = _dataToTransfer_ptr[yy];
+        _DP_APUIO_OUT_2 = a = (0 as *u8)[yy];
 
         xx--;
         break if zero;
 
-        // Tell S-SMP the data is ready by sending a new value to `APUIO_OUT_3`.
-        swap_bytes(aa);
-        APUIO_OUT_3 = a;
-
-        // Increment the next spinLock value.
-        // While the S-CPU is waiting for the S-SMP to acknowledge the `APUIO_OUT_3`.
+        // Increment the spinLock value.
         //
         // The upper 4 bits of the spinlock should be clear.
         // Cannot be 0.
         //   Zero is used for the final word transfer (after this while loop).
         //   Zero is used by the Loader-Ready test at the start of this function.
-        swap_bytes(aa);
         a = y & 7;
         a++;
-        swap_bytes(aa);
+        _DP_APUIO_OUT_3 = a;
 
         yy++;
 
         // Spinloop until the S-SMP has acknowledged the transfer
         do {
-        } while a != APUIO_IN_3;
+        } while a != _DP_APUIO_IN_3;
     }
     yy++;
 
     // Tell the S-SMP the data is ready
-    // The loop does not set `APUIO_OUT_3` on the last word.
+    // The loop does not set `_DP_APUIO_OUT_3` on the last word.
     // Using 0 here so the Loader-Ready test can be used as a lock on the next transfer.
-    APUIO_OUT_3 = 0;
+    _DP_APUIO_OUT_3 = 0;
+
+    data_bank = pop8();
+// DB access registers
 
     mem16();
     #[mem16] {
-        // yy = number of bytes transferred
-        *(&_dataToTransfer_ptr as *u16) = aa = yy + *(&_dataToTransfer_ptr as *u16);
+        direct_page = aa = 0;
+    // DP = 0
 
-        // Reverse subtract `yy` with `_dataToTransfer_size`.
-        aa = yy;
+        // Calculate bytes written
+        aa = yy - *(&_dataToTransfer_ptr as *u16);
+
+        // Reverse subtract `aa` with `_dataToTransfer_size`.
         aa ^= 0xffff;
         carry = true;
         aa +#= _dataToTransfer_size;
@@ -1032,6 +1041,10 @@ func transfer_data() : bool in carry {
             aa = 0;
         }
         _dataToTransfer_size = aa;
+
+        // MUST NOT change zero flag
+
+        *(&_dataToTransfer_ptr as *u16) = yy;
     }
     mem8();
 
