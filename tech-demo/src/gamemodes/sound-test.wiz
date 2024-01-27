@@ -35,7 +35,7 @@ in rodata0 {
     const Text = "Sound Text\n"
                ~ "  \x03 Play SFX:     \xc2\xfd\n"
                ~ "  \x04 SFX PAN:      \xc2\xfe\n"
-               ~ "  \x05 Play Song:    n/a\n"
+               ~ "  \x05 Play Song:    \xc2\xff\n"
                ~ "  \x06 Quit\n";
 }
 
@@ -81,6 +81,7 @@ inline func process__inline() {
 var _menuOption : u8 in textbox.selectedMenuItem;
 var _sfxId @ &textbox.firstU16parameter : u8;
 var _sfxPan @ &textbox.secondU16parameter : u8;
+var _songId @ &textbox.thirdU16parameter : u8;
 
 let JOYH_CONFIRM = joypad.JOYH.B | joypad.JOYH.Y | joypad.JOYH.START;
 
@@ -98,10 +99,21 @@ let JOYH_CONFIRM = joypad.JOYH.B | joypad.JOYH.Y | joypad.JOYH.START;
                 audio.queue_panned_sound_effect(_sfxId as sound_effects, _sfxPan);
             }
             else if x == Options.PLAY_SONG as u8 {
-                // ::TODO implement::
+                a = _songId;
+
+                push16(0x7e80);
+                data_bank = pop8();
+            // DB = 0x80
+                idx16();
+                #[idx16] {
+                    audio.load_song(a);
+                }
+                idx8();
+                data_bank = pop8();
+            // DB = 0x7e
             }
             else {
-                break;
+                ^break;
             }
         }
 
@@ -158,6 +170,24 @@ let JOYH_CONFIRM = joypad.JOYH.B | joypad.JOYH.Y | joypad.JOYH.START;
                 }
             }
             _sfxPan = y;
+        }
+        else if x == Options.PLAY_SONG as u8 {
+            y = _songId;
+
+            a = joypad.pressed_h;
+            if a & joypad.JOYH.LEFT != 0 {
+                y--;
+                if negative {
+                    y = 0;
+                }
+            }
+            else if a & joypad.JOYH.RIGHT != 0 {
+                y++;
+                if y >= resources.N_SONGS {
+                    y = resources.N_SONGS - 1;
+                }
+            }
+            _songId = y;
         }
 
         idx16();
