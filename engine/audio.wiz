@@ -1003,6 +1003,7 @@ func transfer_data() : bool in carry {
 
         _DP_APUIO_OUT_1 = a = (0 as *u8)[yy];
         yy++;
+        // The bank overflow test must be done here as `_dataToTransfer_ptr` might point to an odd memory address.
         goto BankOverflow_1 if zero;
     BankOverflow_1_Resume:
 
@@ -1020,6 +1021,7 @@ func transfer_data() : bool in carry {
         _DP_APUIO_OUT_3 = a;
 
         yy++;
+        // The bank overflow test must be done here as `_dataToTransfer_ptr` might point to an odd memory address.
         goto BankOverflow_2 if zero;
     BankOverflow_2_Resume:
 
