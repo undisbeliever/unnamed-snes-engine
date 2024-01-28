@@ -28,7 +28,7 @@ let CENTER_PAN = MAX_PAN / 2;
 
 // MUST BE > 0
 let MIN_TRANSFER_PER_FRAME = 32;
-// The loader can transfer ~850 bytes per 60Hz frame SlowROM or FastROM
+// The loader can transfer ~849 bytes per 60Hz frame SlowROM or FastROM
 let MAX_TRANSFER_PER_FRAME = 800;
 // MUST BE > 0
 let DEFAULT_TRANSFER_PER_FRAME = 256;
@@ -994,11 +994,18 @@ func transfer_data() : bool in carry {
     data_bank = pop8();
 // DB = dataToTransfer bank
 
-    // xx = number of words to write
-    // yy = data address (using yy to force addr,y addressing mode)
-    while true {
+    // SPAGHETTI CODE
+    // manually creating the loop with labels to optimise the bank-overflow test
+    {
+    Loop:
+        // xx = number of words to write
+        // yy = data address (using yy to force addr,y addressing mode)
+
         _DP_APUIO_OUT_1 = a = (0 as *u8)[yy];
         yy++;
+        goto BankOverflow_1 if zero;
+    BankOverflow_1_Resume:
+
         _DP_APUIO_OUT_2 = a = (0 as *u8)[yy];
 
         // Increment the spinLock value.
@@ -1013,14 +1020,32 @@ func transfer_data() : bool in carry {
         _DP_APUIO_OUT_3 = a;
 
         yy++;
+        goto BankOverflow_2 if zero;
+    BankOverflow_2_Resume:
 
         xx--;
-        break if zero;
+        goto EndLoop if zero;
 
         // Spinloop until the S-SMP has acknowledged the transfer
         do {
         } while a != _DP_APUIO_IN_3;
+
+        goto Loop;
+
+
+    // The first byte overflowed into the next bank.
+    BankOverflow_1:
+        // Not implementing bank wrapping.
+        // Resources subsystem ensures no data crosses a bank boundary.
+        irqcall(1); // Break
+        goto BankOverflow_1_Resume;
+
+    // The second byte overflowed into the next bank.
+    BankOverflow_2:
+        irqcall(2); // Break
+        goto BankOverflow_2_Resume;
     }
+EndLoop:
 
     data_bank = pop8();
 // DB access registers
