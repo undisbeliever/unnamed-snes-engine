@@ -175,15 +175,23 @@ namespace Flags {
 
 enum State : u8 {
     NULL                                =    0,
-    WAITING_FOR_LOADER                  = 0x7d,
-    LOADING_COMMON_AUDIO_DATA           = 0x7e,
-    LOADING_SONG_DATA                   = 0x7f,
+    // Waiting for loader to send the ready signal.
+    WAITING_FOR_LOADER                  = 0x7c,
+    // Loading common audio data.
+    LOADING_COMMON_AUDIO_DATA           = 0x7d,
+    // Loading a song and the LoaderDataType.PLAY_SONG_FLAG was clear.
+    LOADING_SONG_DATA_PAUSED            = 0x7e,
+    // Loading a song and the LoaderDataType.PLAY_SONG_FLAG was set.
+    LOADING_SONG_DATA_PLAY              = 0x7f,
+    // Song is loaded into audio-RAM and the audio driver is paused.
+    // No play-sound-effect commands will be sent when the driver is paused.
     PAUSED                              = 0x80,
-    PLAYING                             = (PAUSED as u8) | Flags.PLAY_SONG_IMMEDIATELY,
+    // Song is loaded into audio-RAM and the audio driver is playing the song.
+    PLAYING                             = 0x81
 }
 
 let __FIRST_LOADING_STATE = State.LOADING_COMMON_AUDIO_DATA;
-
+let __FIRST_LOADING_SONG_STATE = State.LOADING_SONG_DATA_PAUSED;
 
 in rodata0 {
     const __LoaderBinary = embed "gen/audio-loader.bin";
@@ -375,18 +383,12 @@ func __process__send_command__return_idx16(previousCommand: u8 in a, nextCommand
     IO.ToDriver.command = a;
     _previousCommand = a;
 
-    // ::TODO change PAUSE/UNPAUSE order (so I can use a single y >= PAUSE comparison)::
     if y < Command.UNPAUSE as u8 + 1 {
-        a = y;
-        // Assumes `Command.PAUSE == 0`
-        if zero {
-            a = State.PAUSED as u8;
-        }
-        else {
-            // ::TODO should I cancel any queued sound effects?::
-
-            a = State.PLAYING as u8;
-        }
+        // Assumes Command.PAUSE == 0
+        // Assumes Command.UNPAUSE == 2
+        // Assumes State.PAUSED  == 0x80
+        // Assumes State.PLAYING == 0x81
+        a = ((a >>> 1) & 1) | 0x80;
         _state = a as State;
     }
 
@@ -511,9 +513,12 @@ func __process__waiting_for_loader() {
         carry = __Loader.check_ready_and_send_loader_data_type(a);
         goto Return if !carry;
 
-        // Must store state AFTER `load_song_data()`
-        // `load_song_data()` might call `finish_loading_data()`.
-        a = State.LOADING_SONG_DATA as u8;
+        // assumes Flags.PLAY_SONG_IMMEDIATELY == 0x40
+        // assumes State.LOADING_SONG_DATA_PAUSED + 1 == State.LOADING_SONG_DATA_PLAY
+        a = _flags;
+        a <<<= 2;
+        // carry = PLAY_SONG_IMMEDIATELY flag
+        a = (State.LOADING_SONG_DATA_PAUSED as u8) +# 0;
         push8(a);
 
         a = _nextSong;
@@ -559,9 +564,14 @@ func __process__loading() {
             _nextCommand_id = a;
             _sfxQueue = a;
 
-            // Assumes `State.PAUSED | Flags.PLAY_SONG_IMMEDIATELY == State.PLAYING`
-            a = _flags & Flags.PLAY_SONG_IMMEDIATELY;
-            a |= State.PAUSED as u8;
+            // Use `_state` to determine if the song is playing or paused.
+            // Cannot use `_flags` as it may have changed after the `LoaderDataType` was sent to
+            // the loader (while the song was loaded).
+
+            // Assumes `State.LOADING_SONG_DATA_PAUSED & 1 | 0x80 == State.PAUSED`
+            // Assumes `State.LOADING_SONG_DATA_PLAY & 1 | 0x80 == State.PLAYING`
+            a = _state as u8;
+            a = (a & 1) | 0x80;
         }
         _state = a as State;
     }
@@ -683,7 +693,7 @@ func load_song(songId : resources.songs in a) {
     _nextSong = a;
 
     a = _state as u8;
-    if a >= State.LOADING_SONG_DATA as u8 {
+    if a >= __FIRST_LOADING_SONG_STATE as u8 {
          // State is not NULL, WAITING_FOR_LOADER or LOADING_COMMON_AUDIO_DATA
 
         __Loader.send_switch_to_loader_command__inline__db_unknown();
