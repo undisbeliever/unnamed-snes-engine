@@ -482,10 +482,11 @@ func process() {
         return;
     }
 
-    if a >= State.WAITING_FOR_LOADER as u8 {
-        goto __process__waiting_for_loader if zero;
-        return __process__loading();
-    }
+    // Song is not loaded into Audio-RAM
+    // ASSUMES __FIRST_LOADING_STATE == State::WAITING_FOR_LOADER + 1
+    cmp(a, State.WAITING_FOR_LOADER);
+    goto __process__waiting_for_loader if zero;
+    goto __process__loading if carry;
 }
 
 
