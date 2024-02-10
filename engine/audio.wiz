@@ -938,12 +938,12 @@ inline func send_switch_to_loader_command__inline__db_unknown() {
 
 // Send the LoaderDataType to the loader if the loader is ready.
 //
-// Assumes a `SWITCH_TO_LOADER` message was sent to the audio driver.
+// Assumes loader just started OR a `SWITCH_TO_LOADER` message was sent to the audio driver/loader.
 //
 // DB access registers
 #[mem8, idx16]
 func check_ready_and_send_loader_data_type(loader_data_type : u8 in a) : bool in carry {
-    // Wait until loader is ready
+    // Test if the loader is ready
     xx = ('L' as u16) | ('D' as u16 << 8);
     if xx == APUIO_IN_32 {
         // Send the ready signal and the LoaderDataType.
@@ -977,7 +977,7 @@ func set_data_to_transfer(bank_: u8 in a, addr: u16 in xx, size: u16 in yy) {
 //
 // ASSUMES: `check_ready_and_send_loader_data_type` and `set_data_to_transfer` were previously called.
 //
-// Returns true if there is no data remaining in the `_dataToTransfer` queue.
+// Returns true if all data in the transfer queue was sent to Audio-RAM.
 //
 // NOTE: This function may read one byte past the end of the `_dataToTransfer` queue.
 //
