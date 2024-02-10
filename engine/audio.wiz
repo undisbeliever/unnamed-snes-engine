@@ -150,7 +150,7 @@ enum Command : u8 {
 
 
 // Play a sound effect command
-//  * parameter0: sound effect id (not bounds checked)
+//  * parameter0: sound effect id
 //  * parameter1: pan (0-128) (not bounds checked)
 let __PLAY_SOUND_EFFECT_COMMAND  = 4;
 
@@ -270,7 +270,7 @@ in zeropage {
     // Lower sound effect indexes take priority over higher sound effect indexes (as defined by the
     // project file sound effect export order).
     //
-    // If `_sfxQueue > N_SOUND_EFFECTS`, then the queue is considered empty.
+    // If `_sfxQueue = $ff`, then the queue is considered empty.
     var _sfxQueue : u8;
 
     // The pan value for the next sound effect to play.
@@ -486,7 +486,7 @@ func process() {
                 if negative {
                     // Playing state
                     y = _sfxQueue;
-                    if y < N_SOUND_EFFECTS {
+                    if y != 0xff {
                         __process__send_sfx_command__inline(a, y);
                     }
                 }
@@ -672,6 +672,7 @@ let queue_command_override_no_parameter = queue_command_override_with as func(co
 //
 // NOTE: Only 1 sound effect can be played at a time
 // NOTE: Lower sound effect IDs take priority over higher sound effect IDs.
+// NOTE: `effect_id` 0xff is NULL (no sound effect)
 //
 // KEEP: Y, X
 //
@@ -690,6 +691,7 @@ func queue_panned_sound_effect(effect_id : sound_effects in a, pan: u8 in x) {
 //
 // NOTE: Only 1 sound effect can be played at a time.
 // NOTE: Lower sound effect IDs take priority over higher sound effect IDs.
+// NOTE: `effect_id` 0xff is NULL (no sound effect)
 //
 // KEEP: Y, X
 //
