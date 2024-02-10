@@ -631,7 +631,7 @@ func finish_loading_data() {
 // DB access lowram
 #[mem8, idx8]
 func queue_command(command : Command in a, parameter0: u8 in x) : bool in carry {
-    y = _nextCommand_id;
+    bit(_nextCommand_id);
     if negative {
         _nextCommand_id = a = a & IO.ToDriver.COMMAND_MASK;
         _nextCommand_parameter = x;
