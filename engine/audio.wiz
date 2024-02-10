@@ -978,17 +978,14 @@ func transfer_data() : bool in carry {
     // This also prevents a freeze in `process()` if the loader has crashed/glitched.
     // (`finish_loading_data()` will freeze if the loader has crashed/glitched.
     a = _dataToTransfer_prevSpinLock;
-    if a != APUIO_IN_3 {
-        return false;
-    }
+    goto ReturnFalse if a != APUIO_IN_3;
 
     push8(data_bank);
+    push16(direct_page);
 
     mem16();
     #[mem16] {
-        direct_page = aa = 0x2100;
-    // DP = 0x2100
-
+        // Calculate number of words to write
         aa = _dataToTransfer_size;
         if aa >= _bytesToTransferPerFrame {
             aa = _bytesToTransferPerFrame;
@@ -1001,6 +998,21 @@ func transfer_data() : bool in carry {
             aa++;
         }
         xx = aa;
+
+        // Reverse subtract `_dataToTransfer_size` with clamping
+        aa <<= 1;     // convert number of words to number of bytes
+        aa ^= 0xffff;
+        carry = true;
+        aa +#= _dataToTransfer_size;
+        if !carry {
+            aa = 0;
+        }
+        _dataToTransfer_size = aa;
+
+        aa = 0x2100;
+
+        direct_page = aa;
+// DP = 0x2100
     }
     mem8();
 
@@ -1066,35 +1078,15 @@ func transfer_data() : bool in carry {
     }
 EndLoop:
 
+    direct_page = pop16();
     data_bank = pop8();
 // DB access registers
+// D = 0
 
-    // yy = end of data
+    *(&_dataToTransfer_ptr as *u16) = yy;
     _dataToTransfer_prevSpinLock = a;
 
-    mem16();
-    #[mem16] {
-        direct_page = aa = 0;
-    // DP = 0
-
-        // Calculate bytes written
-        aa = yy - *(&_dataToTransfer_ptr as *u16);
-
-        // Reverse subtract `aa` with `_dataToTransfer_size`.
-        aa ^= 0xffff;
-        carry = true;
-        aa +#= _dataToTransfer_size;
-        if !carry {
-            aa = 0;
-        }
-        _dataToTransfer_size = aa;
-
-        // MUST NOT change zero flag
-
-        *(&_dataToTransfer_ptr as *u16) = yy;
-    }
-    mem8();
-
+    yy = _dataToTransfer_size;
     if zero {
         // End of data transfer
 
@@ -1109,9 +1101,9 @@ EndLoop:
 
         return true;
     }
-    else {
-        return false;
-    }
+
+ReturnFalse:
+    return false;
 }
 
 }
