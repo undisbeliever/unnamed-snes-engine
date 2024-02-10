@@ -457,12 +457,17 @@ func process() {
         // Playing or paused state
         idx8();
         #[idx8] {
+            x = a;
+
             a = _previousCommand;
             if a == IO.ToScpu.command_ack {
+                // Previous command has been processed
+
                 y = _nextCommand_id;
                 goto __process__send_command__return_idx16 if !negative;
 
                 // Assumes `State.PAUSED == 0x80`
+                // x = _state
                 x--;
                 if negative {
                     // Playing state
