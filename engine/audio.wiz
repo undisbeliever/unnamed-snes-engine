@@ -408,7 +408,7 @@ func __process__send_command__return_idx16(previousCommand: u8 in a, nextCommand
 //
 // DB access registers
 #[mem8, idx8]
-inline func __process__send_sfx_command__inline(sfx: u8 in x, previousCommand: u8 in a) {
+inline func __process__send_sfx_command__inline(previousCommand : u8 in a, sfx: u8 in y) {
     // Send play_sound_effect command
     // Clear the non i bits of commands
     a &= IO.ToDriver.COMMAND_I_MASK as u8;
@@ -416,7 +416,7 @@ inline func __process__send_sfx_command__inline(sfx: u8 in x, previousCommand: u
     a ^= IO.ToDriver.COMMAND_I_MASK | (__PLAY_SOUND_EFFECT_COMMAND as u8);
 
     // parameter 0 = sfx_id
-    IO.ToDriver.parameter0 = x;
+    IO.ToDriver.parameter0 = y;
 
     // parameter 1 = pan
     y = _sfxQueuePan;
@@ -471,9 +471,9 @@ func process() {
                 x--;
                 if negative {
                     // Playing state
-                    x = _sfxQueue;
-                    if x < N_SOUND_EFFECTS {
-                        __process__send_sfx_command__inline(x, a);
+                    y = _sfxQueue;
+                    if y < N_SOUND_EFFECTS {
+                        __process__send_sfx_command__inline(a, y);
                     }
                 }
             }
