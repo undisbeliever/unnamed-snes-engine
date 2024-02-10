@@ -232,7 +232,8 @@ in lowram {
 // Used by the `LOADING_*` states.
 in lowram {
     // A pointer to the remaining data to transfer
-    var _dataToTransfer_ptr : far *u8;
+    var _dataToTransfer_addr : u16;
+    var _dataToTransfer_bank : u8;
 
     // The remaining number of bytes to transfer
     var _dataToTransfer_size : u16;
@@ -946,8 +947,8 @@ func check_ready_and_send_loader_data_type(loader_data_type : u8 in a) : bool in
 // DB access registers
 #[mem8, idx16]
 func set_data_to_transfer(bank_: u8 in a, addr: u16 in xx, size: u16 in yy) {
-    *(&#:_dataToTransfer_ptr as *u8) = a;
-    *(&_dataToTransfer_ptr as *u16) = xx;
+    _dataToTransfer_addr = xx;
+    _dataToTransfer_bank = a;
     _dataToTransfer_size = yy;
 }
 
@@ -1016,8 +1017,8 @@ func transfer_data() : bool in carry {
     }
     mem8();
 
-    a = *(&#:_dataToTransfer_ptr as *u8);
-    yy = *(&_dataToTransfer_ptr as *u16);
+    a = _dataToTransfer_bank;
+    yy = _dataToTransfer_addr;
 
     push8(a);
     data_bank = pop8();
@@ -1083,7 +1084,7 @@ EndLoop:
 // DB access registers
 // D = 0
 
-    *(&_dataToTransfer_ptr as *u16) = yy;
+    _dataToTransfer_addr = yy;
     _dataToTransfer_prevSpinLock = a;
 
     yy = _dataToTransfer_size;
