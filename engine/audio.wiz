@@ -852,11 +852,12 @@ namespace __Loader {
 inline func transfer_loader_via_ipl__inline() {
     // ::TODO add a 'running IPL' check::
 
-    // Initialize the transfer
-    yy = 0xbbaa;
-    APUIO_OUT_10 = yy;
+    // Clear start command port (just in case APUIO_OUT_0 has a $cc in it)
+    // SOURCE: `blarggapu.s` from lorom-template, originally written by blargg (Shay Green)
+    APUIO_OUT_0 = 0;
 
     // Wait for a response from the IPL
+    yy = 0xbbaa;
     do {
     } while yy != APUIO_IN_10;
 
