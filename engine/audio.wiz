@@ -281,37 +281,50 @@ in zeropage {
 in code {
 
 
-// This callback will be called by `process()` when the common audio data or song data need to be loaded into Audio-RAM.
+// This callback will be called by `process()` when the common audio data or song
+// data need to be loaded into Audio-RAM.
+//
+// This subroutine is responsible for determining if the input is a valid song.
+// If the input is *common audio data* this function MUST return data with carry set.
 //
 // INPUT:
 //    A = 0 - load common audio data
+//              (This function MUST return carry set with a valid address/size if A=0)
 //    A >= 1 - load song data
 //
 // OUTPUT:
+//    carry set if input (`a`) is valid
 //    A:X = far address
 //    Y = data size
 //
 //
 // LIFETIME:
-//  * The data MUST remain in memory while it is being transferred to Audio-RAM (which will take several frames).
-//  * The data can be freed on the next `load_song_data()` call.
+//
+//  * The data MUST remain in memory while it is being transferred to Audio-RAM
+//    (which may take several frames).
+//  * The data can be freed on the next `load_audio_data()` call.
 //  * The data can be freed when the state changes to PAUSED or PLAYING.
 //  * The data can be freed if the `is_loader_active()` function returns false.
-//  * The `finish_loading_data()` subroutine can be used to flush decompressed memory into audio-RAM.
-//    The data can be freed immediately after a `finish_loading_data()` call.
+//  * The `finish_loading_data()` subroutine can be used to flush decompressed
+//    memory into Audio-RAM.  The data can be freed immediately after a
+//    `finish_loading_data()` call.
 //
 // This function MUST NOT call `process()` or `load_song()`.
 // It is allowed to call `finish_loading_data()`.
 //
 // DB access registers
 #[mem8, idx16]
-func load_song_data(id: u8 in a) {
-    var _res : resources.ResourceEntry in resources.res;
-    resources.load_songs_resource(a as resources.songs);
+func load_audio_data(id: u8 in a) : bool in carry {
+    if a < N_SONGS {
+        var _res : resources.ResourceEntry in resources.res;
+        resources.load_songs_resource(a as resources.songs);
 
-    xx = *(&_res.farPtr as *u16);
-    a = #:_res.farPtr;
-    yy = _res.size;
+        xx = *(&_res.farPtr as *u16);
+        a = #:_res.farPtr;
+        yy = _res.size;
+        return true;
+    }
+    return false;
 }
 
 
@@ -439,7 +452,7 @@ inline func __process__send_sfx_command__inline(previousCommand : u8 in a, sfx: 
 //
 // This function will do one of the following, depending on the state:
 //  * Transfer data to the Audio-RAM
-//  * Wait for the loader and call `load_song_data()` when the loader is ready to receive new data
+//  * Wait for the loader and call `load_audio_data()` when the loader is ready to receive new data
 //  * Send a command to the audio driver
 //  * Send a play-sound effect command to the audio driver
 //
@@ -506,15 +519,16 @@ func __process__waiting_for_loader() {
         a = Flags.RELOAD_COMMON_AUDIO_DATA;
         test_and_reset(_flags, a);
 
-        // Must store state AFTER `load_song_data()`
-        // `load_song_data()` might call `finish_loading_data()`.
+        // Must store state AFTER `load_audio_data()`
+        // `load_audio_data()` might call `finish_loading_data()`.
         a = State.LOADING_COMMON_AUDIO_DATA as u8;
         push8(a);
 
-        load_song_data(0);
+        a = 0;
     }
     else {
         // Songs
+
         // a == _flags
         a = (a & Flags.LOADER_MASK) | (LoaderDataType.MIN_SONG_VALUE as u8);
         carry = __Loader.check_ready_and_send_loader_data_type(a);
@@ -525,19 +539,24 @@ func __process__waiting_for_loader() {
         a = _flags;
         a <<<= 2;
         // carry = PLAY_SONG_IMMEDIATELY flag
-        a = (State.LOADING_SONG_DATA_PAUSED as u8) +# 0;
+        a = 0 +# (State.LOADING_SONG_DATA_PAUSED as u8);
         push8(a);
 
         a = _nextSong;
-        if zero || a >= N_SONGS + 1 {
+        goto UseBlankSong if zero;
+    }
+
+    carry = load_audio_data(a);
+    goto DataIsValid if carry;
+        UseBlankSong:
             xx = &BlankSong as u16;
             a = #:far &BlankSong;
             yy = sizeof(typeof(BlankSong));
-        }
-        else {
-            load_song_data(a);
-        }
-    }
+DataIsValid:
+
+    // STACK holds next state
+    // A:X = data address
+    // Y = data size
     __Loader.set_data_to_transfer(a, xx, yy);
 
     a = pop8();
@@ -588,7 +607,7 @@ func __process__loading() {
 
 // Finish loading the data into audio-RAM.
 //
-// This function can be safely called by `load_song_data()`.
+// This function can be safely called by `load_audio_data()`.
 //
 // This function may require multiple frames of execution time.
 //
@@ -806,7 +825,7 @@ func set_transfer_size(bytes_per_frame: u16 in xx) {
 
 
 
-// Returns true if the loader is still using data returned by `load_song_data()`.
+// Returns true if the loader is still using data returned by `load_audio_data()`.
 //
 // DB access lowram
 #[mem8]
