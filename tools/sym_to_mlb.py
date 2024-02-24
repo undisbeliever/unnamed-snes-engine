@@ -8,6 +8,7 @@ import argparse
 from io import StringIO
 
 from unnamed_snes_game.common import lorom_address_to_rom_offset, hirom_address_to_rom_offset
+from unnamed_snes_game.json_formats import load_mappings_json
 
 from typing import Callable, Final, Generator, TextIO, NamedTuple
 
@@ -78,10 +79,7 @@ def create_mlb_file(symbols: list[Symbol]) -> str:
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("-o", "--output", required=True, help="wiz output file")
-
-    mgroup = parser.add_mutually_exclusive_group(required=True)
-    mgroup.add_argument("--lorom", action="store_true", help="sfc file uses LOROM mapping")
-    mgroup.add_argument("--hirom", action="store_true", help="sfc file uses HIROM mapping")
+    parser.add_argument("-m", "--mappings", required=True, help="mappings JSON file (used to determine mapping)")
 
     parser.add_argument("sym_files", nargs="+", help="symbol files")
 
@@ -93,12 +91,9 @@ def parse_arguments() -> argparse.Namespace:
 def main() -> None:
     args = parse_arguments()
 
-    if args.lorom:
-        addr_to_rom_offset = lorom_address_to_rom_offset
-    elif args.hirom:
-        addr_to_rom_offset = hirom_address_to_rom_offset
-    else:
-        raise ValueError("Unknown memory map")
+    mappings = load_mappings_json(args.mappings)
+
+    addr_to_rom_offset = mappings.memory_map.mode.address_to_rom_offset
 
     symbols = list()
     for sym_fn in args.sym_files:

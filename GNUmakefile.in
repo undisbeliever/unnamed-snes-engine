@@ -101,8 +101,8 @@ $(BINARY): $(INTERMEDIATE_BINARY) $(TOOLS_DIR)/insert_resources.py $(COMMON_PYTH
 	$(PYTHON3) '$(TOOLS_DIR)/insert_resources.py' --print-usage -o '$(BINARY)' '$(RESOURCES_DIR)' '$(INTERMEDIATE_BINARY:.sfc=.sym)' '$(INTERMEDIATE_BINARY)'
 
 
-$(MLB_FILE): $(INTERMEDIATE_BINARY) $(AUDIO_DRIVER_BINARIES) $(TOOLS_DIR)/sym_to_mlb.py
-	$(PYTHON3) '$(TOOLS_DIR)/sym_to_mlb.py' -o '$@' --hirom $(SYM_FILES)
+$(MLB_FILE): $(INTERMEDIATE_BINARY) $(AUDIO_DRIVER_BINARIES) $(RESOURCES_DIR)/mappings.json $(TOOLS_DIR)/sym_to_mlb.py
+	$(PYTHON3) '$(TOOLS_DIR)/sym_to_mlb.py' -o '$@' -m '$(RESOURCES_DIR)/mappings.json' $(SYM_FILES)
 
 
 $(INTERMEDIATE_BINARY): $(WIZ) $(SOURCES) $(GEN_SOURCES) $(AUDIO_DRIVER_BINARIES) $(AUDIO_DRIVER_DATA)
