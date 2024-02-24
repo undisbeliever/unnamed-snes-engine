@@ -5,6 +5,7 @@
    "first_resource_bank": "c2",
    "n_resource_banks": 2
  },
+ "tad_binary_directory": "../../terrific-audio-driver/target/release/",
 
  "mt_tilesets": [
    "dungeon"
@@ -27,53 +28,8 @@
  ],
 
  "songs": [
-   "__null__common_data__"
- ],
- "sound_effects": [
-   "menu_cursor",
-   "menu_select",
-
-   "key_spawns",
-   "collect_item",
-
-   "door_slam",
-   "door_open_with_key",
-   "door_open",
-
-   "player_hurt_low_health",
-   "explosion_hurt_player",
-   "player_hurt",
-   "explosion_hurt_enemy",
-
-   "explosion",
-
-   "player_heal",
-
-   "pickup_bomb",
-   "throw_bomb",
-   "enemy_poof",
-   "enemy_hurt",
-   "sword_hit_bolt",
-   "sword_hit_shield",
-   "sword_hit_rook",
-
-   "boss_bomb_disabled",
-   "boss_rising",
-   "boss_shake",
-   "rook_hits_ground",
-
-   "sword_swing",
-
-   "bolt_hits_wall",
-   "bounce_off_wall",
-
-   "statue_spawns_enemy",
-   "spawn_enemy_with_smoke",
-
-   "key_hits_ground",
-
-   "jump_or_bounce",
-   "crossbow_fires_bolt"
+   "__null__common_data__",
+   "timing_test"
  ],
 
  "interactive_tile_functions": [

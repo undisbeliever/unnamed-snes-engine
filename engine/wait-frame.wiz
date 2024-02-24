@@ -131,12 +131,15 @@ func wait_frame() {
         engine_hooks.wait_frame__after_vblank__mem16_idx16__inline();
     }
 
-    mem8_idx8();
-    #[mem8, idx8] {
+    mem8();
+    #[mem8, idx16] {
         nmiCounter = 0;
 
-        audio.process_sfx_queue__inline();
+        audio.process();
+    }
 
+    mem8_idx8();
+    #[mem8, idx8] {
         engine_hooks.wait_frame__after_vblank__mem8_idx8__inline();
     }
 

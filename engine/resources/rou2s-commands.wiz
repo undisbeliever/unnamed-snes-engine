@@ -11,19 +11,17 @@ import "../audio";
 
 namespace rou2s_commands {
 
-// order MUST match Rou2sCommands in `resources_over_usb2snes.py`
-// order MUST command_function_table
+// order MUST match Rou2sCommands in `tools/unnamed_snes_game/resources_over_usb2snes.py`.
+// order MUST `function_table`.
 enum Rou2sCommand : u8 {
     null,
     common_audio_data_changed,
-    upload_song,
 };
 
 in code {
     const function_table = [
         commands.null,
         commands.common_audio_data_changed,
-        commands.upload_song,
     ];
 }
 
@@ -133,37 +131,7 @@ func null() {
 //
 // DB = 0x7e
 #[mem8, idx16]
-func common_audio_data_changed() {
-    audio.mark_common_audio_data_changed();
-}
-
-
-
-// DB = 0x7e
-#[mem8, idx16]
-func upload_song() {
-var _res : resources.ResourceEntry in resources.res;
-
-    push16(0x7e80);
-    data_bank = pop8();
-    // DB = 0x80
-
-    audio._load_common_data_if_required__inline();
-
-    #:_res.farPtr = a = #:far &Command.data;
-    *(&_res.farPtr as *u16) = xx = &Command.data as u16;
-
-    mem16();
-    #[mem16] {
-        _res.size = aa = *(far &Command.data_size);
-    }
-    mem8();
-
-    audio._transfer_song_data(_res);
-
-    data_bank = pop8();
-// DB = 0x7e
-}
+let common_audio_data_changed = audio.reload_common_audio_data;
 
 }
 }

@@ -162,12 +162,11 @@ MAX_COMMAND_SIZE: Final = 8192
 MAX_COMMAND_DATA_SIZE: Final = MAX_COMMAND_SIZE - 4
 
 
-# Order MUST MATCH Rou2sCommands in `src/rou2s-commands.wiz`
+# Order MUST MATCH Rou2sCommands in `engine/resources/rou2s-commands.wiz`
 @unique
 class Rou2sCommands(Enum):
     # Skipping `null`.  `auto()` starts at 1
     COMMON_AUDIO_DATA_CHANGED = auto()
-    UPLOAD_SONG = auto()
 
 
 class Command(NamedTuple):
@@ -290,9 +289,6 @@ class FsWatcherSignals(metaclass=ABCMeta):
         # Interrupt `sleep()` and `wait_until_resource_changed()`
         self._resource_changed_event.set()
 
-    def audio_samples_changed(self) -> None:
-        self.signal_audio_samples_changed()
-
     def sfc_file_changed(self) -> None:
         self._interrupt_request_sleep_event.set()
         self._sym_file_changed_event.set()
@@ -360,10 +356,6 @@ class FsWatcherSignals(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def signal_audio_samples_changed(self) -> None:
-        pass
-
-    @abstractmethod
     def signal_ws_connection_changed(self) -> None:
         pass
 
@@ -418,7 +410,6 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
         signals.set_fs_watcher_status("Running")
 
         signals.resource_changed()
-        self.signals.audio_samples_changed()
 
         self.rebuild_required: bool = False
 
@@ -462,8 +453,7 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
                 self.signals.set_fs_watcher_status("Running")
                 self.signals.sfc_file_changed()
 
-            if r == SharedInputType.AUDIO_SAMPLES:
-                self.signals.audio_samples_changed()
+            if r == SharedInputType.AUDIO_PROJECT:
                 self.signals.send_command(COMMON_AUDIO_DATA_CHANGED_COMMAND)
 
             if self.rebuild_required:

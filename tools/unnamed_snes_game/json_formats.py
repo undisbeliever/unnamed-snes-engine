@@ -592,14 +592,17 @@ class Mappings(NamedTuple):
     ms_spritesheets: list[Name]
     tiles: list[Name]
     bg_images: list[Name]
-    songs: list[Name]
-    sound_effects: list[Name]
     interactive_tile_functions: list[Name]
     gamestate_flags: list[Name]
     gamemodes: list[GameMode]
     room_transitions: list[Name]
     room_events: OrderedDict[Name, RoomEvent]
     memory_map: MemoryMap
+
+    # ::TODO remove songs from mappings (somehow)
+    songs: list[Name]
+    # Location of the directory containing tad-compiler
+    tad_binary_directory: Filename
 
 
 class _Mappings_Helper(_Helper):
@@ -673,30 +676,59 @@ def load_mappings_json(filename: Filename) -> Mappings:
         ms_spritesheets=jh.get_name_list("ms_spritesheets"),
         tiles=jh.get_name_list("tiles"),
         bg_images=jh.get_name_list("bg_images"),
-        songs=jh.get_name_list("songs"),
-        sound_effects=jh.get_name_list("sound_effects"),
         interactive_tile_functions=jh.get_name_list("interactive_tile_functions"),
         gamestate_flags=jh.get_name_list("gamestate_flags"),
         room_transitions=jh.get_name_list("room_transitions"),
         room_events=room_events,
         memory_map=jh.get_memory_map("memory_map"),
         gamemodes=jh.get_gamemodes("gamemodes"),
+        songs=jh.get_name_list("songs"),
+        tad_binary_directory=jh.get_string("tad_binary_directory"),
     )
 
 
-# audio_mappings.json
-# ===================
+# Terrific Audio Driver project.json
+# ==================================
+
+MAX_SONGS = 254
 
 
-class AudioMappings(NamedTuple):
+class Song(NamedTuple):
+    name: Name
+    id: int
+    source: Filename
+
+
+class AudioProject(NamedTuple):
+    instrument_sources: list[Filename]
+    songs: OrderedDict[Name, Song]
     sound_effects: list[Name]
+    sound_effect_file: Filename
 
 
-def load_audio_mappings_json(filename: Filename) -> AudioMappings:
+def load_audio_project(filename: Filename) -> AudioProject:
     jh = _load_json_file(filename, _Helper)
 
-    return AudioMappings(
-        sound_effects=jh.get_name_list("sound-effects"),
+    dirname = os.path.dirname(filename)
+
+    songs = jh.build_ordered_dict_from_list(
+        "songs",
+        Song,
+        MAX_SONGS,
+        lambda sj, name, i: Song(
+            name=name,
+            id=i + 1,
+            source=os.path.join(dirname, sj.get_string("source")),
+        ),
+    )
+
+    instrument_sources = [os.path.join(dirname, j.get_string("source")) for j in jh.iterate_list_of_dicts("instruments")]
+
+    return AudioProject(
+        instrument_sources=instrument_sources,
+        songs=songs,
+        sound_effects=jh.get_name_list("sound_effects"),
+        sound_effect_file=os.path.join(dirname, jh.get_string("sound_effect_file")),
     )
 
 

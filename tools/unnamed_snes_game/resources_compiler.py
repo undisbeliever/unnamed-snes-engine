@@ -21,13 +21,12 @@ from .mt_tileset import convert_mt_tileset
 from .metasprite import convert_spritesheet, MsFsEntry, build_ms_fs_data
 from .rooms import get_list_of_tmx_files, extract_room_id, compile_room
 from .other_resources import convert_tiles, convert_bg_image
-from .audio.common_audio_data import build_common_data as build_common_audio_data
-from .audio.common_audio_data import load_sfx_file
+from .audio import AudioCompiler, COMMON_AUDIO_DATA_RESOURCE_NAME
 
 from .json_formats import load_mappings_json, load_entities_json, load_ms_export_order_json, load_other_resources_json
-from .json_formats import load_metasprites_json, Name, ScopedName, Filename, JsonError, MemoryMap, Mappings, EntitiesJson
-from .json_formats import MsExportOrder, OtherResources, TilesInput, BackgroundImageInput
-from .audio.json_formats import load_samples_json, SamplesJson
+from .json_formats import load_metasprites_json, load_audio_project
+from .json_formats import Name, ScopedName, Filename, JsonError, MemoryMap, Mappings, EntitiesJson
+from .json_formats import MsExportOrder, OtherResources, TilesInput, BackgroundImageInput, AudioProject
 
 
 @unique
@@ -36,7 +35,7 @@ class SharedInputType(Enum):
     ENTITIES = auto()
     OTHER_RESOURCES = auto()
     MS_EXPORT_ORDER = auto()
-    AUDIO_SAMPLES = auto()
+    AUDIO_PROJECT = auto()
     SYMBOLS = auto()
 
     def rebuild_required(self) -> bool:
@@ -119,8 +118,6 @@ class DataStore:
             self._symbols: Optional[dict[ScopedName, int]] = None
             self._n_entities: int = 0
 
-            self._audio_samples: Optional[SamplesJson] = None
-
             self._resources: list[list[Optional[BaseResourceData]]] = [list() for rt in ResourceType]
             self._rooms: list[Optional[BaseResourceData]] = list()
 
@@ -173,10 +170,6 @@ class DataStore:
     def set_n_entities(self, n_entities: int) -> None:
         with self._lock:
             self._n_entities = n_entities
-
-    def set_audio_samples(self, audio_samples: Optional[SamplesJson]) -> None:
-        with self._lock:
-            self._audio_samples = audio_samples
 
     def add_non_resource_error(self, e: NonResourceError) -> None:
         with self._lock:
@@ -237,10 +230,6 @@ class DataStore:
 
             # dict (symbols) is not immutable, return a copy instead
             return self._mappings, self._symbols.copy(), self._n_entities
-
-    def get_audio_samples(self) -> Optional[SamplesJson]:
-        with self._lock:
-            return self._audio_samples
 
     def get_msfs_lists(self) -> list[Optional[list[MsFsEntry]]]:
         with self._lock:
@@ -320,7 +309,7 @@ class SharedInput:
         self.entities: Optional[EntitiesJson] = None
         self.other_resources: Optional[OtherResources] = None
         self.ms_export_order: Optional[MsExportOrder] = None
-        self.audio_samples: Optional[SamplesJson] = None
+        self.audio_project: Optional[AudioProject] = None
         self.symbols: Optional[dict[ScopedName, int]] = None
 
     # May throw an exception
@@ -341,8 +330,8 @@ class SharedInput:
                 _load("other_resources", OTHER_RESOURCES_FILENAME, load_other_resources_json)
             case SharedInputType.MS_EXPORT_ORDER:
                 _load("ms_export_order", MS_EXPORT_ORDER_FILENAME, load_ms_export_order_json)
-            case SharedInputType.AUDIO_SAMPLES:
-                _load("audio_samples", AUDIO_SAMPLES_FILENAME, load_samples_json)
+            case SharedInputType.AUDIO_PROJECT:
+                _load("audio_project", AUDIO_PROJECT_FILENAME, load_audio_project)
             case SharedInputType.SYMBOLS:
                 _load("symbols", self.symbols_filename, read_symbols_file)
             case other:
@@ -353,7 +342,7 @@ MAPPINGS_FILENAME: Final = "mappings.json"
 ENTITIES_FILENAME: Final = "entities.json"
 OTHER_RESOURCES_FILENAME: Final = "other-resources.json"
 MS_EXPORT_ORDER_FILENAME: Final = "ms-export-order.json"
-AUDIO_SAMPLES_FILENAME: Final = "audio/samples.json"
+AUDIO_PROJECT_FILENAME: Final = "audio/project.terrificaudio"
 
 
 SHARED_INPUT_FILENAME_MAP: Final = {
@@ -361,7 +350,7 @@ SHARED_INPUT_FILENAME_MAP: Final = {
     ENTITIES_FILENAME: SharedInputType.ENTITIES,
     OTHER_RESOURCES_FILENAME: SharedInputType.OTHER_RESOURCES,
     MS_EXPORT_ORDER_FILENAME: SharedInputType.MS_EXPORT_ORDER,
-    AUDIO_SAMPLES_FILENAME: SharedInputType.AUDIO_SAMPLES,
+    AUDIO_PROJECT_FILENAME: SharedInputType.AUDIO_PROJECT,
 }
 
 SHARED_INPUT_NAMES: Final = {
@@ -369,7 +358,7 @@ SHARED_INPUT_NAMES: Final = {
     SharedInputType.ENTITIES: "entities JSON",
     SharedInputType.OTHER_RESOURCES: "other Resources JSON",
     SharedInputType.MS_EXPORT_ORDER: "MetaSprite export order JSON",
-    SharedInputType.AUDIO_SAMPLES: "audio Samples JSON",
+    SharedInputType.AUDIO_PROJECT: "audio Samples JSON",
     SharedInputType.SYMBOLS: "Symbols",
 }
 
@@ -546,47 +535,58 @@ class BgImageCompiler(OtherResourcesCompiler):
 
 
 class SongCompiler(SimpleResourceCompiler):
-    COMMON_DATA_RESOURCE_NAME: Final = "__null__common_data__"
-    SFX_FILE: Final = "audio/sound_effects.txt"
-
     def __init__(self, shared_input: SharedInput) -> None:
         super().__init__(ResourceType.songs, shared_input)
-        # Sample source files used in the common audio data
-        self._sample_files: Final[set[Filename]] = set()
+
+        self.compiler: Optional[AudioCompiler] = None
+
+        # Map of filenames to resource index
+        self._file_map: Final[dict[Filename, int]] = dict()
 
     @final
     def shared_input_changed(self, s_type: SharedInputType) -> None:
-        if s_type == SharedInputType.AUDIO_SAMPLES:
-            self._sample_files.clear()
-            audio_samples = self._shared_input.audio_samples
-            if audio_samples:
-                for inst in audio_samples.instruments:
-                    self._sample_files.add(inst.source)
+        if s_type == SharedInputType.MAPPINGS:
+            if self._shared_input.mappings:
+                if self.compiler is None:
+                    self.compiler = AudioCompiler(self._shared_input.mappings, AUDIO_PROJECT_FILENAME)
+            else:
+                self.compiler = None
+
+        if s_type == SharedInputType.AUDIO_PROJECT or s_type == SharedInputType.MAPPINGS:
+            audio_project = self._shared_input.audio_project
+
+            self._file_map.clear()
+
+            if audio_project:
+                # Map sound effects to 0 (common_audio_data)
+                self._file_map[audio_project.sound_effect_file] = 0
+
+                # Map sample sources to 0 (common_audio_data)
+                for filename in audio_project.instrument_sources:
+                    self._file_map[filename] = 0
+
+                for s in audio_project.songs.values():
+                    i = self.name_map[s.name]
+                    if i:
+                        self._file_map[s.source] = i
 
     def test_filename_is_resource(self, filename: Filename) -> Optional[int]:
-        if filename in self._sample_files:
-            return 0
-        if filename == self.SFX_FILE:
-            return 0
-        return None
+        return self._file_map.get(filename)
 
-    SHARED_INPUTS = (SharedInputType.MAPPINGS, SharedInputType.AUDIO_SAMPLES)
+    SHARED_INPUTS = (SharedInputType.MAPPINGS, SharedInputType.AUDIO_PROJECT)
 
     def _compile(self, r_name: Name) -> bytes:
-        assert self._shared_input.mappings
-        assert self._shared_input.audio_samples
+        assert self.compiler
+        assert self._shared_input.audio_project
 
-        if r_name == self.COMMON_DATA_RESOURCE_NAME:
-            if self.name_list[0] != self.COMMON_DATA_RESOURCE_NAME:
-                raise RuntimeError(f"The first entry in the song resource list MUST BE `{self.COMMON_DATA_RESOURCE_NAME}`")
-
-            sfx_file = load_sfx_file(self.SFX_FILE)
-            return build_common_audio_data(self._shared_input.audio_samples, self._shared_input.mappings, sfx_file, self.SFX_FILE)
+        if r_name == COMMON_AUDIO_DATA_RESOURCE_NAME:
+            if self.name_list[0] != COMMON_AUDIO_DATA_RESOURCE_NAME:
+                raise RuntimeError(f"The first entry in the exported song name list MUST BE `{COMMON_AUDIO_DATA_RESOURCE_NAME}`")
+            return self.compiler.compile_common_audio_data()
         else:
             if self.name_list[0] == r_name:
-                raise RuntimeError(f"The first entry in the song resource list MUST BE `{self.COMMON_DATA_RESOURCE_NAME}`")
-
-            raise NotImplementedError("Songs is not yet implemented")
+                raise RuntimeError(f"The first entry in the song resource list MUST BE `{COMMON_AUDIO_DATA_RESOURCE_NAME}`")
+            return self.compiler.compile_song(r_name)
 
 
 class RoomCompiler:
@@ -754,9 +754,6 @@ class ProjectCompiler:
 
             error = NonResourceError(ErrorKey(None, s_type), SHARED_INPUT_NAMES[s_type], e)
             self.data_store.add_non_resource_error(error)
-
-            if s_type == SharedInputType.AUDIO_SAMPLES:
-                self.data_store.set_audio_samples(None)
             return
 
         if s_type == SharedInputType.MAPPINGS:
@@ -774,9 +771,6 @@ class ProjectCompiler:
             if self.__shared_input.entities:
                 n_entities = len(self.__shared_input.entities.entities)
                 self.data_store.set_n_entities(n_entities)
-
-        elif s_type == SharedInputType.AUDIO_SAMPLES:
-            self.data_store.set_audio_samples(self.__shared_input.audio_samples)
 
         # Must be called after `c.update_name_list()`
         for c in self.__resource_compilers:

@@ -146,8 +146,9 @@ namespace DecodeTokens {
 
     // ::TODO add special chars for DTE (Dual Tile Encoding) and names and strings::
 
-    let PRINT_FIRST_U16 = 0xff;
+    let PRINT_FIRST_U16  = 0xfd;
     let PRINT_SECOND_U16 = 0xfe;
+    let PRINT_THIRD_U16  = 0xff;
 }
 
 
@@ -194,9 +195,12 @@ in wram7e {
     var u16Buffer : [u8 ; 8];
 
 
-    // The values to print when the string decoder encounters a `PRINT_FIRST_U16` or `PRINT_SECOND_U16` token.
-    var firstU16parameter : u16;
-    var secondU16parameter : u16;
+    // The values to print when the string decoder encounters a `PRINT_FIRST_U16`, `PRINT_SECOND_U16` or `PRINT_THIRD_U16` token
+    var u16parameters : [u16 ; 3];
+
+    var firstU16parameter  @ &u16parameters[0] : u16;
+    var secondU16parameter @ &u16parameters[1] : u16;
+    var thirdU16parameter  @ &u16parameters[2] : u16;
 }
 
 
@@ -427,11 +431,11 @@ func decode_string(bankbyte : u8 in a, addr : u16 in xx) : [u8; 256] in decodedS
                 continue;
             }
 
-            // Assumes PRINT_FIRST_U16 == 0xfe and PRINT_SECOND_U16 == 0xff
-            if a >= 0xfe {
+            // Assumes all tokens >= PRINT_FIRST_U16 are print u16 tokens.
+            if a >= DecodeTokens.PRINT_FIRST_U16 {
                 // OK to use here, does not modify flags
                 push8(y);
-                    x = __decode_string__u16__inline(x, zero);
+                    x = __decode_string__u16__inline(x, a);
                 y = pop8();
                 continue;
             }
@@ -458,21 +462,19 @@ func decode_string(bankbyte : u8 in a, addr : u16 in xx) : [u8; 256] in decodedS
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func __decode_string__u16__inline(decodedStringPos : u8 in x, isSecondParameter : bool in zero) : u8 in x {
+inline func __decode_string__u16__inline(decodedStringPos : u8 in x, char_token : u8 in a) : u8 in x {
 
     // OK to use here, does not manipulate flags
     push8(x);
 
+    y = a = a <<< 1;
+
     mem16();
     #[mem16] {
         // Get the U16 value
-        // Assumes only 2 PRINT_*_U16 symbols
-        // Assumes comparison is done against the second u16 parameter
-        if !zero {
-            aa = firstU16parameter;
-        } else {
-            aa = secondU16parameter;
-        }
+        // Assumes all tokens >= PRINT_FIRST_U16 are print u16 tokens.
+        let _OFFSET = ((DecodeTokens.PRINT_FIRST_U16 as u16) << 1) & 0xff;
+        aa = ((&u16parameters as u16 - _OFFSET) as *u16)[unaligned y];
 
         // Divisor
         x = 10;

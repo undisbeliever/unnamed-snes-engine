@@ -322,6 +322,7 @@ namespace entities {
     import "audio";
 
     let queue_sound_effect = audio.queue_sound_effect;
+    let queue_panned_sound_effect = audio.queue_panned_sound_effect;
 
 
     // Gamestate functions

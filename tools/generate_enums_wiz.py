@@ -6,15 +6,15 @@
 import re
 import argparse
 from io import StringIO
-from typing import TextIO
+from typing import TextIO, Sequence
 
 from unnamed_snes_game.json_formats import (
     RoomName,
     load_mappings_json,
-    load_audio_mappings_json,
+    load_audio_project,
     Name,
     Mappings,
-    AudioMappings,
+    AudioProject,
     MemoryMap,
     GameMode,
 )
@@ -34,7 +34,7 @@ def resources_over_usb2snes_data_addr(memory_map: MemoryMap) -> int:
     return ((memory_map.first_resource_bank + USB2SNES_DATA_BANK_OFFSET) << 16) | memory_map.mode.bank_start
 
 
-def write_enum(out: TextIO, name: Name, name_list: list[Name]) -> None:
+def write_enum(out: TextIO, name: Name, name_list: Sequence[Name]) -> None:
     out.write(f"enum { name } : u8 {{\n")
 
     for n in name_list:
@@ -61,7 +61,7 @@ def write_gamemodes_enum(out: TextIO, gamemodes: list[GameMode]) -> None:
     out.write("};\n\n")
 
 
-def generate_wiz_code(mappings: Mappings) -> str:
+def generate_wiz_code(mappings: Mappings, audio_project: AudioProject) -> str:
     with StringIO() as out:
         out.write("namespace resources {\n\n")
 
@@ -72,6 +72,8 @@ def generate_wiz_code(mappings: Mappings) -> str:
 
         out.write(f"let _USB2SNES_DATA_ADDR = { resources_over_usb2snes_data_addr(mappings.memory_map) };\n")
         out.write(f"let _BANK_SIZE = { mappings.memory_map.mode.bank_size };\n\n")
+
+        out.write(f"let N_SONGS = { len(mappings.songs) };\n\n")
 
         out.write("let n_resources_per_type = [")
         for rt in ResourceType:
@@ -84,8 +86,8 @@ def generate_wiz_code(mappings: Mappings) -> str:
 
         out.write("}\n\n")
 
-        write_enum(out, "sound_effects", mappings.sound_effects)
-        out.write(f"let N_SOUND_EFFECTS = { len(mappings.sound_effects) };\n\n")
+        write_enum(out, "sound_effects", audio_project.sound_effects)
+        out.write(f"let N_SOUND_EFFECTS = { len(audio_project.sound_effects) };\n\n")
 
         write_gamemodes_enum(out, mappings.gamemodes)
 
@@ -98,6 +100,7 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("-o", "--output", required=True, help="wiz output file")
     parser.add_argument("mappings_json_file", action="store", help="mappings json file input")
+    parser.add_argument("audio_project_file", action="store", help="terrific audio project file")
 
     args = parser.parse_args()
 
@@ -108,8 +111,9 @@ def main() -> None:
     args = parse_arguments()
 
     mappings = load_mappings_json(args.mappings_json_file)
+    audio_project = load_audio_project(args.audio_project_file)
 
-    out = generate_wiz_code(mappings)
+    out = generate_wiz_code(mappings, audio_project)
 
     with open(args.output, "w") as fp:
         fp.write(out)
