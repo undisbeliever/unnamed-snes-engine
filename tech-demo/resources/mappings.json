@@ -1,12 +1,18 @@
 {
  "game_title": "UNNAMED TECH DEMO",
  "memory_map": {
-   "mode": "hirom",
-   "first_resource_bank": "c2",
-   "n_resource_banks": 2
+   "mode": "lorom",
+   "first_resource_bank": "82",
+   "n_resource_banks": 6
  },
  "tad_binary_directory": "../../terrific-audio-driver/target/release/",
 
+ "palettes": [
+   "title_screen",
+   "game_over",
+   "credits",
+   "dungeon"
+ ],
  "mt_tilesets": [
    "dungeon"
  ],

@@ -11,6 +11,7 @@ import "engine/wait-frame";
 import "engine/common/reset";
 import "engine/game/gamestate";
 import "engine/resources/resources";
+import "engine/resources/palette";
 
 import "../joypad";
 
@@ -140,26 +141,7 @@ inline func setup_ppu() {
     TM = a = TM_BG1 | TM_BG3;
 
     resources.load_bg_image_resource_into_vram(resources.bg_images.game_over, VRAM_BG1_MAP_WADDR, VRAM_BG1_TILES_WADDR);
-
-    // Manually load textbox palette
-    // ::TODO add palettes to the resources subsystem::
-    CGADD = a = 64;
-
-    a = 5 * 2;
-    do {
-        CGDATA = 0;
-        a--;
-    } while !zero;
-
-    CGDATA = a = 16;
-    CGDATA = 0;
-
-    CGDATA = 0;
-    CGDATA = 0;
-
-    a = 0xff;
-    CGDATA = a;
-    CGDATA = a;
+    palette.load_palette__forceblank(resources.palettes.game_over);
 }
 
 }

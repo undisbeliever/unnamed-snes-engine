@@ -9,8 +9,9 @@ import PIL.Image  # type: ignore
 import xml.etree.ElementTree
 from typing import Final, NamedTuple, Optional, TextIO
 
-from .json_formats import load_mappings_json, Filename, Mappings
-from .snes import image_to_snes, TileMap, ImageError, InvalidTilesError
+from .json_formats import load_mappings_json, Filename, Mappings, Name
+from .palette import PaletteColors
+from .snes import image_and_palette_map_to_snes, TileMap, ImageError, InvalidTilesError
 from .common import SimpleMultilineError, print_error
 
 
@@ -36,7 +37,7 @@ class TileProperty(NamedTuple):
 class TsxFile(NamedTuple):
     name: str
     image_filename: Filename
-    palette_filename: Filename
+    palette: str
     tile_properties: list[TileProperty]
 
 
@@ -173,7 +174,7 @@ def read_tsx_file(tsx_filename: Filename) -> TsxFile:
     error_list: list[str] = list()
 
     image_filename: Optional[Filename] = None
-    palette_filename: Optional[Filename] = None
+    palette: Optional[str] = None
 
     read_tiles: set[int] = set()
     tile_properties = [TileProperty(solid=False, projectile_solid=False, type=None, priority=DEFAULT_PRIORITY)] * N_TILES
@@ -203,8 +204,8 @@ def read_tsx_file(tsx_filename: Filename) -> TsxFile:
                 if ptag.tag == "property":
                     pname = ptag.attrib.get("name")
                     if pname == "palette":
-                        palette_filename = ptag.attrib.get("value")
-                        if not palette_filename:
+                        palette = ptag.attrib.get("value")
+                        if not palette:
                             error_list.append("palette property is missing a value")
                     else:
                         error_list.append(f"Unknown property: { pname }")
@@ -221,29 +222,25 @@ def read_tsx_file(tsx_filename: Filename) -> TsxFile:
     if not image_filename:
         error_list.append("Missing image filename")
 
-    if not palette_filename:
-        error_list.append("Missing palette filename")
+    if not palette:
+        error_list.append("Missing palette")
 
     if name:
         if image_filename:
             if not image_filename.startswith(name + "-"):
                 error_list.append(f"Invalid image filename (expected `{ name }-*`): { image_filename }")
 
-        if palette_filename:
-            if not palette_filename.startswith(name + "-"):
-                error_list.append(f"Invalid palette filename (expected `{ name }-*`): { palette_filename }")
-
     if error_list:
         raise TsxFileError(f"Error reading { tsx_filename }", error_list)
 
-    assert name and image_filename and palette_filename
+    assert name and image_filename and palette
 
     dirname = os.path.dirname(tsx_filename)
 
     return TsxFile(
         name=name,
         image_filename=os.path.join(dirname, image_filename),
-        palette_filename=os.path.join(dirname, palette_filename),
+        palette=palette,
         tile_properties=tile_properties,
     )
 
@@ -274,7 +271,7 @@ def create_properties_array(
     return data
 
 
-def create_tileset_data(palette_data: bytes, tile_data: bytes, metatile_map: bytes, properties: bytes) -> bytes:
+def create_tileset_data(palette: PaletteColors, tile_data: bytes, metatile_map: bytes, properties: bytes) -> bytes:
     data = bytearray()
 
     # 2048 bytes = metatile map
@@ -285,11 +282,10 @@ def create_tileset_data(palette_data: bytes, tile_data: bytes, metatile_map: byt
     assert len(properties) == 256
     data += properties
 
-    # Next 256 bytes = palette data
-    data += palette_data
-    data += bytes(0) * (256 - len(palette_data))
+    # Next 1 bytes = palette id
+    data.append(palette.id)
 
-    assert len(data) == 2048 + 256 * 2
+    assert len(data) == 2048 + 256 + 1
 
     # Next data: tile data
     data += tile_data
@@ -297,15 +293,19 @@ def create_tileset_data(palette_data: bytes, tile_data: bytes, metatile_map: byt
     return data
 
 
-def convert_mt_tileset(tsx_filename: Filename, mappings: Mappings) -> bytes:
+def convert_mt_tileset(tsx_filename: Filename, mappings: Mappings, palettes: dict[Name, PaletteColors]) -> bytes:
     tsx_file = read_tsx_file(tsx_filename)
 
-    with PIL.Image.open(tsx_file.palette_filename) as palette_image:
-        with PIL.Image.open(tsx_file.image_filename) as image:
-            if image.width != 256 or image.height != 256:
-                raise ImageError(tsx_file.image_filename, "Tileset Image MUST BE 256x256 px in size")
+    with PIL.Image.open(tsx_file.image_filename) as image:
+        if image.width != 256 or image.height != 256:
+            raise ImageError(tsx_file.image_filename, "Tileset Image MUST BE 256x256 px in size")
 
-            tilemap, tile_data, palette_data = image_to_snes(image, tsx_file.image_filename, palette_image, TILE_DATA_BPP)
+        pal = palettes.get(tsx_file.palette)
+        if pal is None:
+            raise RuntimeError(f"Cannot load palette: {tsx_file.palette}")
+        palette_map = pal.create_map(TILE_DATA_BPP)
+
+        tilemap, tile_data = image_and_palette_map_to_snes(image, tsx_file.image_filename, palette_map, TILE_DATA_BPP)
 
     error_list: list[str] = list()
 
@@ -315,4 +315,4 @@ def convert_mt_tileset(tsx_filename: Filename, mappings: Mappings) -> bytes:
     if error_list:
         raise TsxFileError(f"Error compiling { tsx_filename }", error_list)
 
-    return create_tileset_data(palette_data, tile_data, metatile_map, properties)
+    return create_tileset_data(pal, tile_data, metatile_map, properties)

@@ -53,7 +53,14 @@ from .insert_resources import read_binary_file, validate_sfc_file, ROM_HEADER_V3
 from .resources_compiler import DataStore, ProjectCompiler, SharedInputType, ResourceData, ResourceError
 from .json_formats import Name, Filename, Mappings, MemoryMap
 
-from .common import MultilineError, ResourceType, MS_FS_DATA_BANK_OFFSET, USB2SNES_DATA_BANK_OFFSET, USE_RESOURCES_OVER_USB2SNES_LABEL
+from .common import (
+    MultilineError,
+    ResourceType,
+    MS_FS_DATA_BANK_OFFSET,
+    DYNAMIC_SPRITE_TILES_BANK_OFFSET,
+    USB2SNES_DATA_BANK_OFFSET,
+    USE_RESOURCES_OVER_USB2SNES_LABEL,
+)
 from .common import print_error as __print_error
 
 
@@ -723,20 +730,19 @@ class ResourcesOverUsb2Snes:
         self.urou2s_offset: int = address_to_rom_offset(symbols[USE_RESOURCES_OVER_USB2SNES_LABEL])
         self.entity_rom_data_offset: int = address_to_rom_offset(symbols[ENTITY_ROM_DATA_LABEL])
         self.response_data_offset: int = address_to_rom_offset(address_at_bank_offset(memory_map, USB2SNES_DATA_BANK_OFFSET))
+        self.dyanmic_ms_tiles_offset: int = address_to_rom_offset(address_at_bank_offset(memory_map, DYNAMIC_SPRITE_TILES_BANK_OFFSET))
         self.msfs_data_offset: int = address_to_rom_offset(address_at_bank_offset(memory_map, MS_FS_DATA_BANK_OFFSET))
 
         self.rom_update_required_offset: int = address_to_rom_offset(ROM_UPDATE_REQUIRED_ADDR)
 
         self.expected_entity_rom_data_size: int = n_entities * ENTITY_ROM_DATA_BYTES_PER_ENTITY
 
-        self.max_data_size: int = min(memory_map.mode.bank_size, 0xFFFF)
-
-        assert self.max_data_size > MAX_COMMAND_SIZE * 2
-
         # Steal `MAX_COMMAND_SIZE` bytes from the end of the self.response_data_offset and use it for commands.
         # ::TODO find a proper place to put the command block::
-        self.max_data_size -= MAX_COMMAND_SIZE
+        self.max_data_size: int = memory_map.mode.bank_size - MAX_COMMAND_SIZE
         self.command_offset: int = self.response_data_offset + self.max_data_size
+
+        assert self.max_data_size > MAX_COMMAND_SIZE * 2
 
         self.not_room_counter: int = self.data_store.get_not_room_counter()
 
@@ -859,6 +865,7 @@ class ResourcesOverUsb2Snes:
 
             if request.request_type in self.REQUEST_TYPE_USES_MSFS_OR_ENTITY_DATA:
                 if not self.data_store.is_msfs_and_entity_data_valid():
+                    self.transmit_dynamic_metasprite_tiles()
                     self.transmit_msfs_and_entity_data()
 
             self.write_response(request.request_id, status, data)
@@ -910,6 +917,22 @@ class ResourcesOverUsb2Snes:
                 co = self.data_store.get_resource_data(resource_type, resource_id)
 
         return ResponseStatus.OK, co.data
+
+    # NOTE: This method will sleep until the resource data is valid
+    def transmit_dynamic_metasprite_tiles(self) -> None:
+        dyn_ms_data = self.data_store.get_dynamic_ms_data()
+
+        if dyn_ms_data is None:
+            log_error(f"    Cannot access Dynamic Metasprite tile data")
+
+            while dyn_ms_data is None:
+                self.signals.wait_until_resource_changed()
+                dyn_ms_data = self.data_store.get_dynamic_ms_data()
+
+        # ::TODO detect if dyn_ms_data has changed::
+
+        log_response(f"    Dynamic MetaSprite Tiles { len(dyn_ms_data.tile_data) } bytes")
+        self.usb2snes.write_to_offset(self.dyanmic_ms_tiles_offset, dyn_ms_data.tile_data)
 
     # NOTE: This method will sleep until the resource data is valid
     def transmit_msfs_and_entity_data(self) -> None:
@@ -966,6 +989,7 @@ class ResourcesOverUsb2Snes:
 
             log_request("Init")
 
+            self.transmit_dynamic_metasprite_tiles()
             self.transmit_msfs_and_entity_data()
 
             self.write_response(INIT_REQUEST.request_id, ResponseStatus.INIT_OK, None)

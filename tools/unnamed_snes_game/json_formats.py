@@ -503,10 +503,16 @@ class MsAnimationExportOrder(NamedTuple):
     animations: list[Name]
 
 
+class MseoDynamicMsFsSettings(NamedTuple):
+    first_tile_id: int
+    n_large_tiles: int
+
+
 class MsExportOrder(NamedTuple):
     patterns: OrderedDict[Name, MsPattern]
     shadow_sizes: OrderedDict[Name, int]
     animation_lists: OrderedDict[Name, MsAnimationExportOrder]
+    dynamic_metasprites: OrderedDict[Name, MseoDynamicMsFsSettings]
 
 
 class _MSEO_Helper(_Helper):
@@ -533,6 +539,21 @@ class _MSEO_Helper(_Helper):
 
         return out
 
+    def get_dynamic_metasprites(self, key: str) -> OrderedDict[Name, MseoDynamicMsFsSettings]:
+        out = OrderedDict()
+
+        for name, jh in self.iterate_dict_of_dicts(key):
+            item = MseoDynamicMsFsSettings(
+                first_tile_id=jh.get_int("first_tile_id"),
+                n_large_tiles=jh.get_int("n_large_tiles"),
+            )
+
+            if name in out:
+                self._raise_error(f"Duplicate name: { name }", key)
+            out[name] = item
+
+        return out
+
 
 def load_ms_export_order_json(filename: Filename) -> MsExportOrder:
     jh = _load_json_file(filename, _MSEO_Helper)
@@ -547,6 +568,7 @@ def load_ms_export_order_json(filename: Filename) -> MsExportOrder:
         patterns=patterns,
         shadow_sizes=jh.get_name_list_mapping("shadow_sizes"),
         animation_lists=jh.get_animation_eo_lists("animation_lists"),
+        dynamic_metasprites=jh.get_dynamic_metasprites("dynamic_metasprites"),
     )
 
 
@@ -590,6 +612,7 @@ class Mappings(NamedTuple):
     starting_room: RoomName
     mt_tilesets: list[Name]
     ms_spritesheets: list[Name]
+    palettes: list[Name]
     tiles: list[Name]
     bg_images: list[Name]
     interactive_tile_functions: list[Name]
@@ -674,6 +697,7 @@ def load_mappings_json(filename: Filename) -> Mappings:
         starting_room=jh.get_room_name("starting_room"),
         mt_tilesets=jh.get_name_list("mt_tilesets"),
         ms_spritesheets=jh.get_name_list("ms_spritesheets"),
+        palettes=jh.get_name_list("palettes"),
         tiles=jh.get_name_list("tiles"),
         bg_images=jh.get_name_list("bg_images"),
         interactive_tile_functions=jh.get_name_list("interactive_tile_functions"),
@@ -1010,6 +1034,12 @@ def load_metasprites_string(text: str) -> MsSpritesheet:
 #
 
 
+class PaletteInput(NamedTuple):
+    name: Name
+    source: Filename
+    n_rows: int
+
+
 class TilesInput(NamedTuple):
     name: Name
     format: str
@@ -1020,11 +1050,12 @@ class BackgroundImageInput(NamedTuple):
     name: Name
     format: str
     source: Filename
-    palette: Filename
+    palette: Name
     tile_priority: bool
 
 
 class OtherResources(NamedTuple):
+    palettes: dict[Name, PaletteInput]
     tiles: dict[Name, TilesInput]
     bg_images: dict[Name, BackgroundImageInput]
 
@@ -1033,6 +1064,17 @@ def load_other_resources_json(filename: Filename) -> OtherResources:
     jh = _load_json_file(filename, _Helper)
 
     dirname = os.path.dirname(filename)
+
+    palettes = jh.build_dict_from_dict(
+        "palettes",
+        PaletteInput,
+        256,
+        lambda j, name: PaletteInput(
+            name=name,
+            source=os.path.join(dirname, j.get_filename("source")),
+            n_rows=j.get_int("n_rows"),
+        ),
+    )
 
     tiles = jh.build_dict_from_dict(
         "tiles",
@@ -1053,12 +1095,13 @@ def load_other_resources_json(filename: Filename) -> OtherResources:
             name=name,
             format=t.get_string("format"),
             source=os.path.join(dirname, t.get_filename("source")),
-            palette=os.path.join(dirname, t.get_filename("palette")),
+            palette=t.get_name("palette"),
             tile_priority=t.get_int1("tile_priority"),
         ),
     )
 
     return OtherResources(
+        palettes=palettes,
         tiles=tiles,
         bg_images=bg_images,
     )

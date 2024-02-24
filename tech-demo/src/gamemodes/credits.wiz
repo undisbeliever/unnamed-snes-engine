@@ -8,6 +8,7 @@ import "engine/common/reset";
 import "engine/gamemodes";
 import "engine/wait-frame";
 import "engine/resources/resources";
+import "engine/resources/palette";
 import "../joypad";
 
 import "gen/enums";
@@ -105,6 +106,7 @@ inline func setup_ppu__credits() {
     TM = a = TM_BG1;
 
     resources.load_bg_image_resource_into_vram(resources.bg_images.credits, VRAM_BG1_MAP_WADDR, VRAM_BG1_TILES_WADDR);
+    palette.load_palette__forceblank(resources.palettes.credits);
 }
 
 
@@ -158,11 +160,7 @@ inline func setup_ppu__licenses() {
 
     resources.load_bg_image_resource_into_vram(resources.bg_images.licenses_bg1, VRAM_BG1_MAP_WADDR, VRAM_BG1_TILES_WADDR);
     resources.load_bg_image_resource_into_vram(resources.bg_images.licenses_bg2, VRAM_BG2_MAP_WADDR, VRAM_BG2_TILES_WADDR);
-
-    // Set BG2 palette
-    CGADD = a = 32 + 1;
-    CGDATA = a = 0xff;
-    CGDATA = a = 0xff;
+    palette.load_palette__forceblank(resources.palettes.credits);
 
 
     // Setup a HDMA to hide the second half of BG1

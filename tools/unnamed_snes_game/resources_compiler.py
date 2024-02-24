@@ -18,7 +18,8 @@ from typing import cast, final, Any, Callable, ClassVar, Final, Iterable, NamedT
 from .common import ResourceType
 from .entity_data import create_entity_rom_data
 from .mt_tileset import convert_mt_tileset
-from .metasprite import convert_spritesheet, MsFsEntry, build_ms_fs_data
+from .palette import convert_palette, PaletteColors
+from .metasprite import convert_static_spritesheet, convert_dynamic_spritesheet, build_ms_fs_data, MsFsEntry, DynamicMsSpritesheet
 from .rooms import get_list_of_tmx_files, extract_room_id, compile_room
 from .other_resources import convert_tiles, convert_bg_image
 from .audio import AudioCompiler, COMMON_AUDIO_DATA_RESOURCE_NAME
@@ -71,6 +72,11 @@ class MetaSpriteResourceData(ResourceData):
     msfs_entries: list[MsFsEntry]
 
 
+@dataclass(frozen=True)
+class PaletteResourceData(ResourceData):
+    palette: PaletteColors
+
+
 class MsFsAndEntityOutput(NamedTuple):
     msfs_data: Optional[bytes] = None
     entity_rom_data: Optional[bytes] = None
@@ -83,7 +89,8 @@ class ErrorKey(NamedTuple):
     r_id: Union[int, SharedInputType]
 
 
-MS_FS_AND_ENTITY_ERROR_KEY: Final = ErrorKey(None, -1)
+DYNAMIC_METASPRITES_ERROR_KEY: Final = ErrorKey(None, -1)
+MS_FS_AND_ENTITY_ERROR_KEY: Final = ErrorKey(None, -2)
 
 
 class NonResourceError(NamedTuple):
@@ -105,6 +112,11 @@ def create_resource_error(r_type: Optional[ResourceType], r_id: int, r_name: Nam
     return ResourceError(r_type, r_id, r_name, ErrorKey(r_type, r_id), error)
 
 
+# Used to signal the dynamic metasprites were recompiled
+class DynamicMetaspriteToken(NamedTuple):
+    pass
+
+
 # Thread Safety: This class MUST ONLY be accessed via method calls.
 # Thread Safety: All methods in this class must acquire the `_lock` before accessing fields.
 class DataStore:
@@ -123,6 +135,7 @@ class DataStore:
 
             self._errors: OrderedDict[ErrorKey, Union[ResourceError, NonResourceError]] = OrderedDict()
 
+            self._dynamic_ms_data: Optional[DynamicMsSpritesheet] = None
             self._msfs_lists: list[Optional[list[MsFsEntry]]] = list()
 
             self._msfs_and_entity_data: Optional[MsFsAndEntityOutput] = None
@@ -145,6 +158,7 @@ class DataStore:
             self._msfs_lists = [None] * len(mappings.ms_spritesheets)
             self._rooms = [None] * self.ROOMS_PER_WORLD
 
+            self._dynamic_ms_data = None
             self._msfs_and_entity_data = None
             self._msfs_and_entity_data_valid = False
 
@@ -159,6 +173,9 @@ class DataStore:
                     self._resources[rt] = [None] * n_resources
                 else:
                     self._rooms = [None] * self.ROOMS_PER_WORLD
+
+                if rt == ResourceType.ms_spritesheets:
+                    self._dynamic_ms_data = None
 
             self._msfs_and_entity_data = None
             self._msfs_and_entity_data_valid = False
@@ -199,6 +216,18 @@ class DataStore:
             else:
                 e_key: Final = ErrorKey(c.resource_type, c.resource_id)
                 self._errors.pop(e_key, None)
+
+    def set_dyanamic_ms_data(self, ms: Union[DynamicMsSpritesheet, NonResourceError]) -> None:
+        with self._lock:
+            if isinstance(ms, DynamicMsSpritesheet):
+                self._dynamic_ms_data = ms
+                self._errors.pop(DYNAMIC_METASPRITES_ERROR_KEY, None)
+            else:
+                assert ms.error_key == DYNAMIC_METASPRITES_ERROR_KEY
+                self._dynamic_ms_data = None
+                self._errors[ms.error_key] = ms
+            self._msfa_and_entity_rom_data = None
+            self._msfs_and_entity_data_valid = False
 
     def set_msfs_and_entity_data(self, me: Optional[MsFsAndEntityOutput]) -> None:
         with self._lock:
@@ -242,6 +271,10 @@ class DataStore:
     def mark_msfs_and_entity_data_valid(self) -> None:
         with self._lock:
             self._msfs_and_entity_data_valid = True
+
+    def get_dynamic_ms_data(self) -> Optional[DynamicMsSpritesheet]:
+        with self._lock:
+            return self._dynamic_ms_data
 
     def get_msfs_and_entity_data(self) -> Optional[MsFsAndEntityOutput]:
         with self._lock:
@@ -300,7 +333,7 @@ def read_symbols_file(symbol_filename: Filename) -> dict[str, int]:
 
 
 # If this data changes, multiple resources must be recompiled
-# THREAD SAFETY: Must only exist in the ProjectCompiler classes
+# THREAD SAFETY: Must only be edited by the ProjectCompiler classes
 class SharedInput:
     def __init__(self, sym_filename: Filename) -> None:
         self.symbols_filename: Final[Filename] = sym_filename
@@ -374,6 +407,7 @@ MS_SPRITESHEET_FILE_REGEX: Final = re.compile(r"^metasprites/(\w+)/")
 class BaseResourceCompiler(metaclass=ABCMeta):
     # The Shared inputs that are used by the compiler
     SHARED_INPUTS: Sequence[SharedInputType]
+    USES_PALETTES: bool
 
     def __init__(self, r_type: ResourceType, shared_input: SharedInput) -> None:
         # All fields in a BaseResourceCompiler MUST be final
@@ -451,6 +485,7 @@ class MsSpritesheetCompiler(BaseResourceCompiler):
         return None
 
     SHARED_INPUTS = (SharedInputType.MS_EXPORT_ORDER,)
+    USES_PALETTES = False
 
     def compile_resource(self, resource_id: int) -> BaseResourceData:
         assert self._shared_input.ms_export_order
@@ -462,16 +497,49 @@ class MsSpritesheetCompiler(BaseResourceCompiler):
 
             ms_input = load_metasprites_json(json_filename)
 
-            data, msfs_entries = convert_spritesheet(ms_input, self._shared_input.ms_export_order, ms_dir)
+            data, msfs_entries = convert_static_spritesheet(ms_input, self._shared_input.ms_export_order, ms_dir)
 
             return MetaSpriteResourceData(self.resource_type, resource_id, r_name, data, msfs_entries)
         except Exception as e:
             return create_resource_error(self.resource_type, resource_id, r_name, e)
 
 
-class MetaTileTilesetCompiler(SimpleResourceCompiler):
+class PaletteCompiler(OtherResourcesCompiler):
     def __init__(self, shared_input: SharedInput) -> None:
+        super().__init__(ResourceType.palettes, shared_input)
+
+    def build_filename_map(self, other_resources: OtherResources) -> dict[Filename, int]:
+        palettes: Final = other_resources.palettes
+
+        d = dict()
+        for i, n in enumerate(self.name_list):
+            p = palettes.get(n)
+            if p:
+                d[p.source] = i
+        return d
+
+    SHARED_INPUTS = (SharedInputType.OTHER_RESOURCES,)
+    USES_PALETTES = False
+
+    def compile_resource(self, resource_id: int) -> BaseResourceData:
+        assert self._shared_input.other_resources
+
+        r_name = self.name_list[resource_id]
+        try:
+            pin = self._shared_input.other_resources.palettes[r_name]
+            data, pal = convert_palette(pin, resource_id)
+            return PaletteResourceData(self.resource_type, resource_id, r_name, data, pal)
+        except Exception as e:
+            return create_resource_error(self.resource_type, resource_id, r_name, e)
+
+    def _compile(self, r_name: Name) -> bytes:
+        raise NotImplementedError()
+
+
+class MetaTileTilesetCompiler(SimpleResourceCompiler):
+    def __init__(self, shared_input: SharedInput, palettes: dict[Name, PaletteColors]) -> None:
         super().__init__(ResourceType.mt_tilesets, shared_input)
+        self.__palettes = palettes
 
     def test_filename_is_resource(self, filename: Filename) -> Optional[int]:
         if m := MT_TILESET_FILE_REGEX.match(filename):
@@ -479,12 +547,13 @@ class MetaTileTilesetCompiler(SimpleResourceCompiler):
         return None
 
     SHARED_INPUTS = (SharedInputType.MAPPINGS,)
+    USES_PALETTES = True
 
     def _compile(self, r_name: Name) -> bytes:
         assert self._shared_input.mappings
 
         filename = os.path.join("metatiles/", r_name + ".tsx")
-        return convert_mt_tileset(filename, self._shared_input.mappings)
+        return convert_mt_tileset(filename, self._shared_input.mappings, self.__palettes)
 
 
 class TileCompiler(OtherResourcesCompiler):
@@ -502,6 +571,7 @@ class TileCompiler(OtherResourcesCompiler):
         return d
 
     SHARED_INPUTS = (SharedInputType.OTHER_RESOURCES,)
+    USES_PALETTES = False
 
     def _compile(self, r_name: Name) -> bytes:
         assert self._shared_input.other_resources
@@ -511,8 +581,9 @@ class TileCompiler(OtherResourcesCompiler):
 
 
 class BgImageCompiler(OtherResourcesCompiler):
-    def __init__(self, shared_input: SharedInput) -> None:
+    def __init__(self, shared_input: SharedInput, palettes: dict[Name, PaletteColors]) -> None:
         super().__init__(ResourceType.bg_images, shared_input)
+        self.__palettes = palettes
 
     def build_filename_map(self, other_resources: OtherResources) -> dict[Filename, int]:
         bg_images: Final = other_resources.bg_images
@@ -526,12 +597,13 @@ class BgImageCompiler(OtherResourcesCompiler):
         return d
 
     SHARED_INPUTS = (SharedInputType.OTHER_RESOURCES,)
+    USES_PALETTES = True
 
     def _compile(self, r_name: Name) -> bytes:
         assert self._shared_input.other_resources
 
         bi = self._shared_input.other_resources.bg_images[r_name]
-        return convert_bg_image(bi)
+        return convert_bg_image(bi, self.__palettes)
 
 
 class SongCompiler(SimpleResourceCompiler):
@@ -574,6 +646,7 @@ class SongCompiler(SimpleResourceCompiler):
         return self._file_map.get(filename)
 
     SHARED_INPUTS = (SharedInputType.MAPPINGS, SharedInputType.AUDIO_PROJECT)
+    USES_PALETTES = False
 
     def _compile(self, r_name: Name) -> bytes:
         assert self.compiler
@@ -595,6 +668,7 @@ class RoomCompiler:
         self.resource_type: Final = None
 
     SHARED_INPUTS = (SharedInputType.MAPPINGS, SharedInputType.ENTITIES)
+    USES_PALETTES = False
 
     def compile_room(self, filename: Filename) -> BaseResourceData:
         assert self._shared_input.mappings
@@ -612,6 +686,32 @@ class RoomCompiler:
             return ResourceData(None, room_id, name, data)
         except Exception as e:
             return create_resource_error(None, room_id, name, e)
+
+
+class DynamicMetaspriteCompiler:
+    def __init__(self, shared_input: SharedInput) -> None:
+        self._shared_input: Final = shared_input
+        self.ms_dir: Final = "dynamic-metasprites"
+        self.ms_dir_slash: Final = self.ms_dir + os.path.sep
+        self.json_filename: Final = os.path.join(self.ms_dir, "_metasprites.json")
+
+    def test_filename_is_resource(self, filename: Filename) -> bool:
+        return filename.startswith(self.ms_dir_slash)
+
+    def compile(self) -> Union[DynamicMsSpritesheet, NonResourceError]:
+        assert self._shared_input.mappings
+        assert self._shared_input.ms_export_order
+
+        try:
+            ms_input = load_metasprites_json(self.json_filename)
+            return convert_dynamic_spritesheet(
+                ms_input,
+                self._shared_input.ms_export_order,
+                self.ms_dir,
+                self._shared_input.mappings.memory_map.mode,
+            )
+        except Exception as e:
+            return NonResourceError(DYNAMIC_METASPRITES_ERROR_KEY, "Dynamic Metasprites", e)
 
 
 def _build_st_rt_map(
@@ -654,16 +754,24 @@ class ProjectCompiler:
         self.log_message: Final = message_handler
         self.log_error: Final = err_handler
 
+        self.__palettes: Final[dict[Name, PaletteColors]] = dict()
+
         self.__resource_compilers: Final = (
-            MetaTileTilesetCompiler(self.__shared_input),
+            PaletteCompiler(self.__shared_input),
+            MetaTileTilesetCompiler(self.__shared_input, self.__palettes),
             MsSpritesheetCompiler(self.__shared_input),
             TileCompiler(self.__shared_input),
-            BgImageCompiler(self.__shared_input),
+            BgImageCompiler(self.__shared_input, self.__palettes),
             SongCompiler(self.__shared_input),
         )
         self.__room_compiler: Final = RoomCompiler(self.__shared_input)
+        self.__dynamic_ms_compiler: Final = DynamicMetaspriteCompiler(self.__shared_input)
 
         assert len(self.__resource_compilers) == len(ResourceType)
+
+        self.resources_that_use_palettes: Final[frozenset[Optional[ResourceType]]] = frozenset(
+            c.resource_type for c in self.__resource_compilers if c.USES_PALETTES
+        )
 
         self.ST_RT_MAP: Final = _build_st_rt_map(*self.__resource_compilers, self.__room_compiler)
 
@@ -693,7 +801,7 @@ class ProjectCompiler:
         for s_type in SharedInputType:
             self._shared_input_file_changed(s_type)
 
-    def file_changed(self, filename: Filename) -> Optional[BaseResourceData | SharedInputType]:
+    def file_changed(self, filename: Filename) -> Optional[BaseResourceData | DynamicMetaspriteToken | SharedInputType]:
         if filename == self.__shared_input.symbols_filename:
             s_type: Optional[SharedInputType] = SharedInputType.SYMBOLS
         else:
@@ -711,6 +819,11 @@ class ProjectCompiler:
                     co = self.__room_compiler.compile_room(filename)
                 else:
                     self._log_cannot_compile_si_error(filename)
+
+            elif self.__dynamic_ms_compiler.test_filename_is_resource(filename):
+                self.__compile_dynamic_metasprites()
+                return DynamicMetaspriteToken()
+
             else:
                 for c in self.__resource_compilers:
                     r_id = c.test_filename_is_resource(filename)
@@ -727,7 +840,22 @@ class ProjectCompiler:
                 self.data_store.insert_data(co)
                 if isinstance(co, ResourceError):
                     self.log_error(co)
+                if co.resource_type == ResourceType.palettes:
+                    self._palette_changed(co)
             return co
+
+    # MUST NOT be called by `self.__compile_resource_lists()`
+    def _palette_changed(self, co: BaseResourceData) -> None:
+        assert co.resource_type == ResourceType.palettes
+
+        if isinstance(co, PaletteResourceData):
+            self.__palettes[co.resource_name] = co.palette
+        else:
+            self.__palettes.pop(co.resource_name)
+
+        # Recompile the resource that uses palettes
+        # ::TODO only recompile the resources that use the changed palette::
+        self.__compile_resource_lists(set(self.resources_that_use_palettes))
 
     def _log_cannot_compile_si_error(self, res_name: str) -> None:
         si_list = [SHARED_INPUT_NAMES[s_type] for s_type in self.__shared_inputs_with_errors]
@@ -782,23 +910,31 @@ class ProjectCompiler:
             self.__compile_resource_lists(self.__res_lists_waiting_on_shared_input)
             self.__res_lists_waiting_on_shared_input.clear()
 
+    def __compile_dynamic_metasprites(self) -> None:
+        self.log_message(f"Compiling dynamic metasprites")
+        d = self.__dynamic_ms_compiler.compile()
+        if isinstance(d, NonResourceError):
+            self.log_error(d.error)
+        self.data_store.set_dyanamic_ms_data(d)
+
     def __compile_msfs_and_entity_data(self) -> None:
         if self.__shared_input.mappings is None or self.__shared_input.entities is None or self.__shared_input.symbols is None:
             self._log_cannot_compile_si_error("MsFs and Entity Data")
             self.data_store.set_msfs_and_entity_data(None)
             return
 
+        dynamic_ms_data: Final = self.data_store.get_dynamic_ms_data()
         optional_msfs_lists: Final = self.data_store.get_msfs_lists()
 
-        if any(entry_list is None for entry_list in optional_msfs_lists):
+        if dynamic_ms_data is None or any(entry_list is None for entry_list in optional_msfs_lists):
             e = ValueError("Cannot compile MsFs data.  There is an error in a MS Spritesheet.")
             self.log_error(e)
             data = MsFsAndEntityOutput(error=e)
         else:
             try:
-                msfs_lists = cast(list[list[MsFsEntry]], optional_msfs_lists)
+                static_msfs_lists = cast(list[list[MsFsEntry]], optional_msfs_lists)
                 rom_data, ms_map = build_ms_fs_data(
-                    msfs_lists, self.__shared_input.symbols, self.__shared_input.mappings.memory_map.mode
+                    dynamic_ms_data, static_msfs_lists, self.__shared_input.symbols, self.__shared_input.mappings.memory_map.mode
                 )
                 ms_fs_data = bytes(rom_data.data())
                 entity_rom_data = create_entity_rom_data(self.__shared_input.entities, self.__shared_input.symbols, ms_map)
@@ -814,21 +950,35 @@ class ProjectCompiler:
         # Uses multiprocessing to speed up the compilation
 
         if self.__shared_inputs_with_errors:
-            # This should not happen, log the error anyway
             self._log_cannot_compile_si_error("resources")
             return
+
+        if ResourceType.palettes in to_recompile:
+            to_recompile |= self.resources_that_use_palettes
 
         if to_recompile == self.ALL_RESOURCE_LISTS:
             self.log_message("Compiling all resources")
         else:
             for rt in to_recompile:
-                if rt:
+                if rt is not None:
                     self.log_message(f"Compiling all {rt.name}")
                 else:
                     self.log_message("Compiling all rooms")
 
         with multiprocessing.Pool(processes=self.__n_processes) as mp:
-            co_lists = list()
+            co_lists: list[Iterable[BaseResourceData]] = list()
+
+            if ResourceType.palettes in to_recompile:
+                to_recompile.remove(ResourceType.palettes)
+
+                c = self.__resource_compilers[ResourceType.palettes]
+                pal_l = list(mp.imap_unordered(c.compile_resource, range(len(c.name_list))))
+
+                co_lists.append(pal_l)
+
+                self.__palettes.clear()
+                self.__palettes.update((co.resource_name, co.palette) for co in pal_l if isinstance(co, PaletteResourceData))
+
             for rt in to_recompile:
                 if rt is not None:
                     c = self.__resource_compilers[rt]
@@ -842,5 +992,8 @@ class ProjectCompiler:
                     self.data_store.insert_data(co)
                     if isinstance(co, ResourceError):
                         self.log_error(co)
+
+        if ResourceType.ms_spritesheets in to_recompile:
+            self.__compile_dynamic_metasprites()
 
         self.__compile_msfs_and_entity_data()

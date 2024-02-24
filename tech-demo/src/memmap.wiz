@@ -6,7 +6,7 @@ import "engine/common/reset";
 
 
 config {
-    map_mode = "hirom",
+    map_mode = "lorom",
     expansion_type = "none",
     fastrom = false,
     region = "ntsc",
@@ -17,12 +17,10 @@ config {
 }
 
 
-bank farcode  @ 0xc00000 : [constdata;  0x8000];
-bank code     @ 0x808000 : [constdata;  0x8000];
+bank code       @ 0x808000 : [constdata; 0x8000];
+bank rodata0    @ 0x818000 : [constdata; 0x8000];
 
-bank rodata0  @ 0xc10000 : [constdata; 0x10000];
-bank rodata1  @ 0xc20000 : [constdata; 0x10000];
-bank rodata2  @ 0xc30000 : [constdata; 0x10000];
+bank _resources @ 0x828000 : [constdata; 0x8000 * 6];
 
 // NOTE: *_roomstate variables will be saved on every room change
 //       and may be restored if the player backtracks into the previous room.

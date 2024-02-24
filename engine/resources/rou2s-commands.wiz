@@ -34,7 +34,7 @@ let INIT_COMMAND_ID = 0xff;
 let MAX_COMMAND_SIZE = 8192;
 
 // ::TODO find a better place to put the command block::
-let _COMMAND_BLOCK_ADDR = resources._USB2SNES_DATA_ADDR + resources._BANK_SIZE - MAX_COMMAND_SIZE - 1;
+let _COMMAND_BLOCK_ADDR = resources._USB2SNES_DATA_ADDR + resources._BANK_SIZE - MAX_COMMAND_SIZE;
 
 
 // MUST use far addressing to read `Command` data

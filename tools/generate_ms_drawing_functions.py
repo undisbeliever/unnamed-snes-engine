@@ -8,7 +8,7 @@ from io import StringIO
 
 from collections import OrderedDict
 
-from unnamed_snes_game.json_formats import load_ms_export_order_json, Name, MsPattern
+from unnamed_snes_game.json_formats import load_ms_export_order_json, Name, MsPattern, MsExportOrder
 
 
 def generate_pattern_code(out: StringIO, pattern: MsPattern) -> None:
@@ -109,7 +109,9 @@ def generate_ms_patterns_table(out: StringIO, ms_patterns: OrderedDict[Name, MsP
     out.write("];\n")
 
 
-def generate_wiz_code(ms_patterns: OrderedDict[Name, MsPattern]) -> str:
+def generate_wiz_code(ms_export_orders: MsExportOrder) -> str:
+    ms_patterns = ms_export_orders.patterns
+
     with StringIO() as out:
         out.write(
             """
@@ -131,14 +133,17 @@ in code {
 
         generate_ms_patterns_table(out, ms_patterns)
 
-        out.write(
-            """
-}
+        out.write("}\n")
+        out.write("}\n\n")
 
-}
-}
-"""
-        )
+        out.write("namespace dynamic_tiles {\n")
+        for name, d in ms_export_orders.dynamic_metasprites.items():
+            out.write(f"  inline func transfer_{name}_tiles__vblank__inline(msFrameAddr: u16 in xx) {{\n")
+            out.write(f"    metasprites.__transfer_dynamic_metasprites__vblank__inline(xx, {d.first_tile_id}, {d.n_large_tiles});\n")
+            out.write("  }\n")
+        out.write("}\n\n")
+
+        out.write("}\n")
 
         return out.getvalue()
 
@@ -158,7 +163,7 @@ def main() -> None:
 
     ms_export_orders = load_ms_export_order_json(args.ms_export_order_json_file)
 
-    out = generate_wiz_code(ms_export_orders.patterns)
+    out = generate_wiz_code(ms_export_orders)
 
     with open(args.output, "w") as fp:
         fp.write(out)
