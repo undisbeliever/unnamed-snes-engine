@@ -167,12 +167,15 @@ namespace AnimationDataFormat {
 
 
 
+// MetaSprite resource RAM data format
+struct _RamDataFormat {
+    firstTile : u16,
+}
+
+
 // MetaSprie PPU data format in ROM.
 struct _PpuDataFormat {
-    first_tile : u16,
-
     palette_data : [u16 ; 128],
-
     tile_data : u8,
 }
 
@@ -271,7 +274,7 @@ inline func setup__forceblank() {
 // DB = 0x80
 #[mem8, idx16]
 inline func load_ms_spritesheet_ppu_data__forceblank(spritesheet_id : u8 in a) {
-var _res : resources.ResourceEntry in resources.res;
+var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
 
     push8(a);
 
@@ -287,43 +290,43 @@ var _res : resources.ResourceEntry in resources.res;
 
     // Load common spritesheet tiles
     // Assumes resources.ms_spritesheets.common is 0
-    _res = resources.load_ms_spritesheet(0);
-    __transfer_ppu_data__forceblank(_res);
+    __load_and_transfer_resource_data__forceblank(0);
 
 
     // Load requested spritesheet
     // (Assumes resources.ms_spritesheets.common is 0)
     a = pop8();
     if !zero {
-        _res = resources.load_ms_spritesheet(a);
-        __transfer_ppu_data__forceblank(_res);
+        __load_and_transfer_resource_data__forceblank(a);
     }
 }
 
 
 
-// Transfer MetaSprite data to the PPU (CGRAM and VRAM)
+// Load the ms_spritesheet resource and transfer MetaSprite data to the PPU (CGRAM and VRAM)
 //
 // REQUIRES: force-blank
 // Uses DMA channel 0
 //
 // DB = 0x80
 #[mem8, idx16]
-func __transfer_ppu_data__forceblank(_res : resources.ResourceEntry in resources.res) {
+func __load_and_transfer_resource_data__forceblank(spritesheet_id : u8 in a) {
+var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
 
-var _secondRowVramWaddr : u16 in zpTmp_word_0;
+var _header : _RamDataFormat in zpTmp_word_0;
 
-    dma.set_dma0_source__res_plus_offset(_res, offsetof(_PpuDataFormat, palette_data));
+var _secondRowVramWaddr : u16 in zpTmp_word_1;
+
+    _ppuData = resources.load_ms_spritesheet__inline(a, &_header as *u8, sizeof(typeof(_header)));
 
     CGADD = a = 128;
-    dma.continue_transfer_to_cgram__forceblank(256);
+    resources.dma_to_cgram__forceblank(_ppuData, 256);
 
     mem16();
     #[mem16] {
         // Calculate VRAM address of tile data
 
-        // _PpuDataFormat.first_tile;
-        aa = **(&_res.farPtr as *far *u16);
+        aa = _header.firstTile;
 
         // +# safe, carry will never be set
         VMADD = aa = ((aa & 0x1ff) << 4) +# VRAM_OBJ_WADDR;
@@ -335,8 +338,8 @@ var _secondRowVramWaddr : u16 in zpTmp_word_0;
         // Transfer first small row of tiles to VRAM
         // (The first_tile can start in the middle of a VRAM row)
 
-        // Number of tiles in the first row (farPtr = _PpuDataFormat.first_tile)
-        aa = (0x1ff - **(&_res.farPtr as *far *u16)) & 0xf;
+        // Number of tiles in the first row
+        aa = (0x1ff - _header.firstTile) & 0xf;
         aa++;
 
         // first DMA transfer size
@@ -345,11 +348,11 @@ var _secondRowVramWaddr : u16 in zpTmp_word_0;
     mem8();
 
     // Transfer the first row of tiles to VRAM
-    dma.continue_transfer_to_vram__forceblank(yy);
+    resources.dma_to_vram__forceblank(_ppuData, yy);
 
     // Transfer the remaining tiles to VRAM
     VMADD = xx = _secondRowVramWaddr;
-    dma.transfer_remaining_res_data_to_vram__forceblank(_res);
+    ^return resources.dma_remaining_to_vram__forceblank(_ppuData);
 }
 
 

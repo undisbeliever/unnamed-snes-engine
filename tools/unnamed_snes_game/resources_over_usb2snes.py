@@ -897,7 +897,7 @@ class ResourcesOverUsb2Snes:
                 self.not_room_counter = nrc
                 status = ResponseStatus.OK_RESOURCES_CHANGED
 
-            return status, co.data
+            return status, co.data.to_rou2s_data()
         else:
             # Room does not exist
             return ResponseStatus.NOT_FOUND, None
@@ -916,7 +916,7 @@ class ResourcesOverUsb2Snes:
                 self.signals.wait_until_resource_changed()
                 co = self.data_store.get_resource_data(resource_type, resource_id)
 
-        return ResponseStatus.OK, co.data
+        return ResponseStatus.OK, co.data.to_rou2s_data()
 
     # NOTE: This method will sleep until the resource data is valid
     def transmit_dynamic_metasprite_tiles(self) -> None:

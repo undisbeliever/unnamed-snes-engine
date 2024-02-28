@@ -15,7 +15,7 @@ from collections import OrderedDict
 from typing import Final, NamedTuple, Optional, Union
 
 from .json_formats import load_entities_json, load_mappings_json, Filename, Mappings, EntitiesJson, Entity, RoomEvent, Name
-from .common import MultilineError, SimpleMultilineError, print_error
+from .common import EngineData, FixedSizedData, MultilineError, SimpleMultilineError, print_error
 
 
 MAP_WIDTH = 16
@@ -541,7 +541,7 @@ def create_map_data(room: RoomIntermediate) -> bytes:
     return data
 
 
-def compile_room(filename: str, entities: EntitiesJson, mapping: Mappings) -> bytes:
+def compile_room(filename: str, entities: EntitiesJson, mapping: Mappings) -> EngineData:
     with open(filename, "r") as fp:
         tmx_et = xml.etree.ElementTree.parse(fp)
 
@@ -549,9 +549,13 @@ def compile_room(filename: str, entities: EntitiesJson, mapping: Mappings) -> by
 
     room = process_room(tmx_map, mapping, entities.entities)
 
-    # ::TODO compress room data with lz4::
+    map_data = create_map_data(room)
 
-    return create_map_data(room)
+    # ::TODO compress room data with lz4::
+    return EngineData(
+        ram_data=FixedSizedData(map_data),
+        ppu_data=None,
+    )
 
 
 def get_list_of_tmx_files(directory: str) -> list[str]:

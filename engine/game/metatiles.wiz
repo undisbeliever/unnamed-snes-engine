@@ -55,13 +55,12 @@ struct _Tileset {
 };
 
 
-// Tileset data format in ROM.
-struct _DataFormat {
-    ram_data : _Tileset,
-
+// Tileset resource RAM data format.
+//
+// PPU data format: 4bpp tiles
+struct _RamDataFormat {
+    tileset : _Tileset,
     palette : resources.palettes,
-
-    tile_data : u8,
 };
 
 
@@ -128,8 +127,10 @@ in wram7e_roomstate {
 in wram7e {
     // this hack allows me to write `tileset.topLeft[y]` without a compile error.
     #[align(256)]
-    var __far_tileset : _Tileset;
-        var tileset @ &__far_tileset : _Tileset;
+    var __far_mt_data : _RamDataFormat;
+        var mt_data @ &__far_mt_data : _RamDataFormat;
+        var tileset @ &__far_mt_data : _Tileset;
+        var tileset_palette @ &__far_mt_data.palette : resources.palettes;
 }
 
 
@@ -146,21 +147,17 @@ in code {
 // DB = 0x80
 #[mem8, idx16]
 func load_tileset__forceblank(tileset_id : u8 in a) {
-var _res : resources.ResourceEntry in resources.res;
+var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
 
-    _res = resources.load_mt_tileset(a);
-
-    // Transfer header to WorkRAM
-    resources.transfer_resource_header_to_wram7e(_res, &tileset as u16, sizeof(_Tileset));
+    _ppuData = resources.load_mt_tileset__inline(a, &mt_data as *u8, sizeof(typeof(mt_data)));
 
     // Transfer tiles to VRAM
     VMADD = xx = VRAM_BG1_TILES_WADDR;
-    dma.set_dma0_source__res_plus_offset(_res, offsetof(_DataFormat, tile_data));
-    dma.transfer_remaining_res_data_to_vram__forceblank(_res);
+    resources.dma_remaining_to_vram__forceblank(_ppuData);
 
     // Transfer palette (must be done after resources data is processed);
-    yy = offsetof(_DataFormat, palette);
-    ^return palette.load_palette__forceblank(_res.farPtr[yy] as resources.palettes);
+    a = *(far &tileset_palette as far *u8);
+    ^return palette.load_palette__forceblank(a as resources.palettes);
 }
 
 

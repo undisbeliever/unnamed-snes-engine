@@ -316,12 +316,7 @@ in code {
 #[mem8, idx16]
 func load_audio_data(id: u8 in a) : bool in carry {
     if a < N_SONGS {
-        var _res : resources.ResourceEntry in resources.res;
-        resources.load_songs_resource(a as resources.songs);
-
-        xx = *(&_res.farPtr as *u16);
-        a = #:_res.farPtr;
-        yy = _res.size;
+        resources.load_songs_resource__inline_axy(a as resources.songs);
         return true;
     }
     return false;

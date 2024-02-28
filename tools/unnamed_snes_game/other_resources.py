@@ -8,7 +8,7 @@ import sys
 from collections import OrderedDict
 from typing import Any, Callable, Final, Iterable, NamedTuple, Optional
 
-from .common import print_error
+from .common import EngineData, FixedSizedData, DynamicSizedData, print_error
 from .palette import PaletteColors
 
 from .snes import (
@@ -51,13 +51,18 @@ TILE_FORMATS: dict[str, Callable[[Iterable[SmallTileData]], bytes]] = {
 }
 
 
-def convert_tiles(t: TilesInput) -> bytes:
+def convert_tiles(t: TilesInput) -> EngineData:
     tile_converter = TILE_FORMATS[t.format]
 
     with PIL.Image.open(t.source) as image:
         image.load()
 
-    return tile_converter(extract_tiles_from_paletted_image(image))
+    tile_data = tile_converter(extract_tiles_from_paletted_image(image))
+
+    return EngineData(
+        ram_data=None,
+        ppu_data=DynamicSizedData(tile_data),
+    )
 
 
 #
@@ -75,7 +80,7 @@ NAMETABLE_SIZE_BYTES: Final = 32 * 32 * 2
 VALID_BGI_HEADER_TM_SIZES: Final = (1, 2, 4)
 
 
-def convert_bg_image(bgi: BackgroundImageInput, palettes: dict[Name, PaletteColors]) -> bytes:
+def convert_bg_image(bgi: BackgroundImageInput, palettes: dict[Name, PaletteColors]) -> EngineData:
     bpp = BI_BPP_FORMATS[bgi.format]
 
     with PIL.Image.open(bgi.source) as image:
@@ -94,11 +99,17 @@ def convert_bg_image(bgi: BackgroundImageInput, palettes: dict[Name, PaletteColo
     if tm_size not in VALID_BGI_HEADER_TM_SIZES:
         raise ValueError(f"Invalid number of nametables, expected { VALID_BGI_HEADER_TM_SIZES }, got { tm_size }.")
 
-    header_byte = tm_size << 3
+    header = bytes(
+        [
+            tm_size << 3,
+        ]
+    )
 
-    out = bytearray()
-    out.append(header_byte)
-    out += tilemap_data
-    out += tile_data
+    ppu_data = bytearray()
+    ppu_data += tilemap_data
+    ppu_data += tile_data
 
-    return out
+    return EngineData(
+        ram_data=FixedSizedData(header),
+        ppu_data=DynamicSizedData(ppu_data),
+    )

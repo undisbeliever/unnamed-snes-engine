@@ -12,7 +12,7 @@ from typing import Final, NamedTuple, Optional, TextIO
 from .json_formats import load_mappings_json, Filename, Mappings, Name
 from .palette import PaletteColors
 from .snes import image_and_palette_map_to_snes, TileMap, ImageError, InvalidTilesError
-from .common import SimpleMultilineError, print_error
+from .common import FixedSizedData, DynamicSizedData, EngineData, SimpleMultilineError, print_error
 
 
 N_TILES = 256
@@ -271,29 +271,29 @@ def create_properties_array(
     return data
 
 
-def create_tileset_data(palette: PaletteColors, tile_data: bytes, metatile_map: bytes, properties: bytes) -> bytes:
-    data = bytearray()
+def create_tileset_data(palette: PaletteColors, tile_data: bytes, metatile_map: bytes, properties: bytes) -> EngineData:
+    wram_data = bytearray()
 
     # 2048 bytes = metatile map
     assert len(metatile_map) == 2048
-    data += metatile_map
+    wram_data += metatile_map
 
     # 256 bytes = properties map
     assert len(properties) == 256
-    data += properties
+    wram_data += properties
 
     # Next 1 bytes = palette id
-    data.append(palette.id)
+    wram_data.append(palette.id)
 
-    assert len(data) == 2048 + 256 + 1
+    assert len(wram_data) == 2048 + 256 + 1
 
-    # Next data: tile data
-    data += tile_data
+    return EngineData(
+        ram_data=FixedSizedData(wram_data),
+        ppu_data=DynamicSizedData(tile_data),
+    )
 
-    return data
 
-
-def convert_mt_tileset(tsx_filename: Filename, mappings: Mappings, palettes: dict[Name, PaletteColors]) -> bytes:
+def convert_mt_tileset(tsx_filename: Filename, mappings: Mappings, palettes: dict[Name, PaletteColors]) -> EngineData:
     tsx_file = read_tsx_file(tsx_filename)
 
     with PIL.Image.open(tsx_file.image_filename) as image:

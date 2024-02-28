@@ -6,6 +6,7 @@ import struct
 import itertools
 from typing import Final, NamedTuple
 
+from .common import EngineData, FixedSizedData, DynamicSizedData
 from .json_formats import PaletteInput, Filename, Name
 from .snes import convert_rgb_color, PaletteMap, SnesColor, ImageError
 
@@ -54,7 +55,7 @@ def load_palette_image(filename: Filename) -> list[SnesColor]:
     return [convert_rgb_color(c) for c in image.getdata()]
 
 
-def convert_palette(pi: PaletteInput, id: int) -> tuple[bytes, PaletteColors]:
+def convert_palette(pi: PaletteInput, id: int) -> tuple[EngineData, PaletteColors]:
     if pi.n_rows < 1 or pi.n_rows > 16:
         raise ValueError(f"Invalid n_rows ({pi.n_rows}, min 1, max 16)")
 
@@ -70,6 +71,9 @@ def convert_palette(pi: PaletteInput, id: int) -> tuple[bytes, PaletteColors]:
             len(colors),
         ]
     )
-    data = header + struct.pack(f"<{len(colors)}H", *colors)
+    data = EngineData(
+        FixedSizedData(header),
+        DynamicSizedData(struct.pack(f"<{len(colors)}H", *colors)),
+    )
 
     return data, PaletteColors(name=pi.name, id=id, colors=colors)

@@ -10,7 +10,7 @@ import PIL.Image  # type: ignore
 
 from typing import overload, Callable, Final, Iterable, Literal, NamedTuple, Optional, TextIO, TypeVar, Union
 
-from .common import RomData, MemoryMapMode, MultilineError, print_error
+from .common import RomData, EngineData, FixedSizedData, DynamicSizedData, MemoryMapMode, MultilineError, print_error
 from .snes import (
     extract_small_tile,
     extract_large_tile,
@@ -1289,22 +1289,21 @@ def load_image(ms_dir: Filename, filename: Filename) -> PIL.Image.Image:
 #
 
 
-def generate_ppu_data(ms_input: MsSpritesheet, tileset: list[SmallTileData], palette_data: bytes) -> bytes:
+def generate_ppu_data(ms_input: MsSpritesheet, tileset: list[SmallTileData], palette_data: bytes) -> EngineData:
     tile_data = convert_snes_tileset(tileset, TILE_DATA_BPP)
 
-    data = bytearray()
+    header = bytearray()
 
     # first_tile
-    data.append(ms_input.first_tile & 0xFF)
-    data.append(ms_input.first_tile >> 8)
+    header.append(ms_input.first_tile & 0xFF)
+    header.append(ms_input.first_tile >> 8)
 
-    # palette_data
-    data += palette_data
+    ppu_data = palette_data + tile_data
 
-    # tile_data
-    data += tile_data
-
-    return data
+    return EngineData(
+        ram_data=FixedSizedData(header),
+        ppu_data=DynamicSizedData(ppu_data),
+    )
 
 
 def _extract_frameset_data(
@@ -1332,16 +1331,16 @@ def _extract_frameset_data(
 
 def convert_static_spritesheet(
     ms_input: MsSpritesheet, ms_export_orders: MsExportOrder, ms_dir: Filename
-) -> tuple[bytes, list[MsFsEntry]]:
+) -> tuple[EngineData, list[MsFsEntry]]:
     framesets, palette_data = _extract_frameset_data(ms_input, ms_export_orders, ms_dir)
 
     tileset_data, tile_map = build_static_tileset(framesets, ms_input)
 
     msfs_entries = build_static_msfs_entries(framesets, ms_input, tile_map)
 
-    bin_data = generate_ppu_data(ms_input, tileset_data, palette_data)
+    ppu_data = generate_ppu_data(ms_input, tileset_data, palette_data)
 
-    return bin_data, msfs_entries
+    return ppu_data, msfs_entries
 
 
 def convert_dynamic_spritesheet(

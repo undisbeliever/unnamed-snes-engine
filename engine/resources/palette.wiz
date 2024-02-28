@@ -6,14 +6,12 @@ import "../registers";
 
 import "resources";
 
-import "dma";
-
 import "gen/enums";
 
 
 namespace palette {
 
-struct _DataFormat {
+struct _RamDataFormat {
     n_colors : u8,
 };
 
@@ -27,27 +25,23 @@ in code {
 // DB = 0x80
 #[mem8, idx16]
 func load_palette__forceblank(paletteId : resources.palettes in a) {
-var _res : resources.ResourceEntry in resources.res;
+var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
 
-    _res = resources.load_palette(a as resources.palettes);
+var _header : _RamDataFormat in zpTmp_byte_0;
+
+    _ppuData = resources.load_palette__inline(a, &_header as *u8, sizeof(typeof(_header)));
 
     aa = direct_page;
-    a = *_res.farPtr;
+    a = _header.n_colors;
     mem16();
     #[mem16] {
         // DMA size
         yy = aa = aa << 1;
-
-        // carry clear
-        // DMA address
-        xx = aa = *(&_res.farPtr as *u16) +# sizeof(_DataFormat);
     }
     mem8();
 
-    a = #:_res.farPtr;
-
     CGADD = 0;
-    ^return dma.transfer_to_cgram__forceblank(a, xx, yy);
+    ^return resources.dma_to_cgram__forceblank(_ppuData, yy);
 }
 
 }

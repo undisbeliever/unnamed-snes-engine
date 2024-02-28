@@ -6,6 +6,7 @@ import re
 import subprocess
 from typing import Final
 
+from .common import EngineData, DynamicSizedData
 from .json_formats import Filename, Name, Mappings, AudioProject
 
 COMMON_AUDIO_DATA_RESOURCE_NAME: Final = "__null__common_data__"
@@ -36,20 +37,26 @@ class AudioCompiler:
         self._tad_compiler_binary: Final = tad_compiler_binary
         self._project_filename: Final = project_filename
 
-    def compile_common_audio_data(self) -> bytes:
+    def compile_common_audio_data(self) -> EngineData:
         command = (self._tad_compiler_binary, "common", "--stdout", self._project_filename)
         c = subprocess.run(command, capture_output=True, timeout=3)
 
         if c.returncode == 0:
-            return c.stdout
+            return EngineData(
+                ram_data=DynamicSizedData(c.stdout),
+                ppu_data=None,
+            )
         else:
             raise TadCompilerError(c.stderr.decode("UTF-8"))
 
-    def compile_song(self, r_name: Name) -> bytes:
+    def compile_song(self, r_name: Name) -> EngineData:
         command = (self._tad_compiler_binary, "song", "--stdout", self._project_filename, r_name)
         c = subprocess.run(command, capture_output=True, timeout=3)
 
         if c.returncode == 0:
-            return c.stdout
+            return EngineData(
+                ram_data=DynamicSizedData(c.stdout),
+                ppu_data=None,
+            )
         else:
             raise TadCompilerError(c.stderr.decode("UTF-8"))

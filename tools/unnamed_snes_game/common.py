@@ -2,9 +2,11 @@
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
 import sys
+import struct
 from io import StringIO
+from dataclasses import dataclass
 from enum import IntEnum, Enum, unique
-from typing import Callable, Final, Optional, TextIO, Union
+from typing import Callable, Final, NamedTuple, Optional, TextIO, Union
 from abc import abstractmethod
 
 from .ansi_color import NoAnsiColors, AnsiColors
@@ -33,6 +35,64 @@ class ResourceType(IntEnum):
     tiles = 3
     bg_images = 4
     songs = 5
+
+
+class FixedSizedData:
+    "Engine Data with a fixed size"
+
+    def __init__(self, data: bytes):
+        if len(data) > 0xFFFF:
+            raise RuntimeError("data is too large")
+        self._data: Final = data
+
+    def size(self) -> int:
+        return len(self._data)
+
+    def data(self) -> bytes:
+        return self._data
+
+
+# ::TODO compress dynamic data::
+class DynamicSizedData:
+    "Engine data with an unknown size"
+
+    def __init__(self, data: bytes):
+        if len(data) > 0xFFFF:
+            raise RuntimeError("data is too large")
+        self._data: Final = struct.pack("<H", len(data)) + data
+
+    def size(self) -> int:
+        return len(self._data)
+
+    def data(self) -> bytes:
+        return self._data
+
+
+class EngineData:
+    def __init__(self, ram_data: Optional[Union[FixedSizedData, DynamicSizedData]], ppu_data: Optional[DynamicSizedData]):
+        self.ram_data: Final = ram_data
+        self.ppu_data: Final = ppu_data
+
+        if self.size() > 0xFFFF:
+            raise RuntimeError("data is too large")
+
+    def size(self) -> int:
+        size = 0
+        if self.ram_data is not None:
+            size += self.ram_data.size()
+        if self.ppu_data is not None:
+            size += self.ppu_data.size()
+        return size
+
+    def to_rou2s_data(self) -> bytes:
+        if self.ram_data and self.ppu_data:
+            return self.ram_data.data() + self.ppu_data.data()
+        elif self.ram_data:
+            return self.ram_data.data()
+        elif self.ppu_data:
+            return self.ppu_data.data()
+        else:
+            raise RuntimeError("No data")
 
 
 def lorom_address_to_rom_offset(addr: int) -> int:

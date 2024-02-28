@@ -15,7 +15,7 @@ from enum import unique, auto, Enum
 from dataclasses import dataclass
 from typing import cast, final, Any, Callable, ClassVar, Final, Iterable, NamedTuple, Optional, Sequence, Set, Union
 
-from .common import ResourceType
+from .common import ResourceType, EngineData
 from .entity_data import create_entity_rom_data
 from .mt_tileset import convert_mt_tileset
 from .palette import convert_palette, PaletteColors
@@ -64,7 +64,7 @@ class BaseResourceData:
 
 @dataclass(frozen=True)
 class ResourceData(BaseResourceData):
-    data: bytes
+    data: EngineData
 
 
 @dataclass(frozen=True)
@@ -293,12 +293,12 @@ class DataStore:
             return list(self._errors.values())
 
     # Assumes no errors in the DataStore
-    def get_all_data_for_type(self, r_type: ResourceType) -> list[bytes]:
+    def get_all_data_for_type(self, r_type: ResourceType) -> list[EngineData]:
         with self._lock:
             return [r.data for r in self._resources[r_type]]  # type: ignore
 
     # Assumes no errors in the DataStore
-    def get_data_for_all_rooms(self) -> list[Optional[bytes]]:
+    def get_data_for_all_rooms(self) -> list[Optional[EngineData]]:
         with self._lock:
             return [r.data if isinstance(r, ResourceData) else None for r in self._rooms]
 
@@ -449,7 +449,7 @@ class SimpleResourceCompiler(BaseResourceCompiler):
             return create_resource_error(self.resource_type, resource_id, r_name, e)
 
     @abstractmethod
-    def _compile(self, r_name: Name) -> bytes:
+    def _compile(self, r_name: Name) -> EngineData:
         pass
 
 
@@ -532,7 +532,7 @@ class PaletteCompiler(OtherResourcesCompiler):
         except Exception as e:
             return create_resource_error(self.resource_type, resource_id, r_name, e)
 
-    def _compile(self, r_name: Name) -> bytes:
+    def _compile(self, r_name: Name) -> EngineData:
         raise NotImplementedError()
 
 
@@ -549,7 +549,7 @@ class MetaTileTilesetCompiler(SimpleResourceCompiler):
     SHARED_INPUTS = (SharedInputType.MAPPINGS,)
     USES_PALETTES = True
 
-    def _compile(self, r_name: Name) -> bytes:
+    def _compile(self, r_name: Name) -> EngineData:
         assert self._shared_input.mappings
 
         filename = os.path.join("metatiles/", r_name + ".tsx")
@@ -573,7 +573,7 @@ class TileCompiler(OtherResourcesCompiler):
     SHARED_INPUTS = (SharedInputType.OTHER_RESOURCES,)
     USES_PALETTES = False
 
-    def _compile(self, r_name: Name) -> bytes:
+    def _compile(self, r_name: Name) -> EngineData:
         assert self._shared_input.other_resources
 
         t = self._shared_input.other_resources.tiles[r_name]
@@ -599,7 +599,7 @@ class BgImageCompiler(OtherResourcesCompiler):
     SHARED_INPUTS = (SharedInputType.OTHER_RESOURCES,)
     USES_PALETTES = True
 
-    def _compile(self, r_name: Name) -> bytes:
+    def _compile(self, r_name: Name) -> EngineData:
         assert self._shared_input.other_resources
 
         bi = self._shared_input.other_resources.bg_images[r_name]
@@ -648,7 +648,7 @@ class SongCompiler(SimpleResourceCompiler):
     SHARED_INPUTS = (SharedInputType.MAPPINGS, SharedInputType.AUDIO_PROJECT)
     USES_PALETTES = False
 
-    def _compile(self, r_name: Name) -> bytes:
+    def _compile(self, r_name: Name) -> EngineData:
         assert self.compiler
         assert self._shared_input.audio_project
 
