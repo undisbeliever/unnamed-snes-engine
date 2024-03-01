@@ -316,7 +316,7 @@ in code {
 #[mem8, idx16]
 func load_audio_data(id: u8 in a) : bool in carry {
     if a < N_SONGS {
-        resources.load_songs_resource__inline_axy(a as resources.songs);
+        resources.load_resource__dynamic_ram_no_copy__inline_axy(resources.ResourceType.songs, a as resources.songs);
         return true;
     }
     return false;

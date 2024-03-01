@@ -101,60 +101,54 @@ in zeropage {
 in code {
 
 
-// Load a palette resource.
+// Load a resource with fixed RAM data and PPU data.
+//
+// LIFETIME: PPU data is only valid until the next `load_resource__*` call or non-resource DMA transfer.
+// REQUIRES: Force-Blank
+// USES: DMA Channel 0
+//
+// NOTE: This function will only load RAM data to wram bank $7e.
 //
 // DB = 0x80
 #[mem8, idx16]
-inline func load_palette__inline(resourceId : u8 in a, let wram_data_addr: *u8, let wram_data_size: u16) : PpuData_Dma0 in ppuData {
-    ppuData = __load_resource_with_fixed_ram_data__inline(ResourceType.palette, a, wram_data_addr, wram_data_size);
+inline func load_resource__fixed_ram_and_ppu_data__forceblank_inline(let rType: ResourceType, resourceId : u8 in a, let wram_data_addr: *u8, let wram_data_size: u16) : PpuData_Dma0 in ppuData {
+    __load_resource(rType as u16, a);
+
+    // a:xx = resource address
+    WMADDML = yy = wram_data_addr as u16;
+    ppuData = __copy_fixed_size_data_and_prep_dynamic_sized_data(xx, a, wram_data_size);
+
     return ppuData;
 }
 
 
-// Load a MetaTile tileset resource.
+// Load a resource with only PPU data.
+//
+// LIFETIME: PPU data is only valid until the next `load_resource__*` call or non-resource DMA transfer.
+// REQUIRES: Force-Blank
+// USES: DMA Channel 0
 //
 // DB = 0x80
 #[mem8, idx16]
-inline func load_mt_tileset__inline(resourceId : u8 in a, let wram_data_addr: *u8, let wram_data_size: u16) : PpuData_Dma0 in ppuData {
-    ppuData = __load_resource_with_fixed_ram_data__inline(ResourceType.mt_tileset, a, wram_data_addr, wram_data_size);
+inline func load_resource__ppu_data__forceblank__inline(let rType: ResourceType, resourceId : u8 in a) : PpuData_Dma0 in ppuData {
+    ppuData = __load_ppu_only_resource(rType as u16, a);
+
     return ppuData;
 }
 
 
 
-// Load a MetaSprite spritesheet resource.
+// Load a resource with dynamic sized RAM data without copying the data to Work-RAM.
 //
-// DB unknown
-#[mem8, idx16]
-inline func load_ms_spritesheet__inline(resourceId : u8 in a, let wram_data_addr: *u8, let wram_data_size: u16) : PpuData_Dma0 in ppuData {
-    ppuData = __load_resource_with_fixed_ram_data__inline(ResourceType.ms_spritesheet, a, wram_data_addr, wram_data_size);
-    return ppuData;
-}
-
-
-
-// Load a tiles resource.
-//
-// DB unknown
-#[mem8, idx16]
-inline func load_tiles_resource__inline(resourceId : u8 in a) : PpuData_Dma0 in ppuData {
-    ppuData = __load_ppu_only_resource(ResourceType.tiles as u16, a);
-    return ppuData;
-}
-
-
-
-// Load a song resource.
-//
-// NOTE: Resource ID 0 contains the common audio data and not song data.
+// LIFETIME: output is only valid until the next `load_resource__*` call.
 //
 // OUTPUT: a:xx = audio data address
 // OUTPUT:   yy = audio data size
 //
-// DB unknown
+// DB = 0x80
 #[mem8, idx16]
-inline func load_songs_resource__inline_axy(resourceId : resources.songs in a) {
-    __load_resource(ResourceType.songs as u16, a);
+inline func load_resource__dynamic_ram_no_copy__inline_axy(let rType: ResourceType, resourceId : resources.songs in a) {
+    __load_resource(rType as u16, a);
     __read_dynamic_sized_data_size(xx, a);
 }
 
@@ -206,24 +200,6 @@ var _tmp : u16 in zpTmp_word_0;
         a = _RE.addrBank[unaligned xx];
         xx = yy;
     }
-}
-
-
-
-// Load resource data that contains fixed-size RAM data and dynamic sized PPU data.
-//
-// NOTE: This function will only load RAM data to wram bank $7e.
-//
-// DB = 0x80
-#[mem8, idx16]
-inline func __load_resource_with_fixed_ram_data__inline(let resourceType: ResourceType, resourceId : u8 in a, let wram_data_addr: *u8, let wram_data_size: u16) : PpuData_Dma0 in ppuData {
-    __load_resource(resourceType as u16, a);
-
-    // a:xx = resource address
-    WMADDML = yy = wram_data_addr as u16;
-    ppuData = __copy_fixed_size_data_and_prep_dynamic_sized_data(xx, a, wram_data_size);
-
-    return ppuData;
 }
 
 
@@ -455,7 +431,7 @@ func load_tiles_resource_into_vram(resourceId : resources.tiles in a, vramWordAd
 
     VMADD = xx;
 
-    ppuData = load_tiles_resource__inline(a);
+    ppuData = load_resource__ppu_data__forceblank__inline(ResourceType.tiles, a);
     return dma_remaining_to_vram__forceblank(ppuData);
 }
 
@@ -488,7 +464,7 @@ var _header : u8 in zpTmp_byte_0;
     VMADD = xx;
     _vramTilesWaddr = yy;
 
-    ppuData = __load_resource_with_fixed_ram_data__inline(ResourceType.bg_image, a, &_header, sizeof(typeof(_header)));
+    ppuData = load_resource__fixed_ram_and_ppu_data__forceblank_inline(ResourceType.bg_image, a, &_header, sizeof(typeof(_header)));
 
     // Calculate tilemap size
     a = _header;

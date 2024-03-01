@@ -29,7 +29,7 @@ var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
 
 var _header : _RamDataFormat in zpTmp_byte_0;
 
-    _ppuData = resources.load_palette__inline(a, &_header as *u8, sizeof(typeof(_header)));
+    _ppuData = resources.load_resource__fixed_ram_and_ppu_data__forceblank_inline(resources.ResourceType.palette, a, &_header as *u8, sizeof(typeof(_header)));
 
     aa = direct_page;
     a = _header.n_colors;

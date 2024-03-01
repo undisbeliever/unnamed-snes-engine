@@ -149,7 +149,7 @@ in code {
 func load_tileset__forceblank(tileset_id : u8 in a) {
 var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
 
-    _ppuData = resources.load_mt_tileset__inline(a, &mt_data as *u8, sizeof(typeof(mt_data)));
+    _ppuData = resources.load_resource__fixed_ram_and_ppu_data__forceblank_inline(resources.ResourceType.mt_tileset, a, &mt_data as *u8, sizeof(typeof(mt_data)));
 
     // Transfer tiles to VRAM
     VMADD = xx = VRAM_BG1_TILES_WADDR;
