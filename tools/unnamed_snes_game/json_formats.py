@@ -593,18 +593,18 @@ class GameMode(NamedTuple):
     source: str
 
 
-class RoomEventParameter(NamedTuple):
+class EngineHookParameter(NamedTuple):
     name: Name
     comment: str
     type: Name
     default_value: Optional[str]
 
 
-class RoomEvent(NamedTuple):
+class EngineHookFunction(NamedTuple):
     name: Name
     id: int
     source: str
-    parameters: list[RoomEventParameter]
+    parameters: list[EngineHookParameter]
 
 
 class Mappings(NamedTuple):
@@ -619,7 +619,7 @@ class Mappings(NamedTuple):
     gamestate_flags: list[Name]
     gamemodes: list[GameMode]
     room_transitions: list[Name]
-    room_events: OrderedDict[Name, RoomEvent]
+    room_events: OrderedDict[Name, EngineHookFunction]
     memory_map: MemoryMap
 
     # ::TODO remove songs from mappings (somehow)
@@ -659,12 +659,12 @@ class _Mappings_Helper(_Helper):
             self._raise_error(f"Too many gamemodes, max: { MAX_GAME_MODES }", key)
         return out
 
-    def get_room_event_parameters(self, key: str) -> list[RoomEventParameter]:
+    def get_room_event_parameters(self, key: str) -> list[EngineHookParameter]:
         out = list()
 
         for p in self.iterate_list_of_dicts(key):
             out.append(
-                RoomEventParameter(
+                EngineHookParameter(
                     name=p.get_name("name"),
                     comment=p.get_string("comment"),
                     type=p.get_name("type"),
@@ -682,9 +682,9 @@ def load_mappings_json(filename: Filename) -> Mappings:
 
     room_events = jh.build_ordered_dict_from_list(
         "room_events",
-        RoomEvent,
+        EngineHookFunction,
         MAX_ROOM_EVENTS,
-        lambda rj, name, i: RoomEvent(
+        lambda rj, name, i: EngineHookFunction(
             name=name,
             id=i,
             source=rj.get_string("source"),

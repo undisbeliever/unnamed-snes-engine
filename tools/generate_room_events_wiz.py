@@ -8,31 +8,11 @@ from io import StringIO
 
 from collections import OrderedDict
 
-from unnamed_snes_game.json_formats import load_mappings_json, Mappings, Name, RoomEvent
+from unnamed_snes_game.json_formats import load_mappings_json, Mappings, Name, EngineHookFunction
+from unnamed_snes_game.engine_hooks import write_hook_parameters_wiz, ROOM_EVENT_HOOK
 
 
-# Mapping of parameter types to wiz types
-PARAM_TYPES = {
-    "u8": "u8",
-    "u8pos": "U8Position",
-    "gamestate_flag": "u8",
-    "locked_door": "u8",
-    "open_door": "u8",
-    "optional_open_door": "u8",
-}
-
-# Size of each parameter type in bytes
-PARAM_SIZE = {
-    "u8": 1,
-    "u8pos": 2,
-    "gamestate_flag": 1,
-    "locked_door": 1,
-    "open_door": 1,
-    "optional_open_door": 1,
-}
-
-
-def generate_wiz_code(room_events: OrderedDict[Name, RoomEvent]) -> str:
+def generate_wiz_code(room_events: OrderedDict[Name, EngineHookFunction]) -> str:
     n_functions = len(room_events)
 
     with StringIO() as out:
@@ -52,32 +32,7 @@ in wram7e_roomstate {
 """
         )
 
-        for e in room_events.values():
-            if e.parameters:
-                i = 0
-
-                out.write(f"namespace {e.name} {{\n")
-
-                for p in e.parameters:
-                    if i != 0:
-                        out.write("\n")
-
-                    ptype = PARAM_TYPES.get(p.type)
-                    if not ptype:
-                        raise ValueError(f"Unknown room event parameter type: {p.type}")
-
-                    if p.comment:
-                        p_comment = p.comment.replace("\n", "\n  // ")
-                        out.write(f"  // { p_comment }\n")
-                    out.write(f"  // ({ p.type })\n")
-                    out.write(f"  var parameter__{ p.name } @ &room.roomEventParameters[{ i }] : { ptype };\n")
-
-                    i += PARAM_SIZE[p.type]
-
-                out.write("}\n\n")
-
-                if i > 4:
-                    raise ValueError(f"Room Event has too many parameters: {e.name}")
+        write_hook_parameters_wiz(out, room_events, ROOM_EVENT_HOOK)
 
         out.write("}\n")
         out.write("}\n")

@@ -9,7 +9,15 @@ from io import StringIO
 
 from typing import Final, Optional
 
-from unnamed_snes_game.json_formats import load_mappings_json, load_entities_json, Name, Mappings, EntitiesJson, RoomEvent, GameMode
+from unnamed_snes_game.json_formats import (
+    load_mappings_json,
+    load_entities_json,
+    Name,
+    Mappings,
+    EntitiesJson,
+    EngineHookFunction,
+    GameMode,
+)
 
 
 # NOTE: I cannot build these function tables in `gen/entities.wiz` or `gen/enums.wiz` as it causes a circular dependency
@@ -80,7 +88,7 @@ def interactive_tiles_table(out: StringIO, interactive_tile_functions: list[str]
     out.write("}\n}\n\n")
 
 
-def room_events_imports(out: StringIO, room_events: OrderedDict[Name, RoomEvent]) -> None:
+def room_events_imports(out: StringIO, room_events: OrderedDict[Name, EngineHookFunction]) -> None:
     for e in room_events.values():
         if '"' in e.source:
             raise ValueError(f"Invalid source value for room event: {e.name}")
@@ -90,7 +98,7 @@ def room_events_imports(out: StringIO, room_events: OrderedDict[Name, RoomEvent]
             out.write(f'import "../{e.source}";\n')
 
 
-def room_events_table(out: StringIO, room_events: OrderedDict[Name, RoomEvent]) -> None:
+def room_events_table(out: StringIO, room_events: OrderedDict[Name, EngineHookFunction]) -> None:
     n_functions: Final = len(room_events)
 
     def generate_table(table_name: str, fn_type: str, fn_name: str) -> None:
