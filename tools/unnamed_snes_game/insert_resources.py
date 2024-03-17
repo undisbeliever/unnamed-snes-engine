@@ -18,7 +18,7 @@ from .common import (
 from .common import EngineData, FixedSizedData, DynamicSizedData, print_error
 from .json_formats import Name, Filename, Mappings, MemoryMap
 from .entity_data import ENTITY_ROM_DATA_LABEL, validate_entity_rom_data_symbols, expected_blank_entity_rom_data
-from .resources_compiler import DataStore, ProjectCompiler, ResourceError
+from .resources_compiler import DataStore, ProjectCompiler, ResourceError, ResourceData
 
 Address = int
 RomOffset = int
@@ -366,13 +366,46 @@ def compile_data(resources_directory: Filename, symbols_file: Filename, n_proces
         return None
 
 
-def insert_resources_into_binary(
-    resources_dir: Filename, symbols: Filename, sfc_input: Filename, n_processes: Optional[int]
-) -> tuple[bytes, ResourceUsage]:
-    data_store = compile_data(resources_dir, symbols, n_processes)
-    if data_store is None:
-        raise RuntimeError("Error compiling resources")
+def print_resource_sizes(data_store: DataStore) -> None:
+    total_line = "-" * 70
+    mappings = data_store.get_mappings()
 
+    dynamic_ms_data = data_store.get_dynamic_ms_data()
+    if dynamic_ms_data is not None:
+        print(f"Dynamic MS Tiles:{len(dynamic_ms_data.tile_data): 6} bytes")
+
+    msfs_and_entity_data = data_store.get_msfs_and_entity_data()
+    if msfs_and_entity_data is not None:
+        if msfs_and_entity_data.msfs_data is not None:
+            print(f"MetaSprite Data: {len(msfs_and_entity_data.msfs_data): 6} bytes")
+        if msfs_and_entity_data.entity_rom_data is not None:
+            print(f"Entity ROM Data: {len(msfs_and_entity_data.entity_rom_data): 6} bytes")
+
+    print()
+
+    for rt in ResourceType:
+        print(f"{rt.name}:")
+        n_resources = len(getattr(mappings, rt.name))
+        total_ram_size = 0
+        total_ppu_size = 0
+
+        for i in range(n_resources):
+            d = data_store.get_resource_data(rt, i)
+            if isinstance(d, ResourceData):
+                ram_size, ppu_size = d.data.ram_and_ppu_size()
+                total_ram_size += ram_size
+                total_ppu_size += ppu_size
+                print(f"{d.resource_id: 5} {d.resource_name:30} {ram_size: 6} + {ppu_size: 6} = {ram_size + ppu_size: 8} bytes")
+            elif d is not None:
+                print(f"{d.resource_id: 5} {d.resource_name:30} NO DATA")
+            else:
+                print(f"{i: 5} ERROR")
+        print(total_line)
+        print(f"{total_ram_size: 43} + {total_ppu_size:6} = {total_ram_size + total_ppu_size: 8} bytes")
+        print()
+
+
+def insert_resources_into_binary(data_store: DataStore, sfc_input: Filename) -> tuple[bytes, ResourceUsage]:
     sfc_data = bytearray(read_binary_file(sfc_input, 4 * 1024 * 1024))
     sfc_memoryview = memoryview(sfc_data)
 

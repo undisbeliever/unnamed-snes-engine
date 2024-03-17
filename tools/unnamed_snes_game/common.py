@@ -94,6 +94,16 @@ class EngineData:
         else:
             raise RuntimeError("No data")
 
+    def ram_and_ppu_size(self) -> tuple[int, int]:
+        if self.ram_data is not None and self.ppu_data is not None:
+            return self.ram_data.size(), self.ppu_data.size()
+        elif self.ram_data is not None:
+            return self.ram_data.size(), 0
+        elif self.ppu_data is not None:
+            return 0, self.ppu_data.size()
+        else:
+            raise RuntimeError("No data")
+
 
 def lorom_address_to_rom_offset(addr: int) -> int:
     if addr & 0x3F0000 < 0x40 and addr & 0xFFFF < 0x8000:
