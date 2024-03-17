@@ -158,17 +158,14 @@ class AbstractInput(Generic[WidgetT], ABC):
             self._is_valid = is_valid
 
     @abstractmethod
-    def _clear(self) -> None:
-        ...
+    def _clear(self) -> None: ...
 
     @abstractmethod
-    def _load_value(self, value: Any) -> None:
-        ...
+    def _load_value(self, value: Any) -> None: ...
 
     # Returns (value, is_valid)
     @abstractmethod
-    def value(self) -> tuple[Optional[Any], bool]:
-        ...
+    def value(self) -> tuple[Optional[Any], bool]: ...
 
 
 class _EntryInput(AbstractInput[tk.Entry]):

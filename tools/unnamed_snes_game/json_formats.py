@@ -998,9 +998,9 @@ def __read_ms_frameset(jh: _Ms_Helper, name: Name, i: int, skip_animations: Opti
         hurtbox_overrides=jh.get_aabb_overrides("hurtboxes"),
         layout_overrides=jh.get_layout_overrides("layouts"),
         clones=jh.get_clones("clones"),
-        animations=jh.build_dict_from_dict("animations", MsAnimation, 254, __read_ms_animation)
-        if not skip_animations
-        else OrderedDict(),
+        animations=(
+            jh.build_dict_from_dict("animations", MsAnimation, 254, __read_ms_animation) if not skip_animations else OrderedDict()
+        ),
     )
 
 
