@@ -1,7 +1,7 @@
 {
   "_about": {
     "file_type": "Terrific Audio Driver project file",
-    "version": "0.0.6"
+    "version": "0.0.7"
   },
   "instruments": [
     {
@@ -57,6 +57,96 @@
       "last_octave": 6,
       "envelope": "adsr 12 1 1 16",
       "comment": null
+    },
+    {
+      "name": "Strings8",
+      "source": "samples/nesdoug/Strings8.brr",
+      "freq": 1000.0,
+      "loop": "none",
+      "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
+    },
+    {
+      "name": "Trumpet4",
+      "source": "samples/nesdoug/Trumpet4.brr",
+      "freq": 1000.0,
+      "loop": "none",
+      "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
+    },
+    {
+      "name": "TimpaniB",
+      "source": "samples/nesdoug/TimpaniB.brr",
+      "freq": 1000.0,
+      "loop": "none",
+      "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
+    },
+    {
+      "name": "Crash2",
+      "source": "samples/nesdoug/Crash2.brr",
+      "freq": 1000.0,
+      "loop": "none",
+      "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
+    },
+    {
+      "name": "Clarinet",
+      "source": "samples/nesdoug/Clarinet.brr",
+      "freq": 1000.0,
+      "loop": "none",
+      "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
+    },
+    {
+      "name": "HatClosed",
+      "source": "samples/nesdoug/HatClosed.brr",
+      "freq": 1000.0,
+      "loop": "none",
+      "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
+    },
+    {
+      "name": "Flute1",
+      "source": "samples/nesdoug/Flute1.brr",
+      "freq": 1000.0,
+      "loop": "none",
+      "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
+    },
+    {
+      "name": "PIANO_C5",
+      "source": "samples/nesdoug/PIANO_C5.brr",
+      "freq": 1000.0,
+      "loop": "none",
+      "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
+    },
+    {
+      "name": "PianoC2_16",
+      "source": "samples/nesdoug/PianoC2_16.brr",
+      "freq": 1000.0,
+      "loop": "none",
+      "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
     }
   ],
   "samples": [],
@@ -99,6 +189,10 @@
     {
       "name": "timing_test",
       "source": "songs/timing_test.mml"
+    },
+    {
+      "name": "DungeonTheme",
+      "source": "songs/DungeonTheme.mml"
     }
   ]
 }
