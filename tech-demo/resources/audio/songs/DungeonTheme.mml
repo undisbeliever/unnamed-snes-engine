@@ -2,6 +2,13 @@
 ;By KungFuFurby
 ;Made for undisbeliever's Terrific Audio Driver v0.0.7
 
+#Title Dungeon Theme
+#Game untitled-snes-game
+#Composer KungFuFurby
+#Copyright 2024 undisbeliever
+#Date 2024
+#License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
+
 ;Echo Parameters
 #EchoLength 48
 #EchoFeedback 120
