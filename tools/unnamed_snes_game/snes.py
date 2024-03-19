@@ -4,6 +4,7 @@
 
 import itertools
 import PIL.Image  # type: ignore
+from abc import ABC, abstractmethod
 from typing import Generator, Final, Iterable, Literal, NamedTuple, Optional, Sequence, TextIO, Union
 
 from .json_formats import Filename
@@ -39,6 +40,44 @@ class TileMap(NamedTuple):
     # NOTE: No bounds checking
     def get_tile(self, x: int, y: int) -> TileMapEntry:
         return self.grid[x + y * self.width]
+
+
+class AbstractTilesetMap(ABC):
+    @abstractmethod
+    def get_or_insert(self, tile: SmallTileData) -> tuple[int, bool, bool]: ...
+
+    @abstractmethod
+    def tiles(self) -> list[SmallTileData]: ...
+
+
+class SmallTilesetMap(AbstractTilesetMap):
+    def __init__(self) -> None:
+        self._tiles: Final[list[SmallTileData]] = []
+        self._map: Final[dict[SmallTileData, tuple[int, bool, bool]]] = {}
+
+    def get_or_insert(self, tile_data: SmallTileData) -> tuple[int, bool, bool]:
+        tile_match = self._map.get(tile_data, None)
+        if tile_match is not None:
+            return tile_match
+        else:
+            tile_id = len(self._tiles)
+            tile_match = tile_id, False, False
+
+            self._tiles.append(tile_data)
+
+            h_tile_data = hflip_tile(tile_data)
+            v_tile_data = vflip_tile(tile_data)
+            hv_tile_data = vflip_tile(h_tile_data)
+
+            self._map[tile_data] = tile_match
+            self._map.setdefault(h_tile_data, (tile_id, True, False))
+            self._map.setdefault(v_tile_data, (tile_id, False, True))
+            self._map.setdefault(hv_tile_data, (tile_id, True, True))
+
+            return tile_match
+
+    def tiles(self) -> list[SmallTileData]:
+        return self._tiles
 
 
 class ImageError(FileError):
@@ -254,18 +293,18 @@ def split_large_tile(tile: LargeTileData) -> tuple[SmallTileData, SmallTileData,
 
 
 def convert_tilemap_and_tileset(
-    tiles: Generator[SmallColorTile, None, None], filename: Filename, palettes_map: list[PaletteMap], map_width: int, map_height: int
-) -> tuple[TileMap, list[SmallTileData]]:
-    # Returns a tuple(tilemap, tileset)
-
+    tiles: Generator[SmallColorTile, None, None],
+    filename: Filename,
+    tileset: AbstractTilesetMap,
+    palettes_map: list[PaletteMap],
+    map_width: int,
+    map_height: int,
+) -> TileMap:
     assert len(palettes_map) <= 8
 
     invalid_tiles = list()
 
     tilemap: list[TileMapEntry] = list()
-    tileset: list[SmallTileData] = list()
-
-    tileset_map: dict[SmallTileData, tuple[int, bool, bool]] = dict()
 
     for tile_index, tile in enumerate(tiles):
         palette_id, pal_map = get_palette_id(tile, palettes_map)
@@ -275,24 +314,9 @@ def convert_tilemap_and_tileset(
 
             # Must be bytes() here as a dict() key must be immutable
             tile_data = bytes([pal_map[c] for c in tile])
+            tile_id, hflip, vflip = tileset.get_or_insert(tile_data)
 
-            tile_match = tileset_map.get(tile_data, None)
-            if tile_match is None:
-                tile_id = len(tileset)
-                tile_match = tile_id, False, False
-
-                tileset.append(tile_data)
-
-                h_tile_data = hflip_tile(tile_data)
-                v_tile_data = vflip_tile(tile_data)
-                hv_tile_data = vflip_tile(h_tile_data)
-
-                tileset_map[tile_data] = tile_match
-                tileset_map.setdefault(h_tile_data, (tile_id, True, False))
-                tileset_map.setdefault(v_tile_data, (tile_id, False, True))
-                tileset_map.setdefault(hv_tile_data, (tile_id, True, True))
-
-            tilemap.append(TileMapEntry(tile_id=tile_match[0], palette_id=palette_id, hflip=tile_match[1], vflip=tile_match[2]))
+            tilemap.append(TileMapEntry(tile_id, palette_id, hflip, vflip))
         else:
             invalid_tiles.append(tile_index)
 
@@ -301,7 +325,7 @@ def convert_tilemap_and_tileset(
 
     assert len(tilemap) == map_width * map_height
 
-    return TileMap(width=map_width, height=map_height, grid=tilemap), tileset
+    return TileMap(width=map_width, height=map_height, grid=tilemap)
 
 
 # ::TODO add a reorder_tilemap function that will reorder a TileMap into the snes nametable order (with padding)::
@@ -362,11 +386,12 @@ def image_and_palette_map_to_snes(
 ) -> tuple[TileMap, bytes]:
     # Return (tilemap, tile_data)
 
-    tilemap, tileset = convert_tilemap_and_tileset(
-        extract_small_tile_grid(image), image_filename, palettes_map, image.width // 8, image.height // 8
+    tileset = SmallTilesetMap()
+    tilemap = convert_tilemap_and_tileset(
+        extract_small_tile_grid(image), image_filename, tileset, palettes_map, image.width // 8, image.height // 8
     )
 
-    tile_data = convert_snes_tileset(tileset, bpp)
+    tile_data = convert_snes_tileset(tileset.tiles(), bpp)
 
     return tilemap, tile_data
 
@@ -376,11 +401,17 @@ def image_to_snes(
 ) -> tuple[TileMap, bytes, bytes]:
     # Return (tilemap, tile_data, palette_data)
 
-    tilemap, tileset = convert_tilemap_and_tileset(
-        extract_small_tile_grid(image), image_filename, create_palettes_map(palette_image, bpp), image.width // 8, image.height // 8
+    tileset = SmallTilesetMap()
+    tilemap = convert_tilemap_and_tileset(
+        extract_small_tile_grid(image),
+        image_filename,
+        tileset,
+        create_palettes_map(palette_image, bpp),
+        image.width // 8,
+        image.height // 8,
     )
 
-    tile_data = convert_snes_tileset(tileset, bpp)
+    tile_data = convert_snes_tileset(tileset.tiles(), bpp)
 
     palette_data = convert_palette_image(palette_image)
 
