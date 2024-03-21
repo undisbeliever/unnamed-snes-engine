@@ -147,6 +147,26 @@
       "last_octave": 7,
       "envelope": "gain F127",
       "comment": null
+    },
+    {
+      "name": "Kick3",
+      "source": "samples/nesdoug/Kick3.brr",
+      "freq": 1000.0,
+      "loop": "none",
+      "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
+    },
+    {
+      "name": "Snare02",
+      "source": "samples/nesdoug/Snare02.brr",
+      "freq": 1000.0,
+      "loop": "none",
+      "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
     }
   ],
   "samples": [],
@@ -193,6 +213,10 @@
     {
       "name": "DungeonTheme",
       "source": "songs/DungeonTheme.mml"
+    },
+    {
+      "name": "BossTheme",
+      "source": "songs/BossTheme.mml"
     }
   ]
 }
