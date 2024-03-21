@@ -88,7 +88,7 @@ C l1 r^^^^^
 C @PianoC2_16 V64 [o3e1]14
 C @Strings8 E0 V24 o3a1a1>c1<b1a1a1b1b2b4r4
 
-D l1 r^  @Strings8 V64 o2e^f^e^e^
+D l1 r^  @Strings8 V64 E0 o2e^f^e^e^
 D E1 V4 GI2 ~32,2 o7e& GD2 e GI2 ~16,2 o6e& GD2 e ~0
 D l1 r^^^^^^ @Crash2 V128 GF0 o4g2& GI4 g2
 D L l4 @Crash2 A15,7,7,14 [r V128 o4e]3 o4e2
@@ -96,7 +96,7 @@ D A15,7,7,12 l1 o3f^^^
 D @HatClosed [l16 V8 o5g V16 g V32g V16 g]8
 D [l32 V8 o5gg V16 gg V32g16 V16gV12g]184
 
-E l1 r^^^^^ @Strings8 V64 o1b^a^
+E l1 r^^^^^ @Strings8 V64 E0 o1b^a^
 E l1 o1e^^^^^ f^e^f^
 E [o1e4]6e2
 E L @Strings8 V64
@@ -111,7 +111,7 @@ E !ERiff1 ~8,2 o5a16 : g16f+16e16>e16]6 o5g16f+16e16b16
 E @PianoC2_16 V64 E0 ~0 [o3a2]12 [o3b2]3 o3b4b4 [o3e4]6 o3e2
 
 F l1 r^^^^^^^^^^^^^
-F @Trumpet4 V96 o3e^f^e^f^
+F @Trumpet4 V96 E0 o3e^f^e^f^
 F l4 [o3e]6e2 L V96 E0
 F l1 o3e^^^^^^^^^^^^^
 F l1 o3a.b2
