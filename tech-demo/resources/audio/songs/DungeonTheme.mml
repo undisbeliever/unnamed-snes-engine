@@ -19,8 +19,9 @@
 @Strings8 Strings8
 @Strings8Detache Strings8 adsr 15 7 7 25
 @Trumpet4 Trumpet4
-@TimpaniB TimpaniB
+@TimpaniB TimpaniB adsr 15 7 7 19
 @Crash2 Crash2
+@Crash2A Crash2 adsr 15 7 7 14
 @Clarinet Clarinet
 @HatClosed HatClosed
 @Flute1 Flute1
@@ -73,7 +74,7 @@ C l1 r^^^^^^^^^^^^^^^^
 C @Strings8Detache E1 V128 l8 o3afaf16g16afa16f16e16d16
 C w4^32 o3a16a16g16f+16 w8.. l16wo4c<ba l24[wbbag:a]2f+ l32[eeegef+:ga]2ab
 C l8o3aaggaabb waggaabb
-C L E0 [@TimpaniB A15,7,7,19 l8 o3 V128 e V48 e A15,7,7,0 V96 e^]3 e4 V16[e64V+6]16
+C L E0 [@TimpaniB l8 o3 V128 e V48 e A15,7,7,0 V96 e^]3 e4 V16[e64V+6]16
 C l1 A15,7,7,9 o3e^^^^^^^
 !CRiff1 ~6,2 l8 o5g^f+gf+^d^
 !CRiff2 ~6,2 l8 o4beb^^>d& [c+64&d64&]4 c+16
@@ -91,7 +92,7 @@ C @Strings8 E0 V24 o3a1a1>c1<b1a1a1b1b2b4r4
 D l1 r^  @Strings8 V64 E0 o2e^f^e^e^
 D E1 V4 GI2 ~32,2 o7e& GD2 e GI2 ~16,2 o6e& GD2 e ~0
 D l1 r^^^^^^ @Crash2 V128 GF0 o4g2& GI4 g2
-D L l4 @Crash2 A15,7,7,14 [r V128 o4e]3 o4e2
+D L l4 @Crash2A [r V128 o4e]3 o4e2
 D A15,7,7,12 l1 o3f^^^
 D @HatClosed [l16 V8 o5g V16 g V32g V16 g]8
 D [l32 V8 o5gg V16 gg V32g16 V16gV12g]184

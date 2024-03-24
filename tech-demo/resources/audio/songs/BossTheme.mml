@@ -18,12 +18,10 @@
 ;Instrument Definitions
 @Strings8 Strings8
 @Trumpet4 Trumpet4
-@TimpaniB TimpaniB
-@Crash2 Crash2
-@Clarinet Clarinet
+@TimpaniB TimpaniB adsr 15 7 7 16
+@Crash2 Crash2 adsr 15 7 7 16
 @HatClosed HatClosed
 @Flute1 Flute1
-@PIANO_C5 PIANO_C5 adsr 15 7 7 24
 @PianoC2_16 PianoC2_16 adsr 15 7 7 10
 @Kick3 Kick3
 @Snare02 Snare02
@@ -52,8 +50,8 @@ A [[!ARiff1a !ARiff1b !ARiff1a !ARiff1b !ARiff1a !ARiff1b !ARiff2 !ARiff3 !ARiff
 A !ARiff1a !ARiff1b !ARiff1a !ARiff1b !ARiff1a !ARiff1b !ARiff2 !ARiff3 : !ARiff4 ]2 !ARiff6 ]2]2
 A @Snare02 [[V192 o4a48 V48 a48a48 V96 a48]9 V192 o4a48 V0 [V+16 o4a48]11 ]2
 
-B E0 @TimpaniB A15,7,7,16 V156 [o2b16b8b32b32 : b16b8.]4 V0 [V+13 o2b48]12 L
-B @Crash2 A15,7,7,16 V136 E0 o5c1^1
+B E0 @TimpaniB V156 [o2b16b8b32b32 : b16b8.]4 V0 [V+13 o2b48]12 L
+B @Crash2 V136 E0 o5c1^1
 !BRiff1 l48 o6f+<bf+<bf+<bf+b>f+b>f+b
 !BRiff2 l48 o6e<ae<ae<aea>ea>ea
 !BRiff3 l48 o6gc<gc<gc<g>cg>cg>c
@@ -63,9 +61,9 @@ B @Flute1 E1
 B V0 [V+3 !BRiff1 ]2 [V+3 !BRiff2 ]2 [V+3 !BRiff1 ]2 [V+3 !BRiff3 ]2
 B [!BRiff1 !BRiff1 !BRiff2 !BRiff2 !BRiff1 !BRiff1 : !BRiff3 !BRiff3 ]4
 B [!BRiff4 ]2 E0
-B @Crash2 A15,7,7,16 V136 [o5c4]8
-B A15,7,7,13 o3f+1. @TimpaniB A15,7,7,16 V0 [V+6 o3f+48]24
-B @Crash2 A15,7,7,16 V136 o5c4 @Flute1 E1 V6 !BRiff5 [V+3 !BRiff4 ]2 [V+3 !BRiff5 ]2 [V+3 !BRiff4 ]2
+B @Crash2 V136 [o5c4]8
+B A15,7,7,13 o3f+1. @TimpaniB V0 [V+6 o3f+48]24
+B @Crash2 V136 o5c4 @Flute1 E1 V6 !BRiff5 [V+3 !BRiff4 ]2 [V+3 !BRiff5 ]2 [V+3 !BRiff4 ]2
 B [!BRiff5 !BRiff5 !BRiff4 !BRiff4 ]3
 B !BRiff1 !BRiff1 [!BRiff4 !BRiff4 !BRiff5 !BRiff5 ]2
 B [l48 o7c<fc<fc<fcf>cf>cf]2
