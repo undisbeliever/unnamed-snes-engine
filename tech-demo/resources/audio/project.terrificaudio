@@ -217,6 +217,10 @@
     {
       "name": "BossTheme",
       "source": "songs/BossTheme.mml"
+    },
+    {
+      "name": "GameOverTheme",
+      "source": "songs/GameOverTheme.mml"
     }
   ]
 }
