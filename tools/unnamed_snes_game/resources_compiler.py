@@ -18,6 +18,7 @@ from typing import cast, final, Any, Callable, ClassVar, Final, Iterable, NamedT
 from .common import ResourceType, EngineData
 from .entity_data import create_entity_rom_data
 from .mt_tileset import convert_mt_tileset
+from .second_layers import convert_second_layer
 from .palette import convert_palette, PaletteColors
 from .metasprite import convert_static_spritesheet, convert_dynamic_spritesheet, build_ms_fs_data, MsFsEntry, DynamicMsSpritesheet
 from .rooms import get_list_of_tmx_files, extract_room_id, compile_room
@@ -556,6 +557,32 @@ class MetaTileTilesetCompiler(SimpleResourceCompiler):
         return convert_mt_tileset(filename, self._shared_input.mappings, self.__palettes)
 
 
+class SecondLayerCompiler(OtherResourcesCompiler):
+    def __init__(self, shared_input: SharedInput, palettes: dict[Name, PaletteColors]) -> None:
+        super().__init__(ResourceType.second_layers, shared_input)
+        self.__palettes = palettes
+
+    def build_filename_map(self, other_resources: OtherResources) -> dict[Filename, int]:
+        second_layers: Final = other_resources.second_layers
+
+        d = dict()
+        for i, n in enumerate(self.name_list):
+            b = second_layers.get(n)
+            if b:
+                d[b.source] = i
+                d[b.palette] = i
+        return d
+
+    SHARED_INPUTS = (SharedInputType.OTHER_RESOURCES,)
+    USES_PALETTES = True
+
+    def _compile(self, r_name: Name) -> EngineData:
+        assert self._shared_input.other_resources
+
+        sli = self._shared_input.other_resources.second_layers[r_name]
+        return convert_second_layer(sli, self.__palettes)
+
+
 class TileCompiler(OtherResourcesCompiler):
     def __init__(self, shared_input: SharedInput) -> None:
         super().__init__(ResourceType.tiles, shared_input)
@@ -759,6 +786,7 @@ class ProjectCompiler:
         self.__resource_compilers: Final = (
             PaletteCompiler(self.__shared_input),
             MetaTileTilesetCompiler(self.__shared_input, self.__palettes),
+            SecondLayerCompiler(self.__shared_input, self.__palettes),
             MsSpritesheetCompiler(self.__shared_input),
             TileCompiler(self.__shared_input),
             BgImageCompiler(self.__shared_input, self.__palettes),

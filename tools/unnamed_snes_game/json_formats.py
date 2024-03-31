@@ -611,6 +611,7 @@ class Mappings(NamedTuple):
     game_title: str
     starting_room: RoomName
     mt_tilesets: list[Name]
+    second_layers: list[Name]
     ms_spritesheets: list[Name]
     palettes: list[Name]
     tiles: list[Name]
@@ -696,6 +697,7 @@ def load_mappings_json(filename: Filename) -> Mappings:
         game_title=jh.get_string("game_title"),
         starting_room=jh.get_room_name("starting_room"),
         mt_tilesets=jh.get_name_list("mt_tilesets"),
+        second_layers=jh.get_name_list("second_layers"),
         ms_spritesheets=jh.get_name_list("ms_spritesheets"),
         palettes=jh.get_name_list("palettes"),
         tiles=jh.get_name_list("tiles"),
@@ -1054,8 +1056,17 @@ class BackgroundImageInput(NamedTuple):
     tile_priority: bool
 
 
+class SecondLayerInput(NamedTuple):
+    name: Name
+    source: Filename
+    palette: Name
+    tile_priority: bool
+    # ::TODO add engine hooks::
+
+
 class OtherResources(NamedTuple):
     palettes: dict[Name, PaletteInput]
+    second_layers: dict[Name, SecondLayerInput]
     tiles: dict[Name, TilesInput]
     bg_images: dict[Name, BackgroundImageInput]
 
@@ -1100,8 +1111,21 @@ def load_other_resources_json(filename: Filename) -> OtherResources:
         ),
     )
 
+    second_layers = jh.build_dict_from_dict(
+        "second_layers",
+        SecondLayerInput,
+        256,
+        lambda t, name: SecondLayerInput(
+            name=name,
+            source=os.path.join(dirname, t.get_filename("source")),
+            palette=t.get_name("palette"),
+            tile_priority=t.get_int1("tile_priority"),
+        ),
+    )
+
     return OtherResources(
         palettes=palettes,
         tiles=tiles,
         bg_images=bg_images,
+        second_layers=second_layers,
     )

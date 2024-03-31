@@ -22,6 +22,8 @@ in lowram {
     var _brightness_buffer : u8;
 
 
+    // ::TODO make the bg1/bg2 scroll shadows swappable (rename them afterwords)::
+
     // A shadow of the BG1 scroll registers.
     //
     // (2x u16 words)
@@ -90,6 +92,7 @@ func wait_frame() {
         metasprites.update_oam__vblank();
 
         metatiles.transitions.transfer_buffer__vblank();
+        second_layer.transfer_buffers__vblank();
 
         textbox.transfer_buffer__vblank();
 
@@ -241,4 +244,6 @@ func wait_multiple_frames_and_fadein() {
 
 
 }
+
+import "game/second-layer";
 

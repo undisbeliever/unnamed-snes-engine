@@ -8,6 +8,8 @@
 extern writeonly WRMPYA @ 0x4202 : u8;
 extern writeonly WRMPYB @ 0x4203 : u8;
 
+extern writeonly WRMPYA_WRMPYB @ 0x4202 : u16;
+
 
 // Division
 //

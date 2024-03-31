@@ -62,5 +62,12 @@
       "palette": "credits",
       "tile_priority": 1
     }
+  },
+  "second_layers": {
+    "scrolling_test": {
+      "source": "second-layers/scrolling-test.png",
+      "palette": "dungeon",
+      "tile_priority": 1
+    }
   }
 }

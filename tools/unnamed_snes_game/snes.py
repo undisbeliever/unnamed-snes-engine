@@ -43,40 +43,44 @@ class TileMap(NamedTuple):
 
 
 class AbstractTilesetMap(ABC):
+    def __init__(self) -> None:
+        self._map: Final[dict[SmallTileData, tuple[int, bool, bool]]] = {}
+
+    def _add_to_map(self, tile_data: SmallTileData, tile_id: int) -> tuple[int, bool, bool]:
+        tile_match = tile_id, False, False
+
+        h_tile_data = hflip_tile(tile_data)
+        v_tile_data = vflip_tile(tile_data)
+        hv_tile_data = vflip_tile(h_tile_data)
+
+        self._map[tile_data] = tile_match
+        self._map.setdefault(h_tile_data, (tile_id, True, False))
+        self._map.setdefault(v_tile_data, (tile_id, False, True))
+        self._map.setdefault(hv_tile_data, (tile_id, True, True))
+
+        return tile_match
+
     @abstractmethod
     def get_or_insert(self, tile: SmallTileData) -> tuple[int, bool, bool]: ...
 
     @abstractmethod
-    def tiles(self) -> list[SmallTileData]: ...
+    def tiles(self) -> Iterable[SmallTileData]: ...
 
 
 class SmallTilesetMap(AbstractTilesetMap):
     def __init__(self) -> None:
+        super().__init__()
         self._tiles: Final[list[SmallTileData]] = []
-        self._map: Final[dict[SmallTileData, tuple[int, bool, bool]]] = {}
 
     def get_or_insert(self, tile_data: SmallTileData) -> tuple[int, bool, bool]:
         tile_match = self._map.get(tile_data, None)
         if tile_match is not None:
             return tile_match
         else:
-            tile_id = len(self._tiles)
-            tile_match = tile_id, False, False
-
             self._tiles.append(tile_data)
+            return self._add_to_map(tile_data, len(self._tiles) - 1)
 
-            h_tile_data = hflip_tile(tile_data)
-            v_tile_data = vflip_tile(tile_data)
-            hv_tile_data = vflip_tile(h_tile_data)
-
-            self._map[tile_data] = tile_match
-            self._map.setdefault(h_tile_data, (tile_id, True, False))
-            self._map.setdefault(v_tile_data, (tile_id, False, True))
-            self._map.setdefault(hv_tile_data, (tile_id, True, True))
-
-            return tile_match
-
-    def tiles(self) -> list[SmallTileData]:
+    def tiles(self) -> Iterable[SmallTileData]:
         return self._tiles
 
 

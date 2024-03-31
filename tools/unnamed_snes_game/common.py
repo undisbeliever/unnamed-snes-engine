@@ -31,10 +31,11 @@ USE_RESOURCES_OVER_USB2SNES_LABEL = "resources.UseResourcesOverUsb2Snes"
 class ResourceType(IntEnum):
     palettes = 0
     mt_tilesets = 1
-    ms_spritesheets = 2
-    tiles = 3
-    bg_images = 4
-    songs = 5
+    second_layers = 2
+    ms_spritesheets = 3
+    tiles = 4
+    bg_images = 5
+    songs = 6
 
 
 class FixedSizedData:

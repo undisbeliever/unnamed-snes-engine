@@ -16,6 +16,9 @@
  "mt_tilesets": [
    "dungeon"
  ],
+ "second_layers": [
+   "scrolling_test"
+ ],
  "ms_spritesheets": [
    "common",
    "dungeon"
