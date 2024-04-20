@@ -87,7 +87,7 @@ def convert_second_layer(sli: SecondLayerInput, palettes: dict[Name, PaletteColo
         [
             width,
             height,
-            # ::TODO add engine hooks::
+            # ::TODO add callback::
         ]
     ) + create_tilemap_data(tilemap, sli.tile_priority)
 

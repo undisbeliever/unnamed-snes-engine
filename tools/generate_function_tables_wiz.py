@@ -15,7 +15,7 @@ from unnamed_snes_game.json_formats import (
     Name,
     Mappings,
     EntitiesJson,
-    EngineHookFunction,
+    Callback,
     GameMode,
 )
 
@@ -88,7 +88,7 @@ def interactive_tiles_table(out: StringIO, interactive_tile_functions: list[str]
     out.write("}\n}\n\n")
 
 
-def room_events_imports(out: StringIO, room_events: OrderedDict[Name, EngineHookFunction]) -> None:
+def room_events_imports(out: StringIO, room_events: OrderedDict[Name, Callback]) -> None:
     for e in room_events.values():
         if '"' in e.source:
             raise ValueError(f"Invalid source value for room event: {e.name}")
@@ -98,7 +98,7 @@ def room_events_imports(out: StringIO, room_events: OrderedDict[Name, EngineHook
             out.write(f'import "../{e.source}";\n')
 
 
-def room_events_table(out: StringIO, room_events: OrderedDict[Name, EngineHookFunction]) -> None:
+def room_events_table(out: StringIO, room_events: OrderedDict[Name, Callback]) -> None:
     n_functions: Final = len(room_events)
 
     def generate_table(table_name: str, fn_type: str, fn_name: str) -> None:

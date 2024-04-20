@@ -14,9 +14,9 @@ import posixpath
 from collections import OrderedDict
 from typing import Final, NamedTuple, Optional, Union
 
-from .json_formats import load_entities_json, load_mappings_json, Filename, Mappings, EntitiesJson, Entity, EngineHookFunction, Name
+from .json_formats import load_entities_json, load_mappings_json, Filename, Mappings, EntitiesJson, Entity, Callback, Name
 from .common import EngineData, FixedSizedData, MultilineError, SimpleMultilineError, print_error
-from .engine_hooks import parse_hook_parameters, ROOM_EVENT_HOOK, RoomDoors, parse_int
+from .callbacks import parse_callback_parameters, ROOM_CALLBACK, RoomDoors, parse_int
 
 
 MAP_WIDTH = 16
@@ -268,7 +268,7 @@ class RoomIntermediate(NamedTuple):
     map_data: bytes
     tileset_id: int
     entities: list[RoomEntity]
-    room_event: EngineHookFunction
+    room_event: Callback
     room_event_data: bytes
 
 
@@ -370,7 +370,7 @@ def process_room(tmx_map: TmxMap, mapping: Mappings, all_entities: OrderedDict[s
     if not room_event:
         error_list.append("Unknown room event: { tmx_map.map_class }")
     else:
-        room_event_data = parse_hook_parameters(ROOM_EVENT_HOOK, room_event, tmx_map.parameters, mapping, room_doors, error_list)
+        room_event_data = parse_callback_parameters(ROOM_CALLBACK, room_event, tmx_map.parameters, mapping, room_doors, error_list)
 
     if error_list:
         raise RoomError("Error compiling room", error_list)

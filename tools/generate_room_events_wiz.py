@@ -8,11 +8,11 @@ from io import StringIO
 
 from collections import OrderedDict
 
-from unnamed_snes_game.json_formats import load_mappings_json, Mappings, Name, EngineHookFunction
-from unnamed_snes_game.engine_hooks import write_hook_parameters_wiz, ROOM_EVENT_HOOK
+from unnamed_snes_game.json_formats import load_mappings_json, Mappings, Name, Callback
+from unnamed_snes_game.callbacks import write_callback_parameters_wiz, ROOM_CALLBACK
 
 
-def generate_wiz_code(room_events: OrderedDict[Name, EngineHookFunction]) -> str:
+def generate_wiz_code(room_events: OrderedDict[Name, Callback]) -> str:
     n_functions = len(room_events)
 
     with StringIO() as out:
@@ -32,7 +32,7 @@ in wram7e_roomstate {
 """
         )
 
-        write_hook_parameters_wiz(out, room_events, ROOM_EVENT_HOOK)
+        write_callback_parameters_wiz(out, room_events, ROOM_CALLBACK)
 
         out.write("}\n")
         out.write("}\n")

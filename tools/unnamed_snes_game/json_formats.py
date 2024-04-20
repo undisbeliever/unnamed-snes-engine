@@ -593,18 +593,18 @@ class GameMode(NamedTuple):
     source: str
 
 
-class EngineHookParameter(NamedTuple):
+class CallbackParameter(NamedTuple):
     name: Name
     comment: str
     type: Name
     default_value: Optional[str]
 
 
-class EngineHookFunction(NamedTuple):
+class Callback(NamedTuple):
     name: Name
     id: int
     source: str
-    parameters: list[EngineHookParameter]
+    parameters: list[CallbackParameter]
 
 
 class Mappings(NamedTuple):
@@ -620,7 +620,7 @@ class Mappings(NamedTuple):
     gamestate_flags: list[Name]
     gamemodes: list[GameMode]
     room_transitions: list[Name]
-    room_events: OrderedDict[Name, EngineHookFunction]
+    room_events: OrderedDict[Name, Callback]
     memory_map: MemoryMap
 
     # ::TODO remove songs from mappings (somehow)
@@ -660,12 +660,12 @@ class _Mappings_Helper(_Helper):
             self._raise_error(f"Too many gamemodes, max: { MAX_GAME_MODES }", key)
         return out
 
-    def get_room_event_parameters(self, key: str) -> list[EngineHookParameter]:
+    def get_room_event_parameters(self, key: str) -> list[CallbackParameter]:
         out = list()
 
         for p in self.iterate_list_of_dicts(key):
             out.append(
-                EngineHookParameter(
+                CallbackParameter(
                     name=p.get_name("name"),
                     comment=p.get_string("comment"),
                     type=p.get_name("type"),
@@ -683,9 +683,9 @@ def load_mappings_json(filename: Filename) -> Mappings:
 
     room_events = jh.build_ordered_dict_from_list(
         "room_events",
-        EngineHookFunction,
+        Callback,
         MAX_ROOM_EVENTS,
-        lambda rj, name, i: EngineHookFunction(
+        lambda rj, name, i: Callback(
             name=name,
             id=i,
             source=rj.get_string("source"),
@@ -1061,7 +1061,7 @@ class SecondLayerInput(NamedTuple):
     source: Filename
     palette: Name
     tile_priority: bool
-    # ::TODO add engine hooks::
+    # ::TODO add callback::
 
 
 class OtherResources(NamedTuple):
