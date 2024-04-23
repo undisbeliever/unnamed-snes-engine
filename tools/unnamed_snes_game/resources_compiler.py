@@ -573,14 +573,18 @@ class SecondLayerCompiler(OtherResourcesCompiler):
                 d[b.palette] = i
         return d
 
-    SHARED_INPUTS = (SharedInputType.OTHER_RESOURCES,)
+    SHARED_INPUTS = (
+        SharedInputType.MAPPINGS,
+        SharedInputType.OTHER_RESOURCES,
+    )
     USES_PALETTES = True
 
     def _compile(self, r_name: Name) -> EngineData:
+        assert self._shared_input.mappings
         assert self._shared_input.other_resources
 
         sli = self._shared_input.other_resources.second_layers[r_name]
-        return convert_second_layer(sli, self.__palettes)
+        return convert_second_layer(sli, self.__palettes, self._shared_input.mappings)
 
 
 class TileCompiler(OtherResourcesCompiler):

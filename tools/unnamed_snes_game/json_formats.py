@@ -280,6 +280,26 @@ class _Helper:
 
         return out
 
+    def get_parameter_dict(self, key: str) -> dict[Name, str]:
+        """Returns a callback parameter dictionary."""
+
+        d = self.__dict.get(key)
+        if not isinstance(d, dict):
+            self._raise_error(f"Expected a JSON dict type", key)
+
+        out = OrderedDict()
+        for name, value in d.items():
+            name = self._test_name(name, key)
+
+            if isinstance(value, str):
+                out[name] = value
+            elif isinstance(value, int) or isinstance(value, float):
+                out[name] = str(value)
+            else:
+                self._raise_error(f"Only strings or numbers are allowed in parameters", key, name)
+
+        return out
+
     def _test_name(self, s: Any, *path: str) -> Name:
         if not isinstance(s, str):
             self._raise_error("Expected a string", *path)
@@ -575,8 +595,9 @@ def load_ms_export_order_json(filename: Filename) -> MsExportOrder:
 # mappings.json
 # =============
 
-MAX_ROOM_EVENTS = 128
+MAX_N_CALLBACKS = 128
 MAX_ROOM_EVENT_PARAMETERS = 4
+MAX_SL_CALLBACK_PARAMETERS = 8
 
 # GAME_MODES > 128 mean the next game mode is unchanged.
 MAX_GAME_MODES = 128
@@ -600,11 +621,24 @@ class CallbackParameter(NamedTuple):
     default_value: Optional[str]
 
 
-class Callback(NamedTuple):
+class RoomEvent(NamedTuple):
     name: Name
     id: int
     source: str
     parameters: list[CallbackParameter]
+
+
+class SecondLayerCallback(NamedTuple):
+    name: Name
+    id: int
+    source: str
+    sl_parameters: list[CallbackParameter]
+    # ::TODO add world parameters::
+    # ::TODO add room parameters::
+
+
+Callback = Union[RoomEvent, SecondLayerCallback]
+CallbackDict = Union[OrderedDict[Name, RoomEvent], OrderedDict[Name, SecondLayerCallback]]
 
 
 class Mappings(NamedTuple):
@@ -620,7 +654,8 @@ class Mappings(NamedTuple):
     gamestate_flags: list[Name]
     gamemodes: list[GameMode]
     room_transitions: list[Name]
-    room_events: OrderedDict[Name, Callback]
+    room_events: OrderedDict[Name, RoomEvent]
+    sl_callbacks: OrderedDict[Name, SecondLayerCallback]
     memory_map: MemoryMap
 
     # ::TODO remove songs from mappings (somehow)
@@ -660,7 +695,7 @@ class _Mappings_Helper(_Helper):
             self._raise_error(f"Too many gamemodes, max: { MAX_GAME_MODES }", key)
         return out
 
-    def get_room_event_parameters(self, key: str) -> list[CallbackParameter]:
+    def get_callback_parameters(self, key: str, max_parameters: int) -> list[CallbackParameter]:
         out = list()
 
         for p in self.iterate_list_of_dicts(key):
@@ -674,24 +709,40 @@ class _Mappings_Helper(_Helper):
             )
 
         if len(out) > MAX_ROOM_EVENT_PARAMETERS:
-            self._raise_error(f"Too many room parameters, max: { MAX_ROOM_EVENT_PARAMETERS }", key)
+            self._raise_error(f"Too many {key} parameters, max: { max_parameters }", key)
         return out
+
+    def get_room_events(self, key: str) -> OrderedDict[Name, RoomEvent]:
+        return self.build_ordered_dict_from_list(
+            key,
+            RoomEvent,
+            MAX_N_CALLBACKS,
+            lambda rj, name, i: RoomEvent(
+                name=name,
+                id=i,
+                source=rj.get_string("source"),
+                parameters=rj.get_callback_parameters("parameters", MAX_ROOM_EVENT_PARAMETERS),
+            ),
+        )
+
+    def get_sl_callbacks(self, key: str) -> OrderedDict[Name, SecondLayerCallback]:
+        callbacks = self.build_ordered_dict_from_list(
+            key,
+            SecondLayerCallback,
+            MAX_N_CALLBACKS,
+            lambda rj, name, i: SecondLayerCallback(
+                name=name,
+                id=i,
+                source=rj.get_string("source"),
+                sl_parameters=rj.get_callback_parameters("sl_parameters", MAX_SL_CALLBACK_PARAMETERS),
+            ),
+        )
+        # ::TODO detect duplicates in callback parameters::
+        return callbacks
 
 
 def load_mappings_json(filename: Filename) -> Mappings:
     jh = _load_json_file(filename, _Mappings_Helper)
-
-    room_events = jh.build_ordered_dict_from_list(
-        "room_events",
-        Callback,
-        MAX_ROOM_EVENTS,
-        lambda rj, name, i: Callback(
-            name=name,
-            id=i,
-            source=rj.get_string("source"),
-            parameters=rj.get_room_event_parameters("parameters"),
-        ),
-    )
 
     return Mappings(
         game_title=jh.get_string("game_title"),
@@ -705,7 +756,8 @@ def load_mappings_json(filename: Filename) -> Mappings:
         interactive_tile_functions=jh.get_name_list("interactive_tile_functions"),
         gamestate_flags=jh.get_name_list("gamestate_flags"),
         room_transitions=jh.get_name_list("room_transitions"),
-        room_events=room_events,
+        room_events=jh.get_room_events("room_events"),
+        sl_callbacks=jh.get_sl_callbacks("sl_callbacks"),
         memory_map=jh.get_memory_map("memory_map"),
         gamemodes=jh.get_gamemodes("gamemodes"),
         songs=jh.get_name_list("songs"),
@@ -1061,7 +1113,8 @@ class SecondLayerInput(NamedTuple):
     source: Filename
     palette: Name
     tile_priority: bool
-    # ::TODO add callback::
+    callback: Name
+    parameters: dict[Name, str]
 
 
 class OtherResources(NamedTuple):
@@ -1120,6 +1173,8 @@ def load_other_resources_json(filename: Filename) -> OtherResources:
             source=os.path.join(dirname, t.get_filename("source")),
             palette=t.get_name("palette"),
             tile_priority=t.get_int1("tile_priority"),
+            callback=t.get_name("callback"),
+            parameters=t.get_parameter_dict("parameters"),
         ),
     )
 

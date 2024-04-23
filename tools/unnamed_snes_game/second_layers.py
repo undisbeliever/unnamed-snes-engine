@@ -7,7 +7,7 @@ import PIL.Image  # type: ignore
 from collections import OrderedDict
 from typing import Any, Callable, Final, Iterable, NamedTuple, Optional
 
-from .common import EngineData, FixedSizedData, DynamicSizedData, print_error
+from .common import EngineData, FixedSizedData, DynamicSizedData, SimpleMultilineError
 from .palette import PaletteColors
 from .snes import (
     AbstractTilesetMap,
@@ -20,8 +20,8 @@ from .snes import (
     hflip_tile,
     vflip_tile,
 )
-
-from .json_formats import Name, SecondLayerInput
+from .callbacks import parse_callback_parameters, SL_CALLBACK_PARAMETERS
+from .json_formats import Name, SecondLayerInput, Mappings
 
 
 SECOND_LAYER_BPP: Final = 4
@@ -52,7 +52,7 @@ class SecondLayerTilesetMap(AbstractTilesetMap):
         return reversed(self._tiles)
 
 
-def convert_second_layer(sli: SecondLayerInput, palettes: dict[Name, PaletteColors]) -> EngineData:
+def convert_second_layer(sli: SecondLayerInput, palettes: dict[Name, PaletteColors], mapping: Mappings) -> EngineData:
     image_filename = sli.source
 
     with PIL.Image.open(image_filename) as image:
@@ -83,12 +83,26 @@ def convert_second_layer(sli: SecondLayerInput, palettes: dict[Name, PaletteColo
     )
     tile_data = convert_snes_tileset(tileset.tiles(), SECOND_LAYER_BPP)
 
-    ram_data = bytes(
-        [
-            width,
-            height,
-            # ::TODO add callback::
-        ]
-    ) + create_tilemap_data(tilemap, sli.tile_priority)
+    sl_callback = mapping.sl_callbacks.get(sli.callback)
+    if sl_callback is None:
+        raise RuntimeError(f"Unknown sl_callback: {sli.callback}")
+
+    error_list: list[str] = list()
+    callback_parameters = parse_callback_parameters(SL_CALLBACK_PARAMETERS, sl_callback, sli.parameters, mapping, None, error_list)
+
+    if error_list:
+        raise SimpleMultilineError("Error compiling second layer", error_list)
+
+    ram_data = (
+        bytes(
+            [
+                width,
+                height,
+                sl_callback.id * 2,
+            ]
+        )
+        + callback_parameters
+        + create_tilemap_data(tilemap, sli.tile_priority)
+    )
 
     return EngineData(ram_data=DynamicSizedData(ram_data), ppu_data=DynamicSizedData(tile_data))

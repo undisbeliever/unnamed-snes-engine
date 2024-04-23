@@ -203,5 +203,33 @@
        }
      ]
    }
- ]
+ ],
+ "sl_callbacks": [
+   {
+     "name": "fixed_velocity",
+     "source": "fixed-velocity",
+     "sl_parameters": [
+       {
+         "name": "xPos",
+         "comment": "The starting x-position",
+         "type": "u16"
+       },
+       {
+         "name": "yPos",
+         "comment": "The starting y-position",
+         "type": "u16"
+       },
+       {
+         "name": "xVelocity",
+         "comment": "The x-velocity",
+         "type": "sQ4_12"
+       },
+       {
+         "name": "yVelocity",
+         "comment": "The y-velocity",
+         "type": "sQ4_12"
+       }
+     ]
+   }
+  ]
 }

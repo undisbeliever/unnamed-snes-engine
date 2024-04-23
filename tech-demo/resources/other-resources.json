@@ -67,7 +67,14 @@
     "scrolling_test": {
       "source": "second-layers/scrolling-test.png",
       "palette": "dungeon",
-      "tile_priority": 1
+      "tile_priority": 1,
+      "callback": "fixed_velocity",
+      "parameters": {
+        "xPos": 88,
+        "yPos": 88,
+        "xVelocity": 1.125,
+        "yVelocity": -1.25
+      }
     }
   }
 }
