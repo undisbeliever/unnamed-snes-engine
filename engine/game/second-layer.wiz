@@ -568,8 +568,10 @@ func scroll_tilemap() {
         vertical_buffer.update__inline();
         horizontal_buffer.update__inline();
 
+        // Can use |, `viewportXOffset` is tile aligned
         xScrollShadow = aa = (state.xPos & TILE_PX_MASK) | vertical_buffer.viewportXOffset;
-        yScrollShadow = aa = (state.yPos & TILE_PX_MASK) | horizontal_buffer.viewportYOffset;
+        // Must use + here, `viewportYOffset` is not tile aligned
+        yScrollShadow = aa = (state.yPos & TILE_PX_MASK) + horizontal_buffer.viewportYOffset;
     }
     mem8_idx8();
 }
@@ -882,21 +884,19 @@ func dummy_process_callback() {
     #[mem16] {
         aa = *(far &JOY1 as far *u16);
         if !zero {
-            // Using +/- 12 to test the xPos/yPos is clamped correctly when the delta is too large
-
             if aa & JOY_LEFT != 0 {
-                state.xPos = aa = state.xPos + 12;
+                state.xPos = aa = state.xPos + 2;
             }
             else if aa & JOY_RIGHT != 0 {
-                state.xPos = aa = state.xPos - 12;
+                state.xPos = aa = state.xPos - 2;
             }
 
             aa = *(far &JOY1 as far *u16);
             if aa & JOY_UP != 0 {
-                state.yPos = aa = state.yPos + 12;
+                state.yPos = aa = state.yPos + 2;
             }
             else if aa & JOY_DOWN != 0 {
-                state.yPos = aa = state.yPos - 12;
+                state.yPos = aa = state.yPos - 2;
             }
         }
     }
