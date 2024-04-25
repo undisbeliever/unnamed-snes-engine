@@ -14,6 +14,11 @@ import "gen/enums";
 
 namespace second_layer {
 
+// ::TODO add a second layer with a height of 32 to the tech-demo::
+// ::TODO add a second layer with a width of 64 to the tech-demo::
+// ::TODO add a second layer with a width of 32 to the tech-demo::
+
+
 let TILE_PX = 8;
 let TILE_PX_MASK = 7;
 let POSITION_TILE_MASK = 0xffff ^ TILE_PX_MASK;
@@ -123,6 +128,13 @@ in lowram {
         let BUFFER_STATE__VERTICAL_BIT = 7;
         let BUFFER_STATE__HORIZONTAL_BIT = 6;
 
+    // Bitflags to signal if the vertical_buffer or horizontal_buffer should be skipped.
+    //
+    // Vertical buffer updates can be skipped if the second-layer is 32 or 64 tiles wide.
+    // Horizontal buffer updates can be skipped if the second-layer is 32 tiles tall.
+    var skipFlags : u8;
+        let SKIP_FLAGS__VERTICAL_BIT = 7;
+        let SKIP_FLAGS__HORIZONTAL_BIT = 6;
 
     namespace vertical_buffer {
         var vramWordAddr : u16;
@@ -321,6 +333,9 @@ namespace _draw_fullscreen {
         VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
         VMADD = xx = VRAM_BG2_MAP_WADDR;
 
+        bufferState = 0;
+        skipFlags = 0;
+
         push8(p);
         mem16();
         idx8();
@@ -344,8 +359,48 @@ namespace _draw_fullscreen {
             y = _mapHeight;
             bottom = aa = yy <<< 3;
 
-            _tilePos_x = x = __clamp_pos(&sl_callbacks.xPos_px, &right, &vertical_buffer.maskedPrevXPos);
-            _tilePos_y = x = __clamp_pos(&sl_callbacks.yPos_px, &bottom, &horizontal_buffer.maskedPrevYPos);
+            x = __clamp_pos(&sl_callbacks.xPos_px, &right, &vertical_buffer.maskedPrevXPos);
+            y = _mapWidth;
+            if y == VRAM_TILEMAP_TILE_WIDTH || y == NAMETABLE_TILE_WIDTH {
+                // _mapWidth matches VRAM tilemap width.
+                // Disable the vertical buffer.
+                skipFlags = y = 1 << SKIP_FLAGS__VERTICAL_BIT;
+
+                // Set _tilePos_x so the leftmost tile in the VRAM tilemap has an xPos of 0.
+                x = VIEWPORT_X_OFFSET / TILE_PX;
+
+                y = 0;
+                aa = sl_callbacks.xPos_px;
+            } else {
+                y = VIEWPORT_X_OFFSET;
+                aa = (sl_callbacks.xPos_px & TILE_PX_MASK) | VIEWPORT_X_OFFSET;
+            }
+            _tilePos_x = x;
+            xScrollShadow = aa;
+            vertical_buffer.viewportXOffset = aa = yy;
+            vertical_buffer.cursorIndex = 0;
+
+            x = __clamp_pos(&sl_callbacks.yPos_px, &bottom, &horizontal_buffer.maskedPrevYPos);
+            y = _mapHeight;
+            if y == VRAM_TILEMAP_TILE_HEIGHT {
+                // _mapHeight matches VRAM tilemap height.
+                // Disable the horizontal buffer.
+                test_and_set(*(&skipFlags as *u16), aa = 1 << SKIP_FLAGS__HORIZONTAL_BIT);
+
+                // Set _tilePos_y so the topmost tile in the VRAM tilemap has a yPos of 0.
+                x = VIEWPORT_Y_OFFSET / TILE_PX;
+                y = 0;
+                aa = sl_callbacks.yPos_px;
+            }
+            else {
+                y = (VIEWPORT_Y_OFFSET - 1);
+                aa = (sl_callbacks.yPos_px & TILE_PX_MASK) | VIEWPORT_Y_OFFSET;
+                aa--;
+            }
+            _tilePos_y = x;
+            yScrollShadow = aa;
+            horizontal_buffer.viewportYOffset = aa = yy;
+            horizontal_buffer.cursorIndex = 0;
         }
         p = pop8();
 
@@ -388,21 +443,8 @@ namespace _draw_fullscreen {
         #[mem16] {
             tilemapSeam_x = aa = (aa & 0xff) <<< 1;
             tilemapSeam_y = aa = (RDMPY <<< 1);
-
-            vertical_buffer.cursorIndex = 0;
-            horizontal_buffer.cursorIndex = 0;
-
-            vertical_buffer.viewportXOffset = aa = VIEWPORT_X_OFFSET;
-            xScrollShadow = aa = (sl_callbacks.xPos_px & TILE_PX_MASK) | VIEWPORT_X_OFFSET;
-
-            horizontal_buffer.viewportYOffset = aa = (VIEWPORT_Y_OFFSET - 1);
-            aa = (sl_callbacks.yPos_px & TILE_PX_MASK) | VIEWPORT_Y_OFFSET;
-            aa--;
-            yScrollShadow = aa;
         }
         mem8();
-
-        bufferState = 0;
     }
 
 
@@ -579,13 +621,39 @@ func scroll_tilemap() {
 
     mem16_idx16();
     #[mem16, idx16] {
-        vertical_buffer.update__inline();
-        horizontal_buffer.update__inline();
+        // assumes SKIP_FLAGS__VERTICAL_BIT == 7
+        bit((&skipFlags as *u16)[unaligned -1]);
+        if negative {
+            aa = sl_callbacks.xPos_px;
+            ^goto _EndIf_Vertical;
+        }
+        // ^else
+        {
+            vertical_buffer.update__inline();
 
-        // Can use |, `viewportXOffset` is tile aligned
-        xScrollShadow = aa = (sl_callbacks.xPos_px & TILE_PX_MASK) | vertical_buffer.viewportXOffset;
-        // Must use + here, `viewportYOffset` is not tile aligned
-        yScrollShadow = aa = (sl_callbacks.yPos_px & TILE_PX_MASK) + horizontal_buffer.viewportYOffset;
+            // Can use |, `viewportXOffset` is tile aligned
+            aa = (sl_callbacks.xPos_px & TILE_PX_MASK) | vertical_buffer.viewportXOffset;
+        }
+    _EndIf_Vertical:
+        xScrollShadow = aa;
+
+
+        // assumes SKIP_FLAGS__HORIZONTAL_BIT == 6
+        bit((&skipFlags as *u16)[unaligned -1]);
+        if overflow {
+            aa = sl_callbacks.yPos_px;
+            aa--;
+            ^goto _EndIf_Horizontal;
+        }
+        // ^else
+        {
+            horizontal_buffer.update__inline();
+
+            // Must use + here, `viewportYOffset` is not tile aligned
+            aa = (sl_callbacks.yPos_px & TILE_PX_MASK) + horizontal_buffer.viewportYOffset;
+        }
+    _EndIf_Horizontal:
+        yScrollShadow = aa;
     }
     mem8_idx8();
 }
