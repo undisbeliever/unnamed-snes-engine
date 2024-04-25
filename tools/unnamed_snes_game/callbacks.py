@@ -250,7 +250,7 @@ def write_callback_parameters_wiz(out: StringIO, callbacks: CallbackDict, *callb
                         p_comment = p.comment.replace("\n", "\n  // ")
                         out.write(f"  // { p_comment }\n")
                     out.write(f"  // ({ p.type })\n")
-                    out.write(f"  var parameter__{ p.name } @ &{ callback_type.parameter_array }[{ i }] : { ptype };\n")
+                    out.write(f"  const parameter__{ p.name } @ &{ callback_type.parameter_array }[{ i }] : { ptype };\n")
 
                     i += PARAM_SIZE[p.type]
 

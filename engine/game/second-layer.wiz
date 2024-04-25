@@ -168,12 +168,12 @@ in lowram {
 in wram7e {
     // this hack allows me to write `tilemap[x]` without a compile error.
     var __far_sl_data : _RamDataFormat;
-        var sl_data @ &__far_sl_data : _RamDataFormat;
-        var sl_header @ &__far_sl_data : _SecondLayerHeader;
-        var sl_tilemap @ &__far_sl_data.tilemap[0] : [u16 ; MAX_TILEMAP_CELLS];
+        const sl_data @ &__far_sl_data : _RamDataFormat;
+        const sl_header @ &__far_sl_data : _SecondLayerHeader;
+        const sl_tilemap @ &__far_sl_data.tilemap[0] : [u16 ; MAX_TILEMAP_CELLS];
 
     // Callback parameters
-    var sl_parameters @ &sl_header.callback_parameters[0] : typeof(sl_header.callback_parameters);
+    const sl_parameters @ &sl_header.callback_parameters[0] : typeof(sl_header.callback_parameters);
 
     namespace vertical_buffer {
         var buffer : [u16 ; 32];
@@ -224,7 +224,7 @@ func setup__forceblank__inline(second_layer_id : u8 in a) {
             a = 0;
         }
         a &= (0xff - 1);
-        sl_header.callback_index = a;
+        *(&__far_sl_data.header.callback_index as *u8) = a;
 
         x = a;
         sl_callbacks.init_function_table[unaligned xx]();
