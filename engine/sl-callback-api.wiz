@@ -11,9 +11,9 @@ namespace sl_callbacks {
 // Variables
 // =========
 
-// Storing variables in lowram so they can be accessed by setup (DB=0x80) and process (DB=0x7e).
+// Storing variables in lowram so they can be accessed by _draw_fullscreen (DB=0x80) and process (DB=0x7e).
 in lowram {
-    let __STATE_START_ADDR = &xPos_sx as u16;
+    let __STATE_START_ADDR = far &xPos_sx as u24;
 
     // The position of the second layer
     // (signed Q16.16)
@@ -34,7 +34,8 @@ in lowram {
     var var_6 : u16;
     var var_7 : u16;
 
-    let __STATE_SIZE = &var_7 as u16 + 2 - __STATE_START_ADDR;
+    // must be even
+    let __STATE_SIZE = (&var_7 as u16 + 2) - (__STATE_START_ADDR as u16);
 }
 
 

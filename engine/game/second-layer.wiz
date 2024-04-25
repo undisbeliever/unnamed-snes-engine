@@ -178,6 +178,9 @@ in wram7e {
         var sl_header @ &__far_sl_data : _SecondLayerHeader;
         var sl_tilemap @ &__far_sl_data.tilemap[0] : [u16 ; MAX_TILEMAP_CELLS];
 
+    // Callback parameters
+    var sl_parameters @ &sl_header.callback_parameters[0] : typeof(sl_header.callback_parameters);
+
     namespace vertical_buffer {
         var buffer : [u16 ; 32];
         let CURSOR_INDEX_MASK = 31 * 2;
@@ -188,11 +191,6 @@ in wram7e {
         var buffer : [u16 ; 64];
         let CURSOR_INDEX_MASK = 63 * 2;
     }
-}
-
-in lowram {
-    // A copy of the second-layer callback parameters
-    var sl_parameters : typeof(sl_header.callback_parameters);
 }
 
 
@@ -210,49 +208,42 @@ in code {
 func setup__forceblank__inline(second_layer_id : u8 in a) {
     load_second_layer__forceblank__inline(a);
 
-    mem16();
-    #[mem16] {
-        // load_dec_repeat parameter order is destination, source
+    push16(0x807e);
+    data_bank = pop8();
+// DB = 0x7e
 
-        // Copy sl callback parameters
-        load_dec_repeat(0x7e, yy = &sl_parameters[0] as u16,
-                        0x7e, xx = &sl_header.callback_parameters[0] as u16,
-                        aa = sizeof(typeof(sl_header.callback_parameters)) - 1);
-
-    // DB = 0x7e
-
-        // Clear `sl_callbacks` variables
-        xx = yy = sl_callbacks.__STATE_START_ADDR;
-        yy++;
-        (0 as *u16)[unaligned xx] = 0;
-        load_dec_repeat(0x80, yy,
-                        0x80, xx,
-                        aa = sl_callbacks.__STATE_SIZE - 2);
-
-    // DB unchanged (load_dec_repeat target is bank 0x80)
+    mem16_idx16();
+    #[mem16, idx16] {
+        // Clear sl_callback variables
+        // Assumes __STATE_SIZE is even
+        xx = sl_callbacks.__STATE_SIZE - 2;
+        do {
+            (sl_callbacks.__STATE_START_ADDR as *u16)[unaligned xx] = 0;
+            xx--;
+            xx--;
+        } while !negative;
 
         // Copy map width AND height to lowram
         // (Allows parameters to be accessed by setup callback and `_draw_fullscreen`)
-        var _sl_header_map_size @ &__far_sl_data.header.width : u16;
-        *(&map_width as *u16) = aa = *(far &_sl_header_map_size);
+        var _sl_header_map_size @ &sl_header.width : u16;
+        *(&map_width as *u16) = aa = _sl_header_map_size;
     }
-    mem8();
-
-    {
-        // Clear Ah
-        aa = direct_page;
-
-        var __callback_index @ &sl_header.callback_index : u8;
-
-        a = *(far &__callback_index);
+    mem8_idx8();
+    #[mem8, idx8] {
+        a = sl_header.callback_index;
         if a >= sl_callbacks.N_SECOND_LAYER_FUNCTIONS {
             a = 0;
         }
         a &= (0xff - 1);
-        *(far &__callback_index) = a;
+        sl_header.callback_index = a;
+
+        x = a;
+        sl_callbacks.init_function_table[unaligned xx]();
     }
-    xx = aa;
-    sl_callbacks.setup__forceblank__function_table[unaligned xx]();
+    idx16();
+
+    data_bank = pop8();
+// DB = 0x80
 
     _draw_fullscreen.draw__forceblank__inline();
 }

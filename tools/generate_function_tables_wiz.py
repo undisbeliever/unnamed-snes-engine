@@ -138,12 +138,11 @@ def second_layers_table(out: StringIO, sl_callbacks: OrderedDict[Name, SecondLay
 
     out.write(f"let N_SECOND_LAYER_FUNCTIONS = { n_functions };\n\n")
 
-    out.write("// Called when the second layer is loaded, while the screen is disabled.\n")
+    out.write("// Called when the second layer is loaded, before the tilemap is transferred to VRAM.\n")
     out.write("// This callback is allowed to setup HDMA effects.\n")
-    out.write("// NOTE: This callback can only access low-RAM variables.\n")
-    out.write("// DB = 0x80\n")
-    out.write("#[mem8, idx16]\n")
-    generate_table("setup__forceblank__function_table", "func()", "setup__forceblank")
+    out.write("// DB = 0x7e\n")
+    out.write("#[mem8, idx8]\n")
+    generate_table("init_function_table", "func()", "init")
 
     out.write("// Called once per frame\n")
     out.write("// DB = 0x7e\n")

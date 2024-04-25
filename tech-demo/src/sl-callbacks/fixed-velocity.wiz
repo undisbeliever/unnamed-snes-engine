@@ -24,9 +24,9 @@ in lowram {
 in code {
 
 
-// DB = 0x80
-#[mem8, idx16]
-func setup__forceblank() {
+// DB = 0x7e
+#[mem8, idx8]
+func init() {
     mem16_idx16();
     #[mem16, idx16] {
         xPos_px = aa = parameter__xPos;
@@ -42,7 +42,7 @@ func setup__forceblank() {
         yVelocity_sx = xx;
         yVelocity_px = aa;
     }
-    mem8();
+    mem8_idx8();
 }
 
 
