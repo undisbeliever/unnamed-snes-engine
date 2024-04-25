@@ -69,12 +69,6 @@ struct _RamDataFormat {
 // Storing variables in lowram so they can be accessed by setup (DB=0x80) and process (DB=0x7e).
 // NOTE: These variables MUST NOT be modified by the sl_callback
 in lowram {
-    // Map tile width (minimum value: 32)
-    var map_width : u8;
-    // Map tile height (minimum value: 32)
-    var map_height : u8;
-
-
     // The rightmost position
     var right : u16;
 
@@ -222,11 +216,6 @@ func setup__forceblank__inline(second_layer_id : u8 in a) {
             xx--;
             xx--;
         } while !negative;
-
-        // Copy map width AND height to lowram
-        // (Allows parameters to be accessed by setup callback and `_draw_fullscreen`)
-        var _sl_header_map_size @ &sl_header.width : u16;
-        *(&map_width as *u16) = aa = _sl_header_map_size;
     }
     mem8_idx8();
     #[mem8, idx8] {
@@ -285,6 +274,10 @@ namespace _draw_fullscreen {
         var _dmaSize2 : u8 in zpTmp_byte_3;
 
         var _endAddr : u16 in zpTmp_word_0;
+
+        var _mapTileSize : u16 in zpTmp_word_1;
+            var _mapWidth : u8 in <:_mapTileSize;
+            var _mapHeight : u8 in >:_mapTileSize;
     }
 
 
@@ -332,7 +325,12 @@ namespace _draw_fullscreen {
         mem16();
         idx8();
         #[mem16, idx8] {
-            WRMPYA_WRMPYB = aa = *(&map_width as *u16); // Also writes height to WRMPYB
+            // Copy map width AND height to zeropage
+            var __sl_header_mapTileSize @ &__far_sl_data.header.width : u16;
+            _mapTileSize = aa = *(far &__sl_header_mapTileSize);
+
+            WRMPYA_WRMPYB = aa; // Also writes height to WRMPYB
+
             // Must wait 8 CPU cycles before reading RDMPY
             tilemapStride = aa = (aa & 0xff) <<< 1; // 3 (and) + 2 (asl) + 5 (sta) cycles
             tilemapAboveViewportOffset = aa = (aa <<< 5) - tilemapStride;
@@ -340,10 +338,10 @@ namespace _draw_fullscreen {
 
             _endAddr = aa = aa + (&sl_data.tilemap[0] as u16);
 
-            x = map_width;
+            x = _mapWidth;
             right = aa = xx <<< 3;
 
-            y = map_height;
+            y = _mapHeight;
             bottom = aa = yy <<< 3;
 
             _tilePos_x = x = __clamp_pos(&sl_callbacks.xPos_px, &right, &vertical_buffer.maskedPrevXPos);
@@ -351,10 +349,10 @@ namespace _draw_fullscreen {
         }
         p = pop8();
 
-        WRMPYA = a = map_width;
+        WRMPYA = a = _mapWidth;
         a = _tilePos_y - (VIEWPORT_Y_OFFSET / TILE_PX);
         if !carry {
-            a += map_height;
+            a += _mapHeight;
         }
         WRMPYB = a;
         // Must wait 8 CPU cycles before reading RDMPY
@@ -362,28 +360,28 @@ namespace _draw_fullscreen {
 
         a = _tilePos_x - (VIEWPORT_X_OFFSET / TILE_PX);
         if !carry {
-            a += map_width;
+            a += _mapWidth;
         }
         __draw_nametable(a);
 
         a = _tilePos_x + (NAMETABLE_TILE_WIDTH - VIEWPORT_X_OFFSET / TILE_PX);
-        if carry || a >= map_width {
-            a -= map_width;
+        if carry || a >= _mapWidth {
+            a -= _mapWidth;
         }
         __draw_nametable(a);
 
 
         // Calculate the tilemapSeam (bottom-right seam corner)
         a = _tilePos_y + (VRAM_TILEMAP_TILE_HEIGHT - VIEWPORT_Y_OFFSET / TILE_PX - 1);
-        if carry || a >= map_height {
-            a -= map_height;
+        if carry || a >= _mapHeight {
+            a -= _mapHeight;
         }
         WRMPYB = a;
         // Must wait 8 CPU cycles before reading RDMPY
 
         a = _tilePos_x + (VRAM_TILEMAP_TILE_WIDTH - VIEWPORT_X_OFFSET / TILE_PX - 1);
-        if carry || a >= map_width {
-            a -= map_width;
+        if carry || a >= _mapWidth {
+            a -= _mapWidth;
         }
 
         mem16();
@@ -430,7 +428,7 @@ namespace _draw_fullscreen {
             dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_TWO, <:&VMDATAL);
 
             // Calculate size of the two DMA transfers
-            a = map_width - (ss as *u8)[1];
+            a = _mapWidth - (ss as *u8)[1];
             if a >= COLUMNS_TO_DRAW {
                 a = COLUMNS_TO_DRAW;
             }
