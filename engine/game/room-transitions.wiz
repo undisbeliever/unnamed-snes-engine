@@ -735,6 +735,11 @@ func _scrolling_room_transition(roomPosition : u8 in a, _scrollDirection : Scrol
     // continue loading the room.
     _finish_loading_room();
 
+    zero = second_layer.is_not_part_of_room();
+    if !zero {
+        second_layer.part_of_room.start_room_transition(scrollDirection);
+    }
+
     x = scrollDirection as u8;
     MetaTileTransition_Setup_FunctionTable[unaligned x]();
 
@@ -765,6 +770,18 @@ const MetaTileTransition_Process_FunctionTable : [func : bool in carry ; 8] = [
     metatiles.transitions.scroll_down__rollback,
     metatiles.transitions.scroll_left__rollback,
     metatiles.transitions.scroll_right__rollback,
+];
+
+const SecondLayerTransition_Process_FunctionTable__mem16_idx16 : [func ; 8] = [
+    second_layer.part_of_room.scroll_up__process__mem16_idx16,
+    second_layer.part_of_room.scroll_down__process__mem16_idx16,
+    second_layer.part_of_room.scroll_left__process__mem16_idx16,
+    second_layer.part_of_room.scroll_right__process__mem16_idx16,
+
+    second_layer.part_of_room.scroll_up__rollback__mem16_idx16,
+    second_layer.part_of_room.scroll_down__rollback__mem16_idx16,
+    second_layer.part_of_room.scroll_left__rollback__mem16_idx16,
+    second_layer.part_of_room.scroll_right__rollback__mem16_idx16,
 ];
 
 
@@ -798,6 +815,16 @@ func _scrolling_room_transition__loop() : bool in carry {
         }
 
         move_camera_and_draw_sprite_list();
+
+        zero = second_layer.is_not_part_of_room();
+        if !zero {
+            x = scrollDirection as u8;
+            mem16_idx16();
+            #[mem16, idx16] {
+                SecondLayerTransition_Process_FunctionTable__mem16_idx16[unaligned x]();
+            }
+            mem8_idx8();
+        }
 
         x = scrollDirection as u8;
         MetaTileTransition_Process_FunctionTable[unaligned x]();
@@ -853,6 +880,11 @@ func _scrolling_room_transition__rollback(_scrollDirection_ : u8 in a, playerXpo
     _load_room_from_backup(x, y);
 
     engine_hooks.room_transitions__scrolling_room_transition_rollback__inline();
+
+    zero = second_layer.is_not_part_of_room();
+    if !zero {
+        second_layer.part_of_room.start_room_transition(scrollDirection);
+    }
 
     mem16();
     #[mem16] {

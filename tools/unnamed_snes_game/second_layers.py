@@ -73,6 +73,12 @@ def convert_second_layer(sli: SecondLayerInput, palettes: dict[Name, PaletteColo
     if width > 0xFF or height > 0xFF:
         raise ImageError(image_filename, f"Image is too large ({width * 8} x {height * 8}, max: 2040 x 2040)")
 
+    if sli.part_of_room:
+        # ::TODO check room_parameters::
+        part_of_room = 0xFF
+    else:
+        part_of_room = 0
+
     pal = palettes.get(sli.palette)
     if pal is None:
         raise RuntimeError(f"Cannot load palette {sli.palette}")
@@ -96,6 +102,7 @@ def convert_second_layer(sli: SecondLayerInput, palettes: dict[Name, PaletteColo
     ram_data = (
         bytes(
             [
+                part_of_room,
                 width,
                 height,
                 sl_callback.id * 2,
