@@ -57,8 +57,10 @@ enum ScrollDirection : u8 {
     DOWN  = 2,
     LEFT  = 4,
     RIGHT = 6,
-    ROLLBACK_LEFT =  8,
-    ROLLBACK_RIGHT = 10,
+    ROLLBACK_UP    =  8,
+    ROLLBACK_DOWN  = 10,
+    ROLLBACK_LEFT  = 12,
+    ROLLBACK_RIGHT = 14,
 }
 
 
@@ -742,20 +744,25 @@ func _scrolling_room_transition(roomPosition : u8 in a, _scrollDirection : Scrol
 }
 
 
-const MetaTileTransition_Setup_FunctionTable : [func ; 6] = [
+const MetaTileTransition_Setup_FunctionTable : [func ; 8] = [
     metatiles.transitions.scroll_up__setup,
     metatiles.transitions.scroll_down__setup,
     metatiles.transitions.scroll_left__setup,
     metatiles.transitions.scroll_right__setup,
     _invalid_setup_function,
     _invalid_setup_function,
+    _invalid_setup_function,
+    _invalid_setup_function,
 ];
 
-const MetaTileTransition_Process_FunctionTable : [func : bool in carry ; 6] = [
+const MetaTileTransition_Process_FunctionTable : [func : bool in carry ; 8] = [
     metatiles.transitions.scroll_up__process,
     metatiles.transitions.scroll_down__process,
     metatiles.transitions.scroll_left__process,
     metatiles.transitions.scroll_right__process,
+
+    metatiles.transitions.scroll_up__rollback,
+    metatiles.transitions.scroll_down__rollback,
     metatiles.transitions.scroll_left__rollback,
     metatiles.transitions.scroll_right__rollback,
 ];
@@ -920,7 +927,7 @@ func scroll_down() {
                                        player.xPos.px, PLAYER_YPOS_AFTER_DOWN_TRANSITION);
     if !carry {
         // Transition failed, rollback room transition
-        ^return _scrolling_room_transition__rollback(ScrollDirection.UP as u8,
+        ^return _scrolling_room_transition__rollback(ScrollDirection.ROLLBACK_DOWN as u8,
                                                      player.xPos.px, PLAYER_YPOS_AFTER_UP_TRANSITION);
     }
 }
@@ -941,7 +948,7 @@ func scroll_up() {
                                        player.xPos.px, PLAYER_YPOS_AFTER_UP_TRANSITION);
     if !carry {
         // Transition failed, rollback room transition
-        ^return _scrolling_room_transition__rollback(ScrollDirection.DOWN as u8,
+        ^return _scrolling_room_transition__rollback(ScrollDirection.ROLLBACK_UP as u8,
                                                      player.xPos.px, PLAYER_YPOS_AFTER_DOWN_TRANSITION);
     }
 }
@@ -1153,8 +1160,8 @@ func draw_sprite_list() {
 
 in rodata0 {
     // Order MUST Match ScrollDirection
-    const _ScrollDirectionTableX : [i16 ; 6 ] = [                0,                   0,     -DISPLAY_WIDTH,      DISPLAY_WIDTH,     -DISPLAY_WIDTH,    DISPLAY_WIDTH ];
-    const _ScrollDirectionTableY : [i16 ; 6 ] = [  -DISPLAY_HEIGHT,      DISPLAY_HEIGHT,                  0,                  0,                  0,                0 ];
+    const _ScrollDirectionTableX : [i16 ; 8 ] = [               0,               0, -DISPLAY_WIDTH,  DISPLAY_WIDTH,               0,                0, -DISPLAY_WIDTH, DISPLAY_WIDTH ];
+    const _ScrollDirectionTableY : [i16 ; 8 ] = [ -DISPLAY_HEIGHT,  DISPLAY_HEIGHT,              0,              0,  DISPLAY_HEIGHT,  -DISPLAY_HEIGHT,              0,             0 ];
 
     let ScrollDirectionTableX = (far&_ScrollDirectionTableX as far *i16);
     let ScrollDirectionTableY = (far&_ScrollDirectionTableY as far *i16);
@@ -1162,8 +1169,8 @@ in rodata0 {
 
     let _TS = metatiles.transitions.TRANSITION_SPEED;
 
-    const _ScrollDirectionVelocityX : [i16 ; 6 ] = [    0,    0, -_TS,  _TS,  _TS, -_TS];
-    const _ScrollDirectionVelocityY : [i16 ; 6 ] = [ -_TS,  _TS,    0,    0,    0,    0];
+    const _ScrollDirectionVelocityX : [i16 ; 8 ] = [    0,    0, -_TS,  _TS,    0,    0,  _TS, -_TS];
+    const _ScrollDirectionVelocityY : [i16 ; 8 ] = [ -_TS,  _TS,    0,    0,  _TS, -_TS,    0,    0];
 
     let ScrollDirectionVelocityX = (far&_ScrollDirectionVelocityX as far *i16);
     let ScrollDirectionVelocityY = (far&_ScrollDirectionVelocityY as far *i16);

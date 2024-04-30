@@ -1859,6 +1859,7 @@ func scroll_down__process() : bool in carry {
     return false;
 }
 
+let scroll_down__rollback = scroll_up__process;
 
 
 
@@ -1905,6 +1906,8 @@ func scroll_up__process() : bool in carry {
 
     return false;
 }
+
+let scroll_up__rollback = scroll_down__process;
 
 
 
