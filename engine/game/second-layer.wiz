@@ -155,10 +155,12 @@ in lowram {
         //    (since I'm auto-wrapping xPos/yPos, I may as well limit it to the actual location)
         var maskedPrevXPos : u16;
 
-        // Position within `buffer`.
-        // Used to calculate `horizontal_buffer.vramWordAddr1`.
-        // MUST ALWAYS be even and masked by `CURSOR_INDEX_MASK`.
-        var cursorIndex : u16;
+        // The tile position within the buffer.
+        // (named `cursor` to differentiate it from the tilemapSeam).
+        // Used to calculate `buffer` index.
+        // Used to calculate `horizontal_buffer.vramWordAddr1` & `horizontal_buffer.vramWordAddr2`.
+        // NOTE: not masked, `cursor` can be out of bounds.
+        var cursor : u16;
 
         // Offset between `sl_callbacks.xPos_px` and `xScrollShadow`.
         // Used because `xScrollShadow` might be changed outside this subsystem.
@@ -173,10 +175,12 @@ in lowram {
         // See `vertical_buffer.maskedPrevYPos`
         var maskedPrevYPos : u16;
 
-        // Position within `buffer`.
+        // The tile position within the buffer.
+        // (named `cursor` to differentiate it from the tilemapSeam).
+        // Used to calculate `buffer` index.
         // Used to calculate `vertical_buffer.vramWordAddr`.
-        // MUST ALWAYS be even and masked by `CURSOR_INDEX_MASK`.
-        var cursorIndex : u16;
+        // NOTE: not masked, `cursor` can be out of bounds.
+        var cursor : u16;
 
         // Offset between `sl_callbacks.yPos_px` and `yScrollShadow`.
         // Used because `xScrollShadow` might be changed outside this subsystem.
@@ -196,13 +200,13 @@ in wram7e {
 
     namespace vertical_buffer {
         var buffer : [u16 ; 32];
-        let CURSOR_INDEX_MASK = 31 * 2;
+        let BUFFER_INDEX_MASK = 31 * 2;
     }
 
     namespace horizontal_buffer {
         // NOTE: This buffer requires 2 transfers to load into VRAM.
         var buffer : [u16 ; 64];
-        let CURSOR_INDEX_MASK = 63 * 2;
+        let BUFFER_INDEX_MASK = 63 * 2;
     }
 }
 
@@ -413,7 +417,7 @@ namespace _draw_fullscreen {
         _tilePos_x = x;
         xScrollShadow = aa;
         vertical_buffer.viewportXOffset = aa = yy;
-        vertical_buffer.cursorIndex = 0;
+        vertical_buffer.cursor = 0;
 
         x = __clamp_pos(&sl_callbacks.yPos_px, &bottom, &horizontal_buffer.maskedPrevYPos);
         y = _mapHeight;
@@ -435,7 +439,7 @@ namespace _draw_fullscreen {
         _tilePos_y = x;
         yScrollShadow = aa;
         horizontal_buffer.viewportYOffset = aa = yy;
-        horizontal_buffer.cursorIndex = 0;
+        horizontal_buffer.cursor = 0;
     }
 
 
@@ -507,12 +511,12 @@ namespace _draw_fullscreen {
 
         xScrollShadow = 0;
         vertical_buffer.viewportXOffset = 0;
-        vertical_buffer.cursorIndex = 0;
+        vertical_buffer.cursor = 0;
 
         aa = -1 as u16;
         yScrollShadow = aa;
         horizontal_buffer.viewportYOffset = aa;
-        horizontal_buffer.cursorIndex = 0;
+        horizontal_buffer.cursor = 0;
     }
 
 
@@ -833,7 +837,7 @@ namespace vertical_buffer {
             }
             tilemapSeam_x = xx;
 
-            aa = yy = horizontal_buffer.post_increment_cursor__inline__keep_xx();
+            aa = horizontal_buffer.post_increment_cursor__inline__keep_xx();
 
             populate_buffer(xx, aa);
         }
@@ -845,10 +849,10 @@ namespace vertical_buffer {
     //
     // DB = 0x7e
     #[mem16, idx16]
-    func populate_buffer(sl_tilemap_xComponent : u16 in xx, horizontalCursorIndex : u16 in aa) {
+    func populate_buffer(sl_tilemap_xComponent : u16 in xx, horizontalCursor : u16 in aa) {
         var _endIndex : u16 in zpTmp_word_0;
 
-        aa >>>= 1;
+        aa &= (VRAM_TILEMAP_TILE_WIDTH - 1);
         if aa & 32 != 0 {
             aa ^= 32 | NAMETABLE_WORD_SIZE;
         }
@@ -856,7 +860,7 @@ namespace vertical_buffer {
 
         xx = aa = xx + tilemapSeam_y;
 
-        yy = cursorIndex;
+        yy = aa = (cursor <<< 1) & BUFFER_INDEX_MASK;
         _endIndex = yy;
         do {
             yy--;
@@ -884,11 +888,9 @@ namespace vertical_buffer {
     // DB = 0x7e
     #[mem16, idx16]
     inline func pre_decrement_cursor__inline__keep_xx() : u16 in aa {
-        aa = cursorIndex;
+        aa = cursor;
         aa--;
-        aa--;
-        aa &= CURSOR_INDEX_MASK;
-        cursorIndex = aa;
+        cursor = aa;
 
         return aa;
     }
@@ -897,16 +899,11 @@ namespace vertical_buffer {
     // KEEP: xx
     // DB = 0x7e
     #[mem16, idx16]
-    inline func post_increment_cursor__inline__keep_xx() : u16 in yy {
-        aa = cursorIndex;
-        yy = aa;
+    inline func post_increment_cursor__inline__keep_xx() : u16 in aa {
+        aa = cursor;
+        cursor++;
 
-        aa++;
-        aa++;
-        aa &= CURSOR_INDEX_MASK;
-        cursorIndex = aa;
-
-        return yy;
+        return aa;
     }
 }
 
@@ -978,7 +975,7 @@ namespace horizontal_buffer {
             tilemapSeam_y = aa;
             xx = aa;
 
-            aa = yy = vertical_buffer.post_increment_cursor__inline__keep_xx();
+            aa = vertical_buffer.post_increment_cursor__inline__keep_xx();
 
             populate_buffer(xx, aa);
         }
@@ -990,18 +987,19 @@ namespace horizontal_buffer {
     //
     // DB = 0x7e
     #[mem16, idx16]
-    func populate_buffer(sl_tilemap_yComponent: u16 in xx, verticalCursorIndex : u16 in aa) {
+    func populate_buffer(sl_tilemap_yComponent: u16 in xx, verticalCursor : u16 in aa) {
         var _rowStartIndex : u16 in zpTmp_word_0;
         var _endIndex      : u16 in zpTmp_word_1;
 
         // Assumes VRAM_BG2_MAP_WADDR is a multiple of 0x800.
-        vramWordAddr1 = aa = (aa <<< 4) | VRAM_BG2_MAP_WADDR;
+        aa &= (VRAM_TILEMAP_TILE_HEIGHT - 1);
+        vramWordAddr1 = aa = (aa <<< 5) | VRAM_BG2_MAP_WADDR;
         vramWordAddr2 = aa = aa | NAMETABLE_WORD_SIZE;
 
         _rowStartIndex = xx;
         xx = aa = xx + tilemapSeam_x;
 
-        yy = cursorIndex;
+        yy = aa = (cursor <<< 1) & BUFFER_INDEX_MASK;
         _endIndex = yy;
         do {
             yy--;
@@ -1031,11 +1029,9 @@ namespace horizontal_buffer {
     // DB = 0x7e
     #[mem16, idx16]
     inline func pre_decrement_cursor__inline__keep_xx() : u16 in aa {
-        aa = cursorIndex;
+        aa = cursor;
         aa--;
-        aa--;
-        aa &= CURSOR_INDEX_MASK;
-        cursorIndex = aa;
+        cursor = aa;
 
         return aa;
     }
@@ -1044,16 +1040,11 @@ namespace horizontal_buffer {
     // KEEP: xx
     // DB = 0x7e
     #[mem16, idx16]
-    inline func post_increment_cursor__inline__keep_xx() : u16 in yy {
-        aa = cursorIndex;
-        yy = aa;
+    inline func post_increment_cursor__inline__keep_xx() : u16 in aa {
+        aa = cursor;
+        cursor++;
 
-        aa++;
-        aa++;
-        aa &= CURSOR_INDEX_MASK;
-        cursorIndex = aa;
-
-        return yy;
+        return aa;
     }
 }
 
@@ -1203,9 +1194,9 @@ namespace part_of_room {
         tilemapSeam_y = aa;
         xx = aa;
 
-        aa = yy = vertical_buffer.post_increment_cursor__inline__keep_xx();
+        aa = vertical_buffer.post_increment_cursor__inline__keep_xx();
 
-        aa = (aa + DISPLAY_HEIGHT / TILE_PX * 2) & vertical_buffer.CURSOR_INDEX_MASK;
+        aa += DISPLAY_HEIGHT / TILE_PX;
 
         horizontal_buffer.populate_buffer(xx, aa);
     }
@@ -1246,10 +1237,10 @@ namespace part_of_room {
         }
         tilemapSeam_x = xx;
 
-        aa = yy = horizontal_buffer.post_increment_cursor__inline__keep_xx();
+        aa = horizontal_buffer.post_increment_cursor__inline__keep_xx();
 
         // Advance aa to the other nametable.
-        aa = aa ^ (DISPLAY_WIDTH / TILE_PX * 2);
+        aa = aa ^ (DISPLAY_WIDTH / TILE_PX);
 
         vertical_buffer.populate_buffer(xx, aa);
     }
