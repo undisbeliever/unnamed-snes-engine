@@ -816,6 +816,8 @@ func _scrolling_room_transition__loop() : bool in carry {
 
         move_camera_and_draw_sprite_list();
 
+        second_layer.process__inline();
+
         zero = second_layer.is_not_part_of_room();
         if !zero {
             x = scrollDirection as u8;
@@ -894,7 +896,7 @@ func _scrolling_room_transition__rollback(_scrollDirection_ : u8 in a, playerXpo
     }
     mem8();
 
-    return _scrolling_room_transition__loop();
+    ^return _scrolling_room_transition__loop();
 }
 
 
