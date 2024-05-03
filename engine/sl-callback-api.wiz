@@ -42,8 +42,8 @@ in lowram {
 // Read-Only Variables
 // ===================
 in lowram {
-    const map_width @ &second_layer.sl_header.width : u16;
-    const map_height @ &second_layer.sl_header.height : u16;
+    const map_width @ &second_layer.sl_data.width : u16;
+    const map_height @ &second_layer.sl_data.height : u16;
 
     const right @ &second_layer.right : u16;
     const bottom @ &second_layer.bottom : u16;

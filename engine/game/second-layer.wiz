@@ -65,7 +65,12 @@ let MAX_TILES_PER_BG = 1024;
 let MAX_TILEMAP_CELLS = 10 * 1024;
 
 
-struct _SecondLayerHeader {
+// Second layer data stored in RAM
+//
+// NOTE: data MUST NOT be modified after the second-layer has been loaded and drawn to VRAM.
+//
+// PPU data format: 4bpp tiles (note, to be placed at the end of BG1/BG2 tile data)
+struct _RamDataFormat {
     // If non-zero, the second layer is a part of the room.
     //
     // When set, the second layer will only scroll in sync with a room-transition.
@@ -80,14 +85,6 @@ struct _SecondLayerHeader {
     callback_index: u8,
 
     callback_parameters : [u8 ; 8],
-}
-
-// Second layer data stored in RAM
-//
-// PPU data format: 4bpp tiles (note, to be placed at the end of BG1/BG2 tile data)
-struct _RamDataFormat {
-    // Header MUST NOT be modified inside a callback.
-    header: _SecondLayerHeader,
 
     // The four VRAM tiles for each MetaTile
     mt_top_left     : [u16 ; 0x100],
@@ -219,10 +216,9 @@ in wram7e {
     // this hack allows me to write `tilemap[x]` without a compile error.
     var __far_sl_data : _RamDataFormat;
         const sl_data @ &__far_sl_data : _RamDataFormat;
-        const sl_header @ &__far_sl_data : _SecondLayerHeader;
 
     // Callback parameters
-    const sl_parameters @ &sl_header.callback_parameters[0] : typeof(sl_header.callback_parameters);
+    const sl_parameters @ &sl_data.callback_parameters[0] : typeof(sl_data.callback_parameters);
 
     namespace vertical_buffer {
         var buffer : [u16 ; 32];
@@ -268,12 +264,12 @@ func setup__forceblank__inline(second_layer_id : u8 in a) {
     }
     mem8_idx8();
     #[mem8, idx8] {
-        a = sl_header.callback_index;
+        a = sl_data.callback_index;
         if a >= sl_callbacks.N_SECOND_LAYER_FUNCTIONS {
             a = 0;
         }
         a &= (0xff - 1);
-        *(&__far_sl_data.header.callback_index as *u8) = a;
+        *(&__far_sl_data.callback_index as *u8) = a;
 
         x = a;
         sl_callbacks.init_function_table[unaligned xx]();
@@ -374,16 +370,16 @@ namespace _draw_fullscreen {
         bufferState = 0;
         skipFlags = 0;
 
-        var __sl_header_partOfRoom @ &__far_sl_data.header.partOfRoom : u8;
-        _partOfRoom = a = *(far &__sl_header_partOfRoom);
+        var __sl_data_partOfRoom @ &__far_sl_data.partOfRoom : u8;
+        _partOfRoom = a = *(far &__sl_data_partOfRoom);
 
         push8(p);
         mem16();
         idx8();
         #[mem16, idx8] {
             // Copy map width AND height to zeropage
-            var __sl_header_mapTileSize @ &__far_sl_data.header.width : u16;
-            _mapTileSize = aa = *(far &__sl_header_mapTileSize);
+            var __sl_data_mapTileSize @ &__far_sl_data.width : u16;
+            _mapTileSize = aa = *(far &__sl_data_mapTileSize);
 
             WRMPYA_WRMPYB = aa; // Also writes height to WRMPYB
 
@@ -715,7 +711,7 @@ inline func transfer_buffers__vblank() {
 // DB = 0x7e
 #[mem8]
 inline func is_not_part_of_room() : bool in zero{
-    a = sl_header.partOfRoom;
+    a = sl_data.partOfRoom;
     return zero;
 }
 
@@ -730,7 +726,7 @@ inline func is_not_part_of_room() : bool in zero{
 //       (ie, for HDMA effects) after `scroll_tilemap()` has modified them.
 #[mem8, idx8]
 inline func process__inline() {
-    x = sl_header.callback_index;
+    x = sl_data.callback_index;
     sl_callbacks.process_function_table[unaligned x]();
 }
 
@@ -752,7 +748,7 @@ func scroll_tilemap() {
     // Forbid `scroll_tilemap()` if either:
     //  * partOfRoom is set
     //  * the buffers are populated
-    a = sl_header.partOfRoom | bufferState;
+    a = sl_data.partOfRoom | bufferState;
     if !zero {
         return;
     }
@@ -1170,7 +1166,7 @@ namespace part_of_room {
 
     // Calculates the new tilemapSeam for the room and scrollDirection.
     //
-    // MUST ONLY be called if `sl_header.partOfRoom` is set.
+    // MUST ONLY be called if `sl_data.partOfRoom` is set.
     //
     // ASSUMES: Room is loaded into memory.
     //
@@ -1179,23 +1175,23 @@ namespace part_of_room {
     func start_room_transition(scrollDirection : room_transitions.ScrollDirection in x) {
         // ::TODO get x position from room::
         a = 0x28;
-        if a >= sl_header.width {
+        if a >= sl_data.width {
             a = 0;
         }
 
         // Fixes an off-by-one error
         // (done here to avoid signed numbers in `ScrollDirectionTileSeamOffsets_y`)
         if a == 0 {
-            a = sl_header.width;
+            a = sl_data.width;
         }
         a--;
 
         a += ScrollDirectionTileSeamOffsets_x[x];
-        if carry || a >= sl_header.width {
-            a -= sl_header.width;
-            // wrap a second time as max(ScrollDirectionTileSeamOffsets_x) is 64 and min(sl_header.width) is 32
-            if a >= sl_header.width {
-                a -= sl_header.width;
+        if carry || a >= sl_data.width {
+            a -= sl_data.width;
+            // wrap a second time as max(ScrollDirectionTileSeamOffsets_x) is 64 and min(sl_data.width) is 32
+            if a >= sl_data.width {
+                a -= sl_data.width;
             }
         }
         y = a;
@@ -1203,27 +1199,27 @@ namespace part_of_room {
 
         // ::TODO get y position from room::
         a = 0x18;
-        if a >= sl_header.height {
+        if a >= sl_data.height {
             a = 0;
         }
 
         // Fixes an off-by-one error
         // (done here to avoid signed numbers in `ScrollDirectionTileSeamOffsets_y`)
         if a == 0 {
-            a = sl_header.height;
+            a = sl_data.height;
         }
         a--;
 
         a += ScrollDirectionTileSeamOffsets_y[x];
-        if carry || a >= sl_header.height {
-            a -= sl_header.height;
+        if carry || a >= sl_data.height {
+            a -= sl_data.height;
         }
         // y = xTilePos
         // a = yTilePos
 
 
         *(far &WRMPYA) = a;
-        *(far &WRMPYB) = a = sl_header.width;
+        *(far &WRMPYB) = a = sl_data.width;
         // Must wait 8 CPU cycles before reading RDMPY
 
         mem16();
