@@ -78,6 +78,9 @@ in zeropage {
 
     var zpTmp_word_0 : u16;
     var zpTmp_word_1 : u16;
+    var zpTmp_word_2 : u16;
+    var zpTmp_word_3 : u16;
+    var zpTmp_word_4 : u16;
 
     var zpTmp_farPtr : far *u8;
 }

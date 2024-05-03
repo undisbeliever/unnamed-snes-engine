@@ -20,33 +20,49 @@ namespace second_layer {
 // ::TODO add a second layer with a width of 64 to the tech-demo::
 // ::TODO add a second layer with a width of 32 to the tech-demo::
 
+// V_TILE is tile inside the VRAM (8px tile)
+// MT_TILE is the MetaTiles inside `sl_data` (16px MetaTile)
 
-let TILE_PX = 8;
-let TILE_PX_MASK = 7;
-let POSITION_TILE_MASK = 0xffff ^ TILE_PX_MASK;
+// Tile size in VRAM (8px)
+let V_TILE_PX = 8;
+let V_TILE_PX_MASK = 7;
+let POSITION_V_TILE_MASK = 0xffff ^ V_TILE_PX_MASK;
 
+// MetaTile size in RAM (16-px)
+let MT_TILE_PX = 16;
+let MT_TILE_PX_MASK = 0x0f;
+let POSITION_MT_TILE_MASK = 0xffff ^ MT_TILE_PX_MASK;
 
-let DISPLAY_WIDTH = 256;
-let DISPLAY_HEIGHT = 224;
+let DISPLAY_MT_TILE_WIDTH = 16;
+let DISPLAY_MT_TILE_HEIGHT = 14;
 
-let VRAM_TILEMAP_WIDTH = 512;
-let VRAM_TILEMAP_HEIGHT = 256;
+let DISPLAY_V_TILE_HEIGHT = DISPLAY_MT_TILE_HEIGHT * 2;
 
-let VRAM_TILEMAP_TILE_WIDTH = 64;
-let VRAM_TILEMAP_TILE_HEIGHT = 32;
+let VRAM_TILEMAP_V_TILE_WIDTH = 64;
+let VRAM_TILEMAP_V_TILE_HEIGHT = 32;
+
+let VRAM_TILEMAP_MT_TILE_WIDTH = 32;
+let VRAM_TILEMAP_MT_TILE_HEIGHT = 16;
 
 // The VRAM tilemap is made up of 2 smaller 32x32 tilemaps
-let NAMETABLE_TILE_WIDTH = 32;
-let NAMETABLE_TILE_HEIGHT = 32;
-let NAMETABLE_WORD_SIZE = NAMETABLE_TILE_WIDTH * NAMETABLE_TILE_HEIGHT;
+let NAMETABLE_V_TILE_WIDTH = 32;
+let NAMETABLE_V_TILE_HEIGHT = 32;
+let NAMETABLE_WORD_SIZE = NAMETABLE_V_TILE_WIDTH * NAMETABLE_V_TILE_HEIGHT;
 
-let VIEWPORT_X_OFFSET = (VRAM_TILEMAP_WIDTH - DISPLAY_WIDTH) / 2;
-let VIEWPORT_Y_OFFSET = (VRAM_TILEMAP_HEIGHT - DISPLAY_HEIGHT) / 2;
+let NAMETABLE_MT_TILE_WIDTH = 16;
+let NAMETABLE_MT_TILE_HEIGHT = 16;
+
+// Offset between the force-blank `_draw_fullscreen` and the starting second-layer position.
+let VIEWPORT_X_MT_OFFSET = (VRAM_TILEMAP_MT_TILE_WIDTH - DISPLAY_MT_TILE_WIDTH) / 2;
+let VIEWPORT_Y_MT_OFFSET = (VRAM_TILEMAP_MT_TILE_HEIGHT - DISPLAY_MT_TILE_HEIGHT) / 2;
+
+let VIEWPORT_X_OFFSET_PX = VIEWPORT_X_MT_OFFSET * MT_TILE_PX;
+let VIEWPORT_Y_OFFSET_PX = VIEWPORT_Y_MT_OFFSET * MT_TILE_PX;
 
 
 let MAX_TILES_PER_BG = 1024;
 
-let MAX_TILEMAP_CELLS = 6 * 1024;
+let MAX_TILEMAP_CELLS = 10 * 1024;
 
 
 struct _SecondLayerHeader {
@@ -73,9 +89,16 @@ struct _RamDataFormat {
     // Header MUST NOT be modified inside a callback.
     header: _SecondLayerHeader,
 
-    // Tilemap data (contagious row major order)
+    // The four VRAM tiles for each MetaTile
+    mt_top_left     : [u16 ; 0x100],
+    mt_top_right    : [u16 ; 0x100],
+    mt_bottom_left  : [u16 ; 0x100],
+    mt_bottom_right : [u16 ; 0x100],
+
+    // Map data (contagious row major order)
+    // index into the four MetaTile arrays.
     // NOTE: tilemap data may be smaller then `MAX_TILEMAP_SIZE`
-    tilemap: [u16; MAX_TILEMAP_CELLS]
+    map: [u8; MAX_TILEMAP_CELLS]
 };
 
 // Storing variables in lowram so they can be accessed by setup (DB=0x80) and process (DB=0x7e).
@@ -109,10 +132,9 @@ in lowram {
 
     // The x-component of the tilemap seam.
     //
-    // NOTE: The tilemap seam is on the bottom-right (start + 63 columns).
+    // NOTE: The tilemap seam is on the bottom-right (start + VRAM_TILEMAP_MT_TILE_WIDTH - 1 columns).
     //
     // MUST BE:
-    //   * a multiple of 2
     //   * less than `tilemapStride`
     //
     // (index into sl_tilemap)
@@ -120,7 +142,7 @@ in lowram {
 
     // The y-component of the tilemap seam.
     //
-    // NOTE: The tilemap seam is on the bottom-right (start + 31 rows).
+    // NOTE: The tilemap seam is on the bottom-right (start + VRAM_TILEMAP_MT_TILE_HEIGHT - 1 rows).
     //
     // MUST BE:
     //   * a multiple of `tilemapStride`
@@ -146,19 +168,24 @@ in lowram {
     namespace vertical_buffer {
         var vramWordAddr : u16;
 
-        // The masked previous position
+        // The masked previous position.
+        // This value is updated when a VRAM tile boundary is crossed.
+        //
+        // This value MUST be masked by `POSITION_V_TILE_MASK` at all times.
         //
         // Used:
-        //  * to determine if xPos/yPos has advanced past a tile boundary.
         //  * to determine scrolling direction.
-        //  * to limit xPos/yPos to a single tile update per frame.
+        //  * to determine if xPos/yPos has advanced past an 8px VRAM tile boundary.
+        //  * to limit xPos/yPos to a single VRAM tile update per frame.
         //    (since I'm auto-wrapping xPos/yPos, I may as well limit it to the actual location)
+        //  * to determine when to advance the tilemapSeam
         var maskedPrevXPos : u16;
 
-        // The tile position within the buffer.
+        // The 8px VRAM tile position within the buffer.
         // (named `cursor` to differentiate it from the tilemapSeam).
         // Used to calculate `buffer` index.
         // Used to calculate `horizontal_buffer.vramWordAddr1` & `horizontal_buffer.vramWordAddr2`.
+        // Used to determine if the top or bottom half of the MetaTile is written to `horizontal_buffer.buffer`
         // NOTE: not masked, `cursor` can be out of bounds.
         var cursor : u16;
 
@@ -175,7 +202,7 @@ in lowram {
         // See `vertical_buffer.maskedPrevYPos`
         var maskedPrevYPos : u16;
 
-        // The tile position within the buffer.
+        // The 8px VRAM tile position within the buffer.
         // (named `cursor` to differentiate it from the tilemapSeam).
         // Used to calculate `buffer` index.
         // Used to calculate `vertical_buffer.vramWordAddr`.
@@ -183,7 +210,7 @@ in lowram {
         var cursor : u16;
 
         // Offset between `sl_callbacks.yPos_px` and `yScrollShadow`.
-        // Used because `xScrollShadow` might be changed outside this subsystem.
+        // Used because `yScrollShadow` might be changed outside this subsystem.
         var viewportYOffset : u16;
     }
 }
@@ -193,20 +220,19 @@ in wram7e {
     var __far_sl_data : _RamDataFormat;
         const sl_data @ &__far_sl_data : _RamDataFormat;
         const sl_header @ &__far_sl_data : _SecondLayerHeader;
-        const sl_tilemap @ &__far_sl_data.tilemap[0] : [u16 ; MAX_TILEMAP_CELLS];
 
     // Callback parameters
     const sl_parameters @ &sl_header.callback_parameters[0] : typeof(sl_header.callback_parameters);
 
     namespace vertical_buffer {
         var buffer : [u16 ; 32];
-        let BUFFER_INDEX_MASK = 31 * 2;
+        let BUFFER_INDEX_MT_MASK = 15 * 4;
     }
 
     namespace horizontal_buffer {
         // NOTE: This buffer requires 2 transfers to load into VRAM.
         var buffer : [u16 ; 64];
-        let BUFFER_INDEX_MASK = 63 * 2;
+        let BUFFER_INDEX_MT_MASK = 31 * 4;
     }
 }
 
@@ -293,16 +319,16 @@ namespace _draw_fullscreen {
         var _tilePos_x : u8 in zpTmp_byte_0;
         var _tilePos_y : u8 in zpTmp_byte_1;
 
-        var _dmaSize1 : u8 in zpTmp_byte_2;
-        var _dmaSize2 : u8 in zpTmp_byte_3;
-
         var _partOfRoom : u8 in zpTmp_byte_2;
 
-        var _endAddr : u16 in zpTmp_word_0;
-
-        var _mapTileSize : u16 in zpTmp_word_1;
+        var _mapTileSize : u16 in zpTmp_word_0;
             var _mapWidth : u8 in <:_mapTileSize;
             var _mapHeight : u8 in >:_mapTileSize;
+
+        var _xCounter : u16 in zpTmp_word_1;
+        var _yCounter : u16 in zpTmp_word_2;
+        var _rowEndIndex : u16 in zpTmp_word_3;
+        var _mapIndex : u16 in zpTmp_word_4;
     }
 
 
@@ -323,10 +349,10 @@ namespace _draw_fullscreen {
         }
         *pos = aa;
 
-        aa &= POSITION_TILE_MASK;
+        aa &= POSITION_V_TILE_MASK;
         *maskedPrevPos = aa;
 
-        aa >>>= 3;
+        aa >>>= 4;
         #[idx16] xx = aa;
         return x;
     }
@@ -338,7 +364,6 @@ namespace _draw_fullscreen {
     //
     // REQUIRES: Force-Blank
     // REQUIRES: Second layer loaded
-    // Uses DMA channel 0
     //
     // DB = 0x80
     #[mem8, idx16]
@@ -363,17 +388,16 @@ namespace _draw_fullscreen {
             WRMPYA_WRMPYB = aa; // Also writes height to WRMPYB
 
             // Must wait 8 CPU cycles before reading RDMPY
-            tilemapStride = aa = (aa & 0xff) <<< 1; // 3 (and) + 2 (asl) + 5 (sta) cycles
-            tilemapAboveViewportOffset = aa = (aa <<< 5) - tilemapStride;
-            tilemapSize = aa = RDMPY <<< 1;
-
-            _endAddr = aa = aa + (&sl_data.tilemap[0] as u16);
+            aa &= 0xff;
+            tilemapStride = aa;
+            tilemapAboveViewportOffset = aa = (aa <<< 4) - tilemapStride;
+            tilemapSize = aa = RDMPY;
 
             x = _mapWidth;
-            right = aa = xx <<< 3;
+            right = aa = xx <<< 4;
 
             y = _mapHeight;
-            bottom = aa = yy <<< 3;
+            bottom = aa = yy <<< 4;
 
             x = _partOfRoom;
             ^if zero {
@@ -398,59 +422,71 @@ namespace _draw_fullscreen {
 
     #[mem16, idx8]
     inline func __init_state__normal__inline() {
+        vertical_buffer.cursor = 0;
+        horizontal_buffer.cursor = 0;
+
         x = __clamp_pos(&sl_callbacks.xPos_px, &right, &vertical_buffer.maskedPrevXPos);
         y = _mapWidth;
-        if y == VRAM_TILEMAP_TILE_WIDTH || y == NAMETABLE_TILE_WIDTH {
+        if y == VRAM_TILEMAP_MT_TILE_WIDTH || y == NAMETABLE_MT_TILE_WIDTH {
             // _mapWidth matches VRAM tilemap width.
             // Disable the vertical buffer.
             skipFlags = y = 1 << SKIP_FLAGS__VERTICAL_BIT;
 
             // Set _tilePos_x so the leftmost tile in the VRAM tilemap has an xPos of 0.
-            x = VIEWPORT_X_OFFSET / TILE_PX;
+            x = VIEWPORT_X_MT_OFFSET;
 
             y = 0;
             aa = sl_callbacks.xPos_px;
         } else {
-            y = VIEWPORT_X_OFFSET;
-            aa = (sl_callbacks.xPos_px & TILE_PX_MASK) | VIEWPORT_X_OFFSET;
+            y = VIEWPORT_X_OFFSET_PX;
+
+            aa = sl_callbacks.xPos_px;
+            if aa & V_TILE_PX != 0 {
+                y = VIEWPORT_X_OFFSET_PX + V_TILE_PX;
+                horizontal_buffer.cursor++;
+            }
+            aa = (aa & MT_TILE_PX_MASK) | VIEWPORT_X_OFFSET_PX;
         }
         _tilePos_x = x;
         xScrollShadow = aa;
         vertical_buffer.viewportXOffset = aa = yy;
-        vertical_buffer.cursor = 0;
 
         x = __clamp_pos(&sl_callbacks.yPos_px, &bottom, &horizontal_buffer.maskedPrevYPos);
         y = _mapHeight;
-        if y == VRAM_TILEMAP_TILE_HEIGHT {
+        if y == VRAM_TILEMAP_MT_TILE_HEIGHT {
             // _mapHeight matches VRAM tilemap height.
             // Disable the horizontal buffer.
             test_and_set(*(&skipFlags as *u16), aa = 1 << SKIP_FLAGS__HORIZONTAL_BIT);
 
             // Set _tilePos_y so the topmost tile in the VRAM tilemap has a yPos of 0.
-            x = VIEWPORT_Y_OFFSET / TILE_PX;
+            x = VIEWPORT_Y_MT_OFFSET;
             y = 0;
             aa = sl_callbacks.yPos_px;
         }
         else {
-            y = (VIEWPORT_Y_OFFSET - 1);
-            aa = (sl_callbacks.yPos_px & TILE_PX_MASK) | VIEWPORT_Y_OFFSET;
+            y = VIEWPORT_Y_OFFSET_PX - 1;
+
+            aa = sl_callbacks.yPos_px;
+            if aa & V_TILE_PX != 0 {
+                y = VIEWPORT_Y_OFFSET_PX + V_TILE_PX - 1;
+                vertical_buffer.cursor++;
+            }
+            aa = (aa & MT_TILE_PX_MASK) | VIEWPORT_Y_OFFSET_PX;
             aa--;
         }
         _tilePos_y = x;
         yScrollShadow = aa;
         horizontal_buffer.viewportYOffset = aa = yy;
-        horizontal_buffer.cursor = 0;
     }
 
 
     // REQUIRES: Force-Blank
-    // Uses DMA channel 0
     //
     // IN: VMADD = vram address to write to
     #[mem8, idx16]
     inline func __draw_tilemaps__normal__forceblank__inline() {
         WRMPYA = a = _mapWidth;
-        a = _tilePos_y - (VIEWPORT_Y_OFFSET / TILE_PX);
+        a = _tilePos_y - VIEWPORT_Y_MT_OFFSET;
         if !carry {
             a += _mapHeight;
         }
@@ -458,13 +494,13 @@ namespace _draw_fullscreen {
         // Must wait 8 CPU cycles before reading RDMPY
 
 
-        a = _tilePos_x - (VIEWPORT_X_OFFSET / TILE_PX);
+        a = _tilePos_x - VIEWPORT_X_MT_OFFSET;
         if !carry {
             a += _mapWidth;
         }
         __draw_nametable__forceblank(a);
 
-        a = _tilePos_x + (NAMETABLE_TILE_WIDTH - VIEWPORT_X_OFFSET / TILE_PX);
+        a = _tilePos_x + (NAMETABLE_MT_TILE_WIDTH - VIEWPORT_X_MT_OFFSET);
         if carry || a >= _mapWidth {
             a -= _mapWidth;
         }
@@ -472,22 +508,22 @@ namespace _draw_fullscreen {
 
 
         // Calculate the tilemapSeam (bottom-right seam corner)
-        a = _tilePos_y + (VRAM_TILEMAP_TILE_HEIGHT - VIEWPORT_Y_OFFSET / TILE_PX - 1);
+        a = _tilePos_y + (VRAM_TILEMAP_MT_TILE_HEIGHT - VIEWPORT_Y_MT_OFFSET - 1);
         if carry || a >= _mapHeight {
             a -= _mapHeight;
         }
         WRMPYB = a;
         // Must wait 8 CPU cycles before reading RDMPY
 
-        a = _tilePos_x + (VRAM_TILEMAP_TILE_WIDTH - VIEWPORT_X_OFFSET / TILE_PX - 1);
+        a = _tilePos_x + (VRAM_TILEMAP_MT_TILE_WIDTH - VIEWPORT_X_MT_OFFSET - 1);
         if carry || a >= _mapWidth {
             a -= _mapWidth;
         }
 
         mem16();
         #[mem16] {
-            tilemapSeam_x = aa = (aa & 0xff) <<< 1;
-            tilemapSeam_y = aa = (RDMPY <<< 1);
+            tilemapSeam_x = aa = aa & 0xff;
+            tilemapSeam_y = aa = RDMPY;
         }
         mem8();
     }
@@ -496,14 +532,14 @@ namespace _draw_fullscreen {
     #[mem16, idx8]
     inline func __init_state__part_of_room__inline() {
         // ::TODO get tile position from room::
-        x = 0x50;
+        x = 0x28;
         if x >= _mapWidth {
             x = 0;
         }
         _tilePos_x = x;
 
         // ::TODO get tile position from room::
-        y = 0x30;
+        y = 0x18;
         if y >= _mapHeight {
             y = 0;
         }
@@ -521,7 +557,6 @@ namespace _draw_fullscreen {
 
 
     // REQUIRES: Force-Blank
-    // Uses DMA channel 0
     //
     // IN: VMADD = vram address to write to
     #[mem8, idx16]
@@ -541,7 +576,6 @@ namespace _draw_fullscreen {
     // Draw a single nametable (32x32 tilemap) to VRAM.
     //
     // REQUIRES: Force-Blank
-    // Uses DMA channel 0
     //
     // IN: xTilePos
     // IN: VMADD = vram address to write to
@@ -552,73 +586,75 @@ namespace _draw_fullscreen {
     // DB = 0x80
     #[mem8, idx16]
     func __draw_nametable__forceblank(xTilePos : u8 in a) {
-        let ROWS_TO_DRAW = VRAM_TILEMAP_HEIGHT / TILE_PX;
-        let COLUMNS_TO_DRAW = 32;
+        let ROWS_TO_DRAW = NAMETABLE_MT_TILE_HEIGHT;
+        let COLUMNS_TO_DRAW = NAMETABLE_MT_TILE_WIDTH;
 
-        push8(a);
-        {
-            dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_TWO, <:&VMDATAL);
+        mem16_idx16();
+        #[mem16, idx16] {
+            xx = aa = (aa & 0xff) + RDMPY;
 
-            // Calculate size of the two DMA transfers
-            a = _mapWidth - (ss as *u8)[1];
-            if a >= COLUMNS_TO_DRAW {
-                a = COLUMNS_TO_DRAW;
-            }
-            a <<= 1;
-            _dmaSize1 = a;
+            _rowEndIndex = aa = RDMPY + tilemapStride;
 
-            _dmaSize2 = a = COLUMNS_TO_DRAW * 2 - _dmaSize1;
-        }
-        a = pop8();
+            push16(0x807e);
+            data_bank = pop8();
+        // DB = 0x7e
 
-        push8(p);
-        mem16();
-        idx8();
-        #[mem16, idx8] {
-            aa = (aa & 0xff) + RDMPY;
-            aa <<<= 1;
+            _yCounter = aa = ROWS_TO_DRAW;
 
-            aa += (&sl_data.tilemap[0] as u16);
-
-
-            // Set DAS0H to 0
-            DAS0 = 0;
-
-            A1B0 = x = 0x7e;
-
-            y = ROWS_TO_DRAW;
             do {
-                A1T0 = aa;
-                // DAS0H is 0
-                DAS0L = x = _dmaSize1;
-                MDMAEN = x = MDMAEN_DMA0;
+                _mapIndex = xx;
+                _xCounter = aa = COLUMNS_TO_DRAW;
+                do {
+                    yy = aa = ((&sl_data.map[0] as *u16)[unaligned xx] & 0xff) << 1;
 
-                x = _dmaSize2;
-                if !zero {
-                    // Tilemap wrapping is required.
-                    // Do a second DMA transfer.
+                    *(far& VMDATA) = aa = sl_data.mt_top_left[unaligned yy];
+                    *(far& VMDATA) = aa = sl_data.mt_top_right[unaligned yy];
 
-                    // DAS0H is 0
-                    DAS0L = x;
+                    xx++;
+                    if xx >= _rowEndIndex {
+                        xx = aa = xx - tilemapStride;
+                    }
 
-                    push16(aa);
+                    _xCounter--;
+                } while !zero;
 
-                    // A1T0 points to the end of the row
-                    A1T0 = aa = *(&A1T0 as *u16) - tilemapStride;
-                    MDMAEN = x = MDMAEN_DMA0;
 
-                    aa = pop16();
-                }
+                xx = _mapIndex;
+                _xCounter = aa = COLUMNS_TO_DRAW;
+                do {
+                    yy = aa = ((&sl_data.map[0] as *u16)[unaligned xx] & 0xff) << 1;
 
-                aa += tilemapStride;
-                if aa >= _endAddr {
+                    *(far& VMDATA) = aa = sl_data.mt_bottom_left[unaligned yy];
+                    *(far& VMDATA) = aa = sl_data.mt_bottom_right[unaligned yy];
+
+                    xx++;
+                    if xx >= _rowEndIndex {
+                        xx = aa = xx - tilemapStride;
+                    }
+
+                    _xCounter--;
+                } while !zero;
+
+                aa = _mapIndex + tilemapStride;
+                if aa >= tilemapSize {
                     aa -= tilemapSize;
                 }
+                xx = aa;
 
-                y--;
+                aa = _rowEndIndex;
+                if aa >= tilemapSize {
+                    aa = 0;
+                }
+                aa += tilemapStride;
+                _rowEndIndex = aa;
+
+                _yCounter--;
             } while !zero;
+
+            data_bank = pop8();
+        // DB = 0x80
         }
-        p = pop8();
+        mem8();
     }
 }
 
@@ -734,7 +770,7 @@ func scroll_tilemap() {
             vertical_buffer.update__inline();
 
             // Can use |, `viewportXOffset` is tile aligned
-            aa = (sl_callbacks.xPos_px & TILE_PX_MASK) | vertical_buffer.viewportXOffset;
+            aa = (sl_callbacks.xPos_px & V_TILE_PX_MASK) | vertical_buffer.viewportXOffset;
         }
     _EndIf_Vertical:
         xScrollShadow = aa;
@@ -752,7 +788,7 @@ func scroll_tilemap() {
             horizontal_buffer.update__inline();
 
             // Must use + here, `viewportYOffset` is not tile aligned
-            aa = (sl_callbacks.yPos_px & TILE_PX_MASK) + horizontal_buffer.viewportYOffset;
+            aa = (sl_callbacks.yPos_px & V_TILE_PX_MASK) + horizontal_buffer.viewportYOffset;
         }
     _EndIf_Horizontal:
         yScrollShadow = aa;
@@ -770,36 +806,35 @@ namespace vertical_buffer {
     #[mem16, idx16]
     inline func update__inline() {
         aa = sl_callbacks.xPos_px - maskedPrevXPos;
-        yy = aa;
         if negative {
-            viewportXOffset = aa = viewportXOffset - TILE_PX;
+            // Forbid xPos moving more than 1 8px tile
+            if aa < -V_TILE_PX as u16 {
+                sl_callbacks.xPos_px = aa = maskedPrevXPos - V_TILE_PX;
+            }
 
-            aa = maskedPrevXPos - TILE_PX;
+            aa = maskedPrevXPos - V_TILE_PX;
             if negative {
-                sl_callbacks.xPos_px = aa = (sl_callbacks.xPos_px & TILE_PX_MASK) + right - TILE_PX;
-                aa &= POSITION_TILE_MASK;
+                sl_callbacks.xPos_px = aa = (sl_callbacks.xPos_px & V_TILE_PX_MASK) + right - V_TILE_PX;
+                aa &= POSITION_V_TILE_MASK;
             }
             maskedPrevXPos = aa;
 
-            if yy < -TILE_PX as u16 {
-                // Clamp xPos if xPos has moved more than 1 tile
-                sl_callbacks.xPos_px = aa;
+            xx = tilemapSeam_x;
+            viewportXOffset = aa = viewportXOffset - V_TILE_PX;
+            if aa & V_TILE_PX != 0 {
+                // only advance `tilemapSeam_x` if a MetaTile boundary has been crossed
+                xx--;
+                if negative {
+                    xx = tilemapStride;
+                    xx--;
+                }
+                tilemapSeam_x = xx;
             }
-
-            // Assumes `tilemapSeam_x` is even
-            aa = tilemapSeam_x;
-            aa--;
-            if negative {
-                aa = tilemapStride;
-                aa--;
-            }
-            aa--;
-            tilemapSeam_x = aa;
 
             // Move `xx` leftwards.
-            // As the tilemap has infinite scrolling, wrap if `aa is negative
-            // since tilemapStride (min 32) might be < VRAM_TILEMAP_TILE_WIDTH (64), do it twice.
-            aa -= (VRAM_TILEMAP_TILE_WIDTH - 1) * 2;
+            // As the tilemap has infinite scrolling, wrap if `aa` is negative
+            // since tilemapStride (min 16) might be < VRAM_TILEMAP_MT_TILE_WIDTH (32), do it twice.
+            aa = xx - (VRAM_TILEMAP_MT_TILE_WIDTH - 1);
             if negative {
                 aa += tilemapStride;
                 if negative {
@@ -812,32 +847,32 @@ namespace vertical_buffer {
 
             populate_buffer(xx, aa);
         }
-        else if aa >= TILE_PX {
-            // yy = aa
+        else if aa >= V_TILE_PX {
+            // Forbid xPos moving more than 1 8px tile
+            if aa >= V_TILE_PX * 2 {
+                sl_callbacks.xPos_px = aa = maskedPrevXPos + (V_TILE_PX * 2 - 1);
+            }
 
-            viewportXOffset = aa = viewportXOffset + TILE_PX;
-
-            aa = maskedPrevXPos + TILE_PX;
+            aa = maskedPrevXPos + V_TILE_PX;
             if aa >= right {
-                sl_callbacks.xPos_px = aa = sl_callbacks.xPos_px & TILE_PX_MASK;
+                sl_callbacks.xPos_px = aa = sl_callbacks.xPos_px & V_TILE_PX_MASK;
                 aa = 0;
             }
             maskedPrevXPos = aa;
 
-            if yy >= TILE_PX * 2 {
-                // Clamp xPos if xPos has moved too much
-                sl_callbacks.xPos_px = aa = aa | TILE_PX_MASK;
-            }
-
             xx = tilemapSeam_x;
-            xx++;
-            xx++;
-            if xx >= tilemapStride {
-                xx = 0;
+            viewportXOffset = aa = viewportXOffset + V_TILE_PX;
+            if aa & V_TILE_PX == 0 {
+                // only advance `tilemapSeam_x` if a MetaTile boundary has been crossed
+                xx++;
+                if xx >= tilemapStride {
+                    xx = 0;
+                }
+                tilemapSeam_x = xx;
             }
-            tilemapSeam_x = xx;
 
             aa = horizontal_buffer.post_increment_cursor__inline__keep_xx();
+            aa--;   // Fixes an off-by-one glitch when changing velocity in the middle of a MetaTile
 
             populate_buffer(xx, aa);
         }
@@ -850,37 +885,72 @@ namespace vertical_buffer {
     // DB = 0x7e
     #[mem16, idx16]
     func populate_buffer(sl_tilemap_xComponent : u16 in xx, horizontalCursor : u16 in aa) {
-        var _endIndex : u16 in zpTmp_word_0;
+        var _bufferEndIndex : u16 in zpTmp_word_0;
+        var _rowStartIndex  : u16 in zpTmp_word_1;
+        var _mapIndex       : u16 in zpTmp_word_2;
 
-        aa &= (VRAM_TILEMAP_TILE_WIDTH - 1);
+        aa &= (VRAM_TILEMAP_V_TILE_WIDTH - 1);
         if aa & 32 != 0 {
             aa ^= 32 | NAMETABLE_WORD_SIZE;
         }
         vramWordAddr = aa = aa | VRAM_BG2_MAP_WADDR;
 
-        xx = aa = xx + tilemapSeam_y;
-
-        yy = aa = (cursor <<< 1) & BUFFER_INDEX_MASK;
-        _endIndex = yy;
-        do {
-            yy--;
-            yy--;
-            if negative {
-                yy = sizeof(typeof(buffer)) - 2;
-            }
-
-            buffer[unaligned yy] = aa = sl_tilemap[unaligned xx];
-
-            aa = xx - tilemapStride;
-            if !carry {
-                // carry clear
-                aa +#= tilemapSize;
-            }
-            xx = aa;
-        } while yy != _endIndex;
-
         aa = 1 << BUFFER_STATE__VERTICAL_BIT;
         test_and_set(*(&bufferState as *u16), aa);
+
+        xx = aa = xx + tilemapSeam_y;
+
+        yy = aa = (cursor <<< 1) & BUFFER_INDEX_MT_MASK;
+        _bufferEndIndex = yy;
+
+        // Using the VRAM address (horizontalCursor) to determine which half of the MetaTile to draw
+        aa = vramWordAddr >>> 1;
+        if !carry {
+            do {
+                yy--; yy--; yy--; yy--;
+                if negative {
+                    yy = sizeof(typeof(buffer)) - 4;
+                }
+
+                _mapIndex = xx;
+                xx = aa = ((&sl_data.map[0] as *u16)[unaligned xx] & 0xff) << 1;
+
+                (&buffer[0])[unaligned yy] = aa = sl_data.mt_top_left[unaligned xx];
+                (&buffer[1])[unaligned yy] = aa = sl_data.mt_bottom_left[unaligned xx];
+
+                aa = _mapIndex - tilemapStride;
+                if !carry {
+                    // carry clear
+                    aa +#= tilemapSize;
+                }
+                xx = aa;
+            } while yy != _bufferEndIndex;
+
+            return;
+        }
+        else {
+            do {
+                yy--; yy--; yy--; yy--;
+                if negative {
+                    yy = sizeof(typeof(buffer)) - 4;
+                }
+
+                _mapIndex = xx;
+                xx = aa = ((&sl_data.map[0] as *u16)[unaligned xx] & 0xff) << 1;
+
+                (&buffer[0])[unaligned yy] = aa = sl_data.mt_top_right[unaligned xx];
+                (&buffer[1])[unaligned yy] = aa = sl_data.mt_bottom_right[unaligned xx];
+
+                aa = _mapIndex - tilemapStride;
+                if !carry {
+                    // carry clear
+                    aa +#= tilemapSize;
+                }
+                xx = aa;
+            } while yy != _bufferEndIndex;
+
+            return;
+        }
     }
 
 
@@ -916,29 +986,33 @@ namespace horizontal_buffer {
     #[mem16, idx16]
     inline func update__inline() {
         aa = sl_callbacks.yPos_px - maskedPrevYPos;
-        yy = aa;
         if negative {
-            viewportYOffset = aa = viewportYOffset - TILE_PX;
+            // Forbid xPos moving more than 1 8px tile
+            if aa < -V_TILE_PX as u16 {
+                sl_callbacks.yPos_px = aa = maskedPrevYPos - V_TILE_PX;
+            }
 
-            aa = maskedPrevYPos - TILE_PX;
+            aa = maskedPrevYPos - V_TILE_PX;
             if negative {
-                sl_callbacks.yPos_px = aa = (sl_callbacks.yPos_px & TILE_PX_MASK) + bottom - TILE_PX;
-                aa &= POSITION_TILE_MASK;
+                sl_callbacks.yPos_px = aa = (sl_callbacks.yPos_px & V_TILE_PX_MASK) + bottom - V_TILE_PX;
+                aa &= POSITION_V_TILE_MASK;
             }
             maskedPrevYPos = aa;
 
-            if yy < -TILE_PX as u16 {
-                // Clamp yPos if yPos has moved more than 1 tile
-                sl_callbacks.yPos_px = aa;
+            viewportYOffset = aa = viewportYOffset - V_TILE_PX;
+            if aa & V_TILE_PX != 0 {
+                aa = tilemapSeam_y;
             }
-
-            // Assumes tilemapSeam_y is always valid
-            aa = tilemapSeam_y;
-            if zero {
-                aa = tilemapSize;
+            else {
+                // only advance `tilemapSeam_y` if a MetaTile boundary has been crossed
+                // Assumes tilemapSeam_y is always valid
+                aa = tilemapSeam_y;
+                if zero {
+                    aa = tilemapSize;
+                }
+                aa -= tilemapStride;
+                tilemapSeam_y = aa;
             }
-            aa -= tilemapStride;
-            tilemapSeam_y = aa;
 
             // Move `xx` upwards
             aa = aa - tilemapAboveViewportOffset;
@@ -951,31 +1025,35 @@ namespace horizontal_buffer {
 
             populate_buffer(xx, aa);
         }
-        else if aa >= TILE_PX {
-            // yy = aa
+        else if aa >= V_TILE_PX {
+            // Forbid yPos moving more than 1 8px tile
+            if aa >= V_TILE_PX * 2 {
+                sl_callbacks.yPos_px = aa = maskedPrevYPos + (V_TILE_PX * 2 - 1);
+            }
 
-            viewportYOffset = aa = viewportYOffset + TILE_PX;
-
-            aa = maskedPrevYPos + TILE_PX;
+            aa = maskedPrevYPos + V_TILE_PX;
             if aa >= bottom {
-                sl_callbacks.yPos_px = aa = sl_callbacks.yPos_px & TILE_PX_MASK;
+                sl_callbacks.yPos_px = aa = sl_callbacks.yPos_px & V_TILE_PX_MASK;
                 aa = 0;
             }
             maskedPrevYPos = aa;
 
-            if yy >= TILE_PX * 2 {
-                // Clamp yPos if yPos has moved too more than 1 tile
-                sl_callbacks.yPos_px = aa = aa | TILE_PX_MASK;
+            viewportYOffset = aa = viewportYOffset + V_TILE_PX;
+            if aa & V_TILE_PX == 0 {
+                xx = tilemapSeam_y;
             }
-
-            aa = tilemapSeam_y + tilemapStride;
-            if carry || aa >= tilemapSize {
-                aa = 0;
+            else {
+                // only advance `tilemapSeam_y` if a MetaTile boundary has been crossed
+                aa = tilemapSeam_y + tilemapStride;
+                if carry || aa >= tilemapSize {
+                    aa = 0;
+                }
+                tilemapSeam_y = aa;
+                xx = aa;
             }
-            tilemapSeam_y = aa;
-            xx = aa;
 
             aa = vertical_buffer.post_increment_cursor__inline__keep_xx();
+            aa--;   // Fixes an off-by-one glitch when changing velocity in the middle of a MetaTile
 
             populate_buffer(xx, aa);
         }
@@ -988,40 +1066,76 @@ namespace horizontal_buffer {
     // DB = 0x7e
     #[mem16, idx16]
     func populate_buffer(sl_tilemap_yComponent: u16 in xx, verticalCursor : u16 in aa) {
-        var _rowStartIndex : u16 in zpTmp_word_0;
-        var _endIndex      : u16 in zpTmp_word_1;
+        var _bufferEndIndex : u16 in zpTmp_word_0;
+        var _rowStartIndex  : u16 in zpTmp_word_1;
+        var _mapIndex       : u16 in zpTmp_word_2;
 
         // Assumes VRAM_BG2_MAP_WADDR is a multiple of 0x800.
-        aa &= (VRAM_TILEMAP_TILE_HEIGHT - 1);
+        aa &= (VRAM_TILEMAP_V_TILE_HEIGHT - 1);
         vramWordAddr1 = aa = (aa <<< 5) | VRAM_BG2_MAP_WADDR;
         vramWordAddr2 = aa = aa | NAMETABLE_WORD_SIZE;
+
+        aa = 1 << BUFFER_STATE__HORIZONTAL_BIT;
+        test_and_set(*(&bufferState as *u16), aa);
 
         _rowStartIndex = xx;
         xx = aa = xx + tilemapSeam_x;
 
-        yy = aa = (cursor <<< 1) & BUFFER_INDEX_MASK;
-        _endIndex = yy;
-        do {
-            yy--;
-            yy--;
-            if negative {
-                yy = sizeof(typeof(buffer)) - 2;
-            }
+        yy = aa = (cursor <<< 1) & BUFFER_INDEX_MT_MASK;
+        _bufferEndIndex = yy;
 
-            buffer[unaligned yy] = aa = sl_tilemap[unaligned xx];
+        // Using the VRAM address (verticalCursor) to determine which half of the MetaTile to draw
+        aa = vramWordAddr1;
+        if a & NAMETABLE_V_TILE_WIDTH == 0 {
+            do {
+                yy--; yy--; yy--; yy--;
+                if negative {
+                    yy = sizeof(typeof(buffer)) - 4;
+                }
 
-            xx--;
-            xx--;
-            // cmp works since _rowStartIndex is never negative
-            // Required as `xx` might be negative
-            cmp(xx, _rowStartIndex);
-            if negative {
-                xx = aa = xx + tilemapStride;
-            }
-        } while yy != _endIndex;
+                _mapIndex = xx;
+                xx = aa = ((&sl_data.map[0] as *u16)[unaligned xx] & 0xff) << 1;
 
-        aa = 1 << BUFFER_STATE__HORIZONTAL_BIT;
-        test_and_set(*(&bufferState as *u16), aa);
+                (&buffer[0])[unaligned yy] = aa = sl_data.mt_top_left[unaligned xx];
+                (&buffer[1])[unaligned yy] = aa = sl_data.mt_top_right[unaligned xx];
+
+                xx = _mapIndex;
+                xx--;
+                // cmp works since _rowStartIndex is never negative
+                // Required as `xx` might be negative
+                cmp(xx, _rowStartIndex);
+                if negative {
+                    xx = aa = xx + tilemapStride;
+                }
+            } while yy != _bufferEndIndex;
+
+            return;
+        }
+        else {
+            do {
+                yy--; yy--; yy--; yy--;
+                if negative {
+                    yy = sizeof(typeof(buffer)) - 4;
+                }
+
+                _mapIndex = xx;
+                xx = aa = ((&sl_data.map[0] as *u16)[unaligned xx] & 0xff) << 1;
+
+                (&buffer[0])[unaligned yy] = aa = sl_data.mt_bottom_left[unaligned xx];
+                (&buffer[1])[unaligned yy] = aa = sl_data.mt_bottom_right[unaligned xx];
+
+                xx = _mapIndex;
+                xx--;
+                // cmp works since _rowStartIndex is never negative
+                // Required as `xx` might be negative
+                cmp(xx, _rowStartIndex);
+                if negative {
+                    xx = aa = xx + tilemapStride;
+                }
+            } while yy != _bufferEndIndex;
+
+            return;
+        }
     }
 
 
@@ -1064,7 +1178,7 @@ namespace part_of_room {
     #[mem8, idx8]
     func start_room_transition(scrollDirection : room_transitions.ScrollDirection in x) {
         // ::TODO get x position from room::
-        a = 0x50;
+        a = 0x28;
         if a >= sl_header.width {
             a = 0;
         }
@@ -1088,7 +1202,7 @@ namespace part_of_room {
 
 
         // ::TODO get y position from room::
-        a = 0x30;
+        a = 0x18;
         if a >= sl_header.height {
             a = 0;
         }
@@ -1115,8 +1229,8 @@ namespace part_of_room {
         mem16();
         #[mem16, idx8] {
             // high byte of yy clear
-            tilemapSeam_x = aa = yy <<< 1;
-            tilemapSeam_y = aa = *(far &RDMPY) <<< 1;
+            tilemapSeam_x = aa = yy;
+            tilemapSeam_y = aa = *(far &RDMPY);
         }
         mem8_idx8();
     }
@@ -1124,14 +1238,14 @@ namespace part_of_room {
     in rodata0 {
         let _N_SCROLL_DIRECTIONS = 8;
 
-        let _HB_WIDTH  = sizeof(typeof(horizontal_buffer.buffer)) / 2;
-        let _VB_HEIGHT = sizeof(typeof(vertical_buffer.buffer)) / 2;
+        let _HB_WIDTH  = sizeof(typeof(horizontal_buffer.buffer)) / 4;
+        let _VB_HEIGHT = sizeof(typeof(vertical_buffer.buffer)) / 4;
 
-        let _DISPLAY_TW = DISPLAY_WIDTH / TILE_PX;
-        let _DISPLAY_TH = DISPLAY_HEIGHT / TILE_PX;
+        let _DISPLAY_TW = DISPLAY_MT_TILE_WIDTH;
+        let _DISPLAY_TH = DISPLAY_MT_TILE_HEIGHT;
 
         // Tiles before rollback
-        let _TBR = room_transitions.N_TRANSITION_FRAMES_BEFORE_SOLID_CHECK;
+        let _TBR = room_transitions.N_TRANSITION_FRAMES_BEFORE_SOLID_CHECK / 2;
 
         // Offset between the room tile position and the tilemap seam tile position.
         //
@@ -1165,84 +1279,95 @@ namespace part_of_room {
     // DB = 0x7e
     #[mem16, idx16]
     func scroll_up__process__mem16_idx16() {
-        horizontal_buffer.viewportYOffset = aa = horizontal_buffer.viewportYOffset - TILE_PX;
-        _update_scroll_shadows();
+        xx = tilemapSeam_y;
 
-        aa = tilemapSeam_y - tilemapStride;
-        if !carry {
-            aa = tilemapSize - tilemapStride;
+        horizontal_buffer.viewportYOffset = aa = horizontal_buffer.viewportYOffset - V_TILE_PX;
+        if aa & V_TILE_PX == 0 {
+            aa = xx - tilemapStride;
+            if !carry {
+                aa = tilemapSize - tilemapStride;
+            }
+            tilemapSeam_y = aa;
+            xx = aa;
         }
-        tilemapSeam_y = aa;
-        xx = aa;
 
         aa = vertical_buffer.pre_decrement_cursor__inline__keep_xx();
 
         horizontal_buffer.populate_buffer(xx, aa);
+
+        return _update_scroll_shadows();
     }
 
 
     // DB = 0x7e
     #[mem16, idx16]
     func scroll_down__process__mem16_idx16() {
-        horizontal_buffer.viewportYOffset = aa = horizontal_buffer.viewportYOffset + TILE_PX;
-        _update_scroll_shadows();
+        xx = tilemapSeam_y;
 
-        aa = tilemapSeam_y + tilemapStride;
-        if aa >= tilemapSize {
-            aa = 0;
+        horizontal_buffer.viewportYOffset = aa = horizontal_buffer.viewportYOffset + V_TILE_PX;
+        if aa & V_TILE_PX == 0 {
+            aa = xx + tilemapStride;
+            if aa >= tilemapSize {
+                aa = 0;
+            }
+            tilemapSeam_y = aa;
+            xx = aa;
         }
-        tilemapSeam_y = aa;
-        xx = aa;
 
         aa = vertical_buffer.post_increment_cursor__inline__keep_xx();
-
-        aa += DISPLAY_HEIGHT / TILE_PX;
+        aa += DISPLAY_V_TILE_HEIGHT;
 
         horizontal_buffer.populate_buffer(xx, aa);
+
+        return _update_scroll_shadows();
     }
 
 
     // DB = 0x7e
     #[mem16, idx16]
     func scroll_left__process__mem16_idx16() {
-        vertical_buffer.viewportXOffset = aa = vertical_buffer.viewportXOffset - TILE_PX;
-        _update_scroll_shadows();
-
         xx = tilemapSeam_x;
-        xx--;
-        if negative {
-            xx = tilemapStride;
+
+        vertical_buffer.viewportXOffset = aa = vertical_buffer.viewportXOffset - V_TILE_PX;
+        if aa & V_TILE_PX != 0 {
             xx--;
+            if negative {
+                xx = tilemapStride;
+                xx--;
+            }
+            tilemapSeam_x = xx;
         }
-        xx--;
-        tilemapSeam_x = xx;
 
         aa = horizontal_buffer.pre_decrement_cursor__inline__keep_xx();
 
         vertical_buffer.populate_buffer(xx, aa);
+
+        ^return _update_scroll_shadows();
     }
 
 
     // DB = 0x7e
     #[mem16, idx16]
     func scroll_right__process__mem16_idx16() {
-        vertical_buffer.viewportXOffset = aa = vertical_buffer.viewportXOffset + TILE_PX;
-        _update_scroll_shadows();
-
         xx = tilemapSeam_x;
-        xx++;
-        xx++;
-        if xx >= tilemapStride {
-            xx = 0;
+
+        vertical_buffer.viewportXOffset = aa = vertical_buffer.viewportXOffset + V_TILE_PX;
+        if aa & V_TILE_PX != 0 {
+            xx++;
+            if xx >= tilemapStride {
+                xx = 0;
+            }
+            tilemapSeam_x = xx;
         }
-        tilemapSeam_x = xx;
 
         aa = horizontal_buffer.post_increment_cursor__inline__keep_xx();
 
         // Advance aa to the other nametable.
-        aa = aa ^ (DISPLAY_WIDTH / TILE_PX);
+        aa = aa ^ NAMETABLE_V_TILE_WIDTH;
 
         vertical_buffer.populate_buffer(xx, aa);
+
+        ^return _update_scroll_shadows();
     }
 
 
