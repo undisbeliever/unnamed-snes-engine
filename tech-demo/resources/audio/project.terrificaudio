@@ -221,6 +221,14 @@
     {
       "name": "GameOverTheme",
       "source": "songs/GameOverTheme.mml"
+    },
+    {
+      "name": "CreditsTheme",
+      "source": "songs/CreditsTheme.mml"
+    },
+    {
+      "name": "TitleScreenTheme",
+      "source": "songs/TitleScreenTheme.mml"
     }
   ]
 }

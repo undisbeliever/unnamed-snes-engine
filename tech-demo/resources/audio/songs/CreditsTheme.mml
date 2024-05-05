@@ -1,0 +1,44 @@
+;Credits Theme for unnamed-snes-game
+;By KungFuFurby
+;Made for undisbeliever's Terrific Audio Driver v0.0.8
+
+#Title Credits Theme
+#Game unnamed-snes-game
+#Author KungFuFurby
+#Composer KungFuFurby
+#Copyright 2024 undisbeliever
+#Date 2024
+#License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
+
+;Echo Parameters
+#EchoLength 48
+#EchoFeedback 64
+#EchoVolume 32
+
+;Instrument Definitions
+@Strings8 Strings8
+@Strings8Detache Strings8 adsr 15 7 7 25
+@PIANO_C5 PIANO_C5
+
+#ZenLen 192
+
+A T224
+A E1 @Strings8Detache V160
+A L l16 o4cccccccc32c32
+
+B E1 @Strings8Detache V160 p32
+B L l16 o4eeeeeeee32e32 o4ffffffff32f32
+
+C E1 @Strings8Detache V160 p96 L
+!CRiff1 l16 o3aaaaaaaa32a32
+C [l16 o4gggggggg32g32 !CRiff1 ]2
+C [l16 o3gggggggg32g32 !CRiff1 ]2
+
+D E1 @PIANO_C5 V20
+D L l48 o4c<g>c gcg >c<g>c gcg >c<g>c <gcg c<g>c <gcg
+
+E E0 @Strings8 V40
+E L l1 o3c&
+
+F E0 @Strings8 V40
+F L l1 o2c&
