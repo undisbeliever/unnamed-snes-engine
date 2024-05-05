@@ -312,6 +312,7 @@ var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
 
 namespace _draw_fullscreen {
     in zeropage {
+        // The tile position of the top-left `sl_data.map` cell to draw to VRAM
         var _tilePos_x : u8 in zpTmp_byte_0;
         var _tilePos_y : u8 in zpTmp_byte_1;
 
@@ -328,8 +329,10 @@ namespace _draw_fullscreen {
     }
 
 
+    // REQUIRES: partOfRoom is False
+    // OUT: The tile x/y position for __draw_nametable__forceblank();
     #[mem16, idx8]
-    inline func __clamp_pos(let pos : *u16, let max : *u16, let maskedPrevPos : *u16) : u8 in x {
+    inline func __clamp_pos(let pos : *u16, let max : *u16, let maskedPrevPos : *u16, let viewportOffsetPx: u16) : u8 in x {
         aa = *pos;
         if negative {
             aa += *max;
@@ -347,6 +350,12 @@ namespace _draw_fullscreen {
 
         aa &= POSITION_V_TILE_MASK;
         *maskedPrevPos = aa;
+
+        // Calculate the tile x/y position for __draw_nametable__forceblank();
+        aa -= viewportOffsetPx;
+        if !carry {
+            aa += *max;
+        }
 
         aa >>>= 4;
         #[idx16] xx = aa;
@@ -406,6 +415,10 @@ namespace _draw_fullscreen {
         p = pop8();
 
 
+        WRMPYA = a = _mapWidth;
+        WRMPYB = a = _tilePos_y;
+        // Must wait 8 CPU cycles before reading RDMPY
+
         a = _partOfRoom;
         if zero {
             __draw_tilemaps__normal__forceblank__inline();
@@ -421,17 +434,14 @@ namespace _draw_fullscreen {
         vertical_buffer.cursor = 0;
         horizontal_buffer.cursor = 0;
 
-        x = __clamp_pos(&sl_callbacks.xPos_px, &right, &vertical_buffer.maskedPrevXPos);
+        x = __clamp_pos(&sl_callbacks.xPos_px, &right, &vertical_buffer.maskedPrevXPos, VIEWPORT_X_OFFSET_PX);
         y = _mapWidth;
         if y == VRAM_TILEMAP_MT_TILE_WIDTH || y == NAMETABLE_MT_TILE_WIDTH {
             // _mapWidth matches VRAM tilemap width.
             // Disable the vertical buffer.
             skipFlags = y = 1 << SKIP_FLAGS__VERTICAL_BIT;
 
-            // Set _tilePos_x so the leftmost tile in the VRAM tilemap has an xPos of 0.
-            x = VIEWPORT_X_MT_OFFSET;
-
-            y = 0;
+            x = y = 0;
             aa = sl_callbacks.xPos_px;
         } else {
             y = VIEWPORT_X_OFFSET_PX;
@@ -447,16 +457,14 @@ namespace _draw_fullscreen {
         xScrollShadow = aa;
         vertical_buffer.viewportXOffset = aa = yy;
 
-        x = __clamp_pos(&sl_callbacks.yPos_px, &bottom, &horizontal_buffer.maskedPrevYPos);
+        x = __clamp_pos(&sl_callbacks.yPos_px, &bottom, &horizontal_buffer.maskedPrevYPos, VIEWPORT_Y_OFFSET_PX);
         y = _mapHeight;
         if y == VRAM_TILEMAP_MT_TILE_HEIGHT {
             // _mapHeight matches VRAM tilemap height.
             // Disable the horizontal buffer.
             test_and_set(*(&skipFlags as *u16), aa = 1 << SKIP_FLAGS__HORIZONTAL_BIT);
 
-            // Set _tilePos_y so the topmost tile in the VRAM tilemap has a yPos of 0.
-            x = VIEWPORT_Y_MT_OFFSET;
-            y = 0;
+            x = y = 0;
             aa = sl_callbacks.yPos_px;
         }
         else {
@@ -479,24 +487,14 @@ namespace _draw_fullscreen {
     // REQUIRES: Force-Blank
     //
     // IN: VMADD = vram address to write to
+    // IN: WRMPYA = _mapWidth
+    // IN: RDMPY = tileY * tileWidth
     #[mem8, idx16]
     inline func __draw_tilemaps__normal__forceblank__inline() {
-        WRMPYA = a = _mapWidth;
-        a = _tilePos_y - VIEWPORT_Y_MT_OFFSET;
-        if !carry {
-            a += _mapHeight;
-        }
-        WRMPYB = a;
-        // Must wait 8 CPU cycles before reading RDMPY
-
-
-        a = _tilePos_x - VIEWPORT_X_MT_OFFSET;
-        if !carry {
-            a += _mapWidth;
-        }
+        a = _tilePos_x;
         __draw_nametable__forceblank(a);
 
-        a = _tilePos_x + (NAMETABLE_MT_TILE_WIDTH - VIEWPORT_X_MT_OFFSET);
+        a = _tilePos_x + NAMETABLE_MT_TILE_WIDTH;
         if carry || a >= _mapWidth {
             a -= _mapWidth;
         }
@@ -504,14 +502,14 @@ namespace _draw_fullscreen {
 
 
         // Calculate the tilemapSeam (bottom-right seam corner)
-        a = _tilePos_y + (VRAM_TILEMAP_MT_TILE_HEIGHT - VIEWPORT_Y_MT_OFFSET - 1);
+        a = _tilePos_y + (VRAM_TILEMAP_MT_TILE_HEIGHT - 1);
         if carry || a >= _mapHeight {
             a -= _mapHeight;
         }
         WRMPYB = a;
         // Must wait 8 CPU cycles before reading RDMPY
 
-        a = _tilePos_x + (VRAM_TILEMAP_MT_TILE_WIDTH - VIEWPORT_X_MT_OFFSET - 1);
+        a = _tilePos_x + (VRAM_TILEMAP_MT_TILE_WIDTH - 1);
         if carry || a >= _mapWidth {
             a -= _mapWidth;
         }
@@ -555,12 +553,10 @@ namespace _draw_fullscreen {
     // REQUIRES: Force-Blank
     //
     // IN: VMADD = vram address to write to
+    // IN: WRMPYA = _mapWidth
+    // IN: RDMPY = tileY * tileWidth
     #[mem8, idx16]
     inline func __draw_tilemaps__part_of_room__forceblank__inline() {
-        WRMPYA = a = _mapWidth;
-        WRMPYB = a = _tilePos_y;
-        // Must wait 8 CPU cycles before reading RDMPY
-
         __draw_nametable__forceblank(_tilePos_x);
 
         xx = 0;
