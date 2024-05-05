@@ -395,6 +395,8 @@ namespace __init_and_draw_fullscreen {
 
     // REQUIRES: partOfRoom is False
     // OUT: The tile x/y position for __draw_nametable__forceblank();
+    //
+    // DB access lowram
     #[mem16, idx8]
     inline func __clamp_pos(let pos : *u16, let max : *u16, let maskedPrevPos : *u16, let viewportOffsetPx: u16) : u8 in x {
         aa = *pos;
@@ -427,6 +429,7 @@ namespace __init_and_draw_fullscreen {
     }
 
 
+    // DB = 0x80
     #[mem16, idx8]
     inline func __init_state__normal__inline() {
         vertical_buffer.cursor = 0;
@@ -482,6 +485,7 @@ namespace __init_and_draw_fullscreen {
     }
 
 
+    // DB = 0x80
     #[mem16, idx8]
     inline func __init_state__part_of_room__inline() {
         // ::TODO get tile position from room::
@@ -514,6 +518,8 @@ namespace __init_and_draw_fullscreen {
     // IN: VMADD = vram address to write to
     // IN: WRMPYA = _mapWidth
     // IN: RDMPY = tileY * tileWidth
+    //
+    // DB = 0x80
     #[mem8, idx16]
     inline func __draw_tilemaps__normal__forceblank__inline() {
         a = _tilePos_x;
@@ -553,6 +559,8 @@ namespace __init_and_draw_fullscreen {
     // IN: VMADD = vram address to write to
     // IN: WRMPYA = _mapWidth
     // IN: RDMPY = tileY * tileWidth
+    //
+    // DB = 0x80
     #[mem8, idx16]
     inline func __draw_tilemaps__part_of_room__forceblank__inline() {
         __draw_nametable__forceblank(_tilePos_x);
@@ -720,6 +728,8 @@ inline func is_not_part_of_room() : bool in zero{
 //
 //       This will allow the callback function to access the scroll shadow variables
 //       (ie, for HDMA effects) after `scroll_tilemap()` has modified them.
+//
+// DB = 0x7e
 #[mem8, idx8]
 inline func process__inline() {
     x = sl_data.callback_index;
@@ -1261,6 +1271,7 @@ namespace part_of_room {
     }
 
 
+    // DB = 0x7e
     #[mem16, idx16]
     func _update_scroll_shadows() {
         xScrollShadow = aa = vertical_buffer.viewportXOffset;
