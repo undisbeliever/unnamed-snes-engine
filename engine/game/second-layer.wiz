@@ -52,7 +52,7 @@ let NAMETABLE_WORD_SIZE = NAMETABLE_V_TILE_WIDTH * NAMETABLE_V_TILE_HEIGHT;
 let NAMETABLE_MT_TILE_WIDTH = 16;
 let NAMETABLE_MT_TILE_HEIGHT = 16;
 
-// Offset between the force-blank `_draw_fullscreen` and the starting second-layer position.
+// Offset between the force-blank `__init_and_draw_fullscreen` and the starting second-layer position.
 let VIEWPORT_X_MT_OFFSET = (VRAM_TILEMAP_MT_TILE_WIDTH - DISPLAY_MT_TILE_WIDTH) / 2;
 let VIEWPORT_Y_MT_OFFSET = (VRAM_TILEMAP_MT_TILE_HEIGHT - DISPLAY_MT_TILE_HEIGHT) / 2;
 
@@ -279,7 +279,7 @@ func setup__forceblank__inline(second_layer_id : u8 in a) {
     data_bank = pop8();
 // DB = 0x80
 
-    _draw_fullscreen.draw__forceblank__inline();
+    __init_and_draw_fullscreen.init_and_draw__forceblank__inline();
 }
 
 
@@ -310,7 +310,7 @@ var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
 }
 
 
-namespace _draw_fullscreen {
+namespace __init_and_draw_fullscreen {
     in zeropage {
         // The tile position of the top-left `sl_data.map` cell to draw to VRAM
         var _tilePos_x : u8 in zpTmp_byte_0;
@@ -329,50 +329,14 @@ namespace _draw_fullscreen {
     }
 
 
-    // REQUIRES: partOfRoom is False
-    // OUT: The tile x/y position for __draw_nametable__forceblank();
-    #[mem16, idx8]
-    inline func __clamp_pos(let pos : *u16, let max : *u16, let maskedPrevPos : *u16, let viewportOffsetPx: u16) : u8 in x {
-        aa = *pos;
-        if negative {
-            aa += *max;
-            if negative {
-                aa = direct_page; // 0
-            }
-        }
-        else if aa >= *max {
-            aa -= *max;
-            if aa >= *max {
-                aa = direct_page; // 0
-            }
-        }
-        *pos = aa;
-
-        aa &= POSITION_V_TILE_MASK;
-        *maskedPrevPos = aa;
-
-        // Calculate the tile x/y position for __draw_nametable__forceblank();
-        aa -= viewportOffsetPx;
-        if !carry {
-            aa += *max;
-        }
-
-        aa >>>= 4;
-        #[idx16] xx = aa;
-        return x;
-    }
-
-
-    // Draw the second layer to VRAM (using DMA) and populate the state variables.
-    //
-    // NOTE: The viewport starts in the middle of the VRAM tilemap to save 1 DMA transfer per scanline.
+    // Initialise the state variables and draw the second layer to VRAM.
     //
     // REQUIRES: Force-Blank
     // REQUIRES: Second layer loaded
     //
     // DB = 0x80
     #[mem8, idx16]
-    inline func draw__forceblank__inline() {
+    inline func init_and_draw__forceblank__inline() {
         VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
         VMADD = xx = VRAM_BG2_MAP_WADDR;
 
@@ -426,6 +390,40 @@ namespace _draw_fullscreen {
         else {
             __draw_tilemaps__part_of_room__forceblank__inline();
         }
+    }
+
+
+    // REQUIRES: partOfRoom is False
+    // OUT: The tile x/y position for __draw_nametable__forceblank();
+    #[mem16, idx8]
+    inline func __clamp_pos(let pos : *u16, let max : *u16, let maskedPrevPos : *u16, let viewportOffsetPx: u16) : u8 in x {
+        aa = *pos;
+        if negative {
+            aa += *max;
+            if negative {
+                aa = direct_page; // 0
+            }
+        }
+        else if aa >= *max {
+            aa -= *max;
+            if aa >= *max {
+                aa = direct_page; // 0
+            }
+        }
+        *pos = aa;
+
+        aa &= POSITION_V_TILE_MASK;
+        *maskedPrevPos = aa;
+
+        // Calculate the tile x/y position for __draw_nametable__forceblank();
+        aa -= viewportOffsetPx;
+        if !carry {
+            aa += *max;
+        }
+
+        aa >>>= 4;
+        #[idx16] xx = aa;
+        return x;
     }
 
 
@@ -484,6 +482,33 @@ namespace _draw_fullscreen {
     }
 
 
+    #[mem16, idx8]
+    inline func __init_state__part_of_room__inline() {
+        // ::TODO get tile position from room::
+        x = 0x28;
+        if x >= _mapWidth {
+            x = 0;
+        }
+        _tilePos_x = x;
+
+        // ::TODO get tile position from room::
+        y = 0x18;
+        if y >= _mapHeight {
+            y = 0;
+        }
+        _tilePos_y = y;
+
+        xScrollShadow = 0;
+        vertical_buffer.viewportXOffset = 0;
+        vertical_buffer.cursor = 0;
+
+        aa = -1 as u16;
+        yScrollShadow = aa;
+        horizontal_buffer.viewportYOffset = aa;
+        horizontal_buffer.cursor = 0;
+    }
+
+
     // REQUIRES: Force-Blank
     //
     // IN: VMADD = vram address to write to
@@ -523,33 +548,6 @@ namespace _draw_fullscreen {
     }
 
 
-    #[mem16, idx8]
-    inline func __init_state__part_of_room__inline() {
-        // ::TODO get tile position from room::
-        x = 0x28;
-        if x >= _mapWidth {
-            x = 0;
-        }
-        _tilePos_x = x;
-
-        // ::TODO get tile position from room::
-        y = 0x18;
-        if y >= _mapHeight {
-            y = 0;
-        }
-        _tilePos_y = y;
-
-        xScrollShadow = 0;
-        vertical_buffer.viewportXOffset = 0;
-        vertical_buffer.cursor = 0;
-
-        aa = -1 as u16;
-        yScrollShadow = aa;
-        horizontal_buffer.viewportYOffset = aa;
-        horizontal_buffer.cursor = 0;
-    }
-
-
     // REQUIRES: Force-Blank
     //
     // IN: VMADD = vram address to write to
@@ -580,6 +578,8 @@ namespace _draw_fullscreen {
     func __draw_nametable__forceblank(xTilePos : u8 in a) {
         let ROWS_TO_DRAW = NAMETABLE_MT_TILE_HEIGHT;
         let COLUMNS_TO_DRAW = NAMETABLE_MT_TILE_WIDTH;
+
+        // MUST NOT modify WRMPYA, WRMPYB or RDMPY
 
         mem16_idx16();
         #[mem16, idx16] {
