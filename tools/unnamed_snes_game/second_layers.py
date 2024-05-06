@@ -5,6 +5,7 @@
 
 import PIL.Image  # type: ignore
 from collections import OrderedDict
+from enum import IntFlag
 from typing import Any, Callable, Final, Iterable, NamedTuple, Optional
 
 from .common import EngineData, FixedSizedData, DynamicSizedData, SimpleMultilineError
@@ -35,6 +36,11 @@ MT_TILE_PX: Final = 16
 N_SL_METATILES: Final = 256
 
 MAX_SL_CELLS: Final = 10 * 1024
+
+
+class SlFlags(IntFlag):
+    PART_OF_ROOM = 0x80
+    ABOVE_METATILES = 0x40
 
 
 class SecondLayerTilesetMap(AbstractTilesetMap):
@@ -159,11 +165,13 @@ def convert_second_layer(sli: SecondLayerInput, palettes: dict[Name, PaletteColo
             f"Image is too large ({sl.width * MT_TILE_PX} x {sl.height * MT_TILE_PX}, max: {0xff * MT_TILE_PX} x {0xff * MT_TILE_PX}",
         )
 
+    flags = SlFlags(0)
+
     if sli.part_of_room:
-        # ::TODO check room_parameters::
-        part_of_room = 0xFF
-    else:
-        part_of_room = 0
+        flags |= SlFlags.PART_OF_ROOM
+
+    if sli.above_metatiles:
+        flags |= SlFlags.ABOVE_METATILES
 
     sl_callback = mapping.sl_callbacks.get(sli.callback)
     if sl_callback is None:
@@ -184,9 +192,9 @@ def convert_second_layer(sli: SecondLayerInput, palettes: dict[Name, PaletteColo
     ram_data = (
         bytes(
             [
-                part_of_room,
                 sl.width,
                 sl.height,
+                flags,
                 sl_callback.id * 2,
             ]
         )

@@ -11,6 +11,8 @@ import "game/metasprites";
 import "game/metatiles";
 import "game/gamestate";
 
+import "common/reset";
+
 import "src/engine-hooks";
 
 
@@ -22,19 +24,25 @@ in lowram {
     var _brightness_buffer : u8;
 
 
-    // ::TODO make the bg1/bg2 scroll shadows swappable (rename them afterwords)::
-
-    // A shadow of the BG1 scroll registers.
+    // Flag to determine which scroll shadow variable goes to BG1 and BG2.
     //
-    // (2x u16 words)
-    var bg1_scrollX : u16;
-    var bg1_scrollY : u16;
-
-    // A shadow of the BG2 scroll registers.
+    // If `swapBg1AndBg2ScrollShadows` is zero, bgA is BG1 and bgB is BG2.
+    // If `swapBg1AndBg2ScrollShadows` is non-zero, bgA is BG2 and bgB is BG1.
     //
-    // (2x u16 words)
-    var bg2_scrollX : u16;
-    var bg2_scrollY : u16;
+    // NOTE: This variable is reset in `reset_registers()`.
+    //
+    // (byte flag)
+    var swapBg1AndBg2ScrollShadows : u8 in __swapBg1AndBg2ScrollShadows;
+
+    // A shadow of the BG1 and BG2 scroll registers.
+    //
+    // See `swapBg1AndBg2ScrollShadows`.
+    //
+    // (4x u16 words)
+    var bgA_scroll_x : u16;
+    var bgA_scroll_y : u16;
+    var bgB_scroll_x : u16;
+    var bgB_scroll_y : u16;
 }
 
 
@@ -99,15 +107,29 @@ func wait_frame() {
 
         // Update scroll registers
 
-        BG1HOFS = a = *(&<:bg1_scrollX as *u8);
-        BG1HOFS = a = *(&>:bg1_scrollX as *u8);
-        BG1VOFS = a = *(&<:bg1_scrollY as *u8);
-        BG1VOFS = a = *(&>:bg1_scrollY as *u8);
+        a = swapBg1AndBg2ScrollShadows;
+        if zero {
+            BG1HOFS = a = *(&<:bgA_scroll_x as *u8);
+            BG1HOFS = a = *(&>:bgA_scroll_x as *u8);
+            BG1VOFS = a = *(&<:bgA_scroll_y as *u8);
+            BG1VOFS = a = *(&>:bgA_scroll_y as *u8);
 
-        BG2HOFS = a = *(&<:bg2_scrollX as *u8);
-        BG2HOFS = a = *(&>:bg2_scrollX as *u8);
-        BG2VOFS = a = *(&<:bg2_scrollY as *u8);
-        BG2VOFS = a = *(&>:bg2_scrollY as *u8);
+            BG2HOFS = a = *(&<:bgB_scroll_x as *u8);
+            BG2HOFS = a = *(&>:bgB_scroll_x as *u8);
+            BG2VOFS = a = *(&<:bgB_scroll_y as *u8);
+            BG2VOFS = a = *(&>:bgB_scroll_y as *u8);
+        }
+        else {
+            BG1HOFS = a = *(&<:bgB_scroll_x as *u8);
+            BG1HOFS = a = *(&>:bgB_scroll_x as *u8);
+            BG1VOFS = a = *(&<:bgB_scroll_y as *u8);
+            BG1VOFS = a = *(&>:bgB_scroll_y as *u8);
+
+            BG2HOFS = a = *(&<:bgA_scroll_x as *u8);
+            BG2HOFS = a = *(&>:bgA_scroll_x as *u8);
+            BG2VOFS = a = *(&<:bgA_scroll_y as *u8);
+            BG2VOFS = a = *(&>:bgA_scroll_y as *u8);
+        }
 
 
         engine_hooks.wait_frame__vblank__inline();

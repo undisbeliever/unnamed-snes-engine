@@ -1393,6 +1393,14 @@ in lowram {
     // ::: Used to work around a "could not generate code for assignment `=` (got: `a = *(8269313 as *u8)` (mem8, idx8))" error::
         var buffer_vramWordPos_l : u8 in <:buffer_vramWordPos;
         var buffer_vramWordPos_h : u8 in >:buffer_vramWordPos;
+
+
+    var scrollShadow_x : u16 in bgA_scroll_x;
+        var scrollShadow_x_l : u8 in <:scrollShadow_x;
+        var scrollShadow_x_h : u8 in >:scrollShadow_x;
+    var scrollShadow_y : u16 in bgA_scroll_y;
+        var scrollShadow_y_l : u8 in <:scrollShadow_y;
+        var scrollShadow_y_h : u8 in >:scrollShadow_y;
 }
 
 
@@ -1446,9 +1454,9 @@ inline func _reset_state() {
         vramVerticalWoffset = 0;
         currentTilemap_vramWaddr = VRAM_METATILE_MAP_WADDR;
 
-        // Reset BG1 scroll
-        bg1_scrollX = 0;
-        bg1_scrollY = aa = 0xffff;
+        // Reset scroll
+        scrollShadow_x = 0;
+        scrollShadow_y = aa = 0xffff;
     }
     mem8();
 }
@@ -1583,9 +1591,9 @@ func scroll_right__setup() {
 #[mem8, idx8]
 func scroll_right__process() : bool in carry {
 
-    *(&<:bg1_scrollX as *u8) = a = *(&<:bg1_scrollX as *u8) + TRANSITION_SPEED;
+    *(&<:scrollShadow_x as *u8) = a = *(&<:scrollShadow_x as *u8) + TRANSITION_SPEED;
     if carry {
-        (*(&>:bg1_scrollX as *u8))++;
+        (*(&>:scrollShadow_x as *u8))++;
     }
 
 
@@ -1625,9 +1633,9 @@ func scroll_right__rollback() : bool in carry {
 
     // no need to draw tiles, only need to change scroll.
 
-    *(&<:bg1_scrollX as *u8) = a = *(&<:bg1_scrollX as *u8) - TRANSITION_SPEED;
+    *(&<:scrollShadow_x as *u8) = a = *(&<:scrollShadow_x as *u8) - TRANSITION_SPEED;
     if !carry {
-        (*(&>:bg1_scrollX as *u8))--;
+        (*(&>:scrollShadow_x as *u8))--;
     }
 
     if a == 0 {
@@ -1670,9 +1678,9 @@ func scroll_left__setup() {
 #[mem8, idx8]
 func scroll_left__process() : bool in carry {
 
-    *(&<:bg1_scrollX as *u8) = a = *(&<:bg1_scrollX as *u8) - TRANSITION_SPEED;
+    *(&<:scrollShadow_x as *u8) = a = *(&<:scrollShadow_x as *u8) - TRANSITION_SPEED;
     if !carry {
-        (*(&>:bg1_scrollX as *u8))--;
+        (*(&>:scrollShadow_x as *u8))--;
     }
 
 
@@ -1712,9 +1720,9 @@ func scroll_left__rollback() : bool in carry {
 
     // no need to draw tiles, only need to change scroll.
 
-    *(&<:bg1_scrollX as *u8) = a = *(&<:bg1_scrollX as *u8) + TRANSITION_SPEED;
+    *(&<:scrollShadow_x as *u8) = a = *(&<:scrollShadow_x as *u8) + TRANSITION_SPEED;
     if carry {
-        (*(&>:bg1_scrollX as *u8))++;
+        (*(&>:scrollShadow_x as *u8))++;
     }
 
     if a == 0 {
@@ -1837,7 +1845,7 @@ func scroll_down__setup() {
 #[mem8, idx8]
 func scroll_down__process() : bool in carry {
 
-    *(&<:bg1_scrollY as *u8) = a = *(&<:bg1_scrollY as *u8) + TRANSITION_SPEED;
+    *(&<:scrollShadow_y as *u8) = a = *(&<:scrollShadow_y as *u8) + TRANSITION_SPEED;
 
 
     a = topmostRowOffset;
@@ -1885,7 +1893,7 @@ func scroll_up__setup() {
 #[mem8, idx8]
 func scroll_up__process() : bool in carry {
 
-    *(&<:bg1_scrollY as *u8) = a = *(&<:bg1_scrollY as *u8) - TRANSITION_SPEED;
+    *(&<:scrollShadow_y as *u8) = a = *(&<:scrollShadow_y as *u8) - TRANSITION_SPEED;
 
 
     a = topmostRowOffset;

@@ -6,6 +6,12 @@ import "../registers";
 
 import "src/main";
 
+in lowram {
+    // ::HACK declare the `swapBg1AndBg2ScrollShadows` variables in `reset.wiz` to fix a::
+    // ::: to fix an "encountered a reference to `var bgB_scroll_y` before its type was known" error::
+    var __swapBg1AndBg2ScrollShadows : u8;
+}
+
 
 in code {
 
@@ -161,12 +167,15 @@ func reset_registers() {
                 x--;
             } while !negative;
         }
+
+
+        // Reset scroll shadow state
+        __swapBg1AndBg2ScrollShadows = 0;
     }
 
     data_bank = pop8();
     p = pop8();
 }
-
 
 }
 

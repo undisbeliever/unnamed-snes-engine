@@ -453,32 +453,15 @@ inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
     data_bank = pop8();
 // DB = 0x80
     {
-        // Setup PPU registers
-
         reset_registers();
 
-        BGMODE = a = BGMODE_MODE_1_BG3_PRIORITY;
-        BG1SC = a = ((VRAM_METATILE_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_64x32;
-        BG2SC = a = ((VRAM_SECOND_LAYER_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_64x32;
-        BG3SC = a = ((VRAM_BG3_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_32x32;
-
-        BG12NBA = a =   ((VRAM_MTSL_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG1_SHIFT)
-                      | ((VRAM_MTSL_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG2_SHIFT);
-        BG34NBA = a = ((VRAM_BG3_TILES_WADDR / BG34NBA_WALIGN) << BG34NBA_BG3_SHIFT);
-
-        TM = a = TM_BG1 | TM_BG2 | TM_BG3 | TM_OBJ;
-
-
-
-        // Load Graphics to PPU
-
+        // Setup subsystems and load resources to WRAM and PPU.
         idx16();
         #[idx16] {
             metatiles.load_tileset__forceblank(room.tileset);
 
             // ::TODO get second_layer id from room data::
             second_layer.setup__forceblank__inline(0);
-            // ::TODO allow BG1 and BG2 to be swapped::
 
             metasprites.setup__forceblank();
 
@@ -490,6 +473,34 @@ inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
             engine_hooks.room_transitions__setup_ppu__forceblank();
         }
         idx8();
+
+
+        // Setup VRAM MAP
+        BGMODE = a = BGMODE_MODE_1_BG3_PRIORITY;
+
+        // Setup BG1 and BG2 tilemap.
+        // Which background is used by which subsystem is controlled by the
+        // `swapBg1AndBg2ScrollShadows` flag, which is set by the second_layer subsystem.
+        x = ((VRAM_METATILE_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_64x32;
+        y = ((VRAM_SECOND_LAYER_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_64x32;
+
+        a = swapBg1AndBg2ScrollShadows;
+        if !zero {
+            // Swap x & y (uses fewer instructions when setting x/y)
+            a = x;
+            x = y;
+            y = a;
+        }
+        BG1SC = x;
+        BG2SC = y;
+
+        BG3SC = a = ((VRAM_BG3_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_32x32;
+
+        BG12NBA = a =   ((VRAM_MTSL_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG1_SHIFT)
+                      | ((VRAM_MTSL_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG2_SHIFT);
+        BG34NBA = a = ((VRAM_BG3_TILES_WADDR / BG34NBA_WALIGN) << BG34NBA_BG3_SHIFT);
+
+        TM = a = TM_BG1 | TM_BG2 | TM_BG3 | TM_OBJ;
     }
 
 
@@ -736,8 +747,8 @@ func _scrolling_room_transition(roomPosition : u8 in a, _scrollDirection : Scrol
     // continue loading the room.
     _finish_loading_room();
 
-    zero = second_layer.is_not_part_of_room();
-    if !zero {
+    negative = second_layer.is_part_of_room();
+    if negative {
         second_layer.part_of_room.start_room_transition(scrollDirection);
     }
 
@@ -819,8 +830,8 @@ func _scrolling_room_transition__loop() : bool in carry {
 
         second_layer.process__inline();
 
-        zero = second_layer.is_not_part_of_room();
-        if !zero {
+        negative = second_layer.is_part_of_room();
+        if negative {
             x = scrollDirection as u8;
             mem16_idx16();
             #[mem16, idx16] {
@@ -884,8 +895,8 @@ func _scrolling_room_transition__rollback(_scrollDirection_ : u8 in a, playerXpo
 
     engine_hooks.room_transitions__scrolling_room_transition_rollback__inline();
 
-    zero = second_layer.is_not_part_of_room();
-    if !zero {
+    negative = second_layer.is_part_of_room();
+    if zero {
         second_layer.part_of_room.start_room_transition(scrollDirection);
     }
 

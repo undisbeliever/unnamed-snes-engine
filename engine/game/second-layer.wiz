@@ -66,21 +66,32 @@ let MAX_TILES_PER_BG = 1024;
 let MAX_SL_MAP_CELLS = 10 * 1024;
 
 
+namespace flags {
+    // If set, the second-layer is part of room.
+    // When set, the second layer will only scroll in sync with a room-transition.
+    let PART_OF_ROOM = 0x80;
+        let PART_OF_ROOM_BIT = 7;
+
+    // If set, the second-layer is on BG1
+    // If clear, the second-layer is on BG2.
+    let ABOVE_METATILES = 0x40;
+        let ABOVE_METATILES_BIT = 6;
+}
+
+
 // Second layer data stored in RAM
 //
 // NOTE: data MUST NOT be modified after the second-layer has been loaded and drawn to VRAM.
 //
 // PPU data format: 4bpp tiles (note, to be placed at the end of BG1/BG2 tile data)
 struct _RamDataFormat {
-    // If non-zero, the second layer is a part of the room.
-    //
-    // When set, the second layer will only scroll in sync with a room-transition.
-    partOfRoom: u8,
-
     // Map tile width (minimum value: 32)
     width: u8,
     // Map tile height (minimum value: 32)
     height: u8,
+
+    // See the `flags` namespace
+    flags: u8,
 
     // Index into `sl_callbacks` function tables
     callback_index: u8,
@@ -120,10 +131,10 @@ in lowram {
     var mapAboveViewportOffset : u16;  // ::DBEUG find better name::
 
 
-    var xScrollShadow : u16 in bg2_scrollX;
+    var xScrollShadow : u16 in bgB_scroll_x;
         var xScrollShadow_l : u8 in <:xScrollShadow;
         var xScrollShadow_h : u8 in >:xScrollShadow;
-    var yScrollShadow : u16 in bg2_scrollY;
+    var yScrollShadow : u16 in bgB_scroll_y;
         var yScrollShadow_l : u8 in <:yScrollShadow;
         var yScrollShadow_h : u8 in >:yScrollShadow;
 
@@ -217,6 +228,7 @@ in wram7e {
     var __far_sl_data : _RamDataFormat;
         // second-layer data is constant after it has been loaded and initialised
         const sl_data @ &__far_sl_data : _RamDataFormat;
+        const sl_data__flags @ &__far_sl_data.flags : u8;
 
     // Callback parameters
     const sl_parameters @ &sl_data.callback_parameters[0] : typeof(sl_data.callback_parameters);
@@ -317,7 +329,7 @@ namespace __init_and_draw_fullscreen {
         var _tilePos_x : u8 in zpTmp_byte_0;
         var _tilePos_y : u8 in zpTmp_byte_1;
 
-        var _partOfRoom : u8 in zpTmp_byte_2;
+        var _flags : u8 in zpTmp_byte_2;
 
         var _mapTileSize : u16 in zpTmp_word_0;
             var _mapWidth : u8 in <:_mapTileSize;
@@ -344,8 +356,10 @@ namespace __init_and_draw_fullscreen {
         bufferState = 0;
         skipFlags = 0;
 
-        var __sl_data_partOfRoom @ &__far_sl_data.partOfRoom : u8;
-        _partOfRoom = a = *(far &__sl_data_partOfRoom);
+        var __sl_data_flags @ &__far_sl_data.flags : u8;
+        _flags = a = *(far &__sl_data_flags);
+
+        swapBg1AndBg2ScrollShadows = a = a & flags.ABOVE_METATILES;
 
         push8(p);
         mem16();
@@ -371,8 +385,9 @@ namespace __init_and_draw_fullscreen {
             y = _mapHeight;
             bottom = aa = yy <<< 4;
 
-            x = _partOfRoom;
-            ^if zero {
+            // Assumes flags.PART_OF_ROOM_BIT == 7
+            x = _flags;
+            ^if !negative {
                 __init_state__normal__inline();
             }
             else {
@@ -386,8 +401,7 @@ namespace __init_and_draw_fullscreen {
         WRMPYB = a = _tilePos_y;
         // Must wait 8 CPU cycles before reading RDMPY
 
-        a = _partOfRoom;
-        if zero {
+        if !(_flags $ flags.PART_OF_ROOM_BIT) {
             __draw_tilemaps__normal__forceblank__inline();
         }
         else {
@@ -713,13 +727,14 @@ inline func transfer_buffers__vblank() {
 }
 
 
-// Returns true if the second layer is not part of the room.
+// Returns true if the second layer is part of the room.
 //
 // DB = 0x7e
 #[mem8]
-inline func is_not_part_of_room() : bool in zero{
-    a = sl_data.partOfRoom;
-    return zero;
+inline func is_part_of_room() : bool in negative {
+    // Assumes flags.PART_OF_ROOM_BIT == 7
+    bit(sl_data.flags);
+    return negative;
 }
 
 
@@ -759,8 +774,8 @@ func scroll_tilemap() {
     // Forbid `scroll_tilemap()` if either:
     //  * partOfRoom is set
     //  * the buffers are populated
-    a = sl_data.partOfRoom | bufferState;
-    if !zero {
+    a = bufferState;
+    if !zero || sl_data.flags $ flags.PART_OF_ROOM_BIT {
         return;
     }
 

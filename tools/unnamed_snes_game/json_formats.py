@@ -1113,6 +1113,7 @@ class SecondLayerInput(NamedTuple):
     source: Filename
     palette: Name
     tile_priority: bool
+    above_metatiles: bool
     part_of_room: bool
     callback: Name
     parameters: dict[Name, str]
@@ -1175,6 +1176,7 @@ def load_other_resources_json(filename: Filename) -> OtherResources:
             palette=t.get_name("palette"),
             tile_priority=t.get_int1("tile_priority"),
             part_of_room=t.get_bool("part_of_room"),
+            above_metatiles=t.get_bool("above_metatiles"),
             callback=t.get_name("callback"),
             parameters=t.get_parameter_dict("parameters"),
         ),

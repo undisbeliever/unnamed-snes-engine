@@ -82,8 +82,8 @@ inline func setup_ppu() {
     // ::TODO move elsewhere::
     mem16();
     #[mem16] {
-        bg1_scrollX = 0;
-        bg1_scrollY = 0;
+        bgA_scroll_x = 0;
+        bgA_scroll_y = 0;
     }
     mem8();
 
