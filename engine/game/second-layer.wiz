@@ -113,6 +113,11 @@ struct _RamDataFormat {
 // Storing variables in lowram so they can be accessed by setup (DB=0x80) and process (DB=0x7e).
 // NOTE: These variables MUST NOT be modified by the sl_callback
 in lowram {
+    // Range of memory addresses to clear in `init_and_draw__forceblank__inline()`
+    let __LOWRAM_VARS_START = far &right as *u8;
+    let __LOWRAM_VARS_SIZE = (&_lowramEndVariable as u16) - (__LOWRAM_VARS_START as u16) + 1;
+
+
     // The rightmost position
     var right : u16;
 
@@ -222,6 +227,8 @@ in lowram {
         // Used because `yScrollShadow` might be changed outside this subsystem.
         var viewportYOffset : u16;
     }
+
+    var _lowramEndVariable : u8;
 }
 
 in wram7e {
@@ -350,11 +357,16 @@ namespace __init_and_draw_fullscreen {
     // DB = 0x80
     #[mem8, idx16]
     inline func init_and_draw__forceblank__inline() {
+        // zero lowram variables
+        xx = __LOWRAM_VARS_SIZE - 1;
+        do {
+            __LOWRAM_VARS_START[unaligned xx] = 0;
+            xx--;
+        } while !negative;
+
+
         VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
         VMADD = xx = VRAM_SECOND_LAYER_MAP_WADDR;
-
-        bufferState = 0;
-        skipFlags = 0;
 
         var __sl_data_flags @ &__far_sl_data.flags : u8;
         _flags = a = *(far &__sl_data_flags);
@@ -449,8 +461,7 @@ namespace __init_and_draw_fullscreen {
     // DB = 0x80
     #[mem16, idx8]
     inline func __init_state__normal__inline() {
-        vertical_buffer.cursor = 0;
-        horizontal_buffer.cursor = 0;
+        // Note: horizontal_buffer and vertical_buffer state variables have been reset to 0
 
         x = __clamp_pos(&sl_callbacks.xPos_px, &right, &vertical_buffer.maskedPrevXPos, VIEWPORT_X_OFFSET_PX);
         y = _mapWidth;
@@ -519,14 +530,13 @@ namespace __init_and_draw_fullscreen {
         }
         _tilePos_y = y;
 
+        // Note: horizontal_buffer and vertical_buffer state variables have been reset to 0
+
         xScrollShadow = 0;
-        vertical_buffer.viewportXOffset = 0;
-        vertical_buffer.cursor = 0;
 
         aa = -1 as u16;
         yScrollShadow = aa;
         horizontal_buffer.viewportYOffset = aa;
-        horizontal_buffer.cursor = 0;
     }
 
 
@@ -582,9 +592,7 @@ namespace __init_and_draw_fullscreen {
     inline func __draw_tilemaps__part_of_room__forceblank__inline() {
         __draw_nametable__forceblank(_tilePos_x);
 
-        xx = 0;
-        mapSeam_x = xx;
-        mapSeam_y = xx;
+        // No need to set `mapSeam`, mapSeam has been reset to 0
     }
 
 
