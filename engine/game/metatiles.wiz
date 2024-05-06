@@ -5,6 +5,7 @@ import "src/memmap";
 import "../registers";
 
 import "room";
+import "../vram-map";
 import "../wait-frame";
 import "../resources/dma";
 import "../resources/resources";
@@ -152,7 +153,7 @@ var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
     _ppuData = resources.load_resource__fixed_ram_and_ppu_data__forceblank_inline(resources.ResourceType.mt_tileset, a, &mt_data as *u8, sizeof(typeof(mt_data)));
 
     // Transfer tiles to VRAM
-    VMADD = xx = VRAM_BG1_TILES_WADDR;
+    VMADD = xx = VRAM_MTSL_TILES_WADDR;
     resources.dma_remaining_to_vram__forceblank(_ppuData);
 
     // Transfer palette (must be done after resources data is processed);
@@ -176,8 +177,8 @@ var _columnsLeft : u8 in zpTmp_byte_1;
     INIDISP = a = INIDISP_FORCE_BLANK | INIDISP_BRIGHTNESS_MASK;
 
     VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
-    VMADDL = <:VRAM_BG1_MAP_WADDR;
-    VMADDH = >:VRAM_BG1_MAP_WADDR;
+    VMADDL = <:VRAM_METATILE_MAP_WADDR;
+    VMADDH = >:VRAM_METATILE_MAP_WADDR;
 
 
 
@@ -1443,7 +1444,7 @@ inline func _reset_state() {
     mem16();
     #[mem16] {
         vramVerticalWoffset = 0;
-        currentTilemap_vramWaddr = VRAM_BG1_MAP_WADDR;
+        currentTilemap_vramWaddr = VRAM_METATILE_MAP_WADDR;
 
         // Reset BG1 scroll
         bg1_scrollX = 0;
@@ -1464,11 +1465,11 @@ inline func _reset_state() {
 #[mem8, idx8]
 func swap_currentTilemap() {
     a = *(&>:currentTilemap_vramWaddr as *u8);
-    if a == >:VRAM_BG1_MAP_WADDR {
-        a = >:(VRAM_BG1_MAP_WADDR + 0x400);
+    if a == >:VRAM_METATILE_MAP_WADDR {
+        a = >:(VRAM_METATILE_MAP_WADDR + 0x400);
     }
     else {
-        a = >:VRAM_BG1_MAP_WADDR;
+        a = >:VRAM_METATILE_MAP_WADDR;
     }
 
     *(&>:currentTilemap_vramWaddr as *u8) = a;
@@ -1565,7 +1566,7 @@ func scroll_right__setup() {
     let VRAM_OFFSET = 0;
 
     // Subtract one to counter the +1 at the start of `right__process()`
-    *(&<:buffer_vramWordPos as *u8) = a = <:(VRAM_BG1_MAP_WADDR + VRAM_OFFSET - 1);
+    *(&<:buffer_vramWordPos as *u8) = a = <:(VRAM_METATILE_MAP_WADDR + VRAM_OFFSET - 1);
 
     *(&>:buffer_vramWordPos as *u8) = a = *(&>:currentTilemap_vramWaddr as *u8);
 }
@@ -1652,7 +1653,7 @@ func scroll_left__setup() {
     let VRAM_OFFSET = 31;
 
     // Add one to counter the -1 at the start of `left__process()`
-    *(&<:buffer_vramWordPos as *u8) = a = <:(VRAM_BG1_MAP_WADDR + VRAM_OFFSET + 1);
+    *(&<:buffer_vramWordPos as *u8) = a = <:(VRAM_METATILE_MAP_WADDR + VRAM_OFFSET + 1);
 
     *(&>:buffer_vramWordPos as *u8) = a = *(&>:currentTilemap_vramWaddr as *u8);
 }

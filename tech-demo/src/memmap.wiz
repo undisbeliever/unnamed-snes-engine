@@ -85,19 +85,3 @@ in zeropage {
     var zpTmp_farPtr : far *u8;
 }
 
-
-// VRAM Map
-// ========
-
-let VRAM_BG1_MAP_WADDR   = 0x0000;  // 64x32
-let VRAM_BG2_MAP_WADDR   = 0x0800;  // 64x32
-
-let VRAM_BG3_TILES_WADDR = 0x1000;
-let VRAM_BG3_MAP_WADDR   = 0x1c00;  // 32x32
-
-let VRAM_BG1_TILES_WADDR = 0x2000;
-let VRAM_BG2_TILES_WADDR = 0x2000;
-
-let VRAM_OBJ_WADDR       = 0x6000;
-
-

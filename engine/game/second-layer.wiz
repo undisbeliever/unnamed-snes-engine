@@ -2,6 +2,7 @@
 // Distributed under The MIT License, see the LICENSE file for more details.
 
 import "src/memmap";
+import "../vram-map";
 import "../registers";
 import "../registers_math.wiz";
 import "../wait-frame";
@@ -302,7 +303,7 @@ var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
     // Second Layer tiles are loaded at the end of the BG1 tile block.
     mem16();
     #[mem16] {
-        VMADD = aa = ((VRAM_BG1_TILES_WADDR * 2 + MAX_TILES_PER_BG * 32) - _ppuData.remaining) >>> 1;
+        VMADD = aa = ((VRAM_MTSL_TILES_WADDR * 2 + MAX_TILES_PER_BG * 32) - _ppuData.remaining) >>> 1;
     }
     mem8();
 
@@ -338,7 +339,7 @@ namespace __init_and_draw_fullscreen {
     #[mem8, idx16]
     inline func init_and_draw__forceblank__inline() {
         VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
-        VMADD = xx = VRAM_BG2_MAP_WADDR;
+        VMADD = xx = VRAM_SECOND_LAYER_MAP_WADDR;
 
         bufferState = 0;
         skipFlags = 0;
@@ -899,7 +900,7 @@ namespace vertical_buffer {
         if aa & 32 != 0 {
             aa ^= 32 | NAMETABLE_WORD_SIZE;
         }
-        vramWordAddr = aa = aa | VRAM_BG2_MAP_WADDR;
+        vramWordAddr = aa = aa | VRAM_SECOND_LAYER_MAP_WADDR;
 
         aa = 1 << BUFFER_STATE__VERTICAL_BIT;
         test_and_set(*(&bufferState as *u16), aa);
@@ -1078,7 +1079,7 @@ namespace horizontal_buffer {
 
         // Assumes VRAM_BG2_MAP_WADDR is a multiple of 0x800.
         aa &= (VRAM_TILEMAP_V_TILE_HEIGHT - 1);
-        vramWordAddr1 = aa = (aa <<< 5) | VRAM_BG2_MAP_WADDR;
+        vramWordAddr1 = aa = (aa <<< 5) | VRAM_SECOND_LAYER_MAP_WADDR;
         vramWordAddr2 = aa = aa | NAMETABLE_WORD_SIZE;
 
         aa = 1 << BUFFER_STATE__HORIZONTAL_BIT;

@@ -19,6 +19,10 @@ import "gen/enums";
 namespace gamemodes {
 namespace title_screen {
 
+let VRAM_BG1_MAP_WADDR   = 0x0000;
+let VRAM_BG1_TILES_WADDR = 0x2000;
+
+
 in code {
 
 

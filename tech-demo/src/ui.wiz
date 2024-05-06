@@ -6,6 +6,7 @@ import "engine/registers";
 
 import "player";
 
+import "engine/vram-map";
 import "engine/audio";
 import "engine/game/gamestate";
 import "engine/resources/dma";

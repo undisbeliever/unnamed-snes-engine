@@ -4,6 +4,7 @@
 import "src/memmap";
 import "../registers";
 
+import "../vram-map";
 import "../resources/dma";
 import "../resources/resources";
 import "../common/math";
