@@ -49,17 +49,20 @@ func init() {
 // DB = 0x7e
 #[mem8, idx8]
 func process() {
-    mem16();
-    #[mem16] {
-        xPos_sx = aa = xPos_sx + xVelocity_sx;
-        xPos_px = aa = xPos_px +# xVelocity_px;
+    a = parameter__stationary_sl;
+    if zero {
+        mem16();
+        #[mem16] {
+            xPos_sx = aa = xPos_sx + xVelocity_sx;
+            xPos_px = aa = xPos_px +# xVelocity_px;
 
-        yPos_sx = aa = yPos_sx + yVelocity_sx;
-        yPos_px = aa = yPos_px +# yVelocity_px;
+            yPos_sx = aa = yPos_sx + yVelocity_sx;
+            yPos_px = aa = yPos_px +# yVelocity_px;
+        }
+        mem8();
+
+        ^return scroll_tilemap();
     }
-    mem8();
-
-    ^return scroll_tilemap();
 }
 
 }

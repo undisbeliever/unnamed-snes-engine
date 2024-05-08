@@ -11,6 +11,7 @@ from typing import Callable, Final, NamedTuple, Optional
 
 # Mapping of parameter types to wiz types
 PARAM_TYPES: Final = {
+    "bool": "u8",
     "u8": "u8",
     "u8pos": "U8Position",
     "u16": "u16",
@@ -23,6 +24,7 @@ PARAM_TYPES: Final = {
 
 # Size of each parameter type in bytes
 PARAM_SIZE: Final = {
+    "bool": 1,
     "u8": 1,
     "u8pos": 2,
     "u16": 2,
@@ -57,6 +59,31 @@ ROOM_CALLBACK: Final = CallbackType(
 SL_CALLBACK_PARAMETERS: Final = CallbackType(
     "sl parameters", "second_layer.sl_parameters", 8, lambda c: c.sl_parameters if isinstance(c, SecondLayerCallback) else None
 )
+
+SL_ROOM_PARAMETERS: Final = CallbackType(
+    "sl room parameters", "room.sl_parameters", 2, lambda c: c.room_parameters if isinstance(c, SecondLayerCallback) else None
+)
+
+
+def parse_bool(value: str, error_list: list[str]) -> int:
+    v = BOOL_VALUES.get(value)
+
+    if v is None:
+        error_list.append("Unknown bool value: {value}")
+        return 0
+    elif v:
+        return 0xFF
+    else:
+        return 0
+
+
+BOOL_VALUES: Final[dict[str, bool]] = {
+    "": False,
+    "0": False,
+    "1": True,
+    "false": False,
+    "true": True,
+}
 
 
 def parse_int(value: str, max_value: int, error_list: list[str]) -> int:
@@ -184,6 +211,8 @@ def parse_callback_parameters(
         else:
             if not value:
                 error_list.append(f"{ callback_type.human_name } {callback.name}: Missing parameter {p.name}")
+            elif p.type == "bool":
+                out.append(parse_bool(value, error_list))
             elif p.type == "u8":
                 out.append(parse_int(value, 0xFF, error_list))
             elif p.type == "u8pos":

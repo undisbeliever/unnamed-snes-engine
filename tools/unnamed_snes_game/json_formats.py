@@ -598,6 +598,7 @@ def load_ms_export_order_json(filename: Filename) -> MsExportOrder:
 MAX_N_CALLBACKS = 128
 MAX_ROOM_EVENT_PARAMETERS = 4
 MAX_SL_CALLBACK_PARAMETERS = 8
+MAX_SL_ROOM_PARAMETERS = 2
 
 # GAME_MODES > 128 mean the next game mode is unchanged.
 MAX_GAME_MODES = 128
@@ -633,8 +634,8 @@ class SecondLayerCallback(NamedTuple):
     id: int
     source: str
     sl_parameters: list[CallbackParameter]
+    room_parameters: list[CallbackParameter]
     # ::TODO add world parameters::
-    # ::TODO add room parameters::
 
 
 Callback = Union[RoomEvent, SecondLayerCallback]
@@ -735,6 +736,7 @@ class _Mappings_Helper(_Helper):
                 id=i,
                 source=rj.get_string("source"),
                 sl_parameters=rj.get_callback_parameters("sl_parameters", MAX_SL_CALLBACK_PARAMETERS),
+                room_parameters=rj.get_callback_parameters("room_parameters", MAX_SL_ROOM_PARAMETERS),
             ),
         )
         # ::TODO detect duplicates in callback parameters::

@@ -21,14 +21,14 @@ from .mt_tileset import convert_mt_tileset
 from .second_layers import convert_second_layer
 from .palette import convert_palette, PaletteColors
 from .metasprite import convert_static_spritesheet, convert_dynamic_spritesheet, build_ms_fs_data, MsFsEntry, DynamicMsSpritesheet
-from .rooms import get_list_of_tmx_files, extract_room_id, compile_room
+from .rooms import get_list_of_tmx_files, extract_room_id, compile_room, RoomDependencies
 from .other_resources import convert_tiles, convert_bg_image
 from .audio import AudioCompiler, COMMON_AUDIO_DATA_RESOURCE_NAME
 
 from .json_formats import load_mappings_json, load_entities_json, load_ms_export_order_json, load_other_resources_json
 from .json_formats import load_metasprites_json, load_audio_project
 from .json_formats import Name, ScopedName, Filename, JsonError, MemoryMap, Mappings, EntitiesJson
-from .json_formats import MsExportOrder, OtherResources, TilesInput, BackgroundImageInput, AudioProject
+from .json_formats import MsExportOrder, OtherResources, SecondLayerCallback, TilesInput, BackgroundImageInput, AudioProject
 
 
 @unique
@@ -697,9 +697,23 @@ class RoomCompiler:
     def __init__(self, shared_input: SharedInput) -> None:
         self._shared_input: Final = shared_input
         self.resource_type: Final = None
+        self._room_dependencies: Optional[RoomDependencies] = None
 
-    SHARED_INPUTS = (SharedInputType.MAPPINGS, SharedInputType.ENTITIES)
+    SHARED_INPUTS = (SharedInputType.MAPPINGS, SharedInputType.ENTITIES, SharedInputType.OTHER_RESOURCES)
     USES_PALETTES = False
+
+    def shared_input_changed(self, s_type: SharedInputType) -> None:
+        if s_type == SharedInputType.MAPPINGS or s_type == SharedInputType.OTHER_RESOURCES:
+            self._room_dependencies = None
+            if self._shared_input.mappings and self._shared_input.other_resources:
+                # ::TODO get second-layers from dungeon::
+                sl = next(iter(self._shared_input.other_resources.second_layers.values()))
+
+                sl_callback = self._shared_input.mappings.sl_callbacks.get(sl.callback)
+                if sl_callback is None:
+                    raise RuntimeError(f"Unknown second-layer callback: {sl.callback}")
+
+                self._room_dependencies = RoomDependencies(sl, sl_callback)
 
     def compile_room(self, filename: Filename) -> BaseResourceData:
         assert self._shared_input.mappings
@@ -710,9 +724,12 @@ class RoomCompiler:
         name = os.path.splitext(basename)[0]
 
         try:
+            if self._room_dependencies is None:
+                raise RuntimeError("Dependency error")
+
             room_id = extract_room_id(basename)
             filename = os.path.join("rooms", basename)
-            data = compile_room(filename, self._shared_input.entities, self._shared_input.mappings)
+            data = compile_room(filename, self._room_dependencies, self._shared_input.entities, self._shared_input.mappings)
 
             return ResourceData(None, room_id, name, data)
         except Exception as e:
@@ -934,7 +951,17 @@ class ProjectCompiler:
 
         # Must be called after `c.update_name_list()`
         for c in self.__resource_compilers:
-            c.shared_input_changed(s_type)
+            try:
+                c.shared_input_changed(s_type)
+            except Exception as e:
+                self.log_error(e)
+                self.__shared_inputs_with_errors.add(s_type)
+
+        try:
+            self.__room_compiler.shared_input_changed(s_type)
+        except Exception as e:
+            self.log_error(e)
+            self.__shared_inputs_with_errors.add(s_type)
 
         if not self.__shared_inputs_with_errors:
             # No shared inputs have errors.

@@ -229,6 +229,14 @@
          "comment": "The y-velocity",
          "type": "sQ4_12"
        }
+     ],
+     "room_parameters": [
+       {
+         "name": "stationary_sl",
+         "comment": "If true, the second layer will not scroll for this room",
+         "type": "bool",
+         "default": "false"
+       }
      ]
    }
   ]

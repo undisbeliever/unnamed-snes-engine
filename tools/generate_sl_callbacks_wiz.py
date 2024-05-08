@@ -9,7 +9,7 @@ from io import StringIO
 from collections import OrderedDict
 
 from unnamed_snes_game.json_formats import load_mappings_json, Mappings, Name, SecondLayerCallback
-from unnamed_snes_game.callbacks import write_callback_parameters_wiz, SL_CALLBACK_PARAMETERS
+from unnamed_snes_game.callbacks import write_callback_parameters_wiz, SL_CALLBACK_PARAMETERS, SL_ROOM_PARAMETERS
 
 
 def generate_wiz_code(sl_callbacks: OrderedDict[Name, SecondLayerCallback]) -> str:
@@ -18,6 +18,7 @@ def generate_wiz_code(sl_callbacks: OrderedDict[Name, SecondLayerCallback]) -> s
             """
 import "src/memmap";
 import "engine/game/second-layer";
+import "engine/game/room";
 
 namespace sl_callbacks {
 
@@ -31,7 +32,7 @@ in lowram {
 """
         )
 
-        write_callback_parameters_wiz(out, sl_callbacks, SL_CALLBACK_PARAMETERS)
+        write_callback_parameters_wiz(out, sl_callbacks, SL_CALLBACK_PARAMETERS, SL_ROOM_PARAMETERS)
 
         out.write("}\n")
         out.write("}\n")

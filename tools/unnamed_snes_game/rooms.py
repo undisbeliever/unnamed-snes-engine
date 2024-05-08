@@ -14,9 +14,20 @@ import posixpath
 from collections import OrderedDict
 from typing import Final, NamedTuple, Optional, Union
 
-from .json_formats import load_entities_json, load_mappings_json, Filename, Mappings, EntitiesJson, Entity, Callback, Name
+from .json_formats import (
+    load_entities_json,
+    load_mappings_json,
+    Filename,
+    Mappings,
+    EntitiesJson,
+    Entity,
+    SecondLayerCallback,
+    Callback,
+    SecondLayerInput,
+    Name,
+)
 from .common import EngineData, FixedSizedData, MultilineError, SimpleMultilineError, print_error
-from .callbacks import parse_callback_parameters, ROOM_CALLBACK, RoomDoors, parse_int
+from .callbacks import parse_callback_parameters, ROOM_CALLBACK, SL_ROOM_PARAMETERS, RoomDoors, parse_int
 
 
 MAP_WIDTH = 16
@@ -32,6 +43,12 @@ TILE_SIZE = 16
 
 class RoomError(SimpleMultilineError):
     pass
+
+
+# Storing room dependencies in a NamedTuple as I am planning to add more in the future
+class RoomDependencies(NamedTuple):
+    second_layer: SecondLayerInput
+    sl_callback: SecondLayerCallback
 
 
 # `TmxMap` is a limited subset of the TMX data format (only supporting one map layer and tileset)
@@ -270,6 +287,7 @@ class RoomIntermediate(NamedTuple):
     entities: list[RoomEntity]
     room_event: Callback
     room_event_data: bytes
+    sl_parameters: bytes
 
 
 def process_room_entities(
@@ -342,7 +360,9 @@ LOCKED_DOOR_TILE_IDS: Final = (0x80, 0xA0, 0xC0, 0xE0)
 OPEN_DOOR_TILE_IDS: Final = (0x82, 0xA2, 0xC2, 0xE2)
 
 
-def process_room(tmx_map: TmxMap, mapping: Mappings, all_entities: OrderedDict[str, Entity]) -> RoomIntermediate:
+def process_room(
+    tmx_map: TmxMap, dependencies: RoomDependencies, mapping: Mappings, all_entities: OrderedDict[str, Entity]
+) -> RoomIntermediate:
     error_list: list[str] = list()
 
     try:
@@ -372,12 +392,16 @@ def process_room(tmx_map: TmxMap, mapping: Mappings, all_entities: OrderedDict[s
     else:
         room_event_data = parse_callback_parameters(ROOM_CALLBACK, room_event, tmx_map.parameters, mapping, room_doors, error_list)
 
+    sl_parameters = parse_callback_parameters(
+        SL_ROOM_PARAMETERS, dependencies.sl_callback, tmx_map.parameters, mapping, None, error_list
+    )
+
     if error_list:
         raise RoomError("Error compiling room", error_list)
 
     assert room_event is not None
 
-    return RoomIntermediate(map_data, tileset_id, room_entities, room_event, room_event_data)
+    return RoomIntermediate(map_data, tileset_id, room_entities, room_event, room_event_data, sl_parameters)
 
 
 def create_room_entities_soa(entities: list[RoomEntity]) -> bytes:
@@ -420,19 +444,20 @@ def create_map_data(room: RoomIntermediate) -> bytes:
     assert len(room.room_event_data) == 4
     data.append(room.room_event.id * 2)
     data += room.room_event_data
+    data += room.sl_parameters
 
     data += create_room_entities_soa(room.entities)
 
     return data
 
 
-def compile_room(filename: str, entities: EntitiesJson, mapping: Mappings) -> EngineData:
+def compile_room(filename: str, dependencies: RoomDependencies, entities: EntitiesJson, mapping: Mappings) -> EngineData:
     with open(filename, "r") as fp:
         tmx_et = xml.etree.ElementTree.parse(fp)
 
     tmx_map = parse_tmx_map(tmx_et)
 
-    room = process_room(tmx_map, mapping, entities.entities)
+    room = process_room(tmx_map, dependencies, mapping, entities.entities)
 
     map_data = create_map_data(room)
 
