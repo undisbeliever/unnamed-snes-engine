@@ -181,6 +181,10 @@ def convert_second_layer(sli: SecondLayerInput, palettes: dict[Name, PaletteColo
         sl_callback = mapping.sl_callbacks.get(sli.callback)
         if sl_callback is None:
             raise RuntimeError(f"Unknown sl_callback: {sli.callback}")
+
+        if sli.part_of_room and sl_callback.room_parameters:
+            error_list.append(f"part_of_room second-layer cannot use a callback that contains room_parameters")
+
         sl_callback_id = sl_callback.id
         callback_parameters = parse_callback_parameters(
             SL_CALLBACK_PARAMETERS, sl_callback, sli.parameters or {}, mapping, None, error_list

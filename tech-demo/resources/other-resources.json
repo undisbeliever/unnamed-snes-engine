@@ -68,15 +68,9 @@
       "source": "second-layers/scrolling-test.png",
       "palette": "dungeon",
       "tile_priority": 1,
-      "part_of_room": false,
-      "above_metatiles": true,
-      "callback": "fixed_velocity",
-      "parameters": {
-        "xPos": 88,
-        "yPos": 88,
-        "xVelocity": 1.125,
-        "yVelocity": -1.25
-      }
+      "part_of_room": true,
+      "default_room_pos": "0x28 0x19",
+      "above_metatiles": true
     }
   }
 }

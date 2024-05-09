@@ -7,6 +7,7 @@ import "../registers";
 import "../registers_math.wiz";
 import "../wait-frame";
 
+import "room";
 import "room-transitions";
 
 import "../resources/dma";
@@ -239,6 +240,7 @@ in wram7e {
 
     // Callback parameters
     const sl_parameters @ &sl_data.callback_parameters[0] : typeof(sl_data.callback_parameters);
+    const room_sl_parameters @ (far &__far_room) as u24 + offsetof(RoomData, sl_parameters) : typeof(room.sl_parameters);
 
     namespace vertical_buffer {
         var buffer : [u16 ; 32];
@@ -516,15 +518,16 @@ namespace __init_and_draw_fullscreen {
     // DB = 0x80
     #[mem16, idx8]
     inline func __init_state__part_of_room__inline() {
-        // ::TODO get tile position from room::
-        x = 0x28;
+        aa = *(far &room_sl_parameters as far *u16);
+        x = a;
+        swap_bytes(aa);
+        y = a;
+
         if x >= _mapWidth {
             x = 0;
         }
         _tilePos_x = x;
 
-        // ::TODO get tile position from room::
-        y = 0x18;
         if y >= _mapHeight {
             y = 0;
         }
@@ -1207,8 +1210,8 @@ namespace part_of_room {
     // DB = 0x7e
     #[mem8, idx8]
     func start_room_transition(scrollDirection : room_transitions.ScrollDirection in x) {
-        // ::TODO get x position from room::
-        a = 0x28;
+        // second layer x tile position
+        a = room_sl_parameters[0];
         if a >= sl_data.width {
             a = 0;
         }
@@ -1231,8 +1234,8 @@ namespace part_of_room {
         y = a;
 
 
-        // ::TODO get y position from room::
-        a = 0x18;
+        // second layer y tile position
+        a = room_sl_parameters[1];
         if a >= sl_data.height {
             a = 0;
         }

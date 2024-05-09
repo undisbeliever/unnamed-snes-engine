@@ -22,6 +22,11 @@ class JsonError(FileError):
     pass
 
 
+class Position(NamedTuple):
+    x: int
+    y: int
+
+
 class _Helper:
     """
     A helper class to help parse the output of `json.load()` into structured data.
@@ -218,6 +223,28 @@ class _Helper:
         elif i == 1:
             return True
         self._raise_error(f"Expected a 1 or a 0: { i }", key)
+
+    def get_optional_u8_position(self, key: str) -> Optional[Position]:
+        v = self._optional_get2(key, str, list)
+        if v is None:
+            return None
+
+        if isinstance(v, str):
+            v = v.split()
+
+        if len(v) != 2:
+            self._raise_error("u8 position requires 2 integers", key)
+
+        try:
+            v1 = int(v[0], 0)
+            v2 = int(v[1], 0)
+        except ValueError:
+            self._raise_error("A u8 position requires 2 integers", key)
+
+        if v1 < 0 or v1 > 0xFF or v2 < 0 or v2 > 0xFF:
+            self._raise_error(f"u8 position out of bounds: {v1} {v2}", key)
+
+        return Position(v1, v2)
 
     def get_object_size(self, key: str) -> Literal[8, 16]:
         i = self.get_int(key)
@@ -1123,6 +1150,7 @@ class SecondLayerInput(NamedTuple):
     tile_priority: bool
     above_metatiles: bool
     part_of_room: bool
+    default_room_pos: Optional[Position]  # Used if `part_of_room` is True and the room does not have a <imagelayer>
     callback: Optional[Name]
     parameters: Optional[dict[Name, str]]
 
@@ -1184,6 +1212,7 @@ def load_other_resources_json(filename: Filename) -> OtherResources:
             palette=t.get_name("palette"),
             tile_priority=t.get_int1("tile_priority"),
             part_of_room=t.get_bool("part_of_room"),
+            default_room_pos=t.get_optional_u8_position("default_room_pos"),
             above_metatiles=t.get_bool("above_metatiles"),
             callback=t.get_optional_name("callback"),
             parameters=t.get_optional_parameter_dict("parameters"),
