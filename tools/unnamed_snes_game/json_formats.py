@@ -300,6 +300,12 @@ class _Helper:
 
         return out
 
+    def get_optional_parameter_dict(self, key: str) -> Optional[dict[Name, str]]:
+        if key in self.__dict:
+            return self.get_parameter_dict(key)
+        else:
+            return None
+
     def _test_name(self, s: Any, *path: str) -> Name:
         if not isinstance(s, str):
             self._raise_error("Expected a string", *path)
@@ -733,7 +739,7 @@ class _Mappings_Helper(_Helper):
             MAX_N_CALLBACKS,
             lambda rj, name, i: SecondLayerCallback(
                 name=name,
-                id=i,
+                id=i + 1,  # 0 is null
                 source=rj.get_string("source"),
                 sl_parameters=rj.get_callback_parameters("sl_parameters", MAX_SL_CALLBACK_PARAMETERS),
                 room_parameters=rj.get_callback_parameters("room_parameters", MAX_SL_ROOM_PARAMETERS),
@@ -1117,8 +1123,8 @@ class SecondLayerInput(NamedTuple):
     tile_priority: bool
     above_metatiles: bool
     part_of_room: bool
-    callback: Name
-    parameters: dict[Name, str]
+    callback: Optional[Name]
+    parameters: Optional[dict[Name, str]]
 
 
 class OtherResources(NamedTuple):
@@ -1179,8 +1185,8 @@ def load_other_resources_json(filename: Filename) -> OtherResources:
             tile_priority=t.get_int1("tile_priority"),
             part_of_room=t.get_bool("part_of_room"),
             above_metatiles=t.get_bool("above_metatiles"),
-            callback=t.get_name("callback"),
-            parameters=t.get_parameter_dict("parameters"),
+            callback=t.get_optional_name("callback"),
+            parameters=t.get_optional_parameter_dict("parameters"),
         ),
     )
 

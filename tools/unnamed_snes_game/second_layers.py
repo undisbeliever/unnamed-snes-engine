@@ -37,6 +37,8 @@ N_SL_METATILES: Final = 256
 
 MAX_SL_CELLS: Final = 10 * 1024
 
+BLANK_CALLBACK_PARAMETERS: Final = bytes(SL_CALLBACK_PARAMETERS.parameter_size)
+
 
 class SlFlags(IntFlag):
     PART_OF_ROOM = 0x80
@@ -173,12 +175,19 @@ def convert_second_layer(sli: SecondLayerInput, palettes: dict[Name, PaletteColo
     if sli.above_metatiles:
         flags |= SlFlags.ABOVE_METATILES
 
-    sl_callback = mapping.sl_callbacks.get(sli.callback)
-    if sl_callback is None:
-        raise RuntimeError(f"Unknown sl_callback: {sli.callback}")
-
     error_list: list[str] = list()
-    callback_parameters = parse_callback_parameters(SL_CALLBACK_PARAMETERS, sl_callback, sli.parameters, mapping, None, error_list)
+
+    if sli.callback:
+        sl_callback = mapping.sl_callbacks.get(sli.callback)
+        if sl_callback is None:
+            raise RuntimeError(f"Unknown sl_callback: {sli.callback}")
+        sl_callback_id = sl_callback.id
+        callback_parameters = parse_callback_parameters(
+            SL_CALLBACK_PARAMETERS, sl_callback, sli.parameters or {}, mapping, None, error_list
+        )
+    else:
+        sl_callback_id = 0
+        callback_parameters = BLANK_CALLBACK_PARAMETERS
 
     if error_list:
         raise SimpleMultilineError("Error compiling second layer", error_list)
@@ -195,7 +204,7 @@ def convert_second_layer(sli: SecondLayerInput, palettes: dict[Name, PaletteColo
                 sl.width,
                 sl.height,
                 flags,
-                sl_callback.id * 2,
+                sl_callback_id * 2,
             ]
         )
         + callback_parameters

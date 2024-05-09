@@ -58,5 +58,11 @@ in lowram {
 
 let scroll_tilemap = second_layer.scroll_tilemap;
 
+
+in code {
+    // Blank function
+    func null_function() {}
+}
+
 }
 

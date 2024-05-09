@@ -40,6 +40,8 @@ ENTITIES_IN_MAP = 8
 
 TILE_SIZE = 16
 
+BLANK_SL_PARAMETERS: Final = bytes(SL_ROOM_PARAMETERS.parameter_size)
+
 
 class RoomError(SimpleMultilineError):
     pass
@@ -48,7 +50,7 @@ class RoomError(SimpleMultilineError):
 # Storing room dependencies in a NamedTuple as I am planning to add more in the future
 class RoomDependencies(NamedTuple):
     second_layer: SecondLayerInput
-    sl_callback: SecondLayerCallback
+    sl_callback: Optional[SecondLayerCallback]
 
 
 # `TmxMap` is a limited subset of the TMX data format (only supporting one map layer and tileset)
@@ -392,9 +394,12 @@ def process_room(
     else:
         room_event_data = parse_callback_parameters(ROOM_CALLBACK, room_event, tmx_map.parameters, mapping, room_doors, error_list)
 
-    sl_parameters = parse_callback_parameters(
-        SL_ROOM_PARAMETERS, dependencies.sl_callback, tmx_map.parameters, mapping, None, error_list
-    )
+    if dependencies.sl_callback:
+        sl_parameters = parse_callback_parameters(
+            SL_ROOM_PARAMETERS, dependencies.sl_callback, tmx_map.parameters, mapping, None, error_list
+        )
+    else:
+        sl_parameters = BLANK_SL_PARAMETERS
 
     if error_list:
         raise RoomError("Error compiling room", error_list)

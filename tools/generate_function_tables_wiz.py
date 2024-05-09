@@ -126,11 +126,13 @@ def room_events_table(out: StringIO, room_events: OrderedDict[Name, RoomEvent]) 
 
 
 def second_layers_table(out: StringIO, sl_callbacks: OrderedDict[Name, SecondLayerCallback]) -> None:
-    n_functions: Final = len(sl_callbacks)
+    n_functions: Final = len(sl_callbacks) + 1
 
     def generate_table(table_name: str, fn_type: str, fn_name: str) -> None:
         out.write(f"const { table_name } : [ { fn_type } ; { n_functions } ] = [\n")
-        for e in sl_callbacks.values():
+        out.write("  sl_callbacks.null_function,\n")
+        for i, e in enumerate(sl_callbacks.values(), 1):
+            assert e.id == i
             out.write(f"  sl_callbacks.{ e.name }.{ fn_name },\n")
         out.write("];\n\n")
 
