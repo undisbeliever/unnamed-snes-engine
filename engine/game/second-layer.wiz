@@ -285,7 +285,7 @@ func setup__forceblank__inline(second_layer_id : u8 in a) {
     mem8_idx8();
     #[mem8, idx8] {
         a = sl_data.callback_index;
-        if a >= sl_callbacks.N_SECOND_LAYER_FUNCTIONS {
+        if a >= sl_callbacks.N_SECOND_LAYER_FUNCTIONS * 2 {
             a = 0;
         }
         a &= (0xff - 1);
