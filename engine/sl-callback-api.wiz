@@ -3,6 +3,7 @@
 
 import "src/memmap";
 
+import "entity_api";
 import "engine/game/second-layer";
 
 
@@ -50,6 +51,11 @@ in lowram {
 
     const xScrollShadow @ &second_layer.xScrollShadow : u16;
     const yScrollShadow @ &second_layer.yScrollShadow : u16;
+}
+
+in wram7e_roomstate {
+    const player_xPos_px @ &player.xPos.px : u8;
+    const player_yPos_px @ &player.yPos.px : u8;
 }
 
 
