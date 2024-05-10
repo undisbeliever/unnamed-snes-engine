@@ -111,6 +111,10 @@ struct _RamDataFormat {
     map: [u8; MAX_SL_MAP_CELLS]
 };
 
+// The number of bytes in _RamDataFormat before the SL MetaTile and map data.
+let SL_DATA_HEADER_SIZE = offsetof(_RamDataFormat, mt_top_left);
+
+
 // Storing variables in lowram so they can be accessed by setup (DB=0x80) and process (DB=0x7e).
 // NOTE: These variables MUST NOT be modified by the sl_callback
 in lowram {
@@ -260,13 +264,22 @@ in code {
 
 // Load the second-layer into memory and draw second-layer to the tilemap in VRAM.
 //
+// If `second_layer_id >= N_SECOND_LAYERS`, the second layer is disabled and
+// will not be loaded.
+//
 // REQUIRES: Force-Blank
 // REQUIRES: Room loaded
 // Uses DMA channel 0
 //
+// Return true second_layer_id is valid and the second layer is loaded.
+//
 // DB = 0x80
 #[mem8, idx16]
-func setup__forceblank__inline(second_layer_id : u8 in a) {
+func setup__forceblank__inline(second_layer_id : u8 in a) : bool in carry {
+    if a >= resources.N_SECOND_LAYERS {
+        __clear_sl_data_header__inline();
+        return false;
+    }
     load_second_layer__forceblank__inline(a);
 
     push16(0x807e);
@@ -302,6 +315,24 @@ func setup__forceblank__inline(second_layer_id : u8 in a) {
 // DB = 0x80
 
     __init_and_draw_fullscreen.init_and_draw__forceblank__inline();
+
+    return true;
+}
+
+
+// Clear the first section of `sl_data`.
+//
+// This will reset `callback_index` to null and `flags` to 0.
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func __clear_sl_data_header__inline() {
+    a = 0;
+    xx = SL_DATA_HEADER_SIZE - 1;
+    do {
+        (far &__far_sl_data as far* u8)[xx] = a;
+        xx--;
+    } while !negative;
 }
 
 

@@ -82,6 +82,7 @@ def generate_wiz_code(mappings: Mappings, audio_project: AudioProject) -> str:
         out.write(f"let _USB2SNES_DATA_ADDR = { resources_over_usb2snes_data_addr(mappings.memory_map) };\n")
         out.write(f"let _BANK_SIZE = { mappings.memory_map.mode.bank_size };\n\n")
 
+        out.write(f"let N_SECOND_LAYERS = { len(mappings.second_layers) };\n\n")
         out.write(f"let N_SONGS = { len(mappings.songs) };\n\n")
 
         out.write("let n_resources_per_type = [")

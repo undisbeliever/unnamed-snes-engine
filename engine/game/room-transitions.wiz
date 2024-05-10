@@ -460,9 +460,6 @@ inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
         #[idx16] {
             metatiles.load_tileset__forceblank(room.tileset);
 
-            // ::TODO get second_layer id from room data::
-            second_layer.setup__forceblank__inline(0);
-
             metasprites.setup__forceblank();
 
             // ::TODO get spritesheet_id from somewhere::
@@ -471,8 +468,18 @@ inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
             textbox.setup_ppu__forceblank();
 
             engine_hooks.room_transitions__setup_ppu__forceblank();
+
+            // ::TODO get second_layer id from room data::
+            carry = second_layer.setup__forceblank__inline(0xff);
         }
         idx8();
+
+        // second-layer is disabled if carry is false (`second_layer_id` was invalid).
+        a = TM_BG1 | TM_BG3 | TM_OBJ;
+        if carry {
+            a = TM_BG1 | TM_BG2 | TM_BG3 | TM_OBJ;
+        }
+        TM = a;
 
 
         // Setup VRAM MAP
@@ -499,8 +506,6 @@ inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
         BG12NBA = a =   ((VRAM_MTSL_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG1_SHIFT)
                       | ((VRAM_MTSL_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG2_SHIFT);
         BG34NBA = a = ((VRAM_BG3_TILES_WADDR / BG34NBA_WALIGN) << BG34NBA_BG3_SHIFT);
-
-        TM = a = TM_BG1 | TM_BG2 | TM_BG3 | TM_OBJ;
     }
 
 
