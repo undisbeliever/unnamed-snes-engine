@@ -497,6 +497,7 @@ namespace __init_and_draw_fullscreen {
 
             x = y = 0;
             aa = sl_callbacks.yPos_px;
+            aa--;
         }
         else {
             y = VIEWPORT_Y_OFFSET_PX - 1;
