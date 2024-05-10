@@ -42,9 +42,20 @@ class TileMap(NamedTuple):
         return self.grid[x + y * self.width]
 
 
+class ConstSmallTileMap:
+    def __init__(self, tile_map: dict[SmallTileData, tuple[int, bool, bool]]) -> None:
+        self.__tile_map: Final = tile_map
+
+    def get(self, tile_data: SmallTileData) -> Optional[tuple[int, bool, bool]]:
+        return self.__tile_map.get(tile_data)
+
+
 class AbstractTilesetMap(ABC):
     def __init__(self) -> None:
         self._map: Final[dict[SmallTileData, tuple[int, bool, bool]]] = {}
+
+    def const_map(self) -> ConstSmallTileMap:
+        return ConstSmallTileMap(self._map)
 
     def _add_to_map(self, tile_data: SmallTileData, tile_id: int) -> tuple[int, bool, bool]:
         tile_match = tile_id, False, False

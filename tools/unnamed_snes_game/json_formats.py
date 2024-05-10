@@ -1149,6 +1149,7 @@ class SecondLayerInput(NamedTuple):
     palette: Name
     tile_priority: bool
     above_metatiles: bool
+    mt_tileset: Optional[Name]  # If defined, the second-layer will reuse tiles in a MetaTile Tileset
     part_of_room: bool
     default_room_pos: Optional[Position]  # Used if `part_of_room` is True and the room does not have a <imagelayer>
     callback: Optional[Name]
@@ -1211,9 +1212,10 @@ def load_other_resources_json(filename: Filename) -> OtherResources:
             source=os.path.join(dirname, t.get_filename("source")),
             palette=t.get_name("palette"),
             tile_priority=t.get_int1("tile_priority"),
+            above_metatiles=t.get_bool("above_metatiles"),
+            mt_tileset=t.get_optional_name("mt_tileset"),
             part_of_room=t.get_bool("part_of_room"),
             default_room_pos=t.get_optional_u8_position("default_room_pos"),
-            above_metatiles=t.get_bool("above_metatiles"),
             callback=t.get_optional_name("callback"),
             parameters=t.get_optional_parameter_dict("parameters"),
         ),

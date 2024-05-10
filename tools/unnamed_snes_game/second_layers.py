@@ -15,6 +15,7 @@ from .snes import (
     ImageError,
     SmallTileData,
     SmallColorTile,
+    ConstSmallTileMap,
     TileMapEntry,
     convert_snes_tileset,
     convert_tilemap_and_tileset,
@@ -48,11 +49,17 @@ class SlFlags(IntFlag):
 class SecondLayerTilesetMap(AbstractTilesetMap):
     N_BG_TILES: Final = 1024
 
-    def __init__(self) -> None:
+    def __init__(self, mt_tiles: Optional[ConstSmallTileMap]) -> None:
         super().__init__()
         self._tiles: Final[list[SmallTileData]] = []
+        self.__mt_tiles: Final = mt_tiles
 
     def get_or_insert(self, tile_data: SmallTileData) -> tuple[int, bool, bool]:
+        if self.__mt_tiles:
+            tile_match = self.__mt_tiles.get(tile_data)
+            if tile_match is not None:
+                return tile_match
+
         tile_match = self._map.get(tile_data, None)
         if tile_match is not None:
             return tile_match
@@ -74,7 +81,11 @@ class SecondLayerImage(NamedTuple):
 
 
 def convert_sl_image(
-    image: PIL.Image.Image, image_filename: Filename, tile_priority: bool, palette: PaletteColors
+    image: PIL.Image.Image,
+    image_filename: Filename,
+    tile_priority: bool,
+    palette: PaletteColors,
+    mt_tiles: Optional[ConstSmallTileMap],
 ) -> SecondLayerImage:
     if image.width % MT_TILE_PX != 0 or image.height % MT_TILE_PX != 0:
         raise ImageError(image_filename, f"Image is not a multiple of {MT_TILE_PX} in width or height")
@@ -87,7 +98,7 @@ def convert_sl_image(
 
     palettes_map = palette.create_map(SECOND_LAYER_BPP)
 
-    tileset: Final = SecondLayerTilesetMap()
+    tileset: Final = SecondLayerTilesetMap(mt_tiles)
     tilemap8: Final = convert_tilemap_and_tileset(
         extract_small_tile_grid(image), image_filename, tileset, palette.create_map(SECOND_LAYER_BPP), width8, height8
     )
@@ -146,17 +157,26 @@ def convert_sl_image(
     )
 
 
-def convert_second_layer(sli: SecondLayerInput, palettes: dict[Name, PaletteColors], mapping: Mappings) -> EngineData:
+def convert_second_layer(
+    sli: SecondLayerInput, palettes: dict[Name, PaletteColors], mt_tileset_tiles: dict[Name, ConstSmallTileMap], mapping: Mappings
+) -> EngineData:
     image_filename = sli.source
 
     pal = palettes.get(sli.palette)
     if pal is None:
         raise RuntimeError(f"Cannot load palette {sli.palette}")
 
+    mt_tiles = None
+    if sli.mt_tileset:
+        # ::TODO validate second-layer is loaded with the mt_tileset::
+        mt_tiles = mt_tileset_tiles.get(sli.mt_tileset)
+        if mt_tiles is None:
+            raise RuntimeError(f"Cannot load MetaTile tileset {sli.mt_tileset}")
+
     with PIL.Image.open(image_filename) as image:
         image.load()
 
-        sl = convert_sl_image(image, image_filename, sli.tile_priority, pal)
+        sl = convert_sl_image(image, image_filename, sli.tile_priority, pal, mt_tiles)
 
     if sl.width * sl.height > MAX_SL_CELLS:
         raise ImageError(image_filename, f"Image is too large ({sl.width * sl.height} cells, max: {MAX_SL_CELLS})")
