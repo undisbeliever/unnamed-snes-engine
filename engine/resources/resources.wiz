@@ -17,6 +17,7 @@ namespace resources {
 enum ResourceType : u8 {
   palette,
   mt_tileset,
+  second_layer,
   ms_spritesheet,
   tiles,
   bg_image,
@@ -122,6 +123,27 @@ inline func load_resource__fixed_ram_and_ppu_data__forceblank_inline(let rType: 
 }
 
 
+// Load a resource with dynamically sized RAM data and PPU data.
+//
+// LIFETIME: PPU data is only valid until the next `load_resource__*` call or non-resource DMA transfer.
+// REQUIRES: Force-Blank
+// USES: DMA Channel 0
+//
+// NOTE: This function will only load RAM data to wram bank $7e.
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func load_resource__dynamic_ram_and_ppu_data__forceblank_inline(let rType: ResourceType, resourceId : u8 in a, let wram_data_addr: *u8, let max_wram_data_size: u16) : PpuData_Dma0 in ppuData {
+    __load_resource(rType, a);
+
+    // a:xx = resource address
+    WMADDML = yy = wram_data_addr as u16;
+    __copy_dynamic_sized_data_and_prep_dynamic_sized_data(xx, a, max_wram_data_size);
+
+    return ppuData;
+}
+
+
 // Load a resource with only PPU data.
 //
 // LIFETIME: PPU data is only valid until the next `load_resource__*` call or non-resource DMA transfer.
@@ -207,6 +229,30 @@ var _tmp : u16 in zpTmp_word_0;
         a = _RE.addrBank[unaligned xx];
         xx = yy;
     }
+}
+
+
+// Copy fixed-size resource RAM data to Work-RAM and pre-load dynamic sized PPU data.
+//
+// Uses: DMA channel 0
+//
+// IN: WMADDML - the work RAM address to copy the RAM data to (NOTE: WMADDH will be set to 0 (bank $7e))
+// OUT: PpuData_Dma0 in ppuData
+//
+// DB = 0x80
+#[mem8, idx16, fallthrough]
+func __copy_dynamic_sized_data_and_prep_dynamic_sized_data(addr: u16 in xx, bankbyte: u8 in a, max_size: u16 in yy) {
+var _maxSize : u16 in zpTmp_word_0;
+
+    _maxSize = yy;
+
+    __read_dynamic_sized_data_size(xx, a);
+
+    if yy >= _maxSize {
+        yy = _maxSize;
+    }
+
+// Fallthrough
 }
 
 

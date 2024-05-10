@@ -25,6 +25,10 @@ struct RoomData {
     // The behaviour of these variables depends on `roomEventFunction`.
     roomEventParameters : [u8 ; 4],
 
+    // Second layer callback parameters.
+    // The behaviour of these variables depends on the current second-layer callback
+    sl_parameters : [u8 ; 2],
+
     // Entities in the map
     // (Structure of Arrays)
     // If the entity does not spawn then the array elements MUST be 0xff;

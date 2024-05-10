@@ -1,0 +1,74 @@
+// Copyright (c) 2024, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+
+import "entity_api";
+import "engine/game/second-layer";
+
+
+namespace sl_callbacks {
+
+// Variables
+// =========
+
+// Storing variables in lowram so they can be accessed by _draw_fullscreen (DB=0x80) and process (DB=0x7e).
+in lowram {
+    let __STATE_START_ADDR = far &xPos_sx as u24;
+
+    // The position of the second layer
+    // (signed Q16.16)
+    var xPos_sx : u16;
+    var xPos_px : u16;
+    var yPos_sx : u16;
+    var yPos_px : u16;
+
+
+    // Variable storage for the second layer callback.
+    // Reset to 0 before `setup__forceblank()` is called.
+    var var_0 : u16;
+    var var_1 : u16;
+    var var_2 : u16;
+    var var_3 : u16;
+    var var_4 : u16;
+    var var_5 : u16;
+    var var_6 : u16;
+    var var_7 : u16;
+
+    // must be even
+    let __STATE_SIZE = (&var_7 as u16 + 2) - (__STATE_START_ADDR as u16);
+}
+
+
+// Read-Only Variables
+// ===================
+in lowram {
+    const map_width @ &second_layer.sl_data.width : u16;
+    const map_height @ &second_layer.sl_data.height : u16;
+
+    const right @ &second_layer.right : u16;
+    const bottom @ &second_layer.bottom : u16;
+
+    const xScrollShadow @ &second_layer.xScrollShadow : u16;
+    const yScrollShadow @ &second_layer.yScrollShadow : u16;
+}
+
+in wram7e_roomstate {
+    const player_xPos_px @ &player.xPos.px : u8;
+    const player_yPos_px @ &player.yPos.px : u8;
+}
+
+
+// Functions that can be called by a second layer callback
+// =======================================================
+
+let scroll_tilemap = second_layer.scroll_tilemap;
+
+
+in code {
+    // Blank function
+    func null_function() {}
+}
+
+}
+

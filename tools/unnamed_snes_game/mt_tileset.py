@@ -11,7 +11,16 @@ from typing import Final, NamedTuple, Optional, TextIO
 
 from .json_formats import load_mappings_json, Filename, Mappings, Name
 from .palette import PaletteColors
-from .snes import image_and_palette_map_to_snes, TileMap, ImageError, InvalidTilesError
+from .snes import (
+    TileMap,
+    ConstSmallTileMap,
+    SmallTilesetMap,
+    ImageError,
+    InvalidTilesError,
+    extract_small_tile_grid,
+    convert_tilemap_and_tileset,
+    convert_snes_tileset,
+)
 from .common import FixedSizedData, DynamicSizedData, EngineData, SimpleMultilineError, print_error
 
 
@@ -293,7 +302,9 @@ def create_tileset_data(palette: PaletteColors, tile_data: bytes, metatile_map: 
     )
 
 
-def convert_mt_tileset(tsx_filename: Filename, mappings: Mappings, palettes: dict[Name, PaletteColors]) -> EngineData:
+def convert_mt_tileset(
+    tsx_filename: Filename, mappings: Mappings, palettes: dict[Name, PaletteColors]
+) -> tuple[EngineData, ConstSmallTileMap]:
     tsx_file = read_tsx_file(tsx_filename)
 
     with PIL.Image.open(tsx_file.image_filename) as image:
@@ -305,7 +316,12 @@ def convert_mt_tileset(tsx_filename: Filename, mappings: Mappings, palettes: dic
             raise RuntimeError(f"Cannot load palette: {tsx_file.palette}")
         palette_map = pal.create_map(TILE_DATA_BPP)
 
-        tilemap, tile_data = image_and_palette_map_to_snes(image, tsx_file.image_filename, palette_map, TILE_DATA_BPP)
+        tileset = SmallTilesetMap()
+        tilemap = convert_tilemap_and_tileset(
+            extract_small_tile_grid(image), tsx_file.image_filename, tileset, palette_map, image.width // 8, image.height // 8
+        )
+
+        tile_data = convert_snes_tileset(tileset.tiles(), TILE_DATA_BPP)
 
     error_list: list[str] = list()
 
@@ -315,4 +331,7 @@ def convert_mt_tileset(tsx_filename: Filename, mappings: Mappings, palettes: dic
     if error_list:
         raise TsxFileError(f"Error compiling { tsx_filename }", error_list)
 
-    return create_tileset_data(pal, tile_data, metatile_map, properties)
+    return (
+        create_tileset_data(pal, tile_data, metatile_map, properties),
+        tileset.const_map(),
+    )

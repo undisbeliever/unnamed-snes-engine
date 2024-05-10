@@ -95,8 +95,8 @@ inline func setup_ppu__credits() {
     // ::TODO move elsewhere::
     mem16();
     #[mem16] {
-        bg1_scrollX = 0;
-        bg1_scrollY = 0;
+        bgA_scroll_x = 0;
+        bgA_scroll_y = 0;
     }
     mem8();
 
@@ -144,10 +144,10 @@ inline func setup_ppu__licenses() {
     // ::TODO move elsewhere::
     mem16();
     #[mem16] {
-        bg1_scrollX = 0;
-        bg1_scrollY = 0;
-        bg2_scrollX = 0;
-        bg2_scrollY = 0;
+        bgA_scroll_x = 0;
+        bgA_scroll_y = 0;
+        bgB_scroll_x = 0;
+        bgB_scroll_y = 0;
     }
     mem8();
 
@@ -193,17 +193,17 @@ inline func process__licenses() {
 
     idx16();
     #[idx16] {
-        bg1_scrollY = xx = 0;
+        bgA_scroll_y = xx = 0;
 
         yy = 0;
 
         do {
-            bg2_scrollY = yy;
+            bgB_scroll_y = yy;
 
             wait_frame();
 
-            xx = bg1_scrollY;
-            yy = bg2_scrollY;
+            xx = bgA_scroll_y;
+            yy = bgB_scroll_y;
 
             a = joypad.current_h;
             if a & joypad.JOYH.LEFT != 0 {

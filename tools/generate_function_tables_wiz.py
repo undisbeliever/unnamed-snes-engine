@@ -15,7 +15,10 @@ from unnamed_snes_game.json_formats import (
     Name,
     Mappings,
     EntitiesJson,
-    EngineHookFunction,
+    Callback,
+    CallbackDict,
+    RoomEvent,
+    SecondLayerCallback,
     GameMode,
 )
 
@@ -88,17 +91,17 @@ def interactive_tiles_table(out: StringIO, interactive_tile_functions: list[str]
     out.write("}\n}\n\n")
 
 
-def room_events_imports(out: StringIO, room_events: OrderedDict[Name, EngineHookFunction]) -> None:
-    for e in room_events.values():
+def callback_imports(out: StringIO, callbacks: CallbackDict, src_dir: str) -> None:
+    for e in callbacks.values():
         if '"' in e.source:
             raise ValueError(f"Invalid source value for room event: {e.name}")
         if "/" not in e.source:
-            out.write(f'import "src/room-events/{e.source}";\n')
+            out.write(f'import "src/{src_dir}/{e.source}";\n')
         else:
             out.write(f'import "../{e.source}";\n')
 
 
-def room_events_table(out: StringIO, room_events: OrderedDict[Name, EngineHookFunction]) -> None:
+def room_events_table(out: StringIO, room_events: OrderedDict[Name, RoomEvent]) -> None:
     n_functions: Final = len(room_events)
 
     def generate_table(table_name: str, fn_type: str, fn_name: str) -> None:
@@ -117,6 +120,35 @@ def room_events_table(out: StringIO, room_events: OrderedDict[Name, EngineHookFu
     generate_table("init_function_table", "func()", "init")
 
     out.write("// Called once per frame\n")
+    generate_table("process_function_table", "func()", "process")
+
+    out.write("}\n\n")
+
+
+def second_layers_table(out: StringIO, sl_callbacks: OrderedDict[Name, SecondLayerCallback]) -> None:
+    n_functions: Final = len(sl_callbacks) + 1
+
+    def generate_table(table_name: str, fn_type: str, fn_name: str) -> None:
+        out.write(f"const { table_name } : [ { fn_type } ; { n_functions } ] = [\n")
+        out.write("  sl_callbacks.null_function,\n")
+        for i, e in enumerate(sl_callbacks.values(), 1):
+            assert e.id == i
+            out.write(f"  sl_callbacks.{ e.name }.{ fn_name },\n")
+        out.write("];\n\n")
+
+    out.write("namespace sl_callbacks {\n\n")
+
+    out.write(f"let N_SECOND_LAYER_FUNCTIONS = { n_functions };\n\n")
+
+    out.write("// Called when the second layer is loaded, before the tilemap is transferred to VRAM.\n")
+    out.write("// This callback is allowed to setup HDMA effects.\n")
+    out.write("// DB = 0x7e\n")
+    out.write("#[mem8, idx8]\n")
+    generate_table("init_function_table", "func()", "init")
+
+    out.write("// Called once per frame\n")
+    out.write("// DB = 0x7e\n")
+    out.write("#[mem8, idx8]\n")
     generate_table("process_function_table", "func()", "process")
 
     out.write("}\n\n")
@@ -172,7 +204,8 @@ import "src/gamemodes/room-transition.wiz";
 import "engine/game/metatiles";
 """
         )
-        room_events_imports(out, mappings.room_events)
+        callback_imports(out, mappings.room_events, "room-events")
+        callback_imports(out, mappings.sl_callbacks, "sl-callbacks")
         gamemodes_imports(out, mappings.gamemodes)
 
         out.write("\n")
@@ -189,6 +222,7 @@ import "engine/game/metatiles";
         )
         interactive_tiles_table(out, mappings.interactive_tile_functions)
         room_events_table(out, mappings.room_events)
+        second_layers_table(out, mappings.sl_callbacks)
         gamemodes_table(out, mappings.gamemodes)
 
         function_table(

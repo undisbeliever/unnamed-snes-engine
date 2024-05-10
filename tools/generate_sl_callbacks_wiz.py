@@ -8,31 +8,31 @@ from io import StringIO
 
 from collections import OrderedDict
 
-from unnamed_snes_game.json_formats import load_mappings_json, Mappings, Name, RoomEvent
-from unnamed_snes_game.callbacks import write_callback_parameters_wiz, ROOM_CALLBACK
+from unnamed_snes_game.json_formats import load_mappings_json, Mappings, Name, SecondLayerCallback
+from unnamed_snes_game.callbacks import write_callback_parameters_wiz, SL_CALLBACK_PARAMETERS, SL_ROOM_PARAMETERS
 
 
-def generate_wiz_code(room_events: OrderedDict[Name, RoomEvent]) -> str:
-    n_functions = len(room_events)
-
+def generate_wiz_code(sl_callbacks: OrderedDict[Name, SecondLayerCallback]) -> str:
     with StringIO() as out:
         out.write(
             """
 import "src/memmap";
+import "engine/game/second-layer";
 import "engine/game/room";
 
-namespace room_events {
+namespace sl_callbacks {
 
 struct U8Position {
     xPos : u8,
     yPos : u8,
 };
 
-in wram7e_roomstate {
+in lowram {
+
 """
         )
 
-        write_callback_parameters_wiz(out, room_events, ROOM_CALLBACK)
+        write_callback_parameters_wiz(out, sl_callbacks, SL_CALLBACK_PARAMETERS, SL_ROOM_PARAMETERS)
 
         out.write("}\n")
         out.write("}\n")
@@ -55,7 +55,7 @@ def main() -> None:
 
     mappings = load_mappings_json(args.mappings_json_file)
 
-    out = generate_wiz_code(mappings.room_events)
+    out = generate_wiz_code(mappings.sl_callbacks)
 
     with open(args.output, "w") as fp:
         fp.write(out)

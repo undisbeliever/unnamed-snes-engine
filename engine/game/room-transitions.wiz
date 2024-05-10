@@ -8,7 +8,9 @@ import "room";
 import "gamestate";
 import "metasprites";
 import "metatiles";
+import "second-layer";
 
+import "../vram-map";
 import "../gamemodes";
 import "../textbox";
 import "../wait-frame";
@@ -56,8 +58,10 @@ enum ScrollDirection : u8 {
     DOWN  = 2,
     LEFT  = 4,
     RIGHT = 6,
-    ROLLBACK_LEFT =  8,
-    ROLLBACK_RIGHT = 10,
+    ROLLBACK_UP    =  8,
+    ROLLBACK_DOWN  = 10,
+    ROLLBACK_LEFT  = 12,
+    ROLLBACK_RIGHT = 14,
 }
 
 
@@ -245,6 +249,8 @@ var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u1
 //
 // ASSUMES: The room was just loaded
 // ASSUMES: This function HAS NOT been called on this room before
+//
+// DB = 0x7e
 #[mem8, idx8]
 func _finish_loading_room() {
 
@@ -447,23 +453,9 @@ inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
     data_bank = pop8();
 // DB = 0x80
     {
-        // Setup PPU registers
-
         reset_registers();
 
-        BGMODE = a = BGMODE_MODE_1_BG3_PRIORITY;
-        BG1SC = a = ((VRAM_BG1_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_64x32;
-        BG3SC = a = ((VRAM_BG3_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_32x32;
-
-        BG12NBA = a = ((VRAM_BG1_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG1_SHIFT);
-        BG34NBA = a = ((VRAM_BG3_TILES_WADDR / BG34NBA_WALIGN) << BG34NBA_BG3_SHIFT);
-
-        TM = a = TM_BG1 | TM_BG3 | TM_OBJ;
-
-
-
-        // Load Graphics to PPU
-
+        // Setup subsystems and load resources to WRAM and PPU.
         idx16();
         #[idx16] {
             metatiles.load_tileset__forceblank(room.tileset);
@@ -476,8 +468,44 @@ inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
             textbox.setup_ppu__forceblank();
 
             engine_hooks.room_transitions__setup_ppu__forceblank();
+
+            // ::TODO get second_layer id from room data::
+            carry = second_layer.setup__forceblank__inline(0xff);
         }
         idx8();
+
+        // second-layer is disabled if carry is false (`second_layer_id` was invalid).
+        a = TM_BG1 | TM_BG3 | TM_OBJ;
+        if carry {
+            a = TM_BG1 | TM_BG2 | TM_BG3 | TM_OBJ;
+        }
+        TM = a;
+
+
+        // Setup VRAM MAP
+        BGMODE = a = BGMODE_MODE_1_BG3_PRIORITY;
+
+        // Setup BG1 and BG2 tilemap.
+        // Which background is used by which subsystem is controlled by the
+        // `swapBg1AndBg2ScrollShadows` flag, which is set by the second_layer subsystem.
+        x = ((VRAM_METATILE_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_64x32;
+        y = ((VRAM_SECOND_LAYER_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_64x32;
+
+        a = swapBg1AndBg2ScrollShadows;
+        if !zero {
+            // Swap x & y (uses fewer instructions when setting x/y)
+            a = x;
+            x = y;
+            y = a;
+        }
+        BG1SC = x;
+        BG2SC = y;
+
+        BG3SC = a = ((VRAM_BG3_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_32x32;
+
+        BG12NBA = a =   ((VRAM_MTSL_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG1_SHIFT)
+                      | ((VRAM_MTSL_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG2_SHIFT);
+        BG34NBA = a = ((VRAM_BG3_TILES_WADDR / BG34NBA_WALIGN) << BG34NBA_BG3_SHIFT);
     }
 
 
@@ -724,6 +752,11 @@ func _scrolling_room_transition(roomPosition : u8 in a, _scrollDirection : Scrol
     // continue loading the room.
     _finish_loading_room();
 
+    negative = second_layer.is_part_of_room();
+    if negative {
+        second_layer.part_of_room.start_room_transition(scrollDirection);
+    }
+
     x = scrollDirection as u8;
     MetaTileTransition_Setup_FunctionTable[unaligned x]();
 
@@ -733,22 +766,39 @@ func _scrolling_room_transition(roomPosition : u8 in a, _scrollDirection : Scrol
 }
 
 
-const MetaTileTransition_Setup_FunctionTable : [func ; 6] = [
+const MetaTileTransition_Setup_FunctionTable : [func ; 8] = [
     metatiles.transitions.scroll_up__setup,
     metatiles.transitions.scroll_down__setup,
     metatiles.transitions.scroll_left__setup,
     metatiles.transitions.scroll_right__setup,
     _invalid_setup_function,
     _invalid_setup_function,
+    _invalid_setup_function,
+    _invalid_setup_function,
 ];
 
-const MetaTileTransition_Process_FunctionTable : [func : bool in carry ; 6] = [
+const MetaTileTransition_Process_FunctionTable : [func : bool in carry ; 8] = [
     metatiles.transitions.scroll_up__process,
     metatiles.transitions.scroll_down__process,
     metatiles.transitions.scroll_left__process,
     metatiles.transitions.scroll_right__process,
+
+    metatiles.transitions.scroll_up__rollback,
+    metatiles.transitions.scroll_down__rollback,
     metatiles.transitions.scroll_left__rollback,
     metatiles.transitions.scroll_right__rollback,
+];
+
+const SecondLayerTransition_Process_FunctionTable__mem16_idx16 : [func ; 8] = [
+    second_layer.part_of_room.scroll_up__process__mem16_idx16,
+    second_layer.part_of_room.scroll_down__process__mem16_idx16,
+    second_layer.part_of_room.scroll_left__process__mem16_idx16,
+    second_layer.part_of_room.scroll_right__process__mem16_idx16,
+
+    second_layer.part_of_room.scroll_up__rollback__mem16_idx16,
+    second_layer.part_of_room.scroll_down__rollback__mem16_idx16,
+    second_layer.part_of_room.scroll_left__rollback__mem16_idx16,
+    second_layer.part_of_room.scroll_right__rollback__mem16_idx16,
 ];
 
 
@@ -782,6 +832,18 @@ func _scrolling_room_transition__loop() : bool in carry {
         }
 
         move_camera_and_draw_sprite_list();
+
+        second_layer.process__inline();
+
+        negative = second_layer.is_part_of_room();
+        if negative {
+            x = scrollDirection as u8;
+            mem16_idx16();
+            #[mem16, idx16] {
+                SecondLayerTransition_Process_FunctionTable__mem16_idx16[unaligned x]();
+            }
+            mem8_idx8();
+        }
 
         x = scrollDirection as u8;
         MetaTileTransition_Process_FunctionTable[unaligned x]();
@@ -838,6 +900,11 @@ func _scrolling_room_transition__rollback(_scrollDirection_ : u8 in a, playerXpo
 
     engine_hooks.room_transitions__scrolling_room_transition_rollback__inline();
 
+    negative = second_layer.is_part_of_room();
+    if zero {
+        second_layer.part_of_room.start_room_transition(scrollDirection);
+    }
+
     mem16();
     #[mem16] {
         x = scrollDirection as u8;
@@ -846,7 +913,7 @@ func _scrolling_room_transition__rollback(_scrollDirection_ : u8 in a, playerXpo
     }
     mem8();
 
-    return _scrolling_room_transition__loop();
+    ^return _scrolling_room_transition__loop();
 }
 
 
@@ -911,7 +978,7 @@ func scroll_down() {
                                        player.xPos.px, PLAYER_YPOS_AFTER_DOWN_TRANSITION);
     if !carry {
         // Transition failed, rollback room transition
-        ^return _scrolling_room_transition__rollback(ScrollDirection.UP as u8,
+        ^return _scrolling_room_transition__rollback(ScrollDirection.ROLLBACK_DOWN as u8,
                                                      player.xPos.px, PLAYER_YPOS_AFTER_UP_TRANSITION);
     }
 }
@@ -932,7 +999,7 @@ func scroll_up() {
                                        player.xPos.px, PLAYER_YPOS_AFTER_UP_TRANSITION);
     if !carry {
         // Transition failed, rollback room transition
-        ^return _scrolling_room_transition__rollback(ScrollDirection.DOWN as u8,
+        ^return _scrolling_room_transition__rollback(ScrollDirection.ROLLBACK_UP as u8,
                                                      player.xPos.px, PLAYER_YPOS_AFTER_DOWN_TRANSITION);
     }
 }
@@ -1144,8 +1211,8 @@ func draw_sprite_list() {
 
 in rodata0 {
     // Order MUST Match ScrollDirection
-    const _ScrollDirectionTableX : [i16 ; 6 ] = [                0,                   0,     -DISPLAY_WIDTH,      DISPLAY_WIDTH,     -DISPLAY_WIDTH,    DISPLAY_WIDTH ];
-    const _ScrollDirectionTableY : [i16 ; 6 ] = [  -DISPLAY_HEIGHT,      DISPLAY_HEIGHT,                  0,                  0,                  0,                0 ];
+    const _ScrollDirectionTableX : [i16 ; 8 ] = [               0,               0, -DISPLAY_WIDTH,  DISPLAY_WIDTH,               0,                0, -DISPLAY_WIDTH, DISPLAY_WIDTH ];
+    const _ScrollDirectionTableY : [i16 ; 8 ] = [ -DISPLAY_HEIGHT,  DISPLAY_HEIGHT,              0,              0,  DISPLAY_HEIGHT,  -DISPLAY_HEIGHT,              0,             0 ];
 
     let ScrollDirectionTableX = (far&_ScrollDirectionTableX as far *i16);
     let ScrollDirectionTableY = (far&_ScrollDirectionTableY as far *i16);
@@ -1153,8 +1220,8 @@ in rodata0 {
 
     let _TS = metatiles.transitions.TRANSITION_SPEED;
 
-    const _ScrollDirectionVelocityX : [i16 ; 6 ] = [    0,    0, -_TS,  _TS,  _TS, -_TS];
-    const _ScrollDirectionVelocityY : [i16 ; 6 ] = [ -_TS,  _TS,    0,    0,    0,    0];
+    const _ScrollDirectionVelocityX : [i16 ; 8 ] = [    0,    0, -_TS,  _TS,    0,    0,  _TS, -_TS];
+    const _ScrollDirectionVelocityY : [i16 ; 8 ] = [ -_TS,  _TS,    0,    0,  _TS, -_TS,    0,    0];
 
     let ScrollDirectionVelocityX = (far&_ScrollDirectionVelocityX as far *i16);
     let ScrollDirectionVelocityY = (far&_ScrollDirectionVelocityY as far *i16);

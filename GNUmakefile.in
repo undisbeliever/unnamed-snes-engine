@@ -66,6 +66,7 @@ SOURCES := $(wildcard $(ENGINE_SRC_DIR)/*.wiz $(ENGINE_SRC_DIR)/*/*.wiz $(SRC_DI
 GEN_SOURCES  := $(GEN_DIR)/enums.wiz
 GEN_SOURCES  += $(GEN_DIR)/function-tables.wiz
 GEN_SOURCES  += $(GEN_DIR)/room-events.wiz
+GEN_SOURCES  += $(GEN_DIR)/sl-callbacks.wiz
 GEN_SOURCES  += $(GEN_DIR)/entities.wiz
 GEN_SOURCES  += $(GEN_DIR)/ms-drawing-functions.wiz
 GEN_SOURCES  += $(GEN_DIR)/arctan-table.wiz
@@ -145,6 +146,9 @@ $(GEN_DIR)/function-tables.wiz: $(RESOURCES_DIR)/mappings.json $(RESOURCES_DIR)/
 
 $(GEN_DIR)/room-events.wiz: $(RESOURCES_DIR)/mappings.json $(TOOLS_DIR)/generate_room_events_wiz.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) '$(TOOLS_DIR)/generate_room_events_wiz.py' -o '$@' '$(RESOURCES_DIR)/mappings.json'
+
+$(GEN_DIR)/sl-callbacks.wiz: $(RESOURCES_DIR)/mappings.json $(TOOLS_DIR)/generate_sl_callbacks_wiz.py $(COMMON_PYTHON_SCRIPTS)
+	$(PYTHON3) '$(TOOLS_DIR)/generate_sl_callbacks_wiz.py' -o '$@' '$(RESOURCES_DIR)/mappings.json'
 
 $(GEN_DIR)/ms-drawing-functions.wiz: $(RESOURCES_DIR)/ms-export-order.json $(TOOLS_DIR)/generate_ms_drawing_functions.py $(COMMON_PYTHON_SCRIPTS)
 	$(PYTHON3) '$(TOOLS_DIR)/generate_ms_drawing_functions.py' -o '$@' '$(RESOURCES_DIR)/ms-export-order.json'

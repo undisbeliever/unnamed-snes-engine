@@ -4,6 +4,7 @@
 import "../memmap";
 import "engine/registers";
 
+import "engine/vram-map";
 import "engine/audio";
 import "engine/gamemodes";
 import "engine/textbox";
@@ -20,6 +21,13 @@ import "gen/enums";
 
 namespace gamemodes {
 namespace game_over {
+
+let VRAM_BG1_MAP_WADDR   = 0x0000;  // 64x32
+
+let VRAM_BG1_TILES_WADDR = 0x2000;
+
+// BG3 & OBJ VRAM addresses from engine/vram-map.wiz
+
 
 
 let MIN_HEALTH_ON_RESTART_ROOM = 6;
@@ -127,8 +135,8 @@ inline func setup_ppu() {
     // ::TODO move elsewhere::
     mem16();
     #[mem16] {
-        bg1_scrollX = 0;
-        bg1_scrollY = 0;
+        bgA_scroll_x = 0;
+        bgA_scroll_y = 0;
     }
     mem8();
 
