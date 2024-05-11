@@ -728,6 +728,36 @@ func load_song(songId : resources.songs in a) {
 
 
 
+// Calls `load_song()` if `songId` != the song used in the last `load_song()` call.
+//
+// See: `load_song()`
+//
+// Return true if `load_song()` was called.
+//
+// DB access lowram
+#[mem8]
+func load_song_if_changed(songId : resources.songs in a) : bool in carry {
+    if a != _nextSong {
+        load_song(a as resources.songs);
+        return true;
+    }
+    return false;
+}
+
+
+
+// Returns the songId used in the last `load_song()` call.
+//
+// KEEP: Y, X
+//
+// DB access lowram
+#[mem8]
+inline func get_song() : u8 in a {
+    return _nextSong;
+}
+
+
+
 // If this subroutine is called, the common audio data will be reloaded into Audio-RAM.
 // This will not take effect until the next `load_song` call.
 //
