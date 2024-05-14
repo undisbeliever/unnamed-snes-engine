@@ -29,6 +29,7 @@
    "metasprite_shadows"
  ],
  "bg_images": [
+   "loading_audio_data",
    "title_screen",
    "game_over",
    "credits",
