@@ -659,7 +659,7 @@ func queue_command_override(command : Command in a, parameter0: u8 in x) {
 // Adds a command with no parameter to the queue, overriding any previously unsent commands.
 //
 // WARNING: will send the x register value to the audio driver.
-let queue_command_override_no_parameter = queue_command_override_with as func(command : Command in a);
+let queue_command_override_no_parameter = queue_command_override as func(command : Command in a);
 
 
 
