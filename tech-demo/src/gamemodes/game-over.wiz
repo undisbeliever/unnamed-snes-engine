@@ -65,6 +65,8 @@ func exec() {
 
     wait_one_second();
 
+    audio.load_song(resources.songs.GameOverTheme);
+
     wait_multiple_frames_and_fadeout();
 
     idx16();

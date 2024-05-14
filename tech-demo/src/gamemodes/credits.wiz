@@ -5,6 +5,7 @@ import "../memmap";
 import "engine/registers";
 import "engine/common/reset";
 
+import "engine/audio";
 import "engine/gamemodes";
 import "engine/wait-frame";
 import "engine/resources/resources";
@@ -41,6 +42,8 @@ in code {
 #[mem8, idx8]
 func exec() {
     wait_multiple_frames_and_fadeout__slow();
+
+    audio.load_song(resources.songs.CreditsTheme);
 
     push16(0x7e80);
     data_bank = pop8();

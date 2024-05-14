@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.9" tiledversion="1.9.2" class="monster_doors" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="4" nextobjectid="14">
+<map version="1.10" tiledversion="1.10.2" class="boss_room" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="4" nextobjectid="14">
  <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
  <layer id="1" name="Tiles" class="normal" width="16" height="14">
   <data encoding="base64" compression="gzip">
@@ -7,7 +7,7 @@
   </data>
  </layer>
  <objectgroup id="2" name="Enemies">
-  <object id="12" class="boss" x="128" y="112">
+  <object id="12" type="boss" x="128" y="112">
    <properties>
     <property name="parameter" value="boss_defeated"/>
    </properties>

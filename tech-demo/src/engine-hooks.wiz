@@ -6,8 +6,10 @@ import "ui";
 import "joypad";
 import "rng";
 
+import "gen/enums";
 import "gen/ms-drawing-functions";
 
+import "engine/audio";
 import "engine/entity_api";
 import "engine/game/gamestate";
 import "engine/resources/resources";
@@ -169,6 +171,9 @@ inline func room_transitions__setup_ppu__forceblank() {
 inline func room_transitions__init() {
     // Reset and redraw the UI
     ui.init();
+
+    // ::TODO move into engine (and get songId from somewhere)::
+    audio.load_song_if_changed(resources.songs.DungeonTheme);
 }
 
 

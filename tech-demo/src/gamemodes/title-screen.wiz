@@ -34,6 +34,9 @@ in code {
 func exec() {
     wait_multiple_frames_and_fadeout();
 
+    // ::TODO improve title screen to complement this great song::
+    audio.load_song_if_changed(resources.songs.TitleScreenTheme);
+
 
     push16(0x7e80);
     data_bank = pop8();
@@ -67,6 +70,10 @@ func exec() {
 
 
     set_next_game_mode_to_room_transition(RoomTransitions.fadein_reset_player);
+
+
+    // Ensures menu_select sound effect is finished before room transition loads a new song
+    wait_multiple_frames_and_fadeout__slow();
 }
 
 
