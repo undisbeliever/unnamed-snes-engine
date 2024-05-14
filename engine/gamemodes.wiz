@@ -75,6 +75,7 @@ inline func execute_game_mode__inline() {
     while true {
         mem8_idx8();
         #[mem8, idx8] {
+            a = __nextGameMode as u8;
             if a >= gamemodes.N_GAME_MODES {
                 // Invalid game mode, maybe it set to 0xff and was not changed in the previous exec call.
                 irqcall(0);   // Break
@@ -106,8 +107,6 @@ inline func execute_game_mode__inline() {
 
 
         gamemodes.exec_function_table[unaligned x]();
-
-        a = __nextGameMode as u8;
     }
 }
 
