@@ -12,6 +12,7 @@ from .common import EngineData, FixedSizedData, DynamicSizedData, print_error
 from .palette import PaletteColors
 
 from .snes import (
+    load_image_tile_extractor,
     extract_tiles_from_paletted_image,
     convert_mode7_tileset,
     convert_snes_tileset,
@@ -83,14 +84,13 @@ VALID_BGI_HEADER_TM_SIZES: Final = (1, 2, 4)
 def convert_bg_image(bgi: BackgroundImageInput, palettes: dict[Name, PaletteColors]) -> EngineData:
     bpp = BI_BPP_FORMATS[bgi.format]
 
-    with PIL.Image.open(bgi.source) as image:
-        image.load()
+    image = load_image_tile_extractor(bgi.source)
 
     pal = palettes.get(bgi.palette)
     if pal is None:
         raise RuntimeError(f"Cannot load palette {bgi.palette}")
 
-    tilemap, tile_data = image_and_palette_map_to_snes(image, bgi.source, pal.create_map(bpp), bpp)
+    tilemap, tile_data = image_and_palette_map_to_snes(image, pal.create_map(bpp), bpp)
 
     tilemap_data = create_tilemap_data(tilemap, bgi.tile_priority)
 

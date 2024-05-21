@@ -5,7 +5,6 @@
 
 import sys
 import os.path
-import PIL.Image  # type: ignore
 import xml.etree.ElementTree
 from typing import Final, NamedTuple, Optional, TextIO
 
@@ -17,8 +16,8 @@ from .snes import (
     SmallTilesetMap,
     ImageError,
     InvalidTilesError,
-    extract_small_tile_grid,
-    convert_tilemap_and_tileset,
+    load_image_tile_extractor,
+    extract_tiles_and_build_tilemap,
     convert_snes_tileset,
 )
 from .common import FixedSizedData, DynamicSizedData, EngineData, SimpleMultilineError, print_error
@@ -307,21 +306,20 @@ def convert_mt_tileset(
 ) -> tuple[EngineData, ConstSmallTileMap]:
     tsx_file = read_tsx_file(tsx_filename)
 
-    with PIL.Image.open(tsx_file.image_filename) as image:
-        if image.width != 256 or image.height != 256:
-            raise ImageError(tsx_file.image_filename, "Tileset Image MUST BE 256x256 px in size")
+    image = load_image_tile_extractor(tsx_file.image_filename)
 
-        pal = palettes.get(tsx_file.palette)
-        if pal is None:
-            raise RuntimeError(f"Cannot load palette: {tsx_file.palette}")
-        palette_map = pal.create_map(TILE_DATA_BPP)
+    if image.width_px != 256 or image.height_px != 256:
+        raise ImageError(tsx_file.image_filename, "Tileset Image MUST BE 256x256 px in size")
 
-        tileset = SmallTilesetMap()
-        tilemap = convert_tilemap_and_tileset(
-            extract_small_tile_grid(image), tsx_file.image_filename, tileset, palette_map, image.width // 8, image.height // 8
-        )
+    pal = palettes.get(tsx_file.palette)
+    if pal is None:
+        raise RuntimeError(f"Cannot load palette: {tsx_file.palette}")
+    palette_map = pal.create_map(TILE_DATA_BPP)
 
-        tile_data = convert_snes_tileset(tileset.tiles(), TILE_DATA_BPP)
+    tileset = SmallTilesetMap()
+    tilemap = extract_tiles_and_build_tilemap(image, tileset, palette_map)
+
+    tile_data = convert_snes_tileset(tileset.tiles(), TILE_DATA_BPP)
 
     error_list: list[str] = list()
 

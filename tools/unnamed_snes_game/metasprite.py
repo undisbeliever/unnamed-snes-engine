@@ -12,9 +12,9 @@ from typing import overload, Callable, Final, Iterable, Literal, NamedTuple, Opt
 
 from .common import RomData, EngineData, FixedSizedData, DynamicSizedData, MemoryMapMode, MultilineError, print_error
 from .snes import (
-    extract_small_tile,
-    extract_large_tile,
     split_large_tile,
+    load_image_tile_extractor,
+    ImageTileExtractor,
     hflip_tile,
     vflip_tile,
     hflip_large_tile,
@@ -627,7 +627,7 @@ def i8aabb(box: Optional[Aabb], fs: MsFrameset) -> EngineAabb:
 
 
 def extract_frame(
-    fl: FrameLocation, frame_name: Name, image: PIL.Image.Image, palettes_map: list[PaletteMap], fs: MsFrameset
+    fl: FrameLocation, frame_name: Name, image: ImageTileExtractor, palettes_map: list[PaletteMap], fs: MsFrameset
 ) -> FrameData:
     assert fl.x_offset is not None and fl.y_offset is not None
 
@@ -663,7 +663,7 @@ def extract_frame(
             continue
 
         if o.size == 8:
-            tile = extract_small_tile(image, x, y)
+            tile = image.small_tile(x, y)
             palette_id, pal_map = get_palette_id(tile, palettes_map)
             if pal_map:
                 assert palette_id is not None
@@ -672,7 +672,7 @@ def extract_frame(
             else:
                 tiles_with_no_palettes.append(TileError(x, y, 8))
         else:
-            tile = extract_large_tile(image, x, y)
+            tile = image.large_tile(x, y)
             palette_id, pal_map = get_palette_id(tile, palettes_map)
             if pal_map:
                 assert palette_id is not None
@@ -704,15 +704,15 @@ def extract_frame(
 def build_frameset_data(
     frame_locations: dict[Name, FrameLocation],
     fs: MsFrameset,
-    image: PIL.Image.Image,
+    image: ImageTileExtractor,
     palettes_map: list[PaletteMap],
     transparent_color: SnesColor,
 ) -> tuple[dict[Name, FrameData], set[Name]]:
     errors: list[Union[str, FrameError, AnimationError]] = list()
 
-    image_hflip: Optional[PIL.Image.Image] = None
-    image_vflip: Optional[PIL.Image.Image] = None
-    image_hvflip: Optional[PIL.Image.Image] = None
+    image_hflip: Optional[ImageTileExtractor] = None
+    image_vflip: Optional[ImageTileExtractor] = None
+    image_hvflip: Optional[ImageTileExtractor] = None
 
     frames: dict[Name, FrameData] = dict()
     patterns_used: set[Name] = set()
@@ -723,17 +723,17 @@ def build_frameset_data(
             frame_image = image
         elif fl.flip == "hflip":
             if image_hflip is None:
-                image_hflip = image.transpose(PIL.Image.Transpose.FLIP_LEFT_RIGHT)
+                image_hflip = image.hflip_image()
             frame_image = image_hflip
 
         elif fl.flip == "vflip":
             if image_vflip is None:
-                image_vflip = image.transpose(PIL.Image.Transpose.FLIP_TOP_BOTTOM)
+                image_vflip = image.vflip_image()
             frame_image = image_vflip
 
         elif fl.flip == "hvflip":
             if image_hvflip is None:
-                image_hvflip = image.transpose(PIL.Image.Transpose.ROTATE_180)
+                image_hvflip = image.hvflip_image()
             frame_image = image_hvflip
         else:
             errors.append(f"Unknown flip { fl.flip }")
@@ -829,8 +829,8 @@ def build_override_table(
     return out
 
 
-# Using `image_width` and `image_height` instead of an `PIL.Image.Image` argument so I
-# can call this function with either a PIL image and a `tk.PhotoImage` image.
+# Using `image_width` and `image_height` instead of an `image` argument so I
+# can call this function with either a ImageTileExtractor and a `tk.PhotoImage` image.
 def extract_frame_locations(
     fs: MsFrameset, ms_export_orders: MsExportOrder, image_width: int, image_height: int
 ) -> dict[Name, FrameLocation]:
@@ -994,9 +994,9 @@ def build_frameset(
 ) -> FramesetData:
     errors: list[Union[str, FrameError, AnimationError]] = list()
 
-    image = load_image(ms_dir, fs.source)
+    image = load_image_tile_extractor(os.path.join(ms_dir, fs.source))
 
-    frame_locations = extract_frame_locations(fs, ms_export_orders, image.width, image.height)
+    frame_locations = extract_frame_locations(fs, ms_export_orders, image.width_px, image.height_px)
 
     frames, patterns_used = build_frameset_data(frame_locations, fs, image, palettes_map, transparent_color)
     animations: dict[Name, bytes] = dict()
