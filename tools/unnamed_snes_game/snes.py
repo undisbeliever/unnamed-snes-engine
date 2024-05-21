@@ -159,17 +159,6 @@ def convert_rgb_color(c: tuple[int, int, int]) -> SnesColor:
     return (b << 10) | (g << 5) | r
 
 
-def is_small_tile_not_transparent(image: PIL.Image.Image, transparent_color: SnesColor, xpos: int, ypos: int) -> bool:
-    """Returns True if the tile contains a non-transparent pixel"""
-
-    if xpos + 8 > image.width or ypos + 8 > image.height:
-        raise ValueError(f"position out of bounds: { xpos }, { ypos }")
-
-    return any(
-        convert_rgb_color(image.getpixel((x, y))) != transparent_color for y in range(ypos, ypos + 8) for x in range(xpos, xpos + 8)
-    )
-
-
 def extract_small_tile_grid(image: PIL.Image.Image) -> Generator[SmallColorTile, None, None]:
     """Generator that extracts 8px tiles from the image in consecutive order."""
 

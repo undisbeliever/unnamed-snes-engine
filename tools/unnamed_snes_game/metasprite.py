@@ -23,7 +23,6 @@ from .snes import (
     get_palette_id,
     convert_palette_image,
     convert_snes_tileset,
-    is_small_tile_not_transparent,
     SnesColor,
     SmallTileData,
     LargeTileData,
