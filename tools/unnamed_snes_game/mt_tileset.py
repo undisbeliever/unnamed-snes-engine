@@ -9,7 +9,7 @@ import xml.etree.ElementTree
 from typing import Final, NamedTuple, Optional, TextIO
 
 from .json_formats import load_mappings_json, Filename, Mappings, Name
-from .palette import PaletteColors
+from .palette import PaletteResource
 from .snes import (
     TileMap,
     ConstSmallTileMap,
@@ -279,7 +279,7 @@ def create_properties_array(
     return data
 
 
-def create_tileset_data(palette: PaletteColors, tile_data: bytes, metatile_map: bytes, properties: bytes) -> EngineData:
+def create_tileset_data(palette: PaletteResource, tile_data: bytes, metatile_map: bytes, properties: bytes) -> EngineData:
     wram_data = bytearray()
 
     # 2048 bytes = metatile map
@@ -302,7 +302,7 @@ def create_tileset_data(palette: PaletteColors, tile_data: bytes, metatile_map: 
 
 
 def convert_mt_tileset(
-    tsx_filename: Filename, mappings: Mappings, palettes: dict[Name, PaletteColors]
+    tsx_filename: Filename, mappings: Mappings, palettes: dict[Name, PaletteResource]
 ) -> tuple[EngineData, ConstSmallTileMap]:
     tsx_file = read_tsx_file(tsx_filename)
 

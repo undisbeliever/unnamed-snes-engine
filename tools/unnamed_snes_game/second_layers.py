@@ -8,7 +8,7 @@ from enum import IntFlag
 from typing import Any, Callable, Final, Iterable, NamedTuple, Optional
 
 from .common import EngineData, FixedSizedData, DynamicSizedData, SimpleMultilineError
-from .palette import PaletteColors
+from .palette import PaletteResource
 from .snes import (
     AbstractTilesetMap,
     load_image_tile_extractor,
@@ -83,7 +83,7 @@ class SecondLayerImage(NamedTuple):
 def convert_sl_image(
     image: ImageTileExtractor,
     tile_priority: bool,
-    palette: PaletteColors,
+    palette: PaletteResource,
     mt_tiles: Optional[ConstSmallTileMap],
 ) -> SecondLayerImage:
     if image.width_px % MT_TILE_PX != 0 or image.height_px % MT_TILE_PX != 0:
@@ -155,7 +155,7 @@ def convert_sl_image(
 
 
 def convert_second_layer(
-    sli: SecondLayerInput, palettes: dict[Name, PaletteColors], mt_tileset_tiles: dict[Name, ConstSmallTileMap], mapping: Mappings
+    sli: SecondLayerInput, palettes: dict[Name, PaletteResource], mt_tileset_tiles: dict[Name, ConstSmallTileMap], mapping: Mappings
 ) -> EngineData:
     image_filename = sli.source
 

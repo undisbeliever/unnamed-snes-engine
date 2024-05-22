@@ -19,7 +19,7 @@ from .common import ResourceType, EngineData
 from .entity_data import create_entity_rom_data
 from .mt_tileset import convert_mt_tileset
 from .second_layers import convert_second_layer
-from .palette import convert_palette, PaletteColors
+from .palette import convert_palette, PaletteResource
 from .metasprite import convert_static_spritesheet, convert_dynamic_spritesheet, build_ms_fs_data, MsFsEntry, DynamicMsSpritesheet
 from .rooms import get_list_of_tmx_files, extract_room_id, compile_room, RoomDependencies
 from .snes import ConstSmallTileMap
@@ -76,7 +76,7 @@ class MetaSpriteResourceData(ResourceData):
 
 @dataclass(frozen=True)
 class PaletteResourceData(ResourceData):
-    palette: PaletteColors
+    palette: PaletteResource
 
 
 @dataclass(frozen=True)
@@ -545,7 +545,7 @@ class PaletteCompiler(OtherResourcesCompiler):
 
 
 class MetaTileTilesetCompiler(SimpleResourceCompiler):
-    def __init__(self, shared_input: SharedInput, palettes: dict[Name, PaletteColors]) -> None:
+    def __init__(self, shared_input: SharedInput, palettes: dict[Name, PaletteResource]) -> None:
         super().__init__(ResourceType.mt_tilesets, shared_input)
         self.__palettes = palettes
 
@@ -575,7 +575,7 @@ class MetaTileTilesetCompiler(SimpleResourceCompiler):
 
 class SecondLayerCompiler(OtherResourcesCompiler):
     def __init__(
-        self, shared_input: SharedInput, palettes: dict[Name, PaletteColors], mt_tileset_tiles: dict[Name, ConstSmallTileMap]
+        self, shared_input: SharedInput, palettes: dict[Name, PaletteResource], mt_tileset_tiles: dict[Name, ConstSmallTileMap]
     ) -> None:
         super().__init__(ResourceType.second_layers, shared_input)
         self.__palettes: Final = palettes
@@ -632,7 +632,7 @@ class TileCompiler(OtherResourcesCompiler):
 
 
 class BgImageCompiler(OtherResourcesCompiler):
-    def __init__(self, shared_input: SharedInput, palettes: dict[Name, PaletteColors]) -> None:
+    def __init__(self, shared_input: SharedInput, palettes: dict[Name, PaletteResource]) -> None:
         super().__init__(ResourceType.bg_images, shared_input)
         self.__palettes = palettes
 
@@ -825,7 +825,7 @@ class ProjectCompiler:
         self.log_message: Final = message_handler
         self.log_error: Final = err_handler
 
-        self.__palettes: Final[dict[Name, PaletteColors]] = dict()
+        self.__palettes: Final[dict[Name, PaletteResource]] = dict()
         self.__mt_tileset_tiles: Final[dict[Name, ConstSmallTileMap]] = dict()
 
         self.__resource_compilers: Final = (

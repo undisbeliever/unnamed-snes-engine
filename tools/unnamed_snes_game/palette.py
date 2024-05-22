@@ -14,7 +14,8 @@ from .snes import convert_rgb_color, PaletteMap, SnesColor, ImageError
 IMAGE_WIDTH: Final = 16
 
 
-class PaletteColors(NamedTuple):
+# The palette used by the resources subsystem
+class PaletteResource(NamedTuple):
     name: Name
     id: int
     colors: list[SnesColor]
@@ -55,7 +56,7 @@ def load_palette_image(filename: Filename) -> list[SnesColor]:
     return [convert_rgb_color(c) for c in image.getdata()]
 
 
-def convert_palette(pi: PaletteInput, id: int) -> tuple[EngineData, PaletteColors]:
+def convert_palette(pi: PaletteInput, id: int) -> tuple[EngineData, PaletteResource]:
     if pi.n_rows < 1 or pi.n_rows > 16:
         raise ValueError(f"Invalid n_rows ({pi.n_rows}, min 1, max 16)")
 
@@ -76,4 +77,4 @@ def convert_palette(pi: PaletteInput, id: int) -> tuple[EngineData, PaletteColor
         DynamicSizedData(struct.pack(f"<{len(colors)}H", *colors)),
     )
 
-    return data, PaletteColors(name=pi.name, id=id, colors=colors)
+    return data, PaletteResource(name=pi.name, id=id, colors=colors)

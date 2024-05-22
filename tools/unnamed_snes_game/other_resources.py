@@ -9,7 +9,7 @@ from collections import OrderedDict
 from typing import Any, Callable, Final, Iterable, NamedTuple, Optional
 
 from .common import EngineData, FixedSizedData, DynamicSizedData, print_error
-from .palette import PaletteColors
+from .palette import PaletteResource
 
 from .snes import (
     load_image_tile_extractor,
@@ -81,7 +81,7 @@ NAMETABLE_SIZE_BYTES: Final = 32 * 32 * 2
 VALID_BGI_HEADER_TM_SIZES: Final = (1, 2, 4)
 
 
-def convert_bg_image(bgi: BackgroundImageInput, palettes: dict[Name, PaletteColors]) -> EngineData:
+def convert_bg_image(bgi: BackgroundImageInput, palettes: dict[Name, PaletteResource]) -> EngineData:
     bpp = BI_BPP_FORMATS[bgi.format]
 
     image = load_image_tile_extractor(bgi.source)
