@@ -2,6 +2,7 @@
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
 
+import struct
 import itertools
 import PIL.Image  # type: ignore
 from itertools import islice
@@ -21,9 +22,6 @@ LargeColorTile = list[SnesColor]  # 256 (16x16) `SnesColor`s
 # Tiles made up of palette indexes
 SmallTileData = bytes  # 64 (8x8) bytes
 LargeTileData = bytes  # 256 (16x16) bytes
-
-# Mapping of `SnesColor` to palette index
-PaletteMap = dict[SnesColor, int]
 
 
 class TileMapEntry(NamedTuple):
@@ -174,59 +172,65 @@ def extract_tiles_from_paletted_image(image: PIL.Image.Image) -> Generator[Small
             yield bytes(image.getpixel((x, y)) for y in range(ty, ty + 8) for x in range(tx, tx + 8))
 
 
-def create_palettes_map(image: PIL.Image.Image, bpp: int) -> list[PaletteMap]:
-    # Returns palettes_map
+class PaletteMap(NamedTuple):
+    color_maps: list[dict[SnesColor, int]]
+
+    def palette_for_tile(self, tile: Union[SmallColorTile, LargeColorTile]) -> tuple[Optional[int], Optional[dict[SnesColor, int]]]:
+        # Returns a tuple of (palette_id, color_map)
+        for palette_id, color_map in enumerate(self.color_maps):
+            if all([c in color_map for c in tile]):
+                return palette_id, color_map
+
+        return None, None
+
+
+class Palette(NamedTuple):
+    colors: list[SnesColor]
+
+    def create_map(self, bpp: int) -> PaletteMap:
+        if bpp < 1 or bpp > 8:
+            raise ValueError("Invalid bpp")
+
+        colors: Final = self.colors
+        colors_per_palette: Final = 1 << bpp
+        n_palettes: Final = min(len(self.colors) // colors_per_palette, 8)
+
+        out = list()
+
+        for p in range(n_palettes):
+            color_map = dict()
+            pi = p * colors_per_palette
+            for i, c in enumerate(colors[pi : pi + colors_per_palette]):
+                if c not in color_map:
+                    color_map[c] = i
+            out.append(color_map)
+
+        return PaletteMap(out)
+
+    def snes_data(self) -> bytes:
+        return struct.pack(f"<{len(self.colors)}H", *self.colors)
+
+
+PALETTE_IMAGE_WIDTH: Final = 16
+
+
+def load_palette_image(filename: Filename, max_colors: int) -> Palette:
+    try:
+        with PIL.Image.open(filename) as image:
+            image.load()
+    except Exception as e:
+        raise ImageError(filename, str(e))
+
+    if image.width != PALETTE_IMAGE_WIDTH:
+        raise ImageError(filename, f"Palette Image MUST BE {PALETTE_IMAGE_WIDTH} px wide")
+
+    if image.height > max_colors // 16:
+        raise ImageError(filename, "Palette Image contains too many colors")
 
     if image.mode != "RGB":
         image = image.convert("RGB")
 
-    colors_per_palette = 1 << bpp
-    max_colors = min(colors_per_palette * 8, 256)
-
-    if image.width != 16:
-        raise ImageError(image.filename, "Palette Image must be 16 pixels in width")
-
-    if image.width * image.height > max_colors:
-        raise ImageError(image.filename, f"Palette Image has too many colours (max { max_colors })")
-
-    image_data = image.getdata()
-
-    palettes_map = list()
-
-    for p in range(len(image_data) // colors_per_palette):
-        pal_map = dict()
-
-        for x in range(colors_per_palette):
-            c = convert_rgb_color(image_data[p * colors_per_palette + x])
-            if c not in pal_map:
-                pal_map[c] = x
-
-        palettes_map.append(pal_map)
-
-    return palettes_map
-
-
-def convert_palette_image(image: PIL.Image.Image) -> bytes:
-    palette_data = bytearray()
-
-    for c in image.getdata():
-        u16 = convert_rgb_color(c)
-
-        palette_data.append(u16 & 0xFF)
-        palette_data.append(u16 >> 8)
-
-    return palette_data
-
-
-def get_palette_id(
-    tile: Union[SmallColorTile, LargeColorTile], palettes_map: list[PaletteMap]
-) -> tuple[Optional[int], Optional[PaletteMap]]:
-    # Returns a tuple of (palette_id, palette_map)
-    for palette_id, pal_map in enumerate(palettes_map):
-        if all([c in pal_map for c in tile]):
-            return palette_id, pal_map
-
-    return None, None
+    return Palette([convert_rgb_color(c) for c in image.getdata()])
 
 
 class ImageTileExtractor(ABC):
@@ -403,9 +407,9 @@ def split_large_tile(tile: LargeTileData) -> tuple[SmallTileData, SmallTileData,
 def extract_tiles_and_build_tilemap(
     image: ImageTileExtractor,
     tileset: AbstractTilesetMap,
-    palettes_map: list[PaletteMap],
+    palette_map: PaletteMap,
 ) -> TileMap:
-    assert len(palettes_map) <= 8
+    assert len(palette_map.color_maps) <= 8
 
     map_width: Final = image.width_px // 8
     map_height: Final = image.height_px // 8
@@ -415,13 +419,13 @@ def extract_tiles_and_build_tilemap(
     tilemap: list[TileMapEntry] = list()
 
     for tile_index, tile in enumerate(image.extract_small_tiles()):
-        palette_id, pal_map = get_palette_id(tile, palettes_map)
+        palette_id, color_map = palette_map.palette_for_tile(tile)
 
-        if pal_map:
+        if color_map:
             assert palette_id is not None
 
             # Must be bytes() here as a dict() key must be immutable
-            tile_data = bytes([pal_map[c] for c in tile])
+            tile_data = bytes([color_map[c] for c in tile])
             tile_id, hflip, vflip = tileset.get_or_insert(tile_data)
 
             tilemap.append(TileMapEntry(tile_id, palette_id, hflip, vflip))
@@ -489,25 +493,26 @@ def create_tilemap_data_high(tilemap: Union[TileMap, Sequence[TileMapEntry]], de
     return data
 
 
-def image_and_palette_map_to_snes(image: ImageTileExtractor, palettes_map: list[PaletteMap], bpp: int) -> tuple[TileMap, bytes]:
+def image_and_palette_map_to_snes(image: ImageTileExtractor, palette_map: PaletteMap, bpp: int) -> tuple[TileMap, bytes]:
     # Return (tilemap, tile_data)
 
     tileset = SmallTilesetMap()
-    tilemap = extract_tiles_and_build_tilemap(image, tileset, palettes_map)
+    tilemap = extract_tiles_and_build_tilemap(image, tileset, palette_map)
 
     tile_data = convert_snes_tileset(tileset.tiles(), bpp)
 
     return tilemap, tile_data
 
 
-def image_to_snes(image: ImageTileExtractor, palette_image: PIL.Image.Image, bpp: int) -> tuple[TileMap, bytes, bytes]:
+def image_to_snes(image: ImageTileExtractor, palette: Palette, bpp: int) -> tuple[TileMap, bytes, bytes]:
     # Return (tilemap, tile_data, palette_data)
 
+    palette_map = palette.create_map(bpp)
+    palette_data = palette.snes_data()
+
     tileset = SmallTilesetMap()
-    tilemap = extract_tiles_and_build_tilemap(image, tileset, create_palettes_map(palette_image, bpp))
+    tilemap = extract_tiles_and_build_tilemap(image, tileset, palette_map)
 
     tile_data = convert_snes_tileset(tileset.tiles(), bpp)
-
-    palette_data = convert_palette_image(palette_image)
 
     return tilemap, tile_data, palette_data

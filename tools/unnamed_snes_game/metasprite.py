@@ -6,7 +6,6 @@
 import json
 import sys
 import os.path
-import PIL.Image  # type: ignore
 
 from typing import overload, Callable, Final, Iterable, Literal, NamedTuple, Optional, TextIO, TypeVar, Union
 
@@ -14,19 +13,17 @@ from .common import RomData, EngineData, FixedSizedData, DynamicSizedData, Memor
 from .snes import (
     split_large_tile,
     load_image_tile_extractor,
+    load_palette_image,
     ImageTileExtractor,
     hflip_tile,
     vflip_tile,
     hflip_large_tile,
     vflip_large_tile,
-    create_palettes_map,
-    get_palette_id,
-    convert_palette_image,
     convert_snes_tileset,
     SnesColor,
+    PaletteMap,
     SmallTileData,
     LargeTileData,
-    PaletteMap,
 )
 
 from .json_formats import (
@@ -627,7 +624,7 @@ def i8aabb(box: Optional[Aabb], fs: MsFrameset) -> EngineAabb:
 
 
 def extract_frame(
-    fl: FrameLocation, frame_name: Name, image: ImageTileExtractor, palettes_map: list[PaletteMap], fs: MsFrameset
+    fl: FrameLocation, frame_name: Name, image: ImageTileExtractor, palette_map: PaletteMap, fs: MsFrameset
 ) -> FrameData:
     assert fl.x_offset is not None and fl.y_offset is not None
 
@@ -664,19 +661,19 @@ def extract_frame(
 
         if o.size == 8:
             tile = image.small_tile(x, y)
-            palette_id, pal_map = get_palette_id(tile, palettes_map)
-            if pal_map:
+            palette_id, color_map = palette_map.palette_for_tile(tile)
+            if color_map:
                 assert palette_id is not None
-                tile_data = bytes([pal_map[c] for c in tile])
+                tile_data = bytes([color_map[c] for c in tile])
                 objects.append(ObjectTile(tile_data, palette_id))
             else:
                 tiles_with_no_palettes.append(TileError(x, y, 8))
         else:
             tile = image.large_tile(x, y)
-            palette_id, pal_map = get_palette_id(tile, palettes_map)
-            if pal_map:
+            palette_id, color_map = palette_map.palette_for_tile(tile)
+            if color_map:
                 assert palette_id is not None
-                tile_data = bytes([pal_map[c] for c in tile])
+                tile_data = bytes([color_map[c] for c in tile])
                 objects.append(ObjectTile(tile_data, palette_id))
             else:
                 tiles_with_no_palettes.append(TileError(x, y, 16))
@@ -705,7 +702,7 @@ def build_frameset_data(
     frame_locations: dict[Name, FrameLocation],
     fs: MsFrameset,
     image: ImageTileExtractor,
-    palettes_map: list[PaletteMap],
+    palette_map: PaletteMap,
     transparent_color: SnesColor,
 ) -> tuple[dict[Name, FrameData], set[Name]]:
     errors: list[Union[str, FrameError, AnimationError]] = list()
@@ -742,7 +739,7 @@ def build_frameset_data(
         try:
             patterns_used.add(fl.pattern.name)
 
-            frames[frame_name] = extract_frame(fl, frame_name, frame_image, palettes_map, fs)
+            frames[frame_name] = extract_frame(fl, frame_name, frame_image, palette_map, fs)
 
         except FrameError as e:
             errors.append(e)
@@ -988,7 +985,7 @@ def build_frameset(
     fs: MsFrameset,
     ms_export_orders: MsExportOrder,
     ms_dir: Filename,
-    palettes_map: list[PaletteMap],
+    palette_map: PaletteMap,
     transparent_color: SnesColor,
     spritesheet_name: Name,
 ) -> FramesetData:
@@ -998,7 +995,7 @@ def build_frameset(
 
     frame_locations = extract_frame_locations(fs, ms_export_orders, image.width_px, image.height_px)
 
-    frames, patterns_used = build_frameset_data(frame_locations, fs, image, palettes_map, transparent_color)
+    frames, patterns_used = build_frameset_data(frame_locations, fs, image, palette_map, transparent_color)
     animations: dict[Name, bytes] = dict()
 
     exported_frames: list[FrameData] = list()
@@ -1254,33 +1251,18 @@ def build_ms_fs_data(
 #
 
 
-def load_palette(ms_dir: Filename, palette_filename: Filename) -> tuple[list[PaletteMap], bytes]:
-    image = load_image(ms_dir, palette_filename)
+def load_palette(ms_dir: Filename, palette_filename: Filename) -> tuple[PaletteMap, bytes]:
+    pal = load_palette_image(os.path.join(ms_dir, palette_filename), 128)
 
-    if image.width != 16 or image.height != 8:
-        raise ValueError("Palette Image MUST BE 16x8 px in size")
+    palette_map = pal.create_map(TILE_DATA_BPP)
+    palette_data = pal.snes_data()
 
-    palettes_map = create_palettes_map(image, TILE_DATA_BPP)
-    palette_data = convert_palette_image(image)
-
-    return palettes_map, palette_data
+    return palette_map, palette_data
 
 
 def get_transparent_color(palette_data: bytes) -> SnesColor:
     # Hack to reconstruct the first color from palette_data bytes
     return palette_data[0] | (palette_data[1] << 8)
-
-
-def load_image(ms_dir: Filename, filename: Filename) -> PIL.Image.Image:
-    image_filename = os.path.join(ms_dir, filename)
-
-    with PIL.Image.open(image_filename) as image:
-        image.load()
-
-    if image.mode == "RGB":
-        return image
-    else:
-        return image.convert("RGB")
 
 
 #
@@ -1308,7 +1290,7 @@ def generate_ppu_data(ms_input: MsSpritesheet, tileset: list[SmallTileData], pal
 def _extract_frameset_data(
     ms_input: MsSpritesheet, ms_export_orders: MsExportOrder, ms_dir: Filename
 ) -> tuple[list[FramesetData], bytes]:
-    palettes_map, palette_data = load_palette(ms_dir, ms_input.palette)
+    palette_map, palette_data = load_palette(ms_dir, ms_input.palette)
     transparent_color = get_transparent_color(palette_data)
 
     framesets = list()
@@ -1316,7 +1298,7 @@ def _extract_frameset_data(
 
     for fs in ms_input.framesets.values():
         try:
-            framesets.append(build_frameset(fs, ms_export_orders, ms_dir, palettes_map, transparent_color, ms_input.name))
+            framesets.append(build_frameset(fs, ms_export_orders, ms_dir, palette_map, transparent_color, ms_input.name))
         except FramesetError as e:
             errors.append(e)
         except Exception as e:
