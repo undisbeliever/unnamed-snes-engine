@@ -158,12 +158,21 @@ def convert_rgb_color(c: tuple[int, int, int]) -> SnesColor:
     return (b << 10) | (g << 5) | r
 
 
-def extract_tiles_from_paletted_image(image: PIL.Image.Image) -> Generator[SmallTileData, None, None]:
+# NOTE: Does not extract palette from image
+def extract_tiles_from_paletted_image(filename: Filename) -> Generator[SmallTileData, None, None]:
+    try:
+        with PIL.Image.open(filename) as image:
+            image.load()
+    except Exception as e:
+        raise ImageError(filename, str(e))
+
+    if image.mode != "P":
+        raise ImageError(image.filename, "Image does not have a palette")
+
     if image.width % 8 != 0 or image.height % 8 != 0:
         raise ImageError(image.filename, "Image width and height MUST be a multiple of 8")
 
-    if not image.palette:
-        raise ImageError(image.filename, "Image does not have a palette")
+    assert image.palette
 
     img_data = image.getdata()
 

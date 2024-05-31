@@ -3,7 +3,6 @@
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
 
-import PIL.Image  # type: ignore
 import sys
 from collections import OrderedDict
 from typing import Any, Callable, Final, Iterable, NamedTuple, Optional
@@ -55,10 +54,7 @@ TILE_FORMATS: dict[str, Callable[[Iterable[SmallTileData]], bytes]] = {
 def convert_tiles(t: TilesInput) -> EngineData:
     tile_converter = TILE_FORMATS[t.format]
 
-    with PIL.Image.open(t.source) as image:
-        image.load()
-
-    tile_data = tile_converter(extract_tiles_from_paletted_image(image))
+    tile_data = tile_converter(extract_tiles_from_paletted_image(t.source))
 
     return EngineData(
         ram_data=None,
