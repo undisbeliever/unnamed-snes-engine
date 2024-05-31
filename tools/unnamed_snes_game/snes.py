@@ -174,8 +174,6 @@ def extract_tiles_from_paletted_image(filename: Filename) -> Generator[SmallTile
 
     assert image.palette
 
-    img_data = image.getdata()
-
     for ty in range(0, image.height, 8):
         for tx in range(0, image.width, 8):
             yield bytes(image.getpixel((x, y)) for y in range(ty, ty + 8) for x in range(tx, tx + 8))

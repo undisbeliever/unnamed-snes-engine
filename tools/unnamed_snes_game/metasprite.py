@@ -646,8 +646,6 @@ def extract_frame(
     objects = list()
 
     for o in pattern.objects:
-        tile_id, hflip, vflip = 0, False, False
-
         x = image_x + o.xpos
         y = image_y + o.ypos
 

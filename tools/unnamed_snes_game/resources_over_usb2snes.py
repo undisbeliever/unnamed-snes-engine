@@ -321,7 +321,7 @@ class FsWatcherSignals(metaclass=ABCMeta):
             raise DisconnectEventException()
 
     def request_sleep(self, delay: float) -> None:
-        s = self._interrupt_request_sleep_event.wait(delay)
+        self._interrupt_request_sleep_event.wait(delay)
         self._interrupt_request_sleep_event.clear()
 
         if self._disconnect_event.is_set():
@@ -1193,7 +1193,6 @@ class WebsocketThread(BgThread):
             self.signals.set_usb2snes_status("Closed")
 
         except ConnectionRefusedError as e:
-            ws_connected = False
             log_error(f"Cannot connect to {self.ws_address}", e)
             self.signals.set_usb2snes_status(f"Cannot connect to {self.ws_address}: {e}")
 

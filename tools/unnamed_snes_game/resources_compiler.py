@@ -372,7 +372,7 @@ class SharedInput:
                 _load("audio_project", AUDIO_PROJECT_FILENAME, load_audio_project)
             case SharedInputType.SYMBOLS:
                 _load("symbols", self.symbols_filename, read_symbols_file)
-            case other:
+            case _:
                 raise RuntimeError("Unknown shared input file")
 
 

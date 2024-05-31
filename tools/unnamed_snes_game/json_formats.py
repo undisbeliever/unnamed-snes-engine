@@ -418,8 +418,6 @@ class _Helper:
 
 
 def _load_json_file(filename: Filename, cls: Type[_Helper._Self]) -> _Helper._Self:
-    basename = os.path.basename(filename)
-
     with open(filename, "r") as fp:
         j = json.load(fp)
 
@@ -614,8 +612,6 @@ def load_ms_export_order_json(filename: Filename) -> MsExportOrder:
     patterns = jh.build_ordered_dict_from_list(
         "patterns", MsPattern, 256, lambda p, name, i: MsPattern(name=name, id=i * 2, objects=p.get_pattern_objects("objects"))
     )
-
-    shadow_sizes = jh.get_name_list_mapping("shadow_sizes")
 
     return MsExportOrder(
         patterns=patterns,

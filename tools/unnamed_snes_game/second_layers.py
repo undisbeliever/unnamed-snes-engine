@@ -91,8 +91,6 @@ def convert_sl_image(
     width8: Final = width * 2
     height8: Final = height * 2
 
-    palette_map = palette.create_map(SECOND_LAYER_BPP)
-
     tileset: Final = SecondLayerTilesetMap(mt_tiles)
     tilemap8: Final = extract_tiles_and_build_tilemap(image, tileset, palette.create_map(SECOND_LAYER_BPP))
 

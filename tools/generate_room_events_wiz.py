@@ -13,8 +13,6 @@ from unnamed_snes_game.callbacks import write_callback_parameters_wiz, ROOM_CALL
 
 
 def generate_wiz_code(room_events: OrderedDict[Name, RoomEvent]) -> str:
-    n_functions = len(room_events)
-
     with StringIO() as out:
         out.write(
             """
