@@ -13,11 +13,12 @@ from .palette import PaletteResource
 from .snes import (
     load_image_tile_extractor,
     extract_tiles_from_paletted_image,
+    extract_tiles_and_build_tilemap,
     convert_mode7_tileset,
     convert_snes_tileset,
-    image_and_palette_map_to_snes,
     create_tilemap_data,
     SmallTileData,
+    SmallTilesetMap,
 )
 
 from .json_formats import (
@@ -86,9 +87,13 @@ def convert_bg_image(bgi: BackgroundImageInput, palettes: dict[Name, PaletteReso
     if pal is None:
         raise RuntimeError(f"Cannot load palette {bgi.palette}")
 
-    tilemap, tile_data = image_and_palette_map_to_snes(image, pal.create_map(bpp), bpp)
+    tileset = SmallTilesetMap()
+    palette_map = pal.create_map(bpp)
+
+    tilemap = extract_tiles_and_build_tilemap(image, tileset, palette_map)
 
     tilemap_data = create_tilemap_data(tilemap, bgi.tile_priority)
+    tile_data = convert_snes_tileset(tileset.tiles(), bpp)
 
     tm_size = len(tilemap_data) // NAMETABLE_SIZE_BYTES
 

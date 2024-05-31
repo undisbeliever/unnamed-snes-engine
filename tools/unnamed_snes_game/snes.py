@@ -502,17 +502,6 @@ def create_tilemap_data_high(tilemap: Union[TileMap, Sequence[TileMapEntry]], de
     return data
 
 
-def image_and_palette_map_to_snes(image: ImageTileExtractor, palette_map: PaletteMap, bpp: int) -> tuple[TileMap, bytes]:
-    # Return (tilemap, tile_data)
-
-    tileset = SmallTilesetMap()
-    tilemap = extract_tiles_and_build_tilemap(image, tileset, palette_map)
-
-    tile_data = convert_snes_tileset(tileset.tiles(), bpp)
-
-    return tilemap, tile_data
-
-
 def image_to_snes(image: ImageTileExtractor, palette: Palette, bpp: int) -> tuple[TileMap, bytes, bytes]:
     # Return (tilemap, tile_data, palette_data)
 
