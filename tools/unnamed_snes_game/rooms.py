@@ -5,19 +5,15 @@
 
 import re
 import os
-import sys
 import gzip
 import base64
 import struct
 import xml.etree.ElementTree
 import posixpath
 from collections import OrderedDict
-from typing import Final, NamedTuple, Optional, Union
+from typing import Final, NamedTuple, Optional
 
 from .json_formats import (
-    load_entities_json,
-    load_mappings_json,
-    Filename,
     Mappings,
     EntitiesJson,
     Entity,
@@ -26,7 +22,7 @@ from .json_formats import (
     SecondLayerInput,
     Name,
 )
-from .common import EngineData, FixedSizedData, MultilineError, SimpleMultilineError, print_error
+from .common import EngineData, FixedSizedData, SimpleMultilineError
 from .callbacks import parse_callback_parameters, ROOM_CALLBACK, SL_ROOM_PARAMETERS, RoomDoors, parse_int
 
 from .second_layers import MT_TILE_PX as SECOND_LAYER_MT_TILE_PX

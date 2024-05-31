@@ -15,7 +15,6 @@ from unnamed_snes_game.json_formats import (
     Name,
     Mappings,
     EntitiesJson,
-    Callback,
     CallbackDict,
     RoomEvent,
     SecondLayerCallback,

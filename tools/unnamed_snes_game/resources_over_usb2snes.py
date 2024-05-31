@@ -27,12 +27,10 @@
 # SOFTWARE.
 
 
-import re
 import sys
 import json
 import os.path
 import secrets
-import argparse
 import posixpath
 import threading
 import contextlib
@@ -45,7 +43,7 @@ import websocket  # type: ignore[import]
 import watchdog.events
 import watchdog.observers
 
-from typing import cast, final, Any, Callable, Final, NamedTuple, Optional, Union
+from typing import final, Callable, Final, NamedTuple, Optional, Union
 
 from .ansi_color import AnsiColors
 from .entity_data import ENTITY_ROM_DATA_LABEL, ENTITY_ROM_DATA_BYTES_PER_ENTITY
@@ -54,7 +52,6 @@ from .resources_compiler import DataStore, ProjectCompiler, SharedInputType, Res
 from .json_formats import Name, Filename, Mappings, MemoryMap
 
 from .common import (
-    MultilineError,
     ResourceType,
     MS_FS_DATA_BANK_OFFSET,
     DYNAMIC_SPRITE_TILES_BANK_OFFSET,

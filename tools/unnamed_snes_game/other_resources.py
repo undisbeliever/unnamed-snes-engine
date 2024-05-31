@@ -2,12 +2,9 @@
 # -*- coding: utf-8 -*-
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
+from typing import Callable, Final, Iterable
 
-import sys
-from collections import OrderedDict
-from typing import Any, Callable, Final, Iterable, NamedTuple, Optional
-
-from .common import EngineData, FixedSizedData, DynamicSizedData, print_error
+from .common import EngineData, FixedSizedData, DynamicSizedData
 from .palette import PaletteResource
 
 from .snes import (
@@ -21,16 +18,7 @@ from .snes import (
     SmallTilesetMap,
 )
 
-from .json_formats import (
-    load_mappings_json,
-    load_other_resources_json,
-    Name,
-    Filename,
-    Mappings,
-    TilesInput,
-    BackgroundImageInput,
-    OtherResources,
-)
+from .json_formats import Name, TilesInput, BackgroundImageInput
 
 
 # ::TODO add palettes::

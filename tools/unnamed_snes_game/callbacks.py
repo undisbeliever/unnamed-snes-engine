@@ -4,7 +4,6 @@
 from .json_formats import Name, Callback, CallbackDict, CallbackParameter, Mappings, RoomEvent, SecondLayerCallback
 
 from io import StringIO
-from collections import OrderedDict
 
 from typing import Callable, Final, NamedTuple, Optional
 

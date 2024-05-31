@@ -4,9 +4,8 @@
 import sys
 import struct
 from io import StringIO
-from dataclasses import dataclass
 from enum import IntEnum, Enum, unique
-from typing import Callable, Final, NamedTuple, Optional, TextIO, Union
+from typing import Callable, Final, Optional, TextIO, Union
 from abc import abstractmethod
 
 from .ansi_color import NoAnsiColors, AnsiColors

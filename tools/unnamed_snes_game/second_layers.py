@@ -3,11 +3,10 @@
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
 
-from collections import OrderedDict
 from enum import IntFlag
-from typing import Any, Callable, Final, Iterable, NamedTuple, Optional
+from typing import Final, Iterable, NamedTuple, Optional
 
-from .common import EngineData, FixedSizedData, DynamicSizedData, SimpleMultilineError
+from .common import EngineData, DynamicSizedData, SimpleMultilineError
 from .palette import PaletteResource
 from .snes import (
     AbstractTilesetMap,
@@ -15,17 +14,14 @@ from .snes import (
     ImageTileExtractor,
     ImageError,
     SmallTileData,
-    SmallColorTile,
     ConstSmallTileMap,
     TileMapEntry,
     convert_snes_tileset,
     extract_tiles_and_build_tilemap,
     create_tilemap_data,
-    hflip_tile,
-    vflip_tile,
 )
 from .callbacks import parse_callback_parameters, SL_CALLBACK_PARAMETERS
-from .json_formats import Name, Filename, SecondLayerInput, Mappings
+from .json_formats import Name, SecondLayerInput, Mappings
 
 
 SECOND_LAYER_BPP: Final = 4

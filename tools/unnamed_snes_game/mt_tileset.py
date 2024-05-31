@@ -3,24 +3,22 @@
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
 
-import sys
 import os.path
 import xml.etree.ElementTree
-from typing import Final, NamedTuple, Optional, TextIO
+from typing import Final, NamedTuple, Optional
 
-from .json_formats import load_mappings_json, Filename, Mappings, Name
+from .json_formats import Filename, Mappings, Name
 from .palette import PaletteResource
 from .snes import (
     TileMap,
     ConstSmallTileMap,
     SmallTilesetMap,
     ImageError,
-    InvalidTilesError,
     load_image_tile_extractor,
     extract_tiles_and_build_tilemap,
     convert_snes_tileset,
 )
-from .common import FixedSizedData, DynamicSizedData, EngineData, SimpleMultilineError, print_error
+from .common import FixedSizedData, DynamicSizedData, EngineData, SimpleMultilineError
 
 
 N_TILES = 256

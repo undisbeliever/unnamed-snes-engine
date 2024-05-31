@@ -4,8 +4,8 @@
 from typing import Final, NamedTuple
 
 from .common import EngineData, FixedSizedData, DynamicSizedData
-from .json_formats import PaletteInput, Filename, Name
-from .snes import load_palette_image, PALETTE_IMAGE_WIDTH, Palette, PaletteMap, SnesColor, ImageError
+from .json_formats import PaletteInput, Name
+from .snes import load_palette_image, PALETTE_IMAGE_WIDTH, Palette, PaletteMap
 
 
 # The palette used by the resources subsystem

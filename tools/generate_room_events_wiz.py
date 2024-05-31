@@ -8,7 +8,7 @@ from io import StringIO
 
 from collections import OrderedDict
 
-from unnamed_snes_game.json_formats import load_mappings_json, Mappings, Name, RoomEvent
+from unnamed_snes_game.json_formats import load_mappings_json, Name, RoomEvent
 from unnamed_snes_game.callbacks import write_callback_parameters_wiz, ROOM_CALLBACK
 
 

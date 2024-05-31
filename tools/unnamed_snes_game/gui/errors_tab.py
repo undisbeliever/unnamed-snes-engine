@@ -9,7 +9,6 @@ import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.messagebox
 
-from ..resources_over_usb2snes import FsWatcherSignals
 from ..resources_compiler import DataStore, ResourceError, NonResourceError
 from ..common import MultilineError
 from ..snes import InvalidTilesError
