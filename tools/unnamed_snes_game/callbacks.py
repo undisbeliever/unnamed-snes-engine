@@ -130,7 +130,7 @@ def parse_sq4_12(value: str, error_list: list[str]) -> int:
 
     v = int(fv * (1 << 12))
     if v >= 0x8000 or v < -0x8000:
-        error_list.append(f"sQ4.12 value out of bounds (range -8 to +7.9999): value")
+        error_list.append(f"sQ4.12 value out of bounds (range -8 to +7.9999): {value}")
 
     return v & 0xFFFF
 
