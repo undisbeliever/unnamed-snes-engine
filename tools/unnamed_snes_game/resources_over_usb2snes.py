@@ -1185,7 +1185,7 @@ class WebsocketThread(BgThread):
     def start_websocket(self) -> None:
         try:
             with contextlib.closing(websocket.WebSocket()) as ws:
-                ws.connect(self.ws_address, origin="http://localhost")
+                ws.connect(self.ws_address, origin="http://localhost")  # type: ignore
 
                 self.signals.clear_disconnected_flag()
 
