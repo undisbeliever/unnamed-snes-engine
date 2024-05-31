@@ -194,7 +194,7 @@ def convert_second_layer(
             raise RuntimeError(f"Unknown sl_callback: {sli.callback}")
 
         if sli.part_of_room and sl_callback.room_parameters:
-            error_list.append(f"part_of_room second-layer cannot use a callback that contains room_parameters")
+            error_list.append("part_of_room second-layer cannot use a callback that contains room_parameters")
 
         sl_callback_id = sl_callback.id
         callback_parameters = parse_callback_parameters(

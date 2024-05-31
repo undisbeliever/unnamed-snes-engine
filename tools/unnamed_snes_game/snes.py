@@ -113,7 +113,7 @@ class InvalidTilesError(MultilineError):
 
         fp.write(f"{ self.message } for { len(self.invalid_tiles) } { self.tile_size }px tiles in { self.filename }:")
         for i in range(0, to_print, per_line):
-            fp.write(f"\n   ")
+            fp.write("\n   ")
             fp.write(",".join(f"{t:5}" for t in self.invalid_tiles[i : i + per_line]))
         if len(self.invalid_tiles) > to_print:
             fp.write(" ...")

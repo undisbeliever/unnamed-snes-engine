@@ -53,7 +53,7 @@ in rodata0 {
 
         out.write(f"  // Table mapping of 0:8:{ FIXED_POINT_BITS } fixed point tangents to angles multiplied by 2\n")
         out.write(f"  const _Arctan_32x2_Table : [ u8 ; { len(arctan_32x2_table) } ] = { arctan_32x2_table };\n")
-        out.write(f"  let Arctan_32x2_Table = far &_Arctan_32x2_Table as far *const u8;\n")
+        out.write("  let Arctan_32x2_Table = far &_Arctan_32x2_Table as far *const u8;\n")
 
         out.write(
             """

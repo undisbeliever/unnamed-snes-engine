@@ -195,7 +195,7 @@ def parse_objectgroup_tag(tag: xml.etree.ElementTree.Element, error_list: list[s
                                 if p_name == "parameter":
                                     parameter = p.attrib.get("value")
                                     if not parameter:
-                                        add_error(f"Missing parameter value")
+                                        add_error("Missing parameter value")
                                 else:
                                     add_error(f"Unknown property: { p_name }")
                             else:
@@ -382,7 +382,7 @@ def process_room_entities(
             else:
                 # no parameter
                 if tmx_entity.parameter is not None:
-                    add_error(f"Entity does not have a parameter")
+                    add_error("Entity does not have a parameter")
 
         out.append(RoomEntity(xpos=tmx_entity.x, ypos=tmx_entity.y, type_id=entity_type_id, parameter=parameter))
 
@@ -394,10 +394,10 @@ def part_of_room_sl_parameters(image_layer: TmxImageLayer, error_list: list[str]
     # ::TODO implement image wraparound for positive offset values::
 
     if image_layer.offset_x > 0:
-        error_list.append(f"<imagelayer> offsetx must be negative")
+        error_list.append("<imagelayer> offsetx must be negative")
 
     if image_layer.offset_y > 0:
-        error_list.append(f"<imagelayer> offsety must be negative")
+        error_list.append("<imagelayer> offsety must be negative")
 
     tile_pos_x, x_div = divmod(abs(image_layer.offset_x), SECOND_LAYER_MT_TILE_PX)
     tile_pos_y, y_div = divmod(abs(image_layer.offset_y), SECOND_LAYER_MT_TILE_PX)

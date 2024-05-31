@@ -87,7 +87,7 @@ def validate_sfc_file(sfc_data: bytes, symbols: dict[str, int], mappings: Mappin
     if USE_RESOURCES_OVER_USB2SNES_LABEL in symbols:
         o = address_to_rom_offset(symbols[USE_RESOURCES_OVER_USB2SNES_LABEL])
         if sfc_data[o] != 0xFF:
-            raise ValueError(f"sfc file contains resource data")
+            raise ValueError("sfc file contains resource data")
 
 
 class ResourceUsage(NamedTuple):
@@ -311,7 +311,7 @@ def update_checksum(sfc_view: memoryview, memory_map: MemoryMap) -> None:
 
     if len(sfc_view).bit_count() != 1:
         # ::TODO handle non-power of two ROM sizes::
-        raise RuntimeError(f"Invalid sfc file size (must be a power of two in size)")
+        raise RuntimeError("Invalid sfc file size (must be a power of two in size)")
 
     checksum = sum(sfc_view)
 

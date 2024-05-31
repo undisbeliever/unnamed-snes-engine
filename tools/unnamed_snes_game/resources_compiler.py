@@ -1006,7 +1006,7 @@ class ProjectCompiler:
             self.__res_lists_waiting_on_shared_input.clear()
 
     def __compile_dynamic_metasprites(self) -> None:
-        self.log_message(f"Compiling dynamic metasprites")
+        self.log_message("Compiling dynamic metasprites")
         d = self.__dynamic_ms_compiler.compile()
         if isinstance(d, NonResourceError):
             self.log_error(d.error)
