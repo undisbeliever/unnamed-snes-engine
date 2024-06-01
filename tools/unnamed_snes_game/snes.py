@@ -174,9 +174,13 @@ def extract_tiles_from_paletted_image(filename: Filename) -> Generator[SmallTile
 
     assert image.palette
 
-    for ty in range(0, image.height, 8):
-        for tx in range(0, image.width, 8):
-            yield bytes(image.getpixel((x, y)) for y in range(ty, ty + 8) for x in range(tx, tx + 8))
+    imgdata: Final = image.getdata()
+    stride: Final = image.width
+    tile_stride: Final = stride * 8
+
+    for ty in range(0, len(imgdata), tile_stride):
+        for tx in range(0, stride, 8):
+            yield bytes(imgdata[i] for s in range(ty + tx, ty + tile_stride, stride) for i in range(s, s + 8))
 
 
 class PaletteMap(NamedTuple):
@@ -296,20 +300,22 @@ class RgbImageTileExtractor(ImageTileExtractor):
         if xpos + 8 > self.width_px or ypos + 8 > self.height_px:
             raise ImageError(self.filename, f"position out of bounds: { xpos }, { ypos }")
 
+        imgdata: Final = self.__image.getdata()
+        stride: Final = self.width_px
+
         return [
-            convert_rgb_color(self.__image.getpixel((x, y)))  # type: ignore
-            for y in range(ypos, ypos + 8)
-            for x in range(xpos, xpos + 8)
+            convert_rgb_color(imgdata[i]) for s in range(ypos * stride + xpos, (ypos + 8) * stride, stride) for i in range(s, s + 8)
         ]
 
     def large_tile(self, xpos: int, ypos: int) -> LargeColorTile:
         if xpos + 16 > self.width_px or ypos + 16 > self.height_px:
             raise ImageError(self.filename, f"position out of bounds: { xpos }, { ypos }")
 
+        imgdata: Final = self.__image.getdata()
+        stride: Final = self.width_px
+
         return [
-            convert_rgb_color(self.__image.getpixel((x, y)))  # type: ignore
-            for y in range(ypos, ypos + 16)
-            for x in range(xpos, xpos + 16)
+            convert_rgb_color(imgdata[i]) for s in range(ypos * stride + xpos, (ypos + 16) * stride, stride) for i in range(s, s + 16)
         ]
 
 
@@ -348,19 +354,21 @@ class IndexedImageTileExtractor(ImageTileExtractor):
         if xpos + 8 > self.width_px or ypos + 8 > self.height_px:
             raise ImageError(self.filename, f"position out of bounds: { xpos }, { ypos }")
 
-        return [
-            self.__palette[self.__image.getpixel((x, y))] for y in range(ypos, ypos + 8) for x in range(xpos, xpos + 8)  # type: ignore
-        ]
+        pal: Final = self.__palette
+        imgdata: Final = self.__image.getdata()
+        stride: Final = self.width_px
+
+        return [pal[imgdata[i]] for s in range(ypos * stride + xpos, (ypos + 8) * stride, stride) for i in range(s, s + 8)]
 
     def large_tile(self, xpos: int, ypos: int) -> LargeColorTile:
         if xpos + 16 > self.width_px or ypos + 16 > self.height_px:
             raise ImageError(self.filename, f"position out of bounds: { xpos }, { ypos }")
 
-        return [
-            self.__palette[self.__image.getpixel((x, y))]  # type: ignore
-            for y in range(ypos, ypos + 16)
-            for x in range(xpos, xpos + 16)
-        ]
+        pal: Final = self.__palette
+        imgdata: Final = self.__image.getdata()
+        stride: Final = self.width_px
+
+        return [pal[imgdata[i]] for s in range(ypos * stride + xpos, (ypos + 16) * stride, stride) for i in range(s, s + 16)]
 
 
 def load_image_tile_extractor(filename: Filename) -> ImageTileExtractor:
