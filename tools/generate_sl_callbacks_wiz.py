@@ -8,7 +8,7 @@ from io import StringIO
 
 from collections import OrderedDict
 
-from unnamed_snes_game.json_formats import load_mappings_json, Mappings, Name, SecondLayerCallback
+from unnamed_snes_game.json_formats import load_mappings_json, Name, SecondLayerCallback
 from unnamed_snes_game.callbacks import write_callback_parameters_wiz, SL_CALLBACK_PARAMETERS, SL_ROOM_PARAMETERS
 
 

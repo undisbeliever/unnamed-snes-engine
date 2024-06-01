@@ -47,11 +47,11 @@ func {pattern.name}(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos)
 
         if o.xpos == 0:
             # buffer.xPos already written
-            out.write(f"    _update_hi_table_x8_xPos();\n")
+            out.write("    _update_hi_table_x8_xPos();\n")
         else:
             out.write(f"    (&buffer[{-i}].xPos)[unaligned yy] = a = <:xPos + {o.xpos};\n")
-            out.write(f"    a = (>:xPos +# 0) >>> 1;\n")
-            out.write(f"    _update_hi_table_x8(carry);\n")
+            out.write("    a = (>:xPos +# 0) >>> 1;\n")
+            out.write("    _update_hi_table_x8(carry);\n")
 
     out.write("\n")
     out.write("    mem16();\n")

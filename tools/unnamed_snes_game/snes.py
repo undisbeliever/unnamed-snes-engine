@@ -2,8 +2,10 @@
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
 
+import struct
 import itertools
 import PIL.Image  # type: ignore
+from itertools import islice
 from abc import ABC, abstractmethod
 from typing import Generator, Final, Iterable, Literal, NamedTuple, Optional, Sequence, TextIO, Union
 
@@ -20,9 +22,6 @@ LargeColorTile = list[SnesColor]  # 256 (16x16) `SnesColor`s
 # Tiles made up of palette indexes
 SmallTileData = bytes  # 64 (8x8) bytes
 LargeTileData = bytes  # 256 (16x16) bytes
-
-# Mapping of `SnesColor` to palette index
-PaletteMap = dict[SnesColor, int]
 
 
 class TileMapEntry(NamedTuple):
@@ -114,7 +113,7 @@ class InvalidTilesError(MultilineError):
 
         fp.write(f"{ self.message } for { len(self.invalid_tiles) } { self.tile_size }px tiles in { self.filename }:")
         for i in range(0, to_print, per_line):
-            fp.write(f"\n   ")
+            fp.write("\n   ")
             fp.write(",".join(f"{t:5}" for t in self.invalid_tiles[i : i + per_line]))
         if len(self.invalid_tiles) > to_print:
             fp.write(" ...")
@@ -159,119 +158,232 @@ def convert_rgb_color(c: tuple[int, int, int]) -> SnesColor:
     return (b << 10) | (g << 5) | r
 
 
-def is_small_tile_not_transparent(image: PIL.Image.Image, transparent_color: SnesColor, xpos: int, ypos: int) -> bool:
-    """Returns True if the tile contains a non-transparent pixel"""
+# NOTE: Does not extract palette from image
+def extract_tiles_from_paletted_image(filename: Filename) -> Generator[SmallTileData, None, None]:
+    try:
+        with PIL.Image.open(filename) as image:
+            image.load()
+    except Exception as e:
+        raise ImageError(filename, str(e))
 
-    if xpos + 8 > image.width or ypos + 8 > image.height:
-        raise ValueError(f"position out of bounds: { xpos }, { ypos }")
+    if image.mode != "P":
+        raise ImageError(image.filename, "Image does not have a palette")
 
-    return any(
-        convert_rgb_color(image.getpixel((x, y))) != transparent_color for y in range(ypos, ypos + 8) for x in range(xpos, xpos + 8)
-    )
-
-
-def extract_small_tile_grid(image: PIL.Image.Image) -> Generator[SmallColorTile, None, None]:
-    """Generator that extracts 8px tiles from the image in consecutive order."""
-
-    # Required as `image.convert()` has no `filename` attribute
-    image_filename = image.filename
-
-    if image.mode != "RGB":
-        image = image.convert("RGB")
-
-    if image.width % 8 != 0 or image.height % 8 != 0:
-        raise ImageError(image_filename, "Image width and height MUST be a multiple of 8")
-
-    for ty in range(0, image.height, 8):
-        for tx in range(0, image.width, 8):
-            yield [convert_rgb_color(image.getpixel((x, y))) for y in range(ty, ty + 8) for x in range(tx, tx + 8)]
-
-
-def extract_tiles_from_paletted_image(image: PIL.Image.Image) -> Generator[SmallTileData, None, None]:
     if image.width % 8 != 0 or image.height % 8 != 0:
         raise ImageError(image.filename, "Image width and height MUST be a multiple of 8")
 
-    if not image.palette:
-        raise ImageError(image.filename, "Image does not have a palette")
+    assert image.palette
 
-    img_data = image.getdata()
+    imgdata: Final = image.getdata()
+    stride: Final = image.width
+    tile_stride: Final = stride * 8
 
-    for ty in range(0, image.height, 8):
-        for tx in range(0, image.width, 8):
-            yield bytes(image.getpixel((x, y)) for y in range(ty, ty + 8) for x in range(tx, tx + 8))
-
-
-def extract_small_tile(image: PIL.Image.Image, xpos: int, ypos: int) -> SmallColorTile:
-    # Assumes image.mode == 'RGB'
-
-    if xpos + 8 > image.width or ypos + 8 > image.height:
-        raise ValueError(f"position out of bounds: { xpos }, { ypos }")
-
-    return [convert_rgb_color(image.getpixel((x, y))) for y in range(ypos, ypos + 8) for x in range(xpos, xpos + 8)]
+    for ty in range(0, len(imgdata), tile_stride):
+        for tx in range(0, stride, 8):
+            yield bytes(imgdata[i] for s in range(ty + tx, ty + tile_stride, stride) for i in range(s, s + 8))
 
 
-def extract_large_tile(image: PIL.Image.Image, xpos: int, ypos: int) -> LargeColorTile:
-    # Assumes image.mode == 'RGB'
+class PaletteMap(NamedTuple):
+    color_maps: list[dict[SnesColor, int]]
 
-    if xpos + 16 > image.width or ypos + 16 > image.height:
-        raise ValueError(f"position out of bounds: { xpos }, { ypos }")
+    def palette_for_tile(self, tile: Union[SmallColorTile, LargeColorTile]) -> tuple[Optional[int], Optional[dict[SnesColor, int]]]:
+        # Returns a tuple of (palette_id, color_map)
+        for palette_id, color_map in enumerate(self.color_maps):
+            if all([c in color_map for c in tile]):
+                return palette_id, color_map
 
-    return [convert_rgb_color(image.getpixel((x, y))) for y in range(ypos, ypos + 16) for x in range(xpos, xpos + 16)]
+        return None, None
 
 
-def create_palettes_map(image: PIL.Image.Image, bpp: int) -> list[PaletteMap]:
-    # Returns palettes_map
+class Palette(NamedTuple):
+    colors: list[SnesColor]
+
+    def create_map(self, bpp: int) -> PaletteMap:
+        if bpp < 1 or bpp > 8:
+            raise ValueError("Invalid bpp")
+
+        colors: Final = self.colors
+        colors_per_palette: Final = 1 << bpp
+        n_palettes: Final = min(len(self.colors) // colors_per_palette, 8)
+
+        out = list()
+
+        for p in range(n_palettes):
+            color_map = dict()
+            pi = p * colors_per_palette
+            for i, c in enumerate(colors[pi : pi + colors_per_palette]):
+                if c not in color_map:
+                    color_map[c] = i
+            out.append(color_map)
+
+        return PaletteMap(out)
+
+    def snes_data(self) -> bytes:
+        return struct.pack(f"<{len(self.colors)}H", *self.colors)
+
+
+PALETTE_IMAGE_WIDTH: Final = 16
+
+
+def load_palette_image(filename: Filename, max_colors: int) -> Palette:
+    try:
+        with PIL.Image.open(filename) as image:
+            image.load()
+    except Exception as e:
+        raise ImageError(filename, str(e))
+
+    if image.width != PALETTE_IMAGE_WIDTH:
+        raise ImageError(filename, f"Palette Image MUST BE {PALETTE_IMAGE_WIDTH} px wide")
+
+    if image.height > max_colors // 16:
+        raise ImageError(filename, "Palette Image contains too many colors")
 
     if image.mode != "RGB":
         image = image.convert("RGB")
 
-    colors_per_palette = 1 << bpp
-    max_colors = min(colors_per_palette * 8, 256)
-
-    if image.width != 16:
-        raise ImageError(image.filename, "Palette Image must be 16 pixels in width")
-
-    if image.width * image.height > max_colors:
-        raise ImageError(image.filename, f"Palette Image has too many colours (max { max_colors })")
-
-    image_data = image.getdata()
-
-    palettes_map = list()
-
-    for p in range(len(image_data) // colors_per_palette):
-        pal_map = dict()
-
-        for x in range(colors_per_palette):
-            c = convert_rgb_color(image_data[p * colors_per_palette + x])
-            if c not in pal_map:
-                pal_map[c] = x
-
-        palettes_map.append(pal_map)
-
-    return palettes_map
+    return Palette([convert_rgb_color(c) for c in image.getdata()])
 
 
-def convert_palette_image(image: PIL.Image.Image) -> bytes:
-    palette_data = bytearray()
+class ImageTileExtractor(ABC):
+    def __init__(self, filename: Filename, width_px: int, height_px: int):
+        if width_px % 8 != 0 or height_px % 8 != 0:
+            raise ImageError(filename, "Image width and height MUST be a multiple of 8")
 
-    for c in image.getdata():
-        u16 = convert_rgb_color(c)
+        self.filename: Final = filename
+        self.width_px: Final = width_px
+        self.height_px: Final = height_px
 
-        palette_data.append(u16 & 0xFF)
-        palette_data.append(u16 >> 8)
+    @abstractmethod
+    def small_tile(self, xpos: int, ypos: int) -> SmallColorTile:
+        pass
 
-    return palette_data
+    @abstractmethod
+    def large_tile(self, xpos: int, ypos: int) -> LargeColorTile:
+        pass
+
+    def extract_small_tiles(self) -> Generator[SmallColorTile, None, None]:
+        """Generator that extracts 8px tiles from the image in consecutive order."""
+
+        for ty in range(0, self.height_px, 8):
+            for tx in range(0, self.width_px, 8):
+                yield self.small_tile(tx, ty)
+
+    @abstractmethod
+    def hflip_image(self) -> "ImageTileExtractor":
+        pass
+
+    @abstractmethod
+    def vflip_image(self) -> "ImageTileExtractor":
+        pass
+
+    @abstractmethod
+    def hvflip_image(self) -> "ImageTileExtractor":
+        pass
 
 
-def get_palette_id(
-    tile: Union[SmallColorTile, LargeColorTile], palettes_map: list[PaletteMap]
-) -> tuple[Optional[int], Optional[PaletteMap]]:
-    # Returns a tuple of (palette_id, palette_map)
-    for palette_id, pal_map in enumerate(palettes_map):
-        if all([c in pal_map for c in tile]):
-            return palette_id, pal_map
+class RgbImageTileExtractor(ImageTileExtractor):
+    def __init__(self, filename: Filename, image: PIL.Image.Image):
+        assert image.mode == "RGB", "wrong image mode"
+        super().__init__(filename, image.width, image.height)
+        self.__image: Final = image
 
-    return None, None
+    def hflip_image(self) -> "RgbImageTileExtractor":
+        return RgbImageTileExtractor(self.filename + " [hflip]", self.__image.transpose(PIL.Image.Transpose.FLIP_LEFT_RIGHT))
+
+    def vflip_image(self) -> "RgbImageTileExtractor":
+        return RgbImageTileExtractor(self.filename + " [vflip]", self.__image.transpose(PIL.Image.Transpose.FLIP_TOP_BOTTOM))
+
+    def hvflip_image(self) -> "RgbImageTileExtractor":
+        return RgbImageTileExtractor(self.filename + " [hvflip]", self.__image.transpose(PIL.Image.Transpose.ROTATE_180))
+
+    def small_tile(self, xpos: int, ypos: int) -> SmallColorTile:
+        if xpos + 8 > self.width_px or ypos + 8 > self.height_px:
+            raise ImageError(self.filename, f"position out of bounds: { xpos }, { ypos }")
+
+        imgdata: Final = self.__image.getdata()
+        stride: Final = self.width_px
+
+        return [
+            convert_rgb_color(imgdata[i]) for s in range(ypos * stride + xpos, (ypos + 8) * stride, stride) for i in range(s, s + 8)
+        ]
+
+    def large_tile(self, xpos: int, ypos: int) -> LargeColorTile:
+        if xpos + 16 > self.width_px or ypos + 16 > self.height_px:
+            raise ImageError(self.filename, f"position out of bounds: { xpos }, { ypos }")
+
+        imgdata: Final = self.__image.getdata()
+        stride: Final = self.width_px
+
+        return [
+            convert_rgb_color(imgdata[i]) for s in range(ypos * stride + xpos, (ypos + 16) * stride, stride) for i in range(s, s + 16)
+        ]
+
+
+class IndexedImageTileExtractor(ImageTileExtractor):
+    def __init__(self, filename: Filename, image: PIL.Image.Image, palette: Optional[list[SnesColor]] = None):
+        im_palette = image.getpalette("RGB")
+        if im_palette is None:
+            raise ImageError(self.filename, "image does not have a palette")
+
+        if palette is None:
+            palette = list()
+            it = iter(im_palette)
+            while c := tuple(islice(it, 3)):
+                palette.append(convert_rgb_color(c))  # type: ignore
+
+        super().__init__(filename, image.width, image.height)
+        self.__palette: Final = palette
+        self.__image: Final = image
+
+    def hflip_image(self) -> "IndexedImageTileExtractor":
+        return IndexedImageTileExtractor(
+            self.filename + " [hflip]", self.__image.transpose(PIL.Image.Transpose.FLIP_LEFT_RIGHT), self.__palette
+        )
+
+    def vflip_image(self) -> "IndexedImageTileExtractor":
+        return IndexedImageTileExtractor(
+            self.filename + " [vflip]", self.__image.transpose(PIL.Image.Transpose.FLIP_TOP_BOTTOM), self.__palette
+        )
+
+    def hvflip_image(self) -> "IndexedImageTileExtractor":
+        return IndexedImageTileExtractor(
+            self.filename + " [hvflip]", self.__image.transpose(PIL.Image.Transpose.ROTATE_180), self.__palette
+        )
+
+    def small_tile(self, xpos: int, ypos: int) -> SmallColorTile:
+        if xpos + 8 > self.width_px or ypos + 8 > self.height_px:
+            raise ImageError(self.filename, f"position out of bounds: { xpos }, { ypos }")
+
+        pal: Final = self.__palette
+        imgdata: Final = self.__image.getdata()
+        stride: Final = self.width_px
+
+        return [pal[imgdata[i]] for s in range(ypos * stride + xpos, (ypos + 8) * stride, stride) for i in range(s, s + 8)]
+
+    def large_tile(self, xpos: int, ypos: int) -> LargeColorTile:
+        if xpos + 16 > self.width_px or ypos + 16 > self.height_px:
+            raise ImageError(self.filename, f"position out of bounds: { xpos }, { ypos }")
+
+        pal: Final = self.__palette
+        imgdata: Final = self.__image.getdata()
+        stride: Final = self.width_px
+
+        return [pal[imgdata[i]] for s in range(ypos * stride + xpos, (ypos + 16) * stride, stride) for i in range(s, s + 16)]
+
+
+def load_image_tile_extractor(filename: Filename) -> ImageTileExtractor:
+    try:
+        with PIL.Image.open(filename) as image:
+            image.load()
+    except Exception as e:
+        raise ImageError(filename, str(e))
+
+    if image.mode == "RGB":
+        return RgbImageTileExtractor(filename, image)
+    elif image.mode == "P":
+        return IndexedImageTileExtractor(filename, image)
+    else:
+        return RgbImageTileExtractor(filename, image.convert("RGB"))
 
 
 _H_FLIP_ORDER_SMALL = [(y * 8 + x) for y, x in itertools.product(range(8), reversed(range(8)))]
@@ -307,28 +419,28 @@ def split_large_tile(tile: LargeTileData) -> tuple[SmallTileData, SmallTileData,
     )
 
 
-def convert_tilemap_and_tileset(
-    tiles: Generator[SmallColorTile, None, None],
-    filename: Filename,
+def extract_tiles_and_build_tilemap(
+    image: ImageTileExtractor,
     tileset: AbstractTilesetMap,
-    palettes_map: list[PaletteMap],
-    map_width: int,
-    map_height: int,
+    palette_map: PaletteMap,
 ) -> TileMap:
-    assert len(palettes_map) <= 8
+    assert len(palette_map.color_maps) <= 8
+
+    map_width: Final = image.width_px // 8
+    map_height: Final = image.height_px // 8
 
     invalid_tiles = list()
 
     tilemap: list[TileMapEntry] = list()
 
-    for tile_index, tile in enumerate(tiles):
-        palette_id, pal_map = get_palette_id(tile, palettes_map)
+    for tile_index, tile in enumerate(image.extract_small_tiles()):
+        palette_id, color_map = palette_map.palette_for_tile(tile)
 
-        if pal_map:
+        if color_map:
             assert palette_id is not None
 
             # Must be bytes() here as a dict() key must be immutable
-            tile_data = bytes([pal_map[c] for c in tile])
+            tile_data = bytes([color_map[c] for c in tile])
             tile_id, hflip, vflip = tileset.get_or_insert(tile_data)
 
             tilemap.append(TileMapEntry(tile_id, palette_id, hflip, vflip))
@@ -336,7 +448,7 @@ def convert_tilemap_and_tileset(
             invalid_tiles.append(tile_index)
 
     if invalid_tiles:
-        raise InvalidTilesError("Cannot find palette", filename, invalid_tiles, map_width, 8)
+        raise InvalidTilesError("Cannot find palette", image.filename, invalid_tiles, map_width, 8)
 
     assert len(tilemap) == map_width * map_height
 
@@ -394,40 +506,3 @@ def create_tilemap_data_high(tilemap: Union[TileMap, Sequence[TileMapEntry]], de
         )
 
     return data
-
-
-def image_and_palette_map_to_snes(
-    image: PIL.Image.Image, image_filename: Filename, palettes_map: list[PaletteMap], bpp: int
-) -> tuple[TileMap, bytes]:
-    # Return (tilemap, tile_data)
-
-    tileset = SmallTilesetMap()
-    tilemap = convert_tilemap_and_tileset(
-        extract_small_tile_grid(image), image_filename, tileset, palettes_map, image.width // 8, image.height // 8
-    )
-
-    tile_data = convert_snes_tileset(tileset.tiles(), bpp)
-
-    return tilemap, tile_data
-
-
-def image_to_snes(
-    image: PIL.Image.Image, image_filename: Filename, palette_image: PIL.Image.Image, bpp: int
-) -> tuple[TileMap, bytes, bytes]:
-    # Return (tilemap, tile_data, palette_data)
-
-    tileset = SmallTilesetMap()
-    tilemap = convert_tilemap_and_tileset(
-        extract_small_tile_grid(image),
-        image_filename,
-        tileset,
-        create_palettes_map(palette_image, bpp),
-        image.width // 8,
-        image.height // 8,
-    )
-
-    tile_data = convert_snes_tileset(tileset.tiles(), bpp)
-
-    palette_data = convert_palette_image(palette_image)
-
-    return tilemap, tile_data, palette_data

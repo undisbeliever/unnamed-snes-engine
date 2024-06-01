@@ -4,14 +4,12 @@
 
 
 import re
-import json
 from io import StringIO
 from collections import OrderedDict
 from abc import ABC, abstractmethod
-from typing import Any, Final, Generic, Literal, Optional, TypeVar, Union
+from typing import Any, Final, Generic, Optional, TypeVar, Union
 
 import tkinter as tk
-import tkinter.ttk as ttk
 from tkinter.scrolledtext import ScrolledText
 
 from ..json_formats import Name

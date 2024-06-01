@@ -5,19 +5,15 @@
 
 import re
 import os
-import sys
 import gzip
 import base64
 import struct
 import xml.etree.ElementTree
 import posixpath
 from collections import OrderedDict
-from typing import Final, NamedTuple, Optional, Union
+from typing import Final, NamedTuple, Optional
 
 from .json_formats import (
-    load_entities_json,
-    load_mappings_json,
-    Filename,
     Mappings,
     EntitiesJson,
     Entity,
@@ -26,7 +22,7 @@ from .json_formats import (
     SecondLayerInput,
     Name,
 )
-from .common import EngineData, FixedSizedData, MultilineError, SimpleMultilineError, print_error
+from .common import EngineData, FixedSizedData, SimpleMultilineError
 from .callbacks import parse_callback_parameters, ROOM_CALLBACK, SL_ROOM_PARAMETERS, RoomDoors, parse_int
 
 from .second_layers import MT_TILE_PX as SECOND_LAYER_MT_TILE_PX
@@ -199,7 +195,7 @@ def parse_objectgroup_tag(tag: xml.etree.ElementTree.Element, error_list: list[s
                                 if p_name == "parameter":
                                     parameter = p.attrib.get("value")
                                     if not parameter:
-                                        add_error(f"Missing parameter value")
+                                        add_error("Missing parameter value")
                                 else:
                                     add_error(f"Unknown property: { p_name }")
                             else:
@@ -386,7 +382,7 @@ def process_room_entities(
             else:
                 # no parameter
                 if tmx_entity.parameter is not None:
-                    add_error(f"Entity does not have a parameter")
+                    add_error("Entity does not have a parameter")
 
         out.append(RoomEntity(xpos=tmx_entity.x, ypos=tmx_entity.y, type_id=entity_type_id, parameter=parameter))
 
@@ -398,10 +394,10 @@ def part_of_room_sl_parameters(image_layer: TmxImageLayer, error_list: list[str]
     # ::TODO implement image wraparound for positive offset values::
 
     if image_layer.offset_x > 0:
-        error_list.append(f"<imagelayer> offsetx must be negative")
+        error_list.append("<imagelayer> offsetx must be negative")
 
     if image_layer.offset_y > 0:
-        error_list.append(f"<imagelayer> offsety must be negative")
+        error_list.append("<imagelayer> offsety must be negative")
 
     tile_pos_x, x_div = divmod(abs(image_layer.offset_x), SECOND_LAYER_MT_TILE_PX)
     tile_pos_y, y_div = divmod(abs(image_layer.offset_y), SECOND_LAYER_MT_TILE_PX)

@@ -27,12 +27,10 @@
 # SOFTWARE.
 
 
-import re
 import sys
 import json
 import os.path
 import secrets
-import argparse
 import posixpath
 import threading
 import contextlib
@@ -45,7 +43,7 @@ import websocket  # type: ignore[import]
 import watchdog.events
 import watchdog.observers
 
-from typing import cast, final, Any, Callable, Final, NamedTuple, Optional, Union
+from typing import final, Callable, Final, NamedTuple, Optional, Union
 
 from .ansi_color import AnsiColors
 from .entity_data import ENTITY_ROM_DATA_LABEL, ENTITY_ROM_DATA_BYTES_PER_ENTITY
@@ -54,7 +52,6 @@ from .resources_compiler import DataStore, ProjectCompiler, SharedInputType, Res
 from .json_formats import Name, Filename, Mappings, MemoryMap
 
 from .common import (
-    MultilineError,
     ResourceType,
     MS_FS_DATA_BANK_OFFSET,
     DYNAMIC_SPRITE_TILES_BANK_OFFSET,
@@ -324,7 +321,7 @@ class FsWatcherSignals(metaclass=ABCMeta):
             raise DisconnectEventException()
 
     def request_sleep(self, delay: float) -> None:
-        s = self._interrupt_request_sleep_event.wait(delay)
+        self._interrupt_request_sleep_event.wait(delay)
         self._interrupt_request_sleep_event.clear()
 
         if self._disconnect_event.is_set():
@@ -465,7 +462,7 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
 
             if self.rebuild_required:
                 self.signals.set_fs_watcher_status("REBUILD REQUIRED")
-                log_fs_watcher(f"REBUILD REQUIRED")
+                log_fs_watcher("REBUILD REQUIRED")
 
             # Signal to ResourcesOverUsb2Snes that a resource has changed
             self.signals.resource_changed()
@@ -642,7 +639,7 @@ class Usb2Snes:
             raise ValueError(f"Expected bytes data, got { type(data) }")
 
         if offset >= self.USB2SNES_WRAM_OFFSET and offset < self.USB2SNES_SRAM_OFFSET:
-            raise ValueError(f"Cannot write to Work-RAM")
+            raise ValueError("Cannot write to Work-RAM")
 
         size: Final[int] = len(data)
 
@@ -665,7 +662,7 @@ class Usb2Snes:
             if addr & 0xFFFF >= 0x2000:
                 return self.read_offset((addr & 0x1FFF) | self.USB2SNES_WRAM_OFFSET, size)
 
-        raise ValueError(f"addr is not a Work-RAM address")
+        raise ValueError("addr is not a Work-RAM address")
 
 
 # =======================
@@ -808,7 +805,7 @@ class ResourcesOverUsb2Snes:
 
         # Confirmed game is executing Work-RAM code and the ROM can be safely modified.
 
-        log_notice(f"Updating game...")
+        log_notice("Updating game...")
         self.usb2snes.write_to_offset(0, rom_data)
 
         log_notice("Reset")
@@ -882,7 +879,7 @@ class ResourcesOverUsb2Snes:
 
         if isinstance(co, ResourceError):
             log_compiler_error(co)
-            log_notice(f"    Waiting until resource data is ready...")
+            log_notice("    Waiting until resource data is ready...")
             self.signals.set_usb2snes_status(f"WAITING for room {room_id}")
 
             while isinstance(co, ResourceError):
@@ -909,7 +906,7 @@ class ResourcesOverUsb2Snes:
             if isinstance(co, ResourceError):
                 log_compiler_error(co)
 
-            log_notice(f"    Waiting until resource data is ready...")
+            log_notice("    Waiting until resource data is ready...")
             self.signals.set_usb2snes_status(f"WAITING for {resource_type.name}[{resource_id}]")
 
             while not isinstance(co, ResourceData):
@@ -923,7 +920,7 @@ class ResourcesOverUsb2Snes:
         dyn_ms_data = self.data_store.get_dynamic_ms_data()
 
         if dyn_ms_data is None:
-            log_error(f"    Cannot access Dynamic Metasprite tile data")
+            log_error("    Cannot access Dynamic Metasprite tile data")
 
             while dyn_ms_data is None:
                 self.signals.wait_until_resource_changed()
@@ -940,13 +937,13 @@ class ResourcesOverUsb2Snes:
 
         if me is None or (not me.msfs_data) or (not me.entity_rom_data):
             if me is None:
-                log_error(f"    Cannot access MsFsData or Entity ROM Data")
+                log_error("    Cannot access MsFsData or Entity ROM Data")
             elif not me.msfs_data:
-                log_error(f"    Cannot access MsFsData", me.error)
+                log_error("    Cannot access MsFsData", me.error)
             elif not me.entity_rom_data:
-                log_error(f"    Cannot access entity_rom_data", me.error)
+                log_error("    Cannot access entity_rom_data", me.error)
 
-            log_notice(f"    Waiting until data is ready...")
+            log_notice("    Waiting until data is ready...")
             self.signals.set_usb2snes_status("WAITING for MsFs and entity data")
 
             while me is None or (not me.msfs_data) or (not me.entity_rom_data):
@@ -1034,7 +1031,7 @@ class ResourcesOverUsb2Snes:
         # `data_size` and `data` might still be used by the console.
         b = bytes([command_id, 0])
         self.usb2snes.write_to_offset(self.command_offset, b)
-        log_response(f"Reset command_id")
+        log_response("Reset command_id")
 
         self.previous_command_id = command_id
 
@@ -1185,7 +1182,7 @@ class WebsocketThread(BgThread):
     def start_websocket(self) -> None:
         try:
             with contextlib.closing(websocket.WebSocket()) as ws:
-                ws.connect(self.ws_address, origin="http://localhost")
+                ws.connect(self.ws_address, origin="http://localhost")  # type: ignore
 
                 self.signals.clear_disconnected_flag()
 
@@ -1196,7 +1193,6 @@ class WebsocketThread(BgThread):
             self.signals.set_usb2snes_status("Closed")
 
         except ConnectionRefusedError as e:
-            ws_connected = False
             log_error(f"Cannot connect to {self.ws_address}", e)
             self.signals.set_usb2snes_status(f"Cannot connect to {self.ws_address}: {e}")
 

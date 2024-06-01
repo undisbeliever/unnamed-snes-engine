@@ -111,7 +111,7 @@ class _Helper:
         if d is None:
             return None
         if not isinstance(d, dict):
-            self._raise_error(f"Expected a JSON dict type", key)
+            self._raise_error("Expected a JSON dict type", key)
 
         return cls(d, *self.__path, key)
 
@@ -120,7 +120,7 @@ class _Helper:
 
         d = self.__dict.get(key)
         if not isinstance(d, dict):
-            self._raise_error(f"Expected a JSON dict type", key)
+            self._raise_error("Expected a JSON dict type", key)
 
         return cls(d, *self.__path, key)
 
@@ -129,7 +129,7 @@ class _Helper:
 
         for i, item in enumerate(self._get(key, list)):
             if not isinstance(item, dict):
-                self._raise_error(f"Expected a dict", key)
+                self._raise_error("Expected a dict", key)
 
             yield cls(item, *self.__path, key, str(i))
 
@@ -138,7 +138,7 @@ class _Helper:
 
         d = self.__dict.get(key)
         if not isinstance(d, dict):
-            self._raise_error(f"Expected a JSON dict type", key)
+            self._raise_error("Expected a JSON dict type", key)
 
         for name, item in d.items():
             name = self._test_name(name, key)
@@ -153,7 +153,7 @@ class _Helper:
 
         d = self.__dict.get(key)
         if not isinstance(d, dict):
-            self._raise_error(f"Expected a JSON dict type", key)
+            self._raise_error("Expected a JSON dict type", key)
 
         for name, item in d.items():
             name = self._test_name(name, key)
@@ -168,7 +168,7 @@ class _Helper:
 
         d = self.__dict.get(key)
         if not isinstance(d, dict):
-            self._raise_error(f"Expected a JSON dict type", key)
+            self._raise_error("Expected a JSON dict type", key)
 
         for name, item in d.items():
             assert isinstance(name, str)
@@ -312,7 +312,7 @@ class _Helper:
 
         d = self.__dict.get(key)
         if not isinstance(d, dict):
-            self._raise_error(f"Expected a JSON dict type", key)
+            self._raise_error("Expected a JSON dict type", key)
 
         out = OrderedDict()
         for name, value in d.items():
@@ -323,7 +323,7 @@ class _Helper:
             elif isinstance(value, int) or isinstance(value, float):
                 out[name] = str(value)
             else:
-                self._raise_error(f"Only strings or numbers are allowed in parameters", key, name)
+                self._raise_error("Only strings or numbers are allowed in parameters", key, name)
 
         return out
 
@@ -393,7 +393,7 @@ class _Helper:
             if item_name is None:
                 self._raise_missing_field_error("name", key)
             if not isinstance(item_name, str):
-                self._raise_error(f"Expected a string", key, str(i), "name")
+                self._raise_error("Expected a string", key, str(i), "name")
             if not self.NAME_REGEX.match(item_name):
                 self._raise_error(f"Invalid name: { item_name }", key, str(i), "name")
 
@@ -418,8 +418,6 @@ class _Helper:
 
 
 def _load_json_file(filename: Filename, cls: Type[_Helper._Self]) -> _Helper._Self:
-    basename = os.path.basename(filename)
-
     with open(filename, "r") as fp:
         j = json.load(fp)
 
@@ -614,8 +612,6 @@ def load_ms_export_order_json(filename: Filename) -> MsExportOrder:
     patterns = jh.build_ordered_dict_from_list(
         "patterns", MsPattern, 256, lambda p, name, i: MsPattern(name=name, id=i * 2, objects=p.get_pattern_objects("objects"))
     )
-
-    shadow_sizes = jh.get_name_list_mapping("shadow_sizes")
 
     return MsExportOrder(
         patterns=patterns,

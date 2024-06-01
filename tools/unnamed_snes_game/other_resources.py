@@ -2,34 +2,23 @@
 # -*- coding: utf-8 -*-
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
+from typing import Callable, Final, Iterable
 
-import PIL.Image  # type: ignore
-import sys
-from collections import OrderedDict
-from typing import Any, Callable, Final, Iterable, NamedTuple, Optional
-
-from .common import EngineData, FixedSizedData, DynamicSizedData, print_error
-from .palette import PaletteColors
+from .common import EngineData, FixedSizedData, DynamicSizedData
+from .palette import PaletteResource
 
 from .snes import (
+    load_image_tile_extractor,
     extract_tiles_from_paletted_image,
+    extract_tiles_and_build_tilemap,
     convert_mode7_tileset,
     convert_snes_tileset,
-    image_and_palette_map_to_snes,
     create_tilemap_data,
     SmallTileData,
+    SmallTilesetMap,
 )
 
-from .json_formats import (
-    load_mappings_json,
-    load_other_resources_json,
-    Name,
-    Filename,
-    Mappings,
-    TilesInput,
-    BackgroundImageInput,
-    OtherResources,
-)
+from .json_formats import Name, TilesInput, BackgroundImageInput
 
 
 # ::TODO add palettes::
@@ -54,10 +43,7 @@ TILE_FORMATS: dict[str, Callable[[Iterable[SmallTileData]], bytes]] = {
 def convert_tiles(t: TilesInput) -> EngineData:
     tile_converter = TILE_FORMATS[t.format]
 
-    with PIL.Image.open(t.source) as image:
-        image.load()
-
-    tile_data = tile_converter(extract_tiles_from_paletted_image(image))
+    tile_data = tile_converter(extract_tiles_from_paletted_image(t.source))
 
     return EngineData(
         ram_data=None,
@@ -80,19 +66,22 @@ NAMETABLE_SIZE_BYTES: Final = 32 * 32 * 2
 VALID_BGI_HEADER_TM_SIZES: Final = (1, 2, 4)
 
 
-def convert_bg_image(bgi: BackgroundImageInput, palettes: dict[Name, PaletteColors]) -> EngineData:
+def convert_bg_image(bgi: BackgroundImageInput, palettes: dict[Name, PaletteResource]) -> EngineData:
     bpp = BI_BPP_FORMATS[bgi.format]
 
-    with PIL.Image.open(bgi.source) as image:
-        image.load()
+    image = load_image_tile_extractor(bgi.source)
 
     pal = palettes.get(bgi.palette)
     if pal is None:
         raise RuntimeError(f"Cannot load palette {bgi.palette}")
 
-    tilemap, tile_data = image_and_palette_map_to_snes(image, bgi.source, pal.create_map(bpp), bpp)
+    tileset = SmallTilesetMap()
+    palette_map = pal.create_map(bpp)
+
+    tilemap = extract_tiles_and_build_tilemap(image, tileset, palette_map)
 
     tilemap_data = create_tilemap_data(tilemap, bgi.tile_priority)
+    tile_data = convert_snes_tileset(tileset.tiles(), bpp)
 
     tm_size = len(tilemap_data) // NAMETABLE_SIZE_BYTES
 

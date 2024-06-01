@@ -6,10 +6,9 @@
 import re
 import json
 import os.path
-import argparse
 import traceback
 from collections import OrderedDict
-from typing import Any, Final, Generic, Literal, Optional, TypeVar, Union
+from typing import Any, Final, Optional
 
 import tkinter as tk
 import tkinter.ttk as ttk
@@ -18,15 +17,7 @@ import tkinter.messagebox
 from . import gui as gui
 
 from ..metasprite import extract_frame_locations
-from ..json_formats import (
-    load_ms_export_order_json,
-    load_metasprite_frameset_from_dict,
-    Name,
-    Filename,
-    MsExportOrder,
-    MsSpritesheet,
-    MsFrameset,
-)
+from ..json_formats import load_metasprite_frameset_from_dict, Name, Filename, MsExportOrder, MsFrameset
 
 
 ZOOM = 9

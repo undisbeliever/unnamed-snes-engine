@@ -3,29 +3,25 @@
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
 
-import PIL.Image  # type: ignore
-from collections import OrderedDict
 from enum import IntFlag
-from typing import Any, Callable, Final, Iterable, NamedTuple, Optional
+from typing import Final, Iterable, NamedTuple, Optional
 
-from .common import EngineData, FixedSizedData, DynamicSizedData, SimpleMultilineError
-from .palette import PaletteColors
+from .common import EngineData, DynamicSizedData, SimpleMultilineError
+from .palette import PaletteResource
 from .snes import (
     AbstractTilesetMap,
+    load_image_tile_extractor,
+    ImageTileExtractor,
     ImageError,
     SmallTileData,
-    SmallColorTile,
     ConstSmallTileMap,
     TileMapEntry,
     convert_snes_tileset,
-    convert_tilemap_and_tileset,
+    extract_tiles_and_build_tilemap,
     create_tilemap_data,
-    extract_small_tile_grid,
-    hflip_tile,
-    vflip_tile,
 )
 from .callbacks import parse_callback_parameters, SL_CALLBACK_PARAMETERS
-from .json_formats import Name, Filename, SecondLayerInput, Mappings
+from .json_formats import Name, SecondLayerInput, Mappings
 
 
 SECOND_LAYER_BPP: Final = 4
@@ -81,27 +77,22 @@ class SecondLayerImage(NamedTuple):
 
 
 def convert_sl_image(
-    image: PIL.Image.Image,
-    image_filename: Filename,
+    image: ImageTileExtractor,
     tile_priority: bool,
-    palette: PaletteColors,
+    palette: PaletteResource,
     mt_tiles: Optional[ConstSmallTileMap],
 ) -> SecondLayerImage:
-    if image.width % MT_TILE_PX != 0 or image.height % MT_TILE_PX != 0:
-        raise ImageError(image_filename, f"Image is not a multiple of {MT_TILE_PX} in width or height")
+    if image.width_px % MT_TILE_PX != 0 or image.height_px % MT_TILE_PX != 0:
+        raise ImageError(image.filename, f"Image is not a multiple of {MT_TILE_PX} in width or height")
 
-    width: Final = image.width // MT_TILE_PX
-    height: Final = image.height // MT_TILE_PX
+    width: Final = image.width_px // MT_TILE_PX
+    height: Final = image.height_px // MT_TILE_PX
 
     width8: Final = width * 2
     height8: Final = height * 2
 
-    palettes_map = palette.create_map(SECOND_LAYER_BPP)
-
     tileset: Final = SecondLayerTilesetMap(mt_tiles)
-    tilemap8: Final = convert_tilemap_and_tileset(
-        extract_small_tile_grid(image), image_filename, tileset, palette.create_map(SECOND_LAYER_BPP), width8, height8
-    )
+    tilemap8: Final = extract_tiles_and_build_tilemap(image, tileset, palette.create_map(SECOND_LAYER_BPP))
 
     mt_map: dict[tuple[TileMapEntry, ...], int] = dict()
     mt_top_left = list()
@@ -135,7 +126,7 @@ def convert_sl_image(
     assert len(mt_map) == len(mt_top_left) == len(mt_bottom_left) == len(mt_bottom_right)
 
     if len(mt_map) > N_SL_METATILES:
-        raise ImageError(image_filename, f"Too many metatiles in image ({len(mt_map)}, max: {N_SL_METATILES})")
+        raise ImageError(image.filename, f"Too many metatiles in image ({len(mt_map)}, max: {N_SL_METATILES})")
 
     mt_padding: Final = bytes(2 * (N_SL_METATILES - len(mt_map)))
 
@@ -158,7 +149,7 @@ def convert_sl_image(
 
 
 def convert_second_layer(
-    sli: SecondLayerInput, palettes: dict[Name, PaletteColors], mt_tileset_tiles: dict[Name, ConstSmallTileMap], mapping: Mappings
+    sli: SecondLayerInput, palettes: dict[Name, PaletteResource], mt_tileset_tiles: dict[Name, ConstSmallTileMap], mapping: Mappings
 ) -> EngineData:
     image_filename = sli.source
 
@@ -173,10 +164,8 @@ def convert_second_layer(
         if mt_tiles is None:
             raise RuntimeError(f"Cannot load MetaTile tileset {sli.mt_tileset}")
 
-    with PIL.Image.open(image_filename) as image:
-        image.load()
-
-        sl = convert_sl_image(image, image_filename, sli.tile_priority, pal, mt_tiles)
+    image = load_image_tile_extractor(image_filename)
+    sl = convert_sl_image(image, sli.tile_priority, pal, mt_tiles)
 
     if sl.width * sl.height > MAX_SL_CELLS:
         raise ImageError(image_filename, f"Image is too large ({sl.width * sl.height} cells, max: {MAX_SL_CELLS})")
@@ -203,7 +192,7 @@ def convert_second_layer(
             raise RuntimeError(f"Unknown sl_callback: {sli.callback}")
 
         if sli.part_of_room and sl_callback.room_parameters:
-            error_list.append(f"part_of_room second-layer cannot use a callback that contains room_parameters")
+            error_list.append("part_of_room second-layer cannot use a callback that contains room_parameters")
 
         sl_callback_id = sl_callback.id
         callback_parameters = parse_callback_parameters(

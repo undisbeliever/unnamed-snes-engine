@@ -4,22 +4,20 @@
 # Distributed under The MIT License, see the LICENSE file for more details.
 
 import re
-import sys
 import os.path
 import threading
-import subprocess
 import multiprocessing
 from abc import abstractmethod, ABCMeta
 from collections import OrderedDict
 from enum import unique, auto, Enum
 from dataclasses import dataclass
-from typing import cast, final, Any, Callable, ClassVar, Final, Iterable, NamedTuple, Optional, Sequence, Set, Union
+from typing import cast, final, Any, Callable, Final, Iterable, NamedTuple, Optional, Sequence, Set, Union
 
 from .common import ResourceType, EngineData
 from .entity_data import create_entity_rom_data
 from .mt_tileset import convert_mt_tileset
 from .second_layers import convert_second_layer
-from .palette import convert_palette, PaletteColors
+from .palette import convert_palette, PaletteResource
 from .metasprite import convert_static_spritesheet, convert_dynamic_spritesheet, build_ms_fs_data, MsFsEntry, DynamicMsSpritesheet
 from .rooms import get_list_of_tmx_files, extract_room_id, compile_room, RoomDependencies
 from .snes import ConstSmallTileMap
@@ -28,8 +26,8 @@ from .audio import AudioCompiler, COMMON_AUDIO_DATA_RESOURCE_NAME
 
 from .json_formats import load_mappings_json, load_entities_json, load_ms_export_order_json, load_other_resources_json
 from .json_formats import load_metasprites_json, load_audio_project
-from .json_formats import Name, ScopedName, Filename, JsonError, MemoryMap, Mappings, EntitiesJson
-from .json_formats import MsExportOrder, OtherResources, SecondLayerCallback, TilesInput, BackgroundImageInput, AudioProject
+from .json_formats import Name, ScopedName, Filename, Mappings, EntitiesJson
+from .json_formats import MsExportOrder, OtherResources, AudioProject
 
 
 @unique
@@ -76,7 +74,7 @@ class MetaSpriteResourceData(ResourceData):
 
 @dataclass(frozen=True)
 class PaletteResourceData(ResourceData):
-    palette: PaletteColors
+    palette: PaletteResource
 
 
 @dataclass(frozen=True)
@@ -374,7 +372,7 @@ class SharedInput:
                 _load("audio_project", AUDIO_PROJECT_FILENAME, load_audio_project)
             case SharedInputType.SYMBOLS:
                 _load("symbols", self.symbols_filename, read_symbols_file)
-            case other:
+            case _:
                 raise RuntimeError("Unknown shared input file")
 
 
@@ -545,7 +543,7 @@ class PaletteCompiler(OtherResourcesCompiler):
 
 
 class MetaTileTilesetCompiler(SimpleResourceCompiler):
-    def __init__(self, shared_input: SharedInput, palettes: dict[Name, PaletteColors]) -> None:
+    def __init__(self, shared_input: SharedInput, palettes: dict[Name, PaletteResource]) -> None:
         super().__init__(ResourceType.mt_tilesets, shared_input)
         self.__palettes = palettes
 
@@ -575,7 +573,7 @@ class MetaTileTilesetCompiler(SimpleResourceCompiler):
 
 class SecondLayerCompiler(OtherResourcesCompiler):
     def __init__(
-        self, shared_input: SharedInput, palettes: dict[Name, PaletteColors], mt_tileset_tiles: dict[Name, ConstSmallTileMap]
+        self, shared_input: SharedInput, palettes: dict[Name, PaletteResource], mt_tileset_tiles: dict[Name, ConstSmallTileMap]
     ) -> None:
         super().__init__(ResourceType.second_layers, shared_input)
         self.__palettes: Final = palettes
@@ -632,7 +630,7 @@ class TileCompiler(OtherResourcesCompiler):
 
 
 class BgImageCompiler(OtherResourcesCompiler):
-    def __init__(self, shared_input: SharedInput, palettes: dict[Name, PaletteColors]) -> None:
+    def __init__(self, shared_input: SharedInput, palettes: dict[Name, PaletteResource]) -> None:
         super().__init__(ResourceType.bg_images, shared_input)
         self.__palettes = palettes
 
@@ -825,7 +823,7 @@ class ProjectCompiler:
         self.log_message: Final = message_handler
         self.log_error: Final = err_handler
 
-        self.__palettes: Final[dict[Name, PaletteColors]] = dict()
+        self.__palettes: Final[dict[Name, PaletteResource]] = dict()
         self.__mt_tileset_tiles: Final[dict[Name, ConstSmallTileMap]] = dict()
 
         self.__resource_compilers: Final = (
@@ -1008,7 +1006,7 @@ class ProjectCompiler:
             self.__res_lists_waiting_on_shared_input.clear()
 
     def __compile_dynamic_metasprites(self) -> None:
-        self.log_message(f"Compiling dynamic metasprites")
+        self.log_message("Compiling dynamic metasprites")
         d = self.__dynamic_ms_compiler.compile()
         if isinstance(d, NonResourceError):
             self.log_error(d.error)
