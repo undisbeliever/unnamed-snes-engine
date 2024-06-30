@@ -1132,8 +1132,8 @@ namespace horizontal_buffer {
     #[mem16, idx16]
     func populate_buffer(sl_map_yComponent: u16 in xx, verticalCursor : u16 in aa) {
         var _bufferEndIndex : u16 in zpTmp_word_0;
-        var _rowStartIndex  : u16 in zpTmp_word_1;
-        var _mapIndex       : u16 in zpTmp_word_2;
+        var _mapRowPtr      : *u16 in zpTmp_word_1; // Using *u16 to simplify loading with 16 bit A.
+        var _rowIndex       : u16 in zpTmp_word_2;
 
         // Assumes VRAM_BG2_MAP_WADDR is a multiple of 0x800.
         aa &= (VRAM_TILEMAP_V_TILE_HEIGHT - 1);
@@ -1143,61 +1143,59 @@ namespace horizontal_buffer {
         aa = 1 << BUFFER_STATE__HORIZONTAL_BIT;
         test_and_set(*(&bufferState as *u16), aa);
 
-        _rowStartIndex = xx;
-        xx = aa = xx + mapSeam_x;
+        aa = xx + (&sl_data.map[0] as u16);
+        _mapRowPtr = aa as *u16;
 
-        yy = aa = (cursor <<< 1) & BUFFER_INDEX_MT_MASK;
-        _bufferEndIndex = yy;
+        yy = mapSeam_x;
+
+        xx = aa = (cursor <<< 1) & BUFFER_INDEX_MT_MASK;
+        _bufferEndIndex = xx;
 
         // Using the VRAM address (verticalCursor) to determine which half of the MetaTile to draw
         aa = vramWordAddr1;
         if a & NAMETABLE_V_TILE_WIDTH == 0 {
             do {
-                yy--; yy--; yy--; yy--;
+                xx--; xx--; xx--; xx--;
                 if negative {
-                    yy = sizeof(typeof(buffer)) - 4;
+                    xx = sizeof(typeof(buffer)) - 4;
                 }
 
-                _mapIndex = xx;
-                xx = aa = ((&sl_data.map[0] as *u16)[unaligned xx] & 0xff) << 1;
+                _rowIndex = yy;
+                yy = aa = (_mapRowPtr[unaligned yy] & 0xff) << 1;
 
-                (&buffer[0])[unaligned yy] = aa = sl_data.mt_top_left[unaligned xx];
-                (&buffer[1])[unaligned yy] = aa = sl_data.mt_top_right[unaligned xx];
+                (&buffer[0])[unaligned xx] = aa = sl_data.mt_top_left[unaligned yy];
+                (&buffer[1])[unaligned xx] = aa = sl_data.mt_top_right[unaligned yy];
 
-                xx = _mapIndex;
-                xx--;
-                // cmp works since _rowStartIndex is never negative
-                // Required as `xx` might be negative
-                cmp(xx, _rowStartIndex);
-                if negative {
-                    xx = aa = xx + mapStride;
+                // Assumes `mapSeam_x` is valid
+                yy = _rowIndex;
+                if zero {
+                    yy = mapStride;
                 }
-            } while yy != _bufferEndIndex;
+                yy--;
+            } while xx != _bufferEndIndex;
 
             return;
         }
         else {
             do {
-                yy--; yy--; yy--; yy--;
+                xx--; xx--; xx--; xx--;
                 if negative {
-                    yy = sizeof(typeof(buffer)) - 4;
+                    xx = sizeof(typeof(buffer)) - 4;
                 }
 
-                _mapIndex = xx;
-                xx = aa = ((&sl_data.map[0] as *u16)[unaligned xx] & 0xff) << 1;
+                _rowIndex = yy;
+                yy = aa = (_mapRowPtr[unaligned yy] & 0xff) << 1;
 
-                (&buffer[0])[unaligned yy] = aa = sl_data.mt_bottom_left[unaligned xx];
-                (&buffer[1])[unaligned yy] = aa = sl_data.mt_bottom_right[unaligned xx];
+                (&buffer[0])[unaligned xx] = aa = sl_data.mt_bottom_left[unaligned yy];
+                (&buffer[1])[unaligned xx] = aa = sl_data.mt_bottom_right[unaligned yy];
 
-                xx = _mapIndex;
-                xx--;
-                // cmp works since _rowStartIndex is never negative
-                // Required as `xx` might be negative
-                cmp(xx, _rowStartIndex);
-                if negative {
-                    xx = aa = xx + mapStride;
+                // Assumes `mapSeam_x` is valid
+                yy = _rowIndex;
+                if zero {
+                    yy = mapStride;
                 }
-            } while yy != _bufferEndIndex;
+                yy--;
+            } while xx != _bufferEndIndex;
 
             return;
         }
