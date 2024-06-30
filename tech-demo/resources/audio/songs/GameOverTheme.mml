@@ -1,6 +1,6 @@
 ;Game Over Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.8
+;Made for undisbeliever's Terrific Audio Driver v0.0.10
 
 #Title Game Over Theme
 #Game unnamed-snes-game
@@ -87,3 +87,9 @@ E V128 p64 o1e2& A15,7,7,9 e2^1
 F E0 @Strings8 V24 p80
 F [o3g4f+4]4 o3e2e2e2d+2
 F @Trumpet4 V128 p64 o3e2& A15,7,7,9 e2^1
+
+G E0 @Strings8 V24 
+G [o3e4d4]4 o3c2<b2b2b2
+G V192 o0e2& A15,7,7,9 e2^1
+
+H E0 @Strings8 V48 l1 r^^^2 o1b2
