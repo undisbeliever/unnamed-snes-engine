@@ -259,16 +259,18 @@ def parse_callback_parameters(
 
 def write_callback_parameters_wiz(out: StringIO, callbacks: CallbackDict, *callback_types: CallbackType) -> None:
     for e in callbacks.values():
-        for callback_type in callback_types:
+        out.write(f"namespace {e.name} {{\n")
+
+        for callback_index, callback_type in enumerate(callback_types):
             e_parameters = callback_type.get_parameters(e)
             if e_parameters:
                 i = 0
 
-                out.write(f"namespace {e.name} {{\n")
-
                 for p in e_parameters:
                     if i != 0:
                         out.write("\n")
+                    elif callback_index != 0:
+                        out.write("\n\n")
 
                     ptype = PARAM_TYPES.get(p.type)
                     if not ptype:
@@ -282,7 +284,7 @@ def write_callback_parameters_wiz(out: StringIO, callbacks: CallbackDict, *callb
 
                     i += PARAM_SIZE[p.type]
 
-                out.write("}\n\n")
-
                 if i > callback_type.parameter_size:
                     raise ValueError(f"{ callback_type.human_name } has too many parameters: {e.name}")
+
+        out.write("}\n\n")
