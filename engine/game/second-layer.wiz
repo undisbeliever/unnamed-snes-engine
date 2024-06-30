@@ -136,7 +136,7 @@ in lowram {
     // Number of bytes per column in `sl_data.map`
     var mapStride : u16;
 
-    // The `sl_data.map` offset between `mapSeam` and the row to draw above the viewport.
+    // The `sl_data.map` offset between `mapPos` and the row to draw above the viewport.
     // (equal to `mapStride * (VRAM_TILEMAP_MT_TILE_HEIGHT - 1)`)
     var mapAboveViewportOffset : u16;  // ::DBEUG find better name::
 
@@ -149,26 +149,26 @@ in lowram {
         var yScrollShadow_h : u8 in >:yScrollShadow;
 
 
-    // The x-component of the map seam.
+    // The x-component of the map position.
     //
-    // NOTE: The map seam is on the bottom-right (start + VRAM_TILEMAP_MT_TILE_WIDTH - 1 columns).
+    // NOTE: The mapPos is on the bottom-right (start + VRAM_TILEMAP_MT_TILE_WIDTH - 1 columns).
     //
     // MUST BE:
     //   * less than `mapStride`
     //
     // (index into sl_data.map)
-    var mapSeam_x : u16;
+    var mapPos_x : u16;
 
-    // The y-component of the map seam.
+    // The y-component of the map position.
     //
-    // NOTE: The map seam is on the bottom-right (start + VRAM_TILEMAP_MT_TILE_HEIGHT - 1 rows).
+    // NOTE: The mapPos is on the bottom-right (start + VRAM_TILEMAP_MT_TILE_HEIGHT - 1 rows).
     //
     // MUST BE:
     //   * a multiple of `mapStride`
     //   * less than `mapSize`
     //
     // (index into sl_data.map)
-    var mapSeam_y : u16;
+    var mapPos_y : u16;
 
 
     // VBlank flags to determine which buffer (if any) to transfer on the next VBlank.
@@ -197,11 +197,11 @@ in lowram {
         //  * to determine if xPos/yPos has advanced past an 8px VRAM tile boundary.
         //  * to limit xPos/yPos to a single VRAM tile update per frame.
         //    (since I'm auto-wrapping xPos/yPos, I may as well limit it to the actual location)
-        //  * to determine when to advance the mapSeam
+        //  * to determine when to advance the mapPos
         var maskedPrevXPos : u16;
 
         // The 8px VRAM tile position within the buffer.
-        // (named `cursor` to differentiate it from the mapSeam).
+        // (named `cursor` to differentiate it from the mapPos).
         // Used to calculate `buffer` index.
         // Used to calculate `horizontal_buffer.vramWordAddr1` & `horizontal_buffer.vramWordAddr2`.
         // Used to determine if the top or bottom half of the MetaTile is written to `horizontal_buffer.buffer`
@@ -222,7 +222,7 @@ in lowram {
         var maskedPrevYPos : u16;
 
         // The 8px VRAM tile position within the buffer.
-        // (named `cursor` to differentiate it from the mapSeam).
+        // (named `cursor` to differentiate it from the mapPos).
         // Used to calculate `buffer` index.
         // Used to calculate `vertical_buffer.vramWordAddr`.
         // NOTE: not masked, `cursor` can be out of bounds.
@@ -594,7 +594,7 @@ namespace __init_and_draw_fullscreen {
         __draw_nametable__forceblank(a);
 
 
-        // Calculate the mapSeam (bottom-right seam corner)
+        // Calculate the mapPos (bottom-right corner)
         a = _tilePos_y + (VRAM_TILEMAP_MT_TILE_HEIGHT - 1);
         if carry || a >= _mapHeight {
             a -= _mapHeight;
@@ -609,8 +609,8 @@ namespace __init_and_draw_fullscreen {
 
         mem16();
         #[mem16] {
-            mapSeam_x = aa = aa & 0xff;
-            mapSeam_y = aa = RDMPY;
+            mapPos_x = aa = aa & 0xff;
+            mapPos_y = aa = RDMPY;
         }
         mem8();
     }
@@ -627,7 +627,7 @@ namespace __init_and_draw_fullscreen {
     inline func __draw_tilemaps__part_of_room__forceblank__inline() {
         __draw_nametable__forceblank(_tilePos_x);
 
-        // No need to set `mapSeam`, mapSeam has been reset to 0
+        // No need to set `mapPos`, mapPos has been reset to 0
     }
 
 
@@ -884,16 +884,16 @@ namespace vertical_buffer {
             }
             maskedPrevXPos = aa;
 
-            xx = mapSeam_x;
+            xx = mapPos_x;
             viewportXOffset = aa = viewportXOffset - V_TILE_PX;
             if aa & V_TILE_PX != 0 {
-                // only advance `mapSeam_x` if a MetaTile boundary has been crossed
+                // only advance `mapPos_x` if a MetaTile boundary has been crossed
                 xx--;
                 if negative {
                     xx = mapStride;
                     xx--;
                 }
-                mapSeam_x = xx;
+                mapPos_x = xx;
             }
 
             // Move `xx` leftwards.
@@ -925,15 +925,15 @@ namespace vertical_buffer {
             }
             maskedPrevXPos = aa;
 
-            xx = mapSeam_x;
+            xx = mapPos_x;
             viewportXOffset = aa = viewportXOffset + V_TILE_PX;
             if aa & V_TILE_PX == 0 {
-                // only advance `mapSeam_x` if a MetaTile boundary has been crossed
+                // only advance `mapPos_x` if a MetaTile boundary has been crossed
                 xx++;
                 if xx >= mapStride {
                     xx = 0;
                 }
-                mapSeam_x = xx;
+                mapPos_x = xx;
             }
 
             aa = horizontal_buffer.post_increment_cursor__inline__keep_xx();
@@ -963,7 +963,7 @@ namespace vertical_buffer {
         aa = 1 << BUFFER_STATE__VERTICAL_BIT;
         test_and_set(*(&bufferState as *u16), aa);
 
-        xx = aa = xx + mapSeam_y;
+        xx = aa = xx + mapPos_y;
 
         yy = aa = (cursor <<< 1) & BUFFER_INDEX_MT_MASK;
         _bufferEndIndex = yy;
@@ -1066,17 +1066,17 @@ namespace horizontal_buffer {
 
             viewportYOffset = aa = viewportYOffset - V_TILE_PX;
             if aa & V_TILE_PX != 0 {
-                aa = mapSeam_y;
+                aa = mapPos_y;
             }
             else {
-                // only advance `mapSeam_y` if a MetaTile boundary has been crossed
-                // Assumes mapSeam_y is always valid
-                aa = mapSeam_y;
+                // only advance `mapPos_y` if a MetaTile boundary has been crossed
+                // Assumes mapPos_y is always valid
+                aa = mapPos_y;
                 if zero {
                     aa = mapSize;
                 }
                 aa -= mapStride;
-                mapSeam_y = aa;
+                mapPos_y = aa;
             }
 
             // Move `xx` upwards
@@ -1105,15 +1105,15 @@ namespace horizontal_buffer {
 
             viewportYOffset = aa = viewportYOffset + V_TILE_PX;
             if aa & V_TILE_PX == 0 {
-                xx = mapSeam_y;
+                xx = mapPos_y;
             }
             else {
-                // only advance `mapSeam_y` if a MetaTile boundary has been crossed
-                aa = mapSeam_y + mapStride;
+                // only advance `mapPos_y` if a MetaTile boundary has been crossed
+                aa = mapPos_y + mapStride;
                 if carry || aa >= mapSize {
                     aa = 0;
                 }
-                mapSeam_y = aa;
+                mapPos_y = aa;
                 xx = aa;
             }
 
@@ -1148,7 +1148,7 @@ namespace horizontal_buffer {
 
         idx8();
         #[idx8] {
-            y = *(&mapSeam_x as *u8);
+            y = *(&mapPos_x as *u8);
 
             aa = (cursor <<< 1) & BUFFER_INDEX_MT_MASK;
             _bufferEndIndex = x = a;
@@ -1180,7 +1180,7 @@ namespace horizontal_buffer {
                     }
                     (&buffer[1])[unaligned x] = aa;
 
-                    // Assumes `mapSeam_x` is valid
+                    // Assumes `mapPos_x` is valid
                     y = _rowIndex;
                     if zero {
                         y = *(&mapStride as *u8);
@@ -1216,7 +1216,7 @@ namespace horizontal_buffer {
                     }
                     (&buffer[1])[unaligned x] = aa;
 
-                    // Assumes `mapSeam_x` is valid
+                    // Assumes `mapPos_x` is valid
                     y = _rowIndex;
                     if zero {
                         y = *(&mapStride as *u8);
@@ -1260,7 +1260,7 @@ namespace part_of_room {
     let TRANSITION_SPEED = TILE_PX;
 
 
-    // Calculates the new mapSeam for the room and scrollDirection.
+    // Calculates the new mapPos for the room and scrollDirection.
     //
     // MUST ONLY be called if `sl_data.partOfRoom` is set.
     //
@@ -1321,8 +1321,8 @@ namespace part_of_room {
         mem16();
         #[mem16, idx8] {
             // high byte of yy clear
-            mapSeam_x = aa = yy;
-            mapSeam_y = aa = *(far &RDMPY);
+            mapPos_x = aa = yy;
+            mapPos_y = aa = *(far &RDMPY);
         }
         mem8_idx8();
     }
@@ -1339,9 +1339,9 @@ namespace part_of_room {
         // Tiles before rollback
         let _TBR = room_transitions.N_TRANSITION_FRAMES_BEFORE_SOLID_CHECK / 2;
 
-        // Offset between the room tile position and the map seam tile position.
+        // Offset between the map tile position and the VRAM tilemap seam.
         //
-        // NOTE: mapSeam is at the bottom.
+        // NOTE: mapPos is at the bottom.
         //
         // Order MUST match `room_transitions.ScrollDirection`
         const _ScrollDirectionTileSeamOffsets : [u8 ; _N_SCROLL_DIRECTIONS * 2] = [
@@ -1372,7 +1372,7 @@ namespace part_of_room {
     // DB = 0x7e
     #[mem16, idx16]
     func scroll_up__process__mem16_idx16() {
-        xx = mapSeam_y;
+        xx = mapPos_y;
 
         horizontal_buffer.viewportYOffset = aa = horizontal_buffer.viewportYOffset - V_TILE_PX;
         if aa & V_TILE_PX == 0 {
@@ -1380,7 +1380,7 @@ namespace part_of_room {
             if !carry {
                 aa = mapSize - mapStride;
             }
-            mapSeam_y = aa;
+            mapPos_y = aa;
             xx = aa;
         }
 
@@ -1395,7 +1395,7 @@ namespace part_of_room {
     // DB = 0x7e
     #[mem16, idx16]
     func scroll_down__process__mem16_idx16() {
-        xx = mapSeam_y;
+        xx = mapPos_y;
 
         horizontal_buffer.viewportYOffset = aa = horizontal_buffer.viewportYOffset + V_TILE_PX;
         if aa & V_TILE_PX == 0 {
@@ -1403,7 +1403,7 @@ namespace part_of_room {
             if aa >= mapSize {
                 aa = 0;
             }
-            mapSeam_y = aa;
+            mapPos_y = aa;
             xx = aa;
         }
 
@@ -1419,7 +1419,7 @@ namespace part_of_room {
     // DB = 0x7e
     #[mem16, idx16]
     func scroll_left__process__mem16_idx16() {
-        xx = mapSeam_x;
+        xx = mapPos_x;
 
         vertical_buffer.viewportXOffset = aa = vertical_buffer.viewportXOffset - V_TILE_PX;
         if aa & V_TILE_PX != 0 {
@@ -1428,7 +1428,7 @@ namespace part_of_room {
                 xx = mapStride;
                 xx--;
             }
-            mapSeam_x = xx;
+            mapPos_x = xx;
         }
 
         aa = horizontal_buffer.pre_decrement_cursor__inline__keep_xx();
@@ -1442,7 +1442,7 @@ namespace part_of_room {
     // DB = 0x7e
     #[mem16, idx16]
     func scroll_right__process__mem16_idx16() {
-        xx = mapSeam_x;
+        xx = mapPos_x;
 
         vertical_buffer.viewportXOffset = aa = vertical_buffer.viewportXOffset + V_TILE_PX;
         if aa & V_TILE_PX != 0 {
@@ -1450,7 +1450,7 @@ namespace part_of_room {
             if xx >= mapStride {
                 xx = 0;
             }
-            mapSeam_x = xx;
+            mapPos_x = xx;
         }
 
         aa = horizontal_buffer.post_increment_cursor__inline__keep_xx();
