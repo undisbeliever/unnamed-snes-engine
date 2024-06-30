@@ -1131,9 +1131,9 @@ namespace horizontal_buffer {
     // DB = 0x7e
     #[mem16, idx16]
     func populate_buffer(sl_map_yComponent: u16 in xx, verticalCursor : u16 in aa) {
-        var _bufferEndIndex : u16 in zpTmp_word_0;
-        var _mapRowPtr      : *u16 in zpTmp_word_1; // Using *u16 to simplify loading with 16 bit A.
-        var _rowIndex       : u16 in zpTmp_word_2;
+        var _mapRowPtr      : *u16 in zpTmp_word_0; // Using *u16 to simplify loading with 16 bit A.
+        var _bufferEndIndex : u8 in zpTmp_byte_0;
+        var _rowIndex       : u8 in zpTmp_byte_1;
 
         // Assumes VRAM_BG2_MAP_WADDR is a multiple of 0x800.
         aa &= (VRAM_TILEMAP_V_TILE_HEIGHT - 1);
@@ -1146,58 +1146,87 @@ namespace horizontal_buffer {
         aa = xx + (&sl_data.map[0] as u16);
         _mapRowPtr = aa as *u16;
 
-        yy = mapSeam_x;
+        idx8();
+        #[idx8] {
+            y = *(&mapSeam_x as *u8);
 
-        xx = aa = (cursor <<< 1) & BUFFER_INDEX_MT_MASK;
-        _bufferEndIndex = xx;
+            aa = (cursor <<< 1) & BUFFER_INDEX_MT_MASK;
+            _bufferEndIndex = x = a;
 
-        // Using the VRAM address (verticalCursor) to determine which half of the MetaTile to draw
-        aa = vramWordAddr1;
-        if a & NAMETABLE_V_TILE_WIDTH == 0 {
-            do {
-                xx--; xx--; xx--; xx--;
-                if negative {
-                    xx = sizeof(typeof(buffer)) - 4;
-                }
+            // Using the VRAM address (verticalCursor) to determine which half of the MetaTile to draw
+            aa = vramWordAddr1;
+            if a & NAMETABLE_V_TILE_WIDTH == 0 {
+                do {
+                    x--; x--; x--; x--;
+                    if negative {
+                        x = sizeof(typeof(buffer)) - 4;
+                    }
 
-                _rowIndex = yy;
-                yy = aa = (_mapRowPtr[unaligned yy] & 0xff) << 1;
+                    _rowIndex = y;
 
-                (&buffer[0])[unaligned xx] = aa = sl_data.mt_top_left[unaligned yy];
-                (&buffer[1])[unaligned xx] = aa = sl_data.mt_top_right[unaligned yy];
+                    aa = _mapRowPtr[unaligned y];
+                    y = a;
+                    if negative {
+                        aa <<= 1;
+                        y = a;
+                        (&buffer[0])[unaligned x] = aa = (&sl_data.mt_top_left[0x80])[unaligned y];
+                        aa = (&sl_data.mt_top_right[0x80])[unaligned y];
+                    }
+                    else {
+                        aa <<= 1;
+                        y = a;
+                        (&buffer[0])[unaligned x] = aa = sl_data.mt_top_left[unaligned y];
+                        aa = sl_data.mt_top_right[unaligned y];
+                    }
+                    (&buffer[1])[unaligned x] = aa;
 
-                // Assumes `mapSeam_x` is valid
-                yy = _rowIndex;
-                if zero {
-                    yy = mapStride;
-                }
-                yy--;
-            } while xx != _bufferEndIndex;
+                    // Assumes `mapSeam_x` is valid
+                    y = _rowIndex;
+                    if zero {
+                        y = *(&mapStride as *u8);
+                    }
+                    y--;
+                } while x != _bufferEndIndex;
 
-            return;
-        }
-        else {
-            do {
-                xx--; xx--; xx--; xx--;
-                if negative {
-                    xx = sizeof(typeof(buffer)) - 4;
-                }
+                mem16_idx16();
+                return;
+            }
+            else {
+                do {
+                    x--; x--; x--; x--;
+                    if negative {
+                        x = sizeof(typeof(buffer)) - 4;
+                    }
 
-                _rowIndex = yy;
-                yy = aa = (_mapRowPtr[unaligned yy] & 0xff) << 1;
+                    _rowIndex = y;
 
-                (&buffer[0])[unaligned xx] = aa = sl_data.mt_bottom_left[unaligned yy];
-                (&buffer[1])[unaligned xx] = aa = sl_data.mt_bottom_right[unaligned yy];
+                    aa = _mapRowPtr[unaligned y];
+                    y = a;
+                    if negative {
+                        aa <<= 1;
+                        y = a;
+                        (&buffer[0])[unaligned x] = aa = (&sl_data.mt_bottom_left[0x80])[unaligned y];
+                        aa = (&sl_data.mt_bottom_right[0x80])[unaligned y];
+                    }
+                    else {
+                        aa <<= 1;
+                        y = a;
+                        (&buffer[0])[unaligned x] = aa = sl_data.mt_bottom_left[unaligned y];
+                        aa = sl_data.mt_bottom_right[unaligned y];
+                    }
+                    (&buffer[1])[unaligned x] = aa;
 
-                // Assumes `mapSeam_x` is valid
-                yy = _rowIndex;
-                if zero {
-                    yy = mapStride;
-                }
-                yy--;
-            } while xx != _bufferEndIndex;
+                    // Assumes `mapSeam_x` is valid
+                    y = _rowIndex;
+                    if zero {
+                        y = *(&mapStride as *u8);
+                    }
+                    y--;
+                } while x != _bufferEndIndex;
 
-            return;
+                mem16_idx16();
+                return;
+            }
         }
     }
 
