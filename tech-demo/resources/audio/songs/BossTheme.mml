@@ -1,6 +1,6 @@
 ;Boss Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.8
+;Made for undisbeliever's Terrific Audio Driver v0.0.10
 
 #Title Boss Theme
 #Game unnamed-snes-game
@@ -141,3 +141,16 @@ F o3edf+dedec
 F o3c+dd+e
 F V40 !ERiff1
 F V72 p64 o1b1^1
+
+G @Strings8 V48 E0
+G l1 r^^^^^^^^^^^^^^^^^^^2 L
+G l2 o2abab>f+
+G o3gf+d<ababr
+G r1^1
+G o3c+dd+e
+G l1 r^^^^^^^^^^^^^^^^^^^2
+
+H @Strings8 V48 E0
+H l1 r^^^^^^^^^^^^^^^^^^^^^2 L
+H l2 o2abab
+H l1 r^^^^^^^^^^^^^^^^^^^^^^^^^^^
