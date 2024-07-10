@@ -4,14 +4,12 @@
 
 
 import re
-import json
 from io import StringIO
 from collections import OrderedDict
 from abc import ABC, abstractmethod
-from typing import Any, Final, Generic, Literal, Optional, TypeVar, Union
+from typing import Any, Final, Generic, Optional, TypeVar, Union
 
 import tkinter as tk
-import tkinter.ttk as ttk
 from tkinter.scrolledtext import ScrolledText
 
 from ..json_formats import Name
@@ -158,17 +156,14 @@ class AbstractInput(Generic[WidgetT], ABC):
             self._is_valid = is_valid
 
     @abstractmethod
-    def _clear(self) -> None:
-        ...
+    def _clear(self) -> None: ...
 
     @abstractmethod
-    def _load_value(self, value: Any) -> None:
-        ...
+    def _load_value(self, value: Any) -> None: ...
 
     # Returns (value, is_valid)
     @abstractmethod
-    def value(self) -> tuple[Optional[Any], bool]:
-        ...
+    def value(self) -> tuple[Optional[Any], bool]: ...
 
 
 class _EntryInput(AbstractInput[tk.Entry]):

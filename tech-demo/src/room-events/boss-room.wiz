@@ -1,0 +1,53 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "engine/room-events-api";
+import "engine/audio";
+
+import "monster-doors";
+
+import "gen/enums";
+
+namespace room_events {
+namespace boss_room {
+
+// ::TODO Create a better boss_room room-event (not something that reuses monster doors)::
+
+in code {
+
+// DB = 0x7e
+#[mem8, idx8]
+func init() {
+    audio.songs_start_paused();
+    audio.load_song_if_changed(resources.songs.BossTheme);
+
+    ^return room_events.monster_doors.init();
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process() {
+    // Fixes no audio on game over screen.
+    // ::TODO add a next-song-starts-paused flag to the audio API::
+    audio.songs_start_immediately();
+
+    x = room_events.monster_doors.state as u8;
+    if x == room_events.monster_doors.State.LOCK_DOORS as u8 {
+        carry = audio.is_song_playing();
+        if !carry {
+            audio.queue_command_override_no_parameter(audio.Command.UNPAUSE);
+        }
+    }
+
+    ^return room_events.monster_doors.process();
+}
+
+}
+
+}
+}
+

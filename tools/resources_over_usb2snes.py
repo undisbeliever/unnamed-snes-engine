@@ -6,7 +6,7 @@ import os
 import argparse
 from unnamed_snes_game.resources_compiler import DataStore
 from unnamed_snes_game.resources_over_usb2snes import FsWatcherThread, WebsocketThread
-from unnamed_snes_game.gui.ro_usb2snes_gui import Rou2sWindow, GuiSignals
+from unnamed_snes_game.gui.ro_usb2snes_gui import Rou2sWindow
 
 
 def main() -> None:

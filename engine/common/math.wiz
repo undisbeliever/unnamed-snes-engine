@@ -30,6 +30,27 @@ inline func negate16(i16aa : u16 in aa) : i16 in aa {
 
 
 
+// Convert a signed sQ4.12 fixed-point to a signed sQ16.16 fixed-point value
+//
+// OUT: X = fractional component
+// OUT: A = integer component
+#[mem16, idx16]
+func sq4_12_to_sq16_16(sq4_12 : i16 in aa) {
+    yy = aa;
+
+    xx = aa = aa <<< 4;
+
+    aa = yy >>> 4;
+    swap_bytes(aa);
+    aa &= 0x000f;
+
+    if aa & 0x0008 != 0 {
+        aa |= 0xfff0;
+    }
+}
+
+
+
 // Calculate the angle between two points.
 //
 // Returns an 32-division angle multiplied by two.  Useful as an index into a Cosine Table.

@@ -108,20 +108,20 @@ namespace IO {
 
 // MUST match CommandFunctionTable in `audio-driver.wiz`.
 enum Command : u8 {
-    // Stop song and sound effect execution.
-    // * Commands will still be executed when the audio-driver is paused
+    // Pause the song and sound effect channels.
+    // * IO commands will still be executed when the audio-driver is paused.
     // * The audio driver starts paused unless the `LoaderDataType.PLAY_SONG_BIT` is set.
     PAUSE = 0,
 
-    // Unpauses the audio driver.
-    //
-    // * Resets the S-SMP timer counters,
-    //   can cause issues if the S-CPU spams `UNPAUSE` commands.
-    UNPAUSE = 2,
+    // Pauses the music channels, sound effects will continue to play.
+    // Unpauses the sound effects channels.
+    PAUSE_MUSIC_PLAY_SFX = 2,
 
-    // MUST NOT USE PLAY_SOUND_EFFECT in `queue_command`
+    // Unpauses the music and sound effect channels.
+    UNPAUSE = 4,
 
-    // reserved
+    // SHOULD NOT USE PLAY_SOUND_EFFECT in `queue_command`
+    // (command queue only holds 1 parameter byte and PLAY_SOUND_EFFECT has 2 parameters)
 
     // Stop all active sound effects
     STOP_SOUND_EFFECTS = 8,
@@ -132,13 +132,11 @@ enum Command : u8 {
     // NOTE: The main volume is reset whenever a new song is loaded.
     SET_MAIN_VOLUME = 10,
 
-    // Enables or disable channels.
-    //  * parameter0: A bitmask of the 8 channels that can send key-on events
+    // Enables or disables music channels.
+    //  * parameter0: A bitmask of the 8 music channels that can send key-on events
     //
-    // Useful for disabling channels in a song.
-    //
-    // NOTE: The enabled channels bitmask is reset whenever a new song is loaded.
-    SET_ENABLED_CHANNELS = 12,
+    // NOTE: The music channels bitmask is reset whenever a new song is loaded.
+    SET_MUSIC_CHANNELS = 12,
 
     // Set the song tempo.
     //  * parameter0: The new S-DSP TIMER_0 register value
@@ -152,7 +150,7 @@ enum Command : u8 {
 // Play a sound effect command
 //  * parameter0: sound effect id
 //  * parameter1: pan (0-128) (not bounds checked)
-let __PLAY_SOUND_EFFECT_COMMAND  = 4;
+let __PLAY_SOUND_EFFECT_COMMAND  = 6;
 
 
 // MUST match `audio-driver/src/io-commands.wiz`
@@ -186,8 +184,10 @@ enum State : u8 {
     // Song is loaded into audio-RAM and the audio driver is paused.
     // No play-sound-effect commands will be sent when the driver is paused.
     PAUSED                              = 0x80,
+    // Song is loaded into Audio-RAM and the audio driver is playing sfx (song paused).
+    PLAYING_SFX                         = 0x81,
     // Song is loaded into audio-RAM and the audio driver is playing the song.
-    PLAYING                             = 0x81
+    PLAYING                             = 0x82,
 }
 
 let __FIRST_LOADING_STATE = State.LOADING_COMMON_AUDIO_DATA;
@@ -303,7 +303,7 @@ in code {
 //  * The data MUST remain in memory while it is being transferred to Audio-RAM
 //    (which may take several frames).
 //  * The data can be freed on the next `load_audio_data()` call.
-//  * The data can be freed when the state changes to PAUSED or PLAYING.
+//  * The data can be freed when the state changes to PAUSED, PLAYING_SFX or PLAYING.
 //  * The data can be freed if the `is_loader_active()` function returns false.
 //  * The `finish_loading_data()` subroutine can be used to flush decompressed
 //    memory into Audio-RAM.  The data can be freed immediately after a
@@ -316,12 +316,7 @@ in code {
 #[mem8, idx16]
 func load_audio_data(id: u8 in a) : bool in carry {
     if a < N_SONGS {
-        var _res : resources.ResourceEntry in resources.res;
-        resources.load_songs_resource(a as resources.songs);
-
-        xx = *(&_res.farPtr as *u16);
-        a = #:_res.farPtr;
-        yy = _res.size;
+        resources.load_resource__dynamic_ram_no_copy__inline_axy(resources.ResourceType.songs, a as resources.songs);
         return true;
     }
     return false;
@@ -399,10 +394,12 @@ func __process__send_command__return_idx16(previousCommand: u8 in a, nextCommand
 
     if y < Command.UNPAUSE as u8 + 1 {
         // Assumes Command.PAUSE == 0
-        // Assumes Command.UNPAUSE == 2
-        // Assumes State.PAUSED  == 0x80
-        // Assumes State.PLAYING == 0x81
-        a = ((a >>> 1) & 1) | 0x80;
+        // Assumes Command.PAUSE_MUSIC_PLAY_SFX == 2
+        // Assumes Command.UNPAUSE == 4
+        // Assumes (Command.PAUSE >> 1) & 3 | 0x80 == State.PAUSED
+        // Assumes (Command.PAUSE_MUSIC_PLAY_SFX >> 1) & 3 | 0x80 == State.PLAYING_SFX
+        // Assumes (Command.UNPAUSE >> 1) & 3 | 0x80 == State.PLAYING
+        a = ((a >>> 1) & 3) | 0x80;
         _state = a as State;
     }
 
@@ -480,7 +477,9 @@ func process() {
                 y = _nextCommand_id;
                 goto __process__send_command__return_idx16 if !negative;
 
-                // Assumes `State.PAUSED == 0x80`
+                // Assumes State.PAUSED < $81
+                // Assumes State.PLAYING >= $81
+                // Assumes State.PLAYING_SFX >= $81
                 // x = _state
                 x--;
                 if negative {
@@ -594,10 +593,10 @@ func __process__loading() {
             // Cannot use `_flags` as it may have changed after the `LoaderDataType` was sent to
             // the loader (while the song was loaded).
 
-            // Assumes `State.LOADING_SONG_DATA_PAUSED & 1 | 0x80 == State.PAUSED`
-            // Assumes `State.LOADING_SONG_DATA_PLAY & 1 | 0x80 == State.PLAYING`
+            // Assumes ((State::LOADING_SONG_DATA_PAUSED & 1) << 1) | $80 = State::PAUSED
+            // Assumes ((State::LOADING_SONG_DATA_PLAY & 1) << 1) | $80 = State::PLAYING
             a = _state as u8;
-            a = (a & 1) | 0x80;
+            a = ((a & 1) << 1) | 0x80;
         }
         _state = a as State;
     }
@@ -664,7 +663,7 @@ func queue_command_override(command : Command in a, parameter0: u8 in x) {
 // Adds a command with no parameter to the queue, overriding any previously unsent commands.
 //
 // WARNING: will send the x register value to the audio driver.
-let queue_command_override_no_parameter = queue_command_override_with as func(command : Command in a);
+let queue_command_override_no_parameter = queue_command_override as func(command : Command in a);
 
 
 
@@ -729,6 +728,36 @@ func load_song(songId : resources.songs in a) {
         a = State.WAITING_FOR_LOADER as u8;
         _state = a as State;
     }
+}
+
+
+
+// Calls `load_song()` if `songId` != the song used in the last `load_song()` call.
+//
+// See: `load_song()`
+//
+// Return true if `load_song()` was called.
+//
+// DB access lowram
+#[mem8]
+func load_song_if_changed(songId : resources.songs in a) : bool in carry {
+    if a != _nextSong {
+        load_song(a as resources.songs);
+        return true;
+    }
+    return false;
+}
+
+
+
+// Returns the songId used in the last `load_song()` call.
+//
+// KEEP: Y, X
+//
+// DB access lowram
+#[mem8]
+inline func get_song() : u8 in a {
+    return _nextSong;
 }
 
 
@@ -852,6 +881,18 @@ func is_loader_active() : bool in carry {
 func is_song_loaded() : bool in carry {
     a = _state as u8;
     cmp(a, State.PAUSED as u8);
+    return carry;
+}
+
+
+
+// Return true if the song is loaded into audio-RAM and sound effects are not paused
+//
+// DB access lowram
+#[mem8]
+func is_sfx_playing() : bool in carry {
+    a = _state as u8;
+    cmp(a, State.PLAYING_SFX as u8);
     return carry;
 }
 

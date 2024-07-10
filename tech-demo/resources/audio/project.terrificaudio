@@ -207,10 +207,6 @@
   "sound_effect_file": "sound_effects.txt",
   "songs": [
     {
-      "name": "timing_test",
-      "source": "songs/timing_test.mml"
-    },
-    {
       "name": "DungeonTheme",
       "source": "songs/DungeonTheme.mml"
     },

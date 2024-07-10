@@ -6,10 +6,9 @@
 import re
 import json
 import os.path
-import argparse
 import traceback
 from collections import OrderedDict
-from typing import Any, Final, Generic, Literal, Optional, TypeVar, Union
+from typing import Any, Final, Optional
 
 import tkinter as tk
 import tkinter.ttk as ttk
@@ -18,15 +17,7 @@ import tkinter.messagebox
 from . import gui as gui
 
 from ..metasprite import extract_frame_locations
-from ..json_formats import (
-    load_ms_export_order_json,
-    load_metasprite_frameset_from_dict,
-    Name,
-    Filename,
-    MsExportOrder,
-    MsSpritesheet,
-    MsFrameset,
-)
+from ..json_formats import load_metasprite_frameset_from_dict, Name, Filename, MsExportOrder, MsFrameset
 
 
 ZOOM = 9
@@ -918,26 +909,3 @@ class EditorWindow:
 
     def mainloop(self) -> None:
         self.window.mainloop()
-
-
-def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("json_filename", action="store", help="Sprite map JSON file")
-    parser.add_argument("ms_export_order_json_file", action="store", help="metasprite export order map JSON file")
-
-    args = parser.parse_args()
-
-    return args
-
-
-def main() -> None:
-    args = parse_arguments()
-
-    ms_export_orders = load_ms_export_order_json(args.ms_export_order_json_file)
-
-    editor_window = EditorWindow(args.json_filename, ms_export_orders)
-    editor_window.mainloop()
-
-
-if __name__ == "__main__":
-    main()

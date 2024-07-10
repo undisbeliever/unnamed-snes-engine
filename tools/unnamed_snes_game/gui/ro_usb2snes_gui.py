@@ -2,8 +2,7 @@
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
 
-import os.path
-from typing import Any, Final, Optional
+from typing import Any, Final
 
 import tkinter as tk
 import tkinter.ttk as ttk
@@ -13,7 +12,6 @@ from .errors_tab import ErrorsTab
 
 from ..resources_over_usb2snes import FsWatcherSignals, BgThread
 from ..resources_compiler import DataStore
-from .. import metasprite as ms
 
 
 # https://tkdocs.com/tutorial/eventloop.html#threads

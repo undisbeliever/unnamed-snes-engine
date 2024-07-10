@@ -32,6 +32,12 @@
     }
   },
   "bg_images": {
+    "loading_audio_data": {
+      "format": "2bpp",
+      "source": "images/loading-audio-data.png",
+      "palette": "title_screen",
+      "tile_priority": 1
+    },
     "title_screen": {
       "format": "2bpp",
       "source": "images/title-screen.png",
@@ -61,6 +67,17 @@
       "source": "images/licenses-bg2.png",
       "palette": "credits",
       "tile_priority": 1
+    }
+  },
+  "second_layers": {
+    "scrolling_test": {
+      "source": "second-layers/scrolling-test.png",
+      "palette": "dungeon",
+      "mt_tileset": "dungeon",
+      "above_metatiles": true,
+      "tile_priority": 1,
+      "part_of_room": true,
+      "default_room_pos": "0x28 0x19"
     }
   }
 }

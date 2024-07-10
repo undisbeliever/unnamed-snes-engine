@@ -17,6 +17,7 @@ namespace resources {
 enum ResourceType : u8 {
   palette,
   mt_tileset,
+  second_layer,
   ms_spritesheet,
   tiles,
   bg_image,
@@ -24,12 +25,32 @@ enum ResourceType : u8 {
 };
 
 
-struct ResourceEntry {
-    // ::TODO indicate compressed data::
+// Resource data contains one or both of:
+//  * RAM data - data copied into Wram7e bank (or zeropage)
+//  * PPU data - dynamic sized data that is transferred to PPU using DMA
+//
+// RAM data can be either:
+//  * Fixed - The size of the data is fixed and determined by the size of a struct.
+//  * Dynamic - The size is variable and determined by a 2 byte u16le prefix before the data.
+//
+// PPU data (if any) is always dynamically sized and is located immediately after the RAM data.
+struct _ResourceTableEntry {
+    farPtr : far *u8,
+}
 
-    farPtr  : far *u8,
-    size    : u16,
-};
+
+// A struct to keep track of the remaining PPU data that has yet to be sent to the PPU.
+//
+// CAUTION: The memory address of the PPU data is stored in DMA0.
+//   * It will be overridden on the next non-resource DMA transfer.
+//   * It will be overridden by the next load resource call.
+//   * It will be overridden by the next VBlank routine (ie, `WaitFrame` call).
+//
+// LIFETIME: Only valid until the next non-resource DMA transfer or next load resource call.
+struct PpuData_Dma0 {
+    remaining : u16,
+}
+
 
 
 // Hack to provide access into `resourceEntries` fields by `unaligned xx` addressing.
@@ -38,7 +59,6 @@ struct ResourceEntry {
 namespace _RE {
     let addr        = 0xc10000 as far *u16;
     let addrBank    = 0xc10002 as far *u8;
-    let size        = 0xc10003 as far *u16;
 };
 
 
@@ -52,9 +72,9 @@ in rodata0 {
 
     // resource entry = ResourceEntryTable[type][resourceId]
     const __ResourceEntryTable : [ *const u8 ] = [
-        @[ 0u8 ; sizeof(ResourceEntry) * i ] for let i in resources.n_resources_per_type
+        @[ 0u8 ; sizeof(_ResourceTableEntry) * i ] for let i in resources.n_resources_per_type
     ];
-    let ResourceEntryTable = far &__ResourceEntryTable as far * const *ResourceEntry;
+    let ResourceEntryTable = far &__ResourceEntryTable as far * const *_ResourceTableEntry;
 
 
     let INVALID_ROOM_ADDR = 0xffff;
@@ -74,7 +94,7 @@ in rodata0 {
 
 
 in zeropage {
-    var res : ResourceEntry;
+    var ppuData : PpuData_Dma0;
 }
 
 
@@ -82,64 +102,99 @@ in zeropage {
 in code {
 
 
-// Load a palette resource.
+// Load a resource with fixed RAM data and PPU data.
 //
-// DB unknown
+// LIFETIME: PPU data is only valid until the next `load_resource__*` call or non-resource DMA transfer.
+// REQUIRES: Force-Blank
+// USES: DMA Channel 0
+//
+// NOTE: This function will only load RAM data to wram bank $7e.
+//
+// DB = 0x80
 #[mem8, idx16]
-func load_palette(resourceId : resources.palettes in a) : ResourceEntry in res {
-    return __load_resource(ResourceType.palette as u16, a);
+inline func load_resource__fixed_ram_and_ppu_data__forceblank_inline(let rType: ResourceType, resourceId : u8 in a, let wram_data_addr: *u8, let wram_data_size: u16) : PpuData_Dma0 in ppuData {
+    __load_resource(rType, a);
+
+    // a:xx = resource address
+    WMADDML = yy = wram_data_addr as u16;
+    ppuData = __copy_fixed_size_data_and_prep_dynamic_sized_data(xx, a, wram_data_size);
+
+    return ppuData;
 }
 
 
-// Load a MetaTile tileset resource.
+// Load a resource with dynamically sized RAM data and PPU data.
 //
-// DB unknown
+// LIFETIME: PPU data is only valid until the next `load_resource__*` call or non-resource DMA transfer.
+// REQUIRES: Force-Blank
+// USES: DMA Channel 0
+//
+// NOTE: This function will only load RAM data to wram bank $7e.
+//
+// DB = 0x80
 #[mem8, idx16]
-func load_mt_tileset(resourceId : u8 in a) : ResourceEntry in res {
-    return __load_resource(ResourceType.mt_tileset as u16, a);
+inline func load_resource__dynamic_ram_and_ppu_data__forceblank_inline(let rType: ResourceType, resourceId : u8 in a, let wram_data_addr: *u8, let max_wram_data_size: u16) : PpuData_Dma0 in ppuData {
+    __load_resource(rType, a);
+
+    // a:xx = resource address
+    WMADDML = yy = wram_data_addr as u16;
+    __copy_dynamic_sized_data_and_prep_dynamic_sized_data(xx, a, max_wram_data_size);
+
+    return ppuData;
+}
+
+
+// Load a resource with only PPU data.
+//
+// LIFETIME: PPU data is only valid until the next `load_resource__*` call or non-resource DMA transfer.
+// REQUIRES: Force-Blank
+// USES: DMA Channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func load_resource__ppu_data__forceblank__inline(let rType: ResourceType, resourceId : u8 in a) : PpuData_Dma0 in ppuData {
+    ppuData = __load_ppu_only_resource(rType, a);
+
+    return ppuData;
 }
 
 
 
-// Load a MetaSprite spritesheet resource.
+// Load a resource with dynamic sized RAM data without copying the data to Work-RAM.
 //
-// DB unknown
+// LIFETIME: output is only valid until the next `load_resource__*` call.
+//
+// OUTPUT: a:xx = audio data address
+// OUTPUT:   yy = audio data size
+//
+// DB = 0x80
 #[mem8, idx16]
-func load_ms_spritesheet(resourceId : u8 in a) : ResourceEntry in res {
-    return __load_resource(ResourceType.ms_spritesheet as u16, a);
+inline func load_resource__dynamic_ram_no_copy__inline_axy(let rType: ResourceType, resourceId : resources.songs in a) {
+    __load_resource(rType, a);
+    __read_dynamic_sized_data_size(xx, a);
 }
 
 
-
-// Load a tiles resource.
+// OUT: a:xx resource address
 //
 // DB unknown
 #[mem8, idx16]
-func load_tiles_resource(resourceId : u8 in a) : ResourceEntry in res {
-    return __load_resource(ResourceType.tiles as u16, a);
+inline func __load_resource(let rType: ResourceType, resourceId : u8 in a) {
+    __load_resource__xx2(rType as u16 * 2, a);
 }
-
-
-
-// Load a song resource.
-//
-// NOTE: Resource ID 0 contains the common audio data and not song data.
-//
-// DB unknown
-#[mem8, idx16]
-func load_songs_resource(resourceId : resources.songs in a) : ResourceEntry in res {
-    return __load_resource(ResourceType.songs as u16, a);
-}
-
 
 
 // Load a resource
 //
-// ASSUMES: type is always valid
+// ASSUMES: `rTypeTimes2` is always valid.
+// ASSUMES: `rTypeTimes2` is `ResourceType as u16 * 2.
+//
+// OUT: a:xx resource address
 //
 // DB unknown
 #[mem8, idx16]
-func __load_resource(type : u16 in xx, resourceId : u8 in a) : ResourceEntry in res {
+func __load_resource__xx2(rTypeTimes2 : u16 in xx, resourceId : u8 in a) {
+var _tmp : u16 in zpTmp_word_0;
 
     // This function MUST ONLY use zeropage variables
 
@@ -153,41 +208,145 @@ func __load_resource(type : u16 in xx, resourceId : u8 in a) : ResourceEntry in 
     }
     a = *far &UseResourcesOverUsb2Snes;
     if !zero {
-        ^return resources_over_usb2snes.load_resource(xx, yy);
+        resources_over_usb2snes.load_resource(xx, yy);
+    }
+    else {
+        mem16_idx16();
+        #[mem16] {
+            // Multiply low byte of y by 3
+            _tmp = aa = yy & 0xff;
+            // +# is safe: carry always clear
+            aa = (aa << 1) +# _tmp;
+            // +# is safe: carry always clear (`0xff * 2 + 0xff < 0x8000`)
+            aa +#= ResourceEntryTable[unaligned xx] as u16;
+            xx = aa;
+
+
+            yy = aa = _RE.addr[unaligned xx];
+        }
+        mem8();
+
+        a = _RE.addrBank[unaligned xx];
+        xx = yy;
+    }
+}
+
+
+// Copy fixed-size resource RAM data to Work-RAM and pre-load dynamic sized PPU data.
+//
+// Uses: DMA channel 0
+//
+// IN: WMADDML - the work RAM address to copy the RAM data to (NOTE: WMADDH will be set to 0 (bank $7e))
+// OUT: PpuData_Dma0 in ppuData
+//
+// DB = 0x80
+#[mem8, idx16, fallthrough]
+func __copy_dynamic_sized_data_and_prep_dynamic_sized_data(addr: u16 in xx, bankbyte: u8 in a, max_size: u16 in yy) {
+var _maxSize : u16 in zpTmp_word_0;
+
+    _maxSize = yy;
+
+    __read_dynamic_sized_data_size(xx, a);
+
+    if yy >= _maxSize {
+        yy = _maxSize;
     }
 
-    // Clear high bytes of the index registers
-    idx8();
+// Fallthrough
+}
 
-    mem16_idx16();
+
+// Copy fixed-size resource RAM data to Work-RAM and pre-load dynamic sized PPU data.
+//
+// Uses: DMA channel 0
+//
+// IN: WMADDML - the work RAM address to copy the RAM data to (NOTE: WMADDH will be set to 0 (bank $7e))
+//
+// DB = 0x80
+#[mem8, idx16]
+func __copy_fixed_size_data_and_prep_dynamic_sized_data(addr: u16 in xx, bankbyte: u8 in a, wram_data_size: u16 in yy) : PpuData_Dma0 in ppuData {
+    WMADDH = 0;
+
+    // DMA size
+    DAS0 = yy;
+
+    // DMA A-Bus address
+    A1T0 = xx;
+    A1B0 = a;
+
+    dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_ONE, <:&WMDATA);
+
+    MDMAEN = a = MDMAEN_DMA0;
+
+    xx = A1T0 as u16;
+    a = A1B0 as u8;
+    return __prep_dynamic_sized_ppu_data_transfer(xx, a);
+}
+
+
+
+// Load resource data that contains only dynamic sized PPU data.
+//
+// Uses: DMA channel 0
+//
+// DB = 0x80
+inline func __load_ppu_only_resource(let rType : ResourceType, resourceId : u8 in a) : PpuData_Dma0 in ppuData
+{
+    __load_ppu_only_resource__xx2(rType as u16 * 2, a);
+    return ppuData;
+}
+
+// OUT: PpuData_Dma0 in ppuData
+// DB = 0x80
+#[fallthrough, mem8, idx16]
+func __load_ppu_only_resource__xx2(rTypeTimesTwo : u16 in xx, resourceId : u8 in a) {
+    __load_resource__xx2(xx, a);
+
+// Fallthrough
+}
+
+
+// Prepare DMA registers and `ppuData` for a dynamic sized PPU data DMA transfer.
+//
+// Uses: DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+func __prep_dynamic_sized_ppu_data_transfer(addr: u16 in xx, bankbyte: u8 in a) : PpuData_Dma0 in ppuData {
+    __read_dynamic_sized_data_size(xx, a);
+
+    A1T0 = xx;
+    A1B0 = a;
+    ppuData.remaining = yy;
+
+    return ppuData;
+}
+
+
+// Read the size of dynamic sized RAM or PPU data and advance `xx` to data start.
+//
+// OUT: a:xx = far address of data
+// OUT:   yy = data size
+#[mem8, idx16]
+func __read_dynamic_sized_data_size(addr: u16 in xx, bankbyte: u8 in a) {
+var _farPtr : far *u16 in zpTmp_farPtr;
+
+    // ::TODO add decompression::
+
+    *(&_farPtr as *u16) = xx;
+    #:_farPtr = a;
+
+    mem16();
     #[mem16] {
-        // No need to mask high byte of `xx`, it is always 0
-        xx = aa = xx << 1;
-
-        // Multiply yy by 5
-        // No need to mask high byte of `yy`, it is always 0
-        // Reuse res.size as temporary variable, ensure all zeropage variables are unused
-        // +# is safe: carry always clear
-        res.size = aa = yy;
-        aa = (aa << 2) +# res.size;
-
-        xx = aa = aa + ResourceEntryTable[unaligned xx] as u16;
-
-        // X = address of ResourceEntry
-
-        res.size = aa = _RE.size[unaligned xx];
-
-        *(&res.farPtr as *u16) = aa = _RE.addr[unaligned xx];
-
-        aa = (_RE.addrBank as far *u16)[unaligned xx];
+        yy = aa = *_farPtr;
     }
     mem8();
 
-    #:res.farPtr = a;
-
-    return res;
+    // DMA A-Bus address
+    xx++;
+    xx++;
+    a = #:_farPtr;
 }
-
 
 
 // Load a room into memory
@@ -195,6 +354,7 @@ func __load_resource(type : u16 in xx, resourceId : u8 in a) : ResourceEntry in 
 // DB = 0x7e
 #[mem8, idx8]
 func load_room(roomId : u8 in a) : bool in carry {
+var _farPtr : far *u8 in zpTmp_farPtr;
 
     // Save roomId in `y`, UseResourcesOverUsb2Snes test clobbers `a` (no `bit long` instructions).
     y = a;
@@ -215,17 +375,17 @@ func load_room(roomId : u8 in a) : bool in carry {
             return false;
         }
 
-        *(&res.farPtr as *u16) = aa;
+        *(&_farPtr as *u16) = aa;
     }
     mem8();
 
     #[idx16] {
-        #:res.farPtr = a = ROOM_DATA_BANK;
+        #:_farPtr = a = ROOM_DATA_BANK;
 
         // Copy room into memory.
         yy = sizeof(typeof(room)) - 1;
         do {
-            (&room as *u8)[yy] = a = res.farPtr[yy];
+            (&room as *u8)[yy] = a = _farPtr[yy];
             yy--;
         } while !negative;
     }
@@ -233,6 +393,89 @@ func load_room(roomId : u8 in a) : bool in carry {
 
     return true;
 }
+
+
+// Transfer a section of ppuData to CGRAM
+//
+// REQUIRES: Force-Blank
+// Uses DMA Channel 0
+//
+// DB = 0x80
+#[mem8, idx16, fallthrough]
+func dma_to_cgram__forceblank(ppuData_ : PpuData_Dma0 in ppuData, size: u16 in yy) {
+    xx = dma.dmap_and_bbad__xx(DMAP_TO_PPU | DMAP_TRANSFER_ONE, <:&CGDATA);
+    return dma_ppu_data__forceblank(ppuData_, xx, yy);
+}
+
+
+// Transfer the remaining ppuData to VRAM
+//
+// REQUIRES: Force-Blank
+// Uses DMA Channel 0
+//
+// DB = 0x80
+#[mem8, idx16, fallthrough]
+func dma_remaining_to_vram__forceblank(ppuData_ : PpuData_Dma0 in ppuData) {
+    yy = ppuData.remaining;
+
+// Fallthrough
+}
+
+
+// Transfer a section of ppuData to VRAM
+//
+// REQUIRES: Force-Blank
+// Uses DMA Channel 0
+//
+// DB = 0x80
+#[mem8, idx16, fallthrough]
+func dma_to_vram__forceblank(ppuData_ : PpuData_Dma0 in ppuData, size: u16 in yy) {
+    VMAIN  = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+    xx = dma.dmap_and_bbad__xx(DMAP_TO_PPU | DMAP_TRANSFER_TWO, <:&VMDATA);
+
+// Fallthrough
+}
+
+
+// Transfer a section of ppuData to the PPU using DMA
+//
+// REQUIRES: Force-Blank
+// Uses DMA Channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+func dma_ppu_data__forceblank(ppuData_ : PpuData_Dma0 in ppuData, dmapAndBbad: u16 in xx, size: u16 in yy) {
+    mem16();
+    #[mem16] {
+        aa = yy;
+
+        // Reverse subtract
+        carry = true;
+        aa ^= 0xffff;
+        aa +#= ppuData.remaining;
+
+        if !carry {
+            aa = 0;
+        }
+        ppuData.remaining = aa;
+    }
+    mem8();
+
+    // Set DMAP0 and BBAD0
+    *(&DMAP0 as *u16) = xx;
+
+    // Address set in __prep_dynamic_sized_ppu_data_transfer()
+
+    // DMA size
+    DAS0 = yy;
+
+    // Ensure we are in force blank;
+    INIDISP = a = INIDISP_FORCE_BLANK | INIDISP_BRIGHTNESS_MASK;
+
+    HDMAEN = 0;
+    MDMAEN = a = MDMAEN_DMA0;
+}
+
 
 
 
@@ -247,9 +490,8 @@ func load_tiles_resource_into_vram(resourceId : resources.tiles in a, vramWordAd
 
     VMADD = xx;
 
-    res = __load_resource(ResourceType.tiles as u16, a);
-
-    ^return dma.transfer_to_vram__forceblank(#:res.farPtr, *(&res.farPtr as *u16), res.size);
+    ppuData = load_resource__ppu_data__forceblank__inline(ResourceType.tiles, a);
+    return dma_remaining_to_vram__forceblank(ppuData);
 }
 
 
@@ -265,28 +507,26 @@ let load_tiles_resource_into_vram_a = load_tiles_resource_into_vram as func(u8 i
 // DB = 0x80
 #[mem8, idx16]
 func load_bg_image_resource_into_vram(resourceId : resources.bg_images in a, vramTilemapWaddr : u16 in xx, vramTilesWaddr : u16 in yy) {
-var _vramTilesWaddr : u16 in zpTmp_word_0;
+var _vramTilesWaddr : u16 in zpTmp_word_1;
 
-    // BG Image Data format:
+    // BG Image Data RAM data format:
     //  * Single byte header: %000tt000
     //      tt   = tilemap size (number of 32x32 nametables)
     //
+    // BG Image PPU data format:
     //  * tilemapData
     //  * tileData
+var _header : u8 in zpTmp_byte_0;
 
-
-    // ::TODO Add palette resource type, remove palette from BgImage::
     // ::TODO Lookup VRAM word addresses from a table in memory::
 
     VMADD = xx;
     _vramTilesWaddr = yy;
 
-    res = __load_resource(ResourceType.bg_image as u16, a);
-
-    dma.set_dma0_source__res_plus_offset(res, 1);
+    ppuData = load_resource__fixed_ram_and_ppu_data__forceblank_inline(ResourceType.bg_image, a, &_header, sizeof(typeof(_header)));
 
     // Calculate tilemap size
-    a = *res.farPtr;
+    a = _header;
     mem16();
     #[mem16] {
         aa = aa & 0b00011000;
@@ -301,45 +541,15 @@ var _vramTilesWaddr : u16 in zpTmp_word_0;
 
     // Transfer tilemap to VRAM
     // VRAM address set at the top of this function
-    dma.continue_transfer_to_vram__forceblank(yy);
+    dma_to_vram__forceblank(ppuData, yy);
 
     // Transfer tiles to VRAM
     VMADD = xx = _vramTilesWaddr;
-    dma.transfer_remaining_res_data_to_vram__forceblank(res);
+    dma_remaining_to_vram__forceblank(ppuData);
 }
 
 
 let load_bg_image_resource_into_vram_a = load_bg_image_resource_into_vram as func(u8 in a, u16 in xx, u16 in yy);
-
-
-
-
-// Transfer the first `size` bytes of resource data into Work-RAM bank 0x7e.
-//
-// ASSUMES: resource size > size
-// Uses DMA channel 0
-//
-// DB = 0x80
-#[mem8, idx16]
-func transfer_resource_header_to_wram7e(_resourceData : ResourceEntry in res, ptr : u16 in xx, size : u16 in yy)
-{
-    // Assumes res.farPtr is not Work-RAM.
-    // ::TODO slow path if `res.farPtr` bank is a Work-RAM address::
-
-    WMADDML = xx;
-    WMADDH = a = 0x7e;
-
-    // DMA size
-    DAS0 = yy;
-
-    // DMA A-Bus address
-    A1T0 = xx = *(&res.farPtr as *u16);
-    A1B0 = a = #:res.farPtr;
-
-    dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_ONE, <:&WMDATA);
-
-    MDMAEN = a = MDMAEN_DMA0;
-}
 
 }
 

@@ -345,12 +345,11 @@ inline func set_last_command_id__inline(cId : u8 in a) {
 // NOTE: The high byte of `xx` and `yy` is ignored.
 // ASSUMES: `xx` is a valid `resources.ResourceType` value
 //
+// OUT: a:xx resource address
+//
 // DB unknown
 #[mem8, idx16]
-func load_resource(resourceType : u16 in xx, resourceId : u16 in yy) : resources.ResourceEntry in resources.res {
-
-var _res : resources.ResourceEntry in resources.res;
-
+func load_resource(resourceType : u16 in xx, resourceId : u16 in yy) {
     // This function MUST ONLY use zeropage variables or long addressing
 
     idx8();
@@ -366,16 +365,11 @@ var _res : resources.ResourceEntry in resources.res;
         aa = (aa & 0xff00) | (ResponseStatus.OK as u16);
         do {
         } while aa != __far_response_u16[unaligned _RESPONSE_u16_STATUS_AND_ID];
-
-
-        _res.size = aa = __far_response_u16[unaligned _RESPONSE_u16_DATA_SIZE];
     }
     mem8();
 
-    #:_res.farPtr = a = #:far &response_data;
-    *(&_res.farPtr as *u16) = xx = &response_data as u16;
-
-    return _res;
+    xx = &response_data as u16;
+    a = #:far &response_data;
 }
 
 

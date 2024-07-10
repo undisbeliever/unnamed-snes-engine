@@ -7,10 +7,9 @@ import os.path
 import argparse
 from io import StringIO
 
-from unnamed_snes_game.common import lorom_address_to_rom_offset, hirom_address_to_rom_offset
 from unnamed_snes_game.json_formats import load_mappings_json
 
-from typing import Callable, Final, Generator, TextIO, NamedTuple
+from typing import Callable, Final, TextIO, NamedTuple
 
 
 AUDIO_MEMORY_TYPE: Final = "SpcRam"

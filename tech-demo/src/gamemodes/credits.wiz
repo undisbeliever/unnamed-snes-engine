@@ -5,6 +5,7 @@ import "../memmap";
 import "engine/registers";
 import "engine/common/reset";
 
+import "engine/audio";
 import "engine/gamemodes";
 import "engine/wait-frame";
 import "engine/resources/resources";
@@ -27,6 +28,7 @@ let VRAM_BG1_TILES_WADDR = 0x1000;
 let VRAM_BG2_TILES_WADDR = 0x2000;
 
 
+let CREDITS_MAX_YPOS = 512 - 224;
 let MIT_LICENSE_TEXT_MAX_YPOS = 202;
 
 
@@ -40,6 +42,8 @@ in code {
 #[mem8, idx8]
 func exec() {
     wait_multiple_frames_and_fadeout__slow();
+
+    audio.load_song(resources.songs.CreditsTheme);
 
     push16(0x7e80);
     data_bank = pop8();
@@ -95,13 +99,13 @@ inline func setup_ppu__credits() {
     // ::TODO move elsewhere::
     mem16();
     #[mem16] {
-        bg1_scrollX = 0;
-        bg1_scrollY = 0;
+        bgA_scroll_x = 0;
+        bgA_scroll_y = 0;
     }
     mem8();
 
     BGMODE = a = BGMODE_MODE_0;
-    BG1SC = a = ((VRAM_BG1_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_64x32;
+    BG1SC = a = ((VRAM_BG1_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_32x64;
     BG12NBA = a = ((VRAM_BG1_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG1_SHIFT);
     TM = a = TM_BG1;
 
@@ -110,24 +114,61 @@ inline func setup_ppu__credits() {
 }
 
 
+
 // Process the credits image
 // DB = 0x7e
 #[mem8, idx8]
 inline func process__credits() {
+    idx16();
+    #[idx16] {
+        // Number of frames to wait before scrolling
+        xx = 2 * 60;
 
-    // Wait until the player pressed start
-    // Or 8 seconds have elapsed
-    mem16();
-    #[mem16] {
         do {
+            push16(xx);
+
             wait_frame();
 
-            aa = joypad.pressed;
-        } while aa & joypad.JOY.START == 0;
+            a = joypad.current_h;
+            yy = bgA_scroll_y;
+
+            xx = pop16();
+            if !zero {
+                xx--;
+            }
+            else {
+                yy++;
+
+                // Slow down credits scroll
+                xx = 1;
+            }
+
+            if a & (joypad.JOYH.UP | joypad.JOYH.DOWN) != 0 {
+                // temporally disable automatic scroll
+                xx = 10 * 60;
+
+                if a & joypad.JOYH.UP != 0{
+                    yy--;
+                    yy--;
+                    if negative {
+                        yy = 0;
+                    }
+                }
+                else {
+                    yy++;
+                    yy++;
+                }
+            }
+
+            if yy >= CREDITS_MAX_YPOS {
+                yy = CREDITS_MAX_YPOS;
+            }
+            bgA_scroll_y = yy;
+
+        } while a & joypad.JOYH.START == 0;
     }
     mem8_idx8();
 }
-
 
 
 
@@ -144,10 +185,10 @@ inline func setup_ppu__licenses() {
     // ::TODO move elsewhere::
     mem16();
     #[mem16] {
-        bg1_scrollX = 0;
-        bg1_scrollY = 0;
-        bg2_scrollX = 0;
-        bg2_scrollY = 0;
+        bgA_scroll_x = 0;
+        bgA_scroll_y = 0;
+        bgB_scroll_x = 0;
+        bgB_scroll_y = 0;
     }
     mem8();
 
@@ -193,17 +234,17 @@ inline func process__licenses() {
 
     idx16();
     #[idx16] {
-        bg1_scrollY = xx = 0;
+        bgA_scroll_y = xx = 0;
 
         yy = 0;
 
         do {
-            bg2_scrollY = yy;
+            bgB_scroll_y = yy;
 
             wait_frame();
 
-            xx = bg1_scrollY;
-            yy = bg2_scrollY;
+            xx = bgA_scroll_y;
+            yy = bgB_scroll_y;
 
             a = joypad.current_h;
             if a & joypad.JOYH.LEFT != 0 {

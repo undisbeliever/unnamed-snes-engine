@@ -5,6 +5,7 @@ import "../memmap";
 import "engine/registers";
 import "engine/common/reset";
 
+import "engine/vram-map";
 import "engine/audio";
 import "engine/gamemodes";
 import "engine/textbox";

@@ -5,17 +5,27 @@
 
 import re
 import os
-import sys
 import gzip
 import base64
 import struct
 import xml.etree.ElementTree
 import posixpath
 from collections import OrderedDict
-from typing import Final, NamedTuple, Optional, Union
+from typing import Final, NamedTuple, Optional
 
-from .json_formats import load_entities_json, load_mappings_json, Filename, Mappings, EntitiesJson, Entity, RoomEvent, Name
-from .common import MultilineError, SimpleMultilineError, print_error
+from .json_formats import (
+    Mappings,
+    EntitiesJson,
+    Entity,
+    SecondLayerCallback,
+    Callback,
+    SecondLayerInput,
+    Name,
+)
+from .common import EngineData, FixedSizedData, SimpleMultilineError
+from .callbacks import parse_callback_parameters, ROOM_CALLBACK, SL_ROOM_PARAMETERS, RoomDoors, parse_int
+
+from .second_layers import MT_TILE_PX as SECOND_LAYER_MT_TILE_PX
 
 
 MAP_WIDTH = 16
@@ -28,17 +38,32 @@ ENTITIES_IN_MAP = 8
 
 TILE_SIZE = 16
 
+BLANK_SL_PARAMETERS: Final = bytes(SL_ROOM_PARAMETERS.parameter_size)
+
 
 class RoomError(SimpleMultilineError):
     pass
 
 
-# `TmxMap` is a limited subset of the TMX data format (only supporting one map layer and tileset)
+# Storing room dependencies in a NamedTuple as I am planning to add more in the future
+class RoomDependencies(NamedTuple):
+    second_layer: SecondLayerInput
+    sl_callback: Optional[SecondLayerCallback]
+
+
+# `TmxMap` is a limited subset of the TMX data format
+# (only supporting one map layer, image layer and tileset)
 
 
 class TmxTileset(NamedTuple):
     name: str
     firstgid: int
+
+
+class TmxImageLayer(NamedTuple):
+    name: str
+    offset_x: int
+    offset_y: int
 
 
 class TmxEntity(NamedTuple):
@@ -53,6 +78,7 @@ class TmxEntity(NamedTuple):
 class TmxMap(NamedTuple):
     map_class: str
     tileset: TmxTileset
+    image_layer: Optional[TmxImageLayer]
     map: list[int]
     entities: list[TmxEntity]
     parameters: OrderedDict[Name, str]
@@ -115,6 +141,23 @@ def parse_layer_tag(tag: xml.etree.ElementTree.Element) -> list[int]:
     return tiles
 
 
+def parse_imagelayer_tag(tag: xml.etree.ElementTree.Element) -> TmxImageLayer:
+    offset_x = tag.attrib.get("offsetx", 0)
+    offset_y = tag.attrib.get("offsety", 0)
+
+    try:
+        offset_x = int(offset_x)
+        offset_y = int(offset_y)
+    except ValueError:
+        raise ValueError(f"Invalid <imagelayer> offset, expected integer values: {offset_x}, {offset_y}")
+
+    return TmxImageLayer(
+        name=tag.attrib.get("name", "imagelayer"),
+        offset_x=offset_x,
+        offset_y=offset_y,
+    )
+
+
 def parse_objectgroup_tag(tag: xml.etree.ElementTree.Element, error_list: list[str]) -> list[TmxEntity]:
     objects = list()
 
@@ -152,7 +195,7 @@ def parse_objectgroup_tag(tag: xml.etree.ElementTree.Element, error_list: list[s
                                 if p_name == "parameter":
                                     parameter = p.attrib.get("value")
                                     if not parameter:
-                                        add_error(f"Missing parameter value")
+                                        add_error("Missing parameter value")
                                 else:
                                     add_error(f"Unknown property: { p_name }")
                             else:
@@ -205,6 +248,7 @@ def parse_tmx_map(et: xml.etree.ElementTree.ElementTree) -> TmxMap:
         error_list.append("<map>: Missing class/type attribute")
 
     tileset = None
+    image_layer = None
     tiles = None
     entities = None
     parameters = OrderedDict[Name, str]()
@@ -225,6 +269,14 @@ def parse_tmx_map(et: xml.etree.ElementTree.ElementTree) -> TmxMap:
                 tiles = parse_layer_tag(child)
             except Exception as e:
                 error_list.append(f"<layer>: { e }")
+
+        elif child.tag == "imagelayer":
+            if image_layer is not None:
+                error_list.append("Expected only one <imagelayer> tag")
+            try:
+                image_layer = parse_imagelayer_tag(child)
+            except Exception as e:
+                error_list.append(f"<imagelayer>: { e }")
 
         elif child.tag == "objectgroup":
             if entities is not None:
@@ -253,7 +305,7 @@ def parse_tmx_map(et: xml.etree.ElementTree.ElementTree) -> TmxMap:
     assert tiles
     assert entities is not None
 
-    return TmxMap(map_class, tileset, tiles, entities, parameters)
+    return TmxMap(map_class, tileset, image_layer, tiles, entities, parameters)
 
 
 class RoomEntity(NamedTuple):
@@ -267,7 +319,9 @@ class RoomIntermediate(NamedTuple):
     map_data: bytes
     tileset_id: int
     entities: list[RoomEntity]
+    room_event: Callback
     room_event_data: bytes
+    sl_parameters: bytes
 
 
 def process_room_entities(
@@ -328,11 +382,27 @@ def process_room_entities(
             else:
                 # no parameter
                 if tmx_entity.parameter is not None:
-                    add_error(f"Entity does not have a parameter")
+                    add_error("Entity does not have a parameter")
 
         out.append(RoomEntity(xpos=tmx_entity.x, ypos=tmx_entity.y, type_id=entity_type_id, parameter=parameter))
 
     return out
+
+
+def part_of_room_sl_parameters(image_layer: TmxImageLayer, error_list: list[str]) -> bytes:
+    # ::TODO limit offset to second layer image size::
+    # ::TODO implement image wraparound for positive offset values::
+
+    if image_layer.offset_x > 0:
+        error_list.append("<imagelayer> offsetx must be negative")
+
+    if image_layer.offset_y > 0:
+        error_list.append("<imagelayer> offsety must be negative")
+
+    tile_pos_x, x_div = divmod(abs(image_layer.offset_x), SECOND_LAYER_MT_TILE_PX)
+    tile_pos_y, y_div = divmod(abs(image_layer.offset_y), SECOND_LAYER_MT_TILE_PX)
+
+    return bytes((tile_pos_x, tile_pos_y))
 
 
 # ::TODO make configurable::
@@ -340,138 +410,9 @@ LOCKED_DOOR_TILE_IDS: Final = (0x80, 0xA0, 0xC0, 0xE0)
 OPEN_DOOR_TILE_IDS: Final = (0x82, 0xA2, 0xC2, 0xE2)
 
 
-def find_locked_doors(map_data: bytes) -> list[int]:
-    return [i for i, t in enumerate(map_data) if t in LOCKED_DOOR_TILE_IDS]
-
-
-def find_open_doors(map_data: bytes) -> list[int]:
-    return [i for i, t in enumerate(map_data) if t in OPEN_DOOR_TILE_IDS]
-
-
-def parse_int(value: str, max_value: int, error_list: list[str]) -> int:
-    try:
-        int_value = int(value)
-    except ValueError as e:
-        error_list.append(str(e))
-        return 0
-
-    if int_value > max_value:
-        error_list.append(f"Parameter is too large: got { int_value }, max: { max_value }")
-        return 0
-
-    return int_value
-
-
-def parse_u8pos(value: str, error_list: list[str]) -> tuple[int, int]:
-    v = value.split()
-    if len(v) != 2:
-        error_list.append("u8pos parameter does not contain two ints: { value }")
-        return 0, 0
-
-    try:
-        xPos = int(v[0], 0)
-        yPos = int(v[1], 0)
-    except ValueError as e:
-        error_list.append(str(e))
-        return 0, 0
-
-    if xPos < 0 or xPos >= 256:
-        error_list.append(f"Parameter is not a u8: { value }")
-
-    if yPos < 0 or yPos >= 256:
-        error_list.append(f"Parameter is not a u8: { value }")
-
-    return xPos, yPos
-
-
-AUTOGENERATED_PARAMETERS = {
-    "locked_door",
-    "open_door",
-    "optional_open_door",
-}
-
-
-def process_room_event_data(tmx_map: TmxMap, map_data: bytes, mapping: Mappings, error_list: list[str]) -> bytes:
-    assert len(map_data) == MAP_WIDTH * MAP_HEIGHT
-
-    out = bytearray()
-
-    # If not None, the room event has an open_door or optional_open_door parameter
-    open_doors = None
-
-    locked_doors = find_locked_doors(map_data)
-
-    room_event = mapping.room_events.get(tmx_map.map_class)
-    if not room_event:
-        error_list.append("Unknown room event: { tmx_map.map_class }")
-        return out
-
-    out.append(room_event.id * 2)
-
-    for p in room_event.parameters:
-        value = tmx_map.parameters.get(p.name, p.default_value)
-
-        if p.type in AUTOGENERATED_PARAMETERS:
-            if value:
-                error_list.append(f"Room event parameter { p.name } is auto-generated and must not have a value")
-
-            if p.type == "locked_door":
-                if len(locked_doors) > 0:
-                    door_location = locked_doors.pop(0)
-                    out.append(door_location)
-                else:
-                    error_list.append(f"Room event parameter {p.name}: Cannot find a locked door")
-
-            elif p.type == "open_door" or p.type == "optional_open_door":
-                if open_doors is None:
-                    open_doors = find_open_doors(map_data)
-
-                if len(open_doors) > 0:
-                    door_location = open_doors.pop(0)
-                elif p.type == "optional_open_door":
-                    door_location = 0
-                else:
-                    error_list.append(f"Room event parameter {p.name}: Cannot find a locked door")
-                    door_location = 0
-                out.append(door_location)
-
-            else:
-                error_list.append(f"Unknown Room Event parameter type: {p.type}")
-        else:
-            if not value:
-                error_list.append(f"Room Event {room_event.name}: Missing parameter {p.name}")
-            elif p.type == "u8":
-                out.append(parse_int(value, 0xFF, error_list))
-            elif p.type == "u8pos":
-                out += bytes(parse_u8pos(value, error_list))
-            elif p.type == "gamestate_flag":
-                try:
-                    flag_index = mapping.gamestate_flags.index(value)
-                    out.append(flag_index)
-                except ValueError:
-                    error_list.append(f"Room event parameter {p.name}: Cannot find gamestate flag: {value}")
-            else:
-                error_list.append(f"Unknown Room Event parameter type: {p.type}")
-
-    if len(out) < 5:
-        out += bytes(5 - len(out))
-
-    if len(out) > 5:
-        error_list.append("CRITICAL ERROR: Room event data is too large")
-        return bytes(5)
-
-    if locked_doors:
-        error_list.append("There are locked_doors that are unused by the room event")
-
-    if open_doors:
-        error_list.append(
-            "There are too many open doors in the map (and the room event has an open_door/optional_open_door parameter)"
-        )
-
-    return out
-
-
-def process_room(tmx_map: TmxMap, mapping: Mappings, all_entities: OrderedDict[str, Entity]) -> RoomIntermediate:
+def process_room(
+    tmx_map: TmxMap, dependencies: RoomDependencies, mapping: Mappings, all_entities: OrderedDict[str, Entity]
+) -> RoomIntermediate:
     error_list: list[str] = list()
 
     try:
@@ -488,12 +429,46 @@ def process_room(tmx_map: TmxMap, mapping: Mappings, all_entities: OrderedDict[s
 
     room_entities = process_room_entities(tmx_map.entities, all_entities, mapping, error_list)
 
-    room_event_data = process_room_event_data(tmx_map, map_data, mapping, error_list)
+    assert len(map_data) == MAP_WIDTH * MAP_HEIGHT
+    room_doors = RoomDoors(
+        map_data=map_data,
+        locked_door_tiles=LOCKED_DOOR_TILE_IDS,
+        open_door_tiles=OPEN_DOOR_TILE_IDS,
+    )
+
+    room_event = mapping.room_events.get(tmx_map.map_class)
+    if not room_event:
+        error_list.append("Unknown room event: { tmx_map.map_class }")
+    else:
+        room_event_data = parse_callback_parameters(ROOM_CALLBACK, room_event, tmx_map.parameters, mapping, room_doors, error_list)
+
+    if dependencies.second_layer.part_of_room:
+        if dependencies.sl_callback:
+            assert dependencies.sl_callback.room_parameters, "part-of-room second-layer must not have a callback with room_parameters"
+
+        if tmx_map.image_layer:
+            sl_parameters = part_of_room_sl_parameters(tmx_map.image_layer, error_list)
+        else:
+            drp = dependencies.second_layer.default_room_pos
+            if drp:
+                sl_parameters = bytes((drp.x, drp.y))
+            else:
+                error_list.append(
+                    "Cannot position part-of-room second-layer: No <imagelayer> in map or default_room_pos in second-layer"
+                )
+    elif dependencies.sl_callback:
+        sl_parameters = parse_callback_parameters(
+            SL_ROOM_PARAMETERS, dependencies.sl_callback, tmx_map.parameters, mapping, None, error_list
+        )
+    else:
+        sl_parameters = BLANK_SL_PARAMETERS
 
     if error_list:
         raise RoomError("Error compiling room", error_list)
 
-    return RoomIntermediate(map_data, tileset_id, room_entities, room_event_data)
+    assert room_event is not None
+
+    return RoomIntermediate(map_data, tileset_id, room_entities, room_event, room_event_data, sl_parameters)
 
 
 def create_room_entities_soa(entities: list[RoomEntity]) -> bytes:
@@ -533,25 +508,33 @@ def create_map_data(room: RoomIntermediate) -> bytes:
     data.append(room.tileset_id)
 
     # Room event
-    assert len(room.room_event_data) == 5
+    assert len(room.room_event_data) == 4
+    data.append(room.room_event.id * 2)
     data += room.room_event_data
+
+    assert len(room.sl_parameters) == 2
+    data += room.sl_parameters
 
     data += create_room_entities_soa(room.entities)
 
     return data
 
 
-def compile_room(filename: str, entities: EntitiesJson, mapping: Mappings) -> bytes:
+def compile_room(filename: str, dependencies: RoomDependencies, entities: EntitiesJson, mapping: Mappings) -> EngineData:
     with open(filename, "r") as fp:
         tmx_et = xml.etree.ElementTree.parse(fp)
 
     tmx_map = parse_tmx_map(tmx_et)
 
-    room = process_room(tmx_map, mapping, entities.entities)
+    room = process_room(tmx_map, dependencies, mapping, entities.entities)
+
+    map_data = create_map_data(room)
 
     # ::TODO compress room data with lz4::
-
-    return create_map_data(room)
+    return EngineData(
+        ram_data=FixedSizedData(map_data),
+        ppu_data=None,
+    )
 
 
 def get_list_of_tmx_files(directory: str) -> list[str]:

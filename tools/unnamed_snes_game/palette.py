@@ -1,75 +1,41 @@
 # -*- coding: utf-8 -*-
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
-import PIL.Image  # type: ignore
-import struct
-import itertools
 from typing import Final, NamedTuple
 
-from .json_formats import PaletteInput, Filename, Name
-from .snes import convert_rgb_color, PaletteMap, SnesColor, ImageError
+from .common import EngineData, FixedSizedData, DynamicSizedData
+from .json_formats import PaletteInput, Name
+from .snes import load_palette_image, PALETTE_IMAGE_WIDTH, Palette, PaletteMap
 
 
-IMAGE_WIDTH: Final = 16
-
-
-class PaletteColors(NamedTuple):
+# The palette used by the resources subsystem
+# (Named PaletteResource to prevent confusion with snes.Palette)
+class PaletteResource(NamedTuple):
     name: Name
     id: int
-    colors: list[SnesColor]
+    palette: Palette
 
-    def create_map(self, bpp: int) -> list[PaletteMap]:
+    def create_map(self, bpp: int) -> PaletteMap:
         # ::TODO should this be precalculated or cached?::
-        colors: Final = self.colors
-        assert len(self.colors) <= 256, "Invalid number of palette colors"
-
-        if bpp < 1 or bpp > 8:
-            raise ValueError("Invalid bpp")
-
-        colors_per_palette: Final = 1 << bpp
-        n_palettes: Final = min(len(self.colors) // colors_per_palette, 8)
-
-        palettes_map = list()
-
-        for p in range(n_palettes):
-            pal_map = dict()
-            pi = p * colors_per_palette
-            for i, c in enumerate(colors[pi : pi + colors_per_palette]):
-                if c not in pal_map:
-                    pal_map[c] = i
-            palettes_map.append(pal_map)
-        return palettes_map
+        return self.palette.create_map(bpp)
 
 
-def load_palette_image(filename: Filename) -> list[SnesColor]:
-    with PIL.Image.open(filename) as image:
-        image.load()
-
-    if image.mode != "RGB":
-        image = image.convert("RGB")
-
-    if image.width != IMAGE_WIDTH:
-        raise ImageError(image.filename, f"Palette image must be {IMAGE_WIDTH} pixels in width")
-
-    return [convert_rgb_color(c) for c in image.getdata()]
-
-
-def convert_palette(pi: PaletteInput, id: int) -> tuple[bytes, PaletteColors]:
+def convert_palette(pi: PaletteInput, id: int) -> tuple[EngineData, PaletteResource]:
     if pi.n_rows < 1 or pi.n_rows > 16:
         raise ValueError(f"Invalid n_rows ({pi.n_rows}, min 1, max 16)")
 
-    colors: Final = load_palette_image(pi.source)
+    palette: Final = load_palette_image(pi.source, 256)
 
-    rows_in_image: Final = len(colors) // IMAGE_WIDTH
+    rows_in_image: Final = len(palette.colors) // PALETTE_IMAGE_WIDTH
 
     if rows_in_image != pi.n_rows:
         raise RuntimeError(f"Image height ({rows_in_image}) does not match n_rows ({pi.n_rows})")
 
     header: Final = bytes(
         [
-            len(colors),
+            len(palette.colors),
         ]
     )
-    data = header + struct.pack(f"<{len(colors)}H", *colors)
+    data = EngineData(FixedSizedData(header), DynamicSizedData(palette.snes_data()))
 
-    return data, PaletteColors(name=pi.name, id=id, colors=colors)
+    return data, PaletteResource(name=pi.name, id=id, palette=palette)

@@ -1,0 +1,23 @@
+// Copyright (c) 2024, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+
+// VRAM Map
+// ========
+
+let VRAM_METATILE_MAP_WADDR     = 0x0000;  // 64x32
+let VRAM_SECOND_LAYER_MAP_WADDR = 0x0800;  // 64x32
+
+// Textbox and UI (BG3)
+let VRAM_BG3_TILES_WADDR = 0x1000;
+let VRAM_BG3_MAP_WADDR   = 0x1c00;  // 32x32
+
+// MetaTiles and Second Layer use the same stating address
+//  * MetaTiles tiles are allocated upwards (0, 1, 2, ...)
+//  * Second-Layer tiles are allocated downwards (1023, 1022, 1021, ...)
+let VRAM_MTSL_TILES_WADDR = 0x2000;
+
+// MetaSprite tiles
+let VRAM_OBJ_WADDR       = 0x6000;
+
+

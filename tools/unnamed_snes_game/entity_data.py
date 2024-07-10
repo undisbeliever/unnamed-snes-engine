@@ -2,8 +2,6 @@
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
 
-import itertools
-from collections import OrderedDict
 from typing import Final
 
 from .json_formats import Name, ScopedName, EntitiesJson

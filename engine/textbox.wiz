@@ -7,6 +7,7 @@ import "registers_math";
 
 import "audio";
 import "wait-frame";
+import "vram-map";
 import "resources/dma";
 import "resources/resources";
 

@@ -19,6 +19,10 @@ import "gen/enums";
 namespace gamemodes {
 namespace title_screen {
 
+let VRAM_BG1_MAP_WADDR   = 0x0000;
+let VRAM_BG1_TILES_WADDR = 0x2000;
+
+
 in code {
 
 
@@ -29,6 +33,9 @@ in code {
 #[mem8, idx8]
 func exec() {
     wait_multiple_frames_and_fadeout();
+
+    // ::TODO improve title screen to complement this great song::
+    audio.load_song_if_changed(resources.songs.TitleScreenTheme);
 
 
     push16(0x7e80);
@@ -63,6 +70,10 @@ func exec() {
 
 
     set_next_game_mode_to_room_transition(RoomTransitions.fadein_reset_player);
+
+
+    // Ensures menu_select sound effect is finished before room transition loads a new song
+    wait_multiple_frames_and_fadeout__slow();
 }
 
 
@@ -78,8 +89,8 @@ inline func setup_ppu() {
     // ::TODO move elsewhere::
     mem16();
     #[mem16] {
-        bg1_scrollX = 0;
-        bg1_scrollY = 0;
+        bgA_scroll_x = 0;
+        bgA_scroll_y = 0;
     }
     mem8();
 

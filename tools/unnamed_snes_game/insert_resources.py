@@ -3,8 +3,6 @@
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
 
-import re
-import sys
 import os.path
 from typing import Callable, Final, NamedTuple, Optional, Union
 
@@ -15,10 +13,10 @@ from .common import (
     ResourceType,
     USE_RESOURCES_OVER_USB2SNES_LABEL,
 )
-from .common import print_error
-from .json_formats import Name, Filename, Mappings, MemoryMap
+from .common import EngineData, FixedSizedData, print_error
+from .json_formats import Filename, Mappings, MemoryMap
 from .entity_data import ENTITY_ROM_DATA_LABEL, validate_entity_rom_data_symbols, expected_blank_entity_rom_data
-from .resources_compiler import DataStore, ProjectCompiler, ResourceError
+from .resources_compiler import DataStore, ProjectCompiler, ResourceError, ResourceData
 
 Address = int
 RomOffset = int
@@ -89,7 +87,7 @@ def validate_sfc_file(sfc_data: bytes, symbols: dict[str, int], mappings: Mappin
     if USE_RESOURCES_OVER_USB2SNES_LABEL in symbols:
         o = address_to_rom_offset(symbols[USE_RESOURCES_OVER_USB2SNES_LABEL])
         if sfc_data[o] != 0xFF:
-            raise ValueError(f"sfc file contains resource data")
+            raise ValueError("sfc file contains resource data")
 
 
 class ResourceUsage(NamedTuple):
@@ -111,7 +109,7 @@ class ResourceUsage(NamedTuple):
 
 class ResourceInserter:
     BANK_END = 0x10000
-    BLANK_RESOURCE_ENTRY = bytes(5)
+    BLANK_RESOURCE_ENTRY = bytes(3)
 
     def __init__(self, sfc_view: memoryview, symbols: dict[str, int], mappings: Mappings):
         memory_map = mappings.memory_map
@@ -149,25 +147,36 @@ class ResourceInserter:
         o = self.address_to_rom_offset(addr)
         return self.view[o : o + size]
 
-    def insert_blob(self, blob: bytes) -> Address:
-        assert isinstance(blob, bytes) or isinstance(blob, bytearray)
+    def insert_engine_data(self, engine_data: EngineData) -> Address:
+        assert isinstance(engine_data, EngineData)
 
-        blob_size = len(blob)
-        assert blob_size > 0 and blob_size <= self.bank_size
+        data_size = engine_data.size()
+        assert data_size > 0 and data_size <= self.bank_size
 
         for i in range(len(self.bank_positions)):
-            if self.bank_positions[i] + blob_size <= self.BANK_END:
+            if self.bank_positions[i] + data_size <= self.BANK_END:
                 addr = ((self.bank_offset + i) << 16) + self.bank_positions[i]
 
                 rom_offset = self.address_to_rom_offset(addr)
+                rom_offset_end = rom_offset + data_size
 
-                self.view[rom_offset : rom_offset + blob_size] = blob
+                def write_data(d: bytes) -> None:
+                    nonlocal rom_offset
+                    self.view[rom_offset : rom_offset + len(d)] = d
+                    rom_offset += len(d)
 
-                self.bank_positions[i] += blob_size
+                if engine_data.ram_data is not None:
+                    write_data(engine_data.ram_data.data())
+                if engine_data.ppu_data is not None:
+                    write_data(engine_data.ppu_data.data())
+
+                assert rom_offset == rom_offset_end
+
+                self.bank_positions[i] += data_size
 
                 return addr
 
-        raise RuntimeError(f"Cannot fit blob of size { blob_size } into binary")
+        raise RuntimeError(f"Cannot fit blob of size { data_size } into binary")
 
     def insert_blob_at_label(self, label: str, blob: bytes) -> None:
         # NOTE: There is no boundary checking.  This could override data if I am not careful.
@@ -211,7 +220,7 @@ class ResourceInserter:
 
         return resource_table_addr, expected_n_resources
 
-    def insert_resources(self, resource_type: ResourceType, resource_data: list[bytes]) -> None:
+    def insert_resources(self, resource_type: ResourceType, resource_data: list[EngineData]) -> None:
         table_addr, expected_n_resources = self.resource_table_for_type(resource_type)
 
         if len(resource_data) != expected_n_resources:
@@ -220,23 +229,17 @@ class ResourceInserter:
         table_pos = self.address_to_rom_offset(table_addr)
 
         for data in resource_data:
-            size = len(data)
-            assert size > 0 and size < 0xFFFF
+            addr = self.insert_engine_data(data)
 
-            addr = self.insert_blob(data)
-
-            assert self.view[table_pos : table_pos + 5] == self.BLANK_RESOURCE_ENTRY
+            assert self.view[table_pos : table_pos + 3] == self.BLANK_RESOURCE_ENTRY
 
             self.view[table_pos + 0] = addr & 0xFF
             self.view[table_pos + 1] = (addr >> 8) & 0xFF
             self.view[table_pos + 2] = addr >> 16
 
-            self.view[table_pos + 3] = size & 0xFF
-            self.view[table_pos + 4] = size >> 8
+            table_pos += 3
 
-            table_pos += 5
-
-    def insert_room_data(self, bank_offset: int, rooms: list[Optional[bytes]]) -> None:
+    def insert_room_data(self, bank_offset: int, rooms: list[Optional[EngineData]]) -> None:
         assert len(rooms) == 256
         ROOM_TABLE_SIZE: Final = 0x100 * 2
 
@@ -247,10 +250,15 @@ class ResourceInserter:
 
         for room_id, room_data in enumerate(rooms):
             if room_data:
+                assert isinstance(room_data.ram_data, FixedSizedData)
+                assert room_data.ppu_data is None
+
+                rd = room_data.ram_data.data()
+
                 room_table[room_id * 2 + 0] = room_addr & 0xFF
                 room_table[room_id * 2 + 1] = room_addr >> 8
-                room_data_blob += room_data
-                room_addr += len(room_data)
+                room_data_blob += rd
+                room_addr += len(rd)
 
         room_table_offset = self.label_offset("resources.__RoomsTable")
         self.view[room_table_offset : room_table_offset + ROOM_TABLE_SIZE] = room_table
@@ -303,7 +311,7 @@ def update_checksum(sfc_view: memoryview, memory_map: MemoryMap) -> None:
 
     if len(sfc_view).bit_count() != 1:
         # ::TODO handle non-power of two ROM sizes::
-        raise RuntimeError(f"Invalid sfc file size (must be a power of two in size)")
+        raise RuntimeError("Invalid sfc file size (must be a power of two in size)")
 
     checksum = sum(sfc_view)
 
@@ -356,13 +364,46 @@ def compile_data(resources_directory: Filename, symbols_file: Filename, n_proces
         return None
 
 
-def insert_resources_into_binary(
-    resources_dir: Filename, symbols: Filename, sfc_input: Filename, n_processes: Optional[int]
-) -> tuple[bytes, ResourceUsage]:
-    data_store = compile_data(resources_dir, symbols, n_processes)
-    if data_store is None:
-        raise RuntimeError("Error compiling resources")
+def print_resource_sizes(data_store: DataStore) -> None:
+    total_line = "-" * 70
+    mappings = data_store.get_mappings()
 
+    dynamic_ms_data = data_store.get_dynamic_ms_data()
+    if dynamic_ms_data is not None:
+        print(f"Dynamic MS Tiles:{len(dynamic_ms_data.tile_data): 6} bytes")
+
+    msfs_and_entity_data = data_store.get_msfs_and_entity_data()
+    if msfs_and_entity_data is not None:
+        if msfs_and_entity_data.msfs_data is not None:
+            print(f"MetaSprite Data: {len(msfs_and_entity_data.msfs_data): 6} bytes")
+        if msfs_and_entity_data.entity_rom_data is not None:
+            print(f"Entity ROM Data: {len(msfs_and_entity_data.entity_rom_data): 6} bytes")
+
+    print()
+
+    for rt in ResourceType:
+        print(f"{rt.name}:")
+        n_resources = len(getattr(mappings, rt.name))
+        total_ram_size = 0
+        total_ppu_size = 0
+
+        for i in range(n_resources):
+            d = data_store.get_resource_data(rt, i)
+            if isinstance(d, ResourceData):
+                ram_size, ppu_size = d.data.ram_and_ppu_size()
+                total_ram_size += ram_size
+                total_ppu_size += ppu_size
+                print(f"{d.resource_id: 5} {d.resource_name:30} {ram_size: 6} + {ppu_size: 6} = {ram_size + ppu_size: 8} bytes")
+            elif d is not None:
+                print(f"{d.resource_id: 5} {d.resource_name:30} NO DATA")
+            else:
+                print(f"{i: 5} ERROR")
+        print(total_line)
+        print(f"{total_ram_size: 43} + {total_ppu_size:6} = {total_ram_size + total_ppu_size: 8} bytes")
+        print()
+
+
+def insert_resources_into_binary(data_store: DataStore, sfc_input: Filename) -> tuple[bytes, ResourceUsage]:
     sfc_data = bytearray(read_binary_file(sfc_input, 4 * 1024 * 1024))
     sfc_memoryview = memoryview(sfc_data)
 

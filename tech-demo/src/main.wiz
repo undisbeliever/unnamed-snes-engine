@@ -10,9 +10,12 @@ import "engine/common/reset";
 import "engine/game/entityloop";
 
 import "engine/audio";
+import "engine/wait-frame";
 import "engine/gamemodes";
 import "engine/game/metasprites";
 import "engine/game/gamestate";
+import "engine/resources/resources";
+import "engine/resources/palette";
 import "engine/resources/resources-over-usb2snes";
 
 
@@ -40,6 +43,52 @@ import "gen/function-tables";
 in code {
 
 
+// Initialize the audio subsystem, load the common audio data and show the
+// loading-audio-data splash screen.
+//
+// MUST only be called once.
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func __initialise_audio__inline() {
+    let VRAM_BG1_MAP_WADDR = 0;
+    let VRAM_BG1_TILES_WADDR = 0x1000;
+
+    let IMAGE = resources.bg_images.loading_audio_data;
+    let PALETTE = resources.palettes.title_screen;
+
+    audio.setup__inline();
+    audio.set_stereo();
+
+
+    INIDISP = a = INIDISP_FORCE_BLANK;
+
+    BGMODE = a = BGMODE_MODE_0;
+    BG1SC = a = ((VRAM_BG1_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_32x32;
+    BG12NBA = a = ((VRAM_BG1_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG1_SHIFT);
+    TM = a = TM_BG1;
+
+    resources.load_bg_image_resource_into_vram(IMAGE, VRAM_BG1_MAP_WADDR, VRAM_BG1_TILES_WADDR);
+    palette.load_palette__forceblank(PALETTE);
+
+
+    audio.set_transfer_size(audio.MAX_TRANSFER_PER_FRAME);
+
+    // Waiting 2 frames to ensure the Loader is active
+    wait_frame_and_change_brightness(7);
+    wait_frame_and_change_brightness(15);
+
+    do {
+        wait_frame();
+
+        carry = audio.is_loader_active();
+    } while carry;
+
+    audio.set_transfer_size(audio.DEFAULT_TRANSFER_PER_FRAME);
+}
+
+
+
 // Must only be called once.
 //
 // DB = 0x80
@@ -47,14 +96,11 @@ in code {
 inline func main__inline() {
     mem8_idx8();
     #[mem8, idx8] {
-        INIDISP = a = INIDISP_FORCE_BLANK;
-
         resources_over_usb2snes.init();
     }
     idx16();
 
-    audio.setup__inline();
-    audio.set_stereo();
+    __initialise_audio__inline();
 
     metasprites.setup__forceblank();
 
@@ -71,6 +117,10 @@ inline func main__inline() {
         } else {
             // No gamestate backup, show the title screen
             set_next_game_mode(GameModes.TITLE_SCREEN);
+
+            // Pre-load the title screen song
+            // ::TODO find a better way to do this::
+            audio.load_song(resources.songs.TitleScreenTheme);
         }
 
         execute_game_mode__inline();
