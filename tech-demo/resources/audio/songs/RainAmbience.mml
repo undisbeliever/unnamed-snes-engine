@@ -1,0 +1,26 @@
+;Rain Ambience for unnamed-snes-game
+;By KungFuFurby
+;Made for undisbeliever's Terrific Audio Driver v0.0.10
+
+#Title Rain Ambience
+#Game unnamed-snes-game
+#Author KungFuFurby
+#Composer KungFuFurby
+#Copyright 2024 undisbeliever
+#Date 2024
+#License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
+
+;Instrument Definitions
+@noise noise
+@HatClosed HatClosed
+
+#ZenLen 192
+
+A T255
+A @noise GI1 V8 p48 L o5d%32&
+
+B @noise GI1 V8 p80 L o4a+%32&
+
+!CRiff1 o5b%4f+%5>f+%6d%7<b%6>c+%6d%6e%5f+%6d%5c%5
+C @HatClosed V2 [!CRiff1 V+2]8 L !CRiff1
+D @HatClosed V20 w%654 L o5a%11g%11f+%12g%13a%14 w%24 a%16g%8f%64 d%31 d%15 f+%49 d%16 e%48 f+%32 g%25 g%21 g%20

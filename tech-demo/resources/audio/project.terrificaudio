@@ -169,7 +169,20 @@
       "comment": null
     }
   ],
-  "samples": [],
+  "samples": [
+    {
+      "name": "Snare02SMP",
+      "source": "samples/nesdoug/Snare02.brr",
+      "loop": "none",
+      "sample_rates": [
+        384,
+        540,
+        224
+      ],
+      "envelope": "gain F127",
+      "comment": null
+    }
+  ],
   "default_sfx_flags": {
     "one_channel": true,
     "interruptible": true
@@ -231,6 +244,14 @@
     {
       "name": "TitleScreenTheme",
       "source": "songs/TitleScreenTheme.mml"
+    },
+    {
+      "name": "RainAmbience",
+      "source": "songs/RainAmbience.mml"
+    },
+    {
+      "name": "RainAmbienceWThunder",
+      "source": "songs/RainAmbienceWThunder.mml"
     }
   ]
 }
