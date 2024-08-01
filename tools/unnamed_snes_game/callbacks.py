@@ -16,6 +16,7 @@ PARAM_TYPES: Final = {
     "u16": "u16",
     "sQ4_12": "i16",
     "gamestate_flag": "u8",
+    "optional_gamestate_flag": "u8",
     "locked_door": "u8",
     "open_door": "u8",
     "optional_open_door": "u8",
@@ -29,6 +30,7 @@ PARAM_SIZE: Final = {
     "u16": 2,
     "sQ4_12": 2,
     "gamestate_flag": 1,
+    "optional_gamestate_flag": 1,
     "locked_door": 1,
     "open_door": 1,
     "optional_open_door": 1,
@@ -208,7 +210,20 @@ def parse_callback_parameters(
             else:
                 error_list.append(f"Unknown { callback_type.human_name } parameter type: {p.type}")
         else:
-            if not value:
+            if p.type == "optional_gamestate_flag":
+                if value:
+                    try:
+                        flag_index = mapping.gamestate_flags.index(value)
+                        if flag_index == 0:
+                            error_list.append(
+                                f"{ callback_type.human_name } parameter {p.name}: Optional gamestate flag cannot be 0: {value}"
+                            )
+                        out.append(flag_index)
+                    except ValueError:
+                        error_list.append(f"{ callback_type.human_name } parameter {p.name}: Cannot find gamestate flag: {value}")
+                else:
+                    out.append(0)
+            elif not value:
                 error_list.append(f"{ callback_type.human_name } {callback.name}: Missing parameter {p.name}")
             elif p.type == "bool":
                 out.append(parse_bool(value, error_list))

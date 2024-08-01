@@ -61,6 +61,7 @@
    "first_locked_door",
    "second_locked_door",
    "third_locked_door",
+   "rook_tutorial_complete",
    "tutorial_rook_1",
    "tutorial_rook_2",
    "key_guarding_rook_1",
@@ -145,6 +146,11 @@
      "source": "monster-doors",
      "parameters": [
        {
+         "name": "flag",
+         "comment": "Optional room defeated flag.  If non-zero, the room will only lock once",
+         "type": "optional_gamestate_flag"
+       },
+       {
          "name": "door0",
          "comment": "Location of the first door",
          "type": "open_door"
@@ -157,11 +163,6 @@
        {
          "name": "door2",
          "comment": "Location of the third (optional) door",
-         "type": "optional_open_door"
-       },
-       {
-         "name": "door3",
-         "comment": "Location of the fourth (optional) door",
          "type": "optional_open_door"
        }
      ]
@@ -172,6 +173,11 @@
      "comment": "A monster_doors room-event that also changes the music",
      "parameters": [
        {
+         "name": "flag",
+         "comment": "Boss defeated flag",
+         "type": "gamestate_flag"
+       },
+       {
          "name": "door0",
          "comment": "Location of the first door",
          "type": "open_door"
@@ -184,11 +190,6 @@
        {
          "name": "door2",
          "comment": "Location of the third (optional) door",
-         "type": "optional_open_door"
-       },
-       {
-         "name": "door3",
-         "comment": "Location of the fourth (optional) door",
          "type": "optional_open_door"
        }
      ]
