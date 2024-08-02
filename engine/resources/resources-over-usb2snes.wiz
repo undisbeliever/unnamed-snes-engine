@@ -56,9 +56,9 @@ struct Request {
     // Request ID.
     request_id   : u8,
 
-    // Type of request, either a `resources.ResourceType` request or a `SpecialRequestType` request.
+    // Type of request, either a `resources.ResourceType * 2` request or a `SpecialRequestType` request.
     //
-    // (`resources.ResourceType` or `SpecialRequestType`)
+    // (`resources.ResourceType * 2` or `SpecialRequestType`)
     request_type : u8,
 
     // ::SHOULDDO increase to u16 when implementing multiple-worlds ::
@@ -151,7 +151,7 @@ in code {
 //
 // DB unknown
 #[mem8, idx8]
-func __send_request(type : u8 in x, resourceId : u8 in y) : u8 in a{
+func __send_request(rTypeTimes2 : u8 in x, resourceId : u8 in y) : u8 in a {
 
     // Annoying hack to access var struct elements with far addressing
     in wram7e {

@@ -834,8 +834,8 @@ class ResourcesOverUsb2Snes:
         r_type_id = rb[1]
 
         rt: Union[ResourceType, SpecialRequestType]
-        if r_type_id < N_RESOURCE_TYPES:
-            rt = ResourceType(r_type_id)
+        if r_type_id < N_RESOURCE_TYPES * 2:
+            rt = ResourceType(r_type_id >> 1)
         else:
             try:
                 rt = SpecialRequestType(r_type_id)
