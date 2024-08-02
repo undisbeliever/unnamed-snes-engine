@@ -66,6 +66,8 @@
    "tutorial_rook_2",
    "key_guarding_rook_1",
    "key_guarding_rook_2",
+   "arena_one",
+   "arena_two",
    "boss_defeated"
  ],
  "room_transitions": [
