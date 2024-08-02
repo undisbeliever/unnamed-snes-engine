@@ -161,7 +161,7 @@ def log_success(s: str) -> None:
 # Commands
 # ========
 
-MAX_COMMAND_SIZE: Final = 8192
+MAX_COMMAND_SIZE: Final = 1024
 
 MAX_COMMAND_DATA_SIZE: Final = MAX_COMMAND_SIZE - 4
 
