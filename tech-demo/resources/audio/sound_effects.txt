@@ -179,7 +179,7 @@
 
 === pickup_bomb === one uninterruptible
 
-    set_volume 92
+    set_volume 128
 
     ; ::TODO increase triangle sample volume::
     set_instrument_and_adsr triangle    12 0 7 0
