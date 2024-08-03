@@ -630,6 +630,8 @@ func finish_loading_data() {
 //
 // MUST NOT be used to send a play-sound-effect command.
 //
+// KEEP: Y
+//
 // DB access lowram
 #[mem8, idx8]
 func queue_command(command : Command in a, parameter0: u8 in x) : bool in carry {
@@ -647,6 +649,8 @@ func queue_command(command : Command in a, parameter0: u8 in x) : bool in carry 
 // Queue command with no parameter
 //
 // WARNING: will send the x register value to the audio driver.
+//
+// KEEP: Y
 let queue_command_no_parameter = queue_command as func(command : Command in a): bool in carry;
 
 
@@ -655,6 +659,8 @@ let queue_command_no_parameter = queue_command as func(command : Command in a): 
 //
 // MUST NOT be used to send a play-sound-effect command.
 // The command queue can only hold 1 command.
+//
+// KEEP: Y
 //
 // DB access lowram
 #[mem8, idx8]
@@ -666,6 +672,8 @@ func queue_command_override(command : Command in a, parameter0: u8 in x) {
 // Adds a command with no parameter to the queue, overriding any previously unsent commands.
 //
 // WARNING: will send the x register value to the audio driver.
+//
+// KEEP: Y
 let queue_command_override_no_parameter = queue_command_override as func(command : Command in a);
 
 
@@ -714,6 +722,8 @@ func queue_sound_effect(effect_id : sound_effects in a) {
 //
 // CAUTION: The audio driver starts in the paused state if the PlaySongImmediatly flag is false.
 // CAUTION: Tad_Process will call LoadSongData (which can take a while if it decompresses song data).
+//
+// KEEP: Y
 //
 // DB access lowram
 #[mem8]

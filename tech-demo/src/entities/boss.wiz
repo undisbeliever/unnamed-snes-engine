@@ -7,6 +7,7 @@ import "engine/entity_api";
 import "_base";
 
 import "engine/common/math";
+import "engine/audio";
 import "../rng";
 import "../player";
 
@@ -730,6 +731,14 @@ func set_state__dead(entityId: u8 in y) {
     SoA.health[y] = a = 0xff;
 
     zero_velocities(y);
+
+    // Stop music.
+    // Having the boss music playing while the boss was defeated didn't sound right.
+    // I tried changing the song to DungeonTheme but it did not feel right.
+    // It also interfered with the sound effects (not a big deal as I could have worked around it)
+    //
+    // ::TODO load fanfare song and delay boss explosion::
+    audio.queue_command_override_no_parameter(audio.Command.PAUSE_MUSIC_PLAY_SFX);
 
     ^return set_ms_animation(y, ms_animations.dead);
 }
