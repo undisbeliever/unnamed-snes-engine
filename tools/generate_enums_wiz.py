@@ -15,6 +15,7 @@ from unnamed_snes_game.json_formats import (
     Name,
     Mappings,
     AudioProject,
+    SfxExportOrder,
     MemoryMap,
     GameMode,
 )
@@ -58,6 +59,21 @@ def write_enum_inc_by_2(out: TextIO, name: Name, name_list: list[Name]) -> None:
     out.write("};\n\n")
 
 
+def write_sound_effects(out: TextIO, sfx_eo: SfxExportOrder) -> None:
+    out.write("enum sound_effects : u8 {\n")
+
+    for i, n in enumerate(sfx_eo.export_order):
+        if i == sfx_eo.first_low_priority_sfx:
+            out.write("  // low priority sound effects\n")
+        elif i == sfx_eo.n_high_priority_sfx:
+            out.write("  // normal priority sound effects\n")
+        elif i == 0:
+            out.write("  // high priority sound effects\n")
+        out.write(f"  { n },\n")
+
+    out.write("};\n\n")
+
+
 def write_gamemodes_enum(out: TextIO, gamemodes: list[GameMode]) -> None:
     out.write("enum GameModes : u8 {\n")
 
@@ -96,7 +112,7 @@ def generate_wiz_code(mappings: Mappings, audio_project: AudioProject) -> str:
 
         out.write("}\n\n")
 
-        write_enum(out, "sound_effects", audio_project.sound_effects)
+        write_sound_effects(out, audio_project.sound_effects)
         out.write(f"let N_SOUND_EFFECTS = { len(audio_project.sound_effects) };\n\n")
 
         write_gamemodes_enum(out, mappings.gamemodes)
