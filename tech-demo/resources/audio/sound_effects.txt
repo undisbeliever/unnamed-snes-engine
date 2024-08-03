@@ -346,7 +346,7 @@
 === rook_hits_ground ===
     set_volume 255
 
-    set_instrument_and_gain square      127
+    set_instrument_and_gain square  F127
 
     play_note  c2 no_keyoff 2
     play_note  a1 no_keyoff 2
@@ -356,7 +356,7 @@
 
     rest 2
 
-    set_gain 32
+    set_gain F32
 
     play_note  c2 no_keyoff 2
     play_note  a1 no_keyoff 2
@@ -366,13 +366,13 @@
 
     rest 2
 
-    set_gain 4
+    set_gain F4
 
-    play_note  c2 no_keyoff 1
-    play_note  a1 no_keyoff 1
-    play_note  g2 no_keyoff 1
-    play_note  c2 no_keyoff 1
-    play_note  e1 2
+    play_note  c2 no_keyoff 2
+    play_note  a1 no_keyoff 2
+    play_note  g2 no_keyoff 2
+    play_note  c2 no_keyoff 2
+    play_note  e1 4
 
 
 === boss_shake === one interruptible
