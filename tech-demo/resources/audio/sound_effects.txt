@@ -412,7 +412,7 @@
 
 
 === bounce_off_wall ===
-    set_volume 80
+    set_volume 72
 
     set_instrument_and_adsr square      13 3 6 28
 
