@@ -21,19 +21,19 @@
     ; It adds more emphasis to the player-hurt portion of the sound-effect.
 
     set_instrument noise
-    set_volume 192
+    set_volume 200
 
     play_note c1 4
     play_note c2 2
 
     set_instrument_and_adsr triangle    14 2 1 25
-    set_volume 128
+    set_volume 255
     play_note  f3 no_keyoff 2
     portamento c2 keyoff -25 4
 
 
     set_instrument noise
-    set_volume 192
+    set_volume 200
     play_note e2 4
     rest 2
 
@@ -45,7 +45,7 @@
 
 
 === explosion_hurt_enemy ===
-    set_volume 192
+    set_volume 200
 
     set_instrument_and_gain noise       127
 
@@ -64,7 +64,7 @@
 
 
 === explosion === one interruptible
-    set_volume 192
+    set_volume 200
 
     set_instrument_and_gain noise       127
 
