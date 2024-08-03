@@ -195,11 +195,11 @@
     "door_slam",
     "door_open_with_key",
     "door_open",
+    "explosion_hurt_player",
     "player_hurt"
   ],
   "sound_effects": [
     "collect_item",
-    "explosion_hurt_player",
     "explosion_hurt_enemy",
     "explosion",
     "player_heal",
