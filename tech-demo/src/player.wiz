@@ -116,10 +116,10 @@ let N_IFRAMES_AFTER_ENVIRONMENTAL_DAMAGE = 30;
 
 
 // Number of frames the player cannot move after being attacked by an enemy
-let N_HURT_FRAMES__ENEMY = 6;
+let N_HURT_FRAMES__ENEMY = 20;
 
 // Number of frames the player cannot move after being attacked by the environment
-let N_HURT_FRAMES__ENVIRONMENT = 5;
+let N_HURT_FRAMES__ENVIRONMENT = 10;
 
 
 
