@@ -12,7 +12,7 @@
       "xorigin": 16,
       "yorigin": 21,
       "ms-export-order": "player",
-      "frames": [ "north0", "north1", "north2", "north3", "south0", "south1", "south2", "south3", "east0", "east1", "east2", "east3", "west0", "west1", "west2", "west3", "holding_north0", "holding_north1", "holding_north2", "holding_north3", "holding_south0", "holding_south1", "holding_south2", "holding_south3", "holding_east0", "holding_east1", "holding_east2", "holding_east3", "attack_north0", "attack_north1", "attack_north2", "attack_north3", "attack_south0", "attack_south1", "attack_south2", "attack_south3", "attack_east0", "attack_east1", "attack_east2", "attack_east3", "attack_west0", "attack_west1", "attack_west2", "attack_west3" ],
+      "frames": [ "north0", "north1", "north2", "north3", "south0", "south1", "south2", "south3", "east0", "east1", "east2", "east3", "west0", "west1", "west2", "west3", "holding_north0", "holding_north1", "holding_north2", "holding_north3", "holding_south0", "holding_south1", "holding_south2", "holding_south3", "holding_east0", "holding_east1", "holding_east2", "holding_east3", "attack_north0", "attack_north1", "attack_north2", "attack_north3", "attack_south0", "attack_south1", "attack_south2", "attack_south3", "attack_east0", "attack_east1", "attack_east2", "attack_east3", "attack_west0", "attack_west1", "attack_west2", "attack_west3", "hurt_north", "hurt_south", "hurt_east" ],
       "order": 2,
       "shadowSize": "MEDIUM",
       "tilehitbox": "6 3",
@@ -79,22 +79,22 @@
         "hurt_north": {
           "delay-type": "frame",
           "loop": false,
-          "frames": [ "south0", 6 ]
+          "frames": [ "hurt_north", 6 ]
         },
         "hurt_south": {
           "delay-type": "frame",
           "loop": false,
-          "frames": [ "north0", 6 ]
+          "frames": [ "hurt_south", 6 ]
         },
         "hurt_east": {
           "delay-type": "frame",
           "loop": false,
-          "frames": [ "west0", 6 ]
+          "frames": [ "hurt_east", 6 ]
         },
         "hurt_west": {
           "delay-type": "frame",
           "loop": false,
-          "frames": [ "east0", 6 ]
+          "frames": [ "hurt_west", 6 ]
         },
         "holding_south": {
           "fixed-delay": 9.5,
@@ -146,7 +146,8 @@
         "holding_west0": "holding_east0 hflip",
         "holding_west1": "holding_east1 hflip",
         "holding_west2": "holding_east2 hflip",
-        "holding_west3": "holding_east3 hflip"
+        "holding_west3": "holding_east3 hflip",
+        "hurt_west": "hurt_east hflip"
       }
     }
   ]
