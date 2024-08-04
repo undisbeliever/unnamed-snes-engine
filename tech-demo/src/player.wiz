@@ -123,8 +123,6 @@ let N_HURT_FRAMES__ENVIRONMENT = 5;
 
 
 
-// ::TODO draw hurt animation ::
-
 let WALKING_MS_ANIMATION_OFFSET     = 0;
 let ATTACKING_MS_ANIMATION_OFFSET   = 4;
 let HURT_MS_ANIMATION_OFFSET        = 8;
@@ -1108,6 +1106,26 @@ func _set_state__hurt__enemy_collision(enemyEntityId : u8 in y, _previousState :
         yVelocity = aa = CosineTables.PlayerHurtVelocity[unaligned x] as u16;
     }
     mem8();
+
+    // Set facingDirection based on knockback
+    a = (x + 8) & 63;
+    if a < 32 {
+        if  a < 16 {
+            a = FacingDirection.UP as u8;
+        }
+        else {
+            a = FacingDirection.LEFT as u8;
+        }
+    }
+    else {
+        if a < 48 {
+            a = FacingDirection.DOWN as u8;
+        }
+        else {
+            a = FacingDirection.RIGHT as u8;
+        }
+    }
+    facingDirection = a;
 
 
     iframeCounter = a = N_IFRAMES_AFTER_ATTACKED;
