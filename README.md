@@ -39,12 +39,6 @@ The included unnamed-snes-game tech-demo is Copyright (c) 2022, Marcus Rowe <und
  * Unless otherwise noted; the art, levels and sound-effects included in the
    [tech-demo/resources](tech-demo/resources/) directory is created by undisbeliever and licensed under a
    [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0) license](https://creativecommons.org/licenses/by-sa/4.0/)
-
-The included unnamed-snes-game tech-demo is Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
- * The code is released under the [MIT license](LICENSE).
- * Unless otherwise noted; the art, levels and sound-effects included in the
-   [tech-demo/resources](tech-demo/resources/) directory is created by undisbeliever and licensed under a
-   [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0) license](https://creativecommons.org/licenses/by-sa/4.0/)
  * Music by KungFuFurby, licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
 
 
