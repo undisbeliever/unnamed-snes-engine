@@ -161,7 +161,7 @@ def log_success(s: str) -> None:
 # Commands
 # ========
 
-MAX_COMMAND_SIZE: Final = 8192
+MAX_COMMAND_SIZE: Final = 1024
 
 MAX_COMMAND_DATA_SIZE: Final = MAX_COMMAND_SIZE - 4
 
@@ -834,8 +834,8 @@ class ResourcesOverUsb2Snes:
         r_type_id = rb[1]
 
         rt: Union[ResourceType, SpecialRequestType]
-        if r_type_id < N_RESOURCE_TYPES:
-            rt = ResourceType(r_type_id)
+        if r_type_id < N_RESOURCE_TYPES * 2:
+            rt = ResourceType(r_type_id >> 1)
         else:
             try:
                 rt = SpecialRequestType(r_type_id)

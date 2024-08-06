@@ -187,18 +187,19 @@
     "one_channel": true,
     "interruptible": true
   },
-  "high_priority_sound_effects": [],
-  "sound_effects": [
-    "menu_cursor",
+  "high_priority_sound_effects": [
+    "player_hurt_low_health",
     "menu_select",
+    "menu_cursor",
     "key_spawns",
-    "collect_item",
     "door_slam",
     "door_open_with_key",
     "door_open",
-    "player_hurt_low_health",
     "explosion_hurt_player",
-    "player_hurt",
+    "player_hurt"
+  ],
+  "sound_effects": [
+    "collect_item",
     "explosion_hurt_enemy",
     "explosion",
     "player_heal",

@@ -808,10 +808,16 @@ class Song(NamedTuple):
     source: Filename
 
 
+class SfxExportOrder(NamedTuple):
+    export_order: list[Name]
+    n_high_priority_sfx: int
+    first_low_priority_sfx: int
+
+
 class AudioProject(NamedTuple):
     instrument_sources: list[Filename]
     songs: OrderedDict[Name, Song]
-    sound_effects: list[Name]
+    sound_effects: SfxExportOrder
     sound_effect_file: Filename
 
 
@@ -833,10 +839,18 @@ def load_audio_project(filename: Filename) -> AudioProject:
 
     instrument_sources = [os.path.join(dirname, j.get_string("source")) for j in jh.iterate_list_of_dicts("instruments")]
 
+    hp_sfx = jh.get_name_list("high_priority_sound_effects")
+    np_sfx = jh.get_name_list("sound_effects")
+    lp_sfx = jh.get_name_list("low_priority_sound_effects")
+
     return AudioProject(
         instrument_sources=instrument_sources,
         songs=songs,
-        sound_effects=jh.get_name_list("sound_effects"),
+        sound_effects=SfxExportOrder(
+            export_order=hp_sfx + np_sfx + lp_sfx,
+            n_high_priority_sfx=len(hp_sfx),
+            first_low_priority_sfx=len(hp_sfx) + len(np_sfx),
+        ),
         sound_effect_file=os.path.join(dirname, jh.get_string("sound_effect_file")),
     )
 

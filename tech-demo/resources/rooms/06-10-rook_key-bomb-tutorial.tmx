@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.9" tiledversion="1.9.2" class="monster_doors" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="4" nextobjectid="16">
+<map version="1.10" tiledversion="1.11.0" class="monster_doors" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="4" nextobjectid="16">
+ <properties>
+  <property name="flag" value="rook_tutorial_complete"/>
+ </properties>
  <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
  <layer id="1" name="Tiles" class="normal" width="16" height="14">
   <data encoding="base64" compression="gzip">
@@ -7,19 +10,19 @@
   </data>
  </layer>
  <objectgroup id="2" name="Enemies">
-  <object id="12" class="rook" x="40" y="104">
+  <object id="12" type="rook" x="40" y="104">
    <properties>
     <property name="parameter" value="tutorial_rook_2"/>
    </properties>
    <point/>
   </object>
-  <object id="13" class="rook" x="40" y="120">
+  <object id="13" type="rook" x="40" y="120">
    <properties>
     <property name="parameter" value="tutorial_rook_1"/>
    </properties>
    <point/>
   </object>
-  <object id="14" class="player_bomb" x="192" y="64">
+  <object id="14" type="player_bomb" x="192" y="64">
    <point/>
   </object>
  </objectgroup>

@@ -119,7 +119,10 @@ func exec() {
         set_next_game_mode(a as GameModes);
     }
 
-    ^return audio.queue_sound_effect(sound_effects.menu_select);
+    audio.queue_sound_effect(sound_effects.menu_select);
+
+    // Ensures menu_select sound effect is finished before room transition loads a new song
+    ^return wait_multiple_frames_and_fadeout__slow();
 }
 
 

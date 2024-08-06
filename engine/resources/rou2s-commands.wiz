@@ -31,7 +31,7 @@ let INIT_COMMAND_ID = 0xff;
 
 
 // Must match MAX_COMMAND_SIZE in `resources_over_usb2snes.py`
-let MAX_COMMAND_SIZE = 8192;
+let MAX_COMMAND_SIZE = 1024;
 
 // ::TODO find a better place to put the command block::
 let _COMMAND_BLOCK_ADDR = resources._USB2SNES_DATA_ADDR + resources._BANK_SIZE - MAX_COMMAND_SIZE;

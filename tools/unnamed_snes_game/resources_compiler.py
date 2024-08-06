@@ -687,7 +687,7 @@ class SongCompiler(SimpleResourceCompiler):
                     self._file_map[filename] = 0
 
                 for s in audio_project.songs.values():
-                    i = self.name_map[s.name]
+                    i = self.name_map.get(s.name)
                     if i:
                         self._file_map[s.source] = i
 

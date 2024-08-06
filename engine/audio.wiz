@@ -270,11 +270,11 @@ in zeropage {
     // Lower sound effect indexes take priority over higher sound effect indexes (as defined by the
     // project file sound effect export order).
     //
-    // If `_sfxQueue = $ff`, then the queue is considered empty.
-    var _sfxQueue : u8;
+    // If `sfxQueue_sfx = $ff`, then the queue is considered empty.
+    var sfxQueue_sfx : u8;
 
     // The pan value for the next sound effect to play.
-    var _sfxQueuePan : u8;
+    var sfxQueue_pan : u8;
 }
 
 
@@ -359,7 +359,7 @@ inline func setup__inline() {
 
     _nextSong = 0;
     _nextCommand_id = a;
-    _sfxQueue = a;
+    sfxQueue_sfx = a;
 
     do {
         carry = __Loader.check_ready_and_send_loader_data_type(LoaderDataType.CODE);
@@ -430,7 +430,7 @@ inline func __process__send_sfx_command__inline(previousCommand : u8 in a, sfx: 
     IO.ToDriver.parameter0 = y;
 
     // parameter 1 = pan
-    y = _sfxQueuePan;
+    y = sfxQueue_pan;
     if y >= MAX_PAN + 1 {
         y = CENTER_PAN;
     }
@@ -440,7 +440,9 @@ inline func __process__send_sfx_command__inline(previousCommand : u8 in a, sfx: 
     _previousCommand = a;
 
     // Reset the SFX queue
-    _sfxQueue = y = 0xff;
+    y = 0xff;
+    sfxQueue_sfx = y;
+    sfxQueue_pan = y;
 }
 
 
@@ -484,7 +486,7 @@ func process() {
                 x--;
                 if negative {
                     // Playing state
-                    y = _sfxQueue;
+                    y = sfxQueue_sfx;
                     if y != 0xff {
                         __process__send_sfx_command__inline(a, y);
                     }
@@ -587,7 +589,8 @@ func __process__loading() {
             // Reset command and SFX queues
             a = 0xff;
             _nextCommand_id = a;
-            _sfxQueue = a;
+            sfxQueue_sfx = a;
+            sfxQueue_pan = a;
 
             // Use `_state` to determine if the song is playing or paused.
             // Cannot use `_flags` as it may have changed after the `LoaderDataType` was sent to
@@ -627,6 +630,8 @@ func finish_loading_data() {
 //
 // MUST NOT be used to send a play-sound-effect command.
 //
+// KEEP: Y
+//
 // DB access lowram
 #[mem8, idx8]
 func queue_command(command : Command in a, parameter0: u8 in x) : bool in carry {
@@ -644,6 +649,8 @@ func queue_command(command : Command in a, parameter0: u8 in x) : bool in carry 
 // Queue command with no parameter
 //
 // WARNING: will send the x register value to the audio driver.
+//
+// KEEP: Y
 let queue_command_no_parameter = queue_command as func(command : Command in a): bool in carry;
 
 
@@ -652,6 +659,8 @@ let queue_command_no_parameter = queue_command as func(command : Command in a): 
 //
 // MUST NOT be used to send a play-sound-effect command.
 // The command queue can only hold 1 command.
+//
+// KEEP: Y
 //
 // DB access lowram
 #[mem8, idx8]
@@ -663,6 +672,8 @@ func queue_command_override(command : Command in a, parameter0: u8 in x) {
 // Adds a command with no parameter to the queue, overriding any previously unsent commands.
 //
 // WARNING: will send the x register value to the audio driver.
+//
+// KEEP: Y
 let queue_command_override_no_parameter = queue_command_override as func(command : Command in a);
 
 
@@ -678,9 +689,9 @@ let queue_command_override_no_parameter = queue_command_override as func(command
 // DB access lowram
 #[mem8, idx8]
 func queue_panned_sound_effect(effect_id : sound_effects in a, pan: u8 in x) {
-    if a < _sfxQueue {
-        _sfxQueue = a;
-        _sfxQueuePan = x;
+    if a < sfxQueue_sfx {
+        sfxQueue_sfx = a;
+        sfxQueue_pan = x;
     }
 }
 
@@ -699,9 +710,9 @@ func queue_panned_sound_effect(effect_id : sound_effects in a, pan: u8 in x) {
 // DB access lowram
 #[mem8]
 func queue_sound_effect(effect_id : sound_effects in a) {
-    if a < _sfxQueue {
-        _sfxQueue = a;
-        _sfxQueuePan = a = CENTER_PAN;
+    if a < sfxQueue_sfx {
+        sfxQueue_sfx = a;
+        sfxQueue_pan = a = CENTER_PAN;
     }
 }
 
@@ -711,6 +722,8 @@ func queue_sound_effect(effect_id : sound_effects in a) {
 //
 // CAUTION: The audio driver starts in the paused state if the PlaySongImmediatly flag is false.
 // CAUTION: Tad_Process will call LoadSongData (which can take a while if it decompresses song data).
+//
+// KEEP: Y
 //
 // DB access lowram
 #[mem8]

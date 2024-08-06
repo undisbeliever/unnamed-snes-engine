@@ -14,7 +14,7 @@ import "gen/room-events";
 namespace room_events {
 namespace monster_doors {
 
-let MAX_N_DOORS = 4;
+let MAX_N_DOORS = 3;
 
 
 // Delay to wait before locking the door if the player entered the room outside of a doorway.
@@ -35,6 +35,7 @@ enum State : u8 {
     SPAWN_ENEMIES                    =  8,
     WAIT_UNTIL_ENEMIES_DEFEATED      = 10,
     UNLOCK_DOORS                     = 12,
+    DISABLED                         = 14,
 };
 
 
@@ -54,13 +55,26 @@ in code {
 // DB = 0x7e
 #[mem8, idx8]
 func init() {
-    a = player.state;
-    if a == player.State.WALK_THROUGH_DOORWAY as u8 {
-        a = State.WAIT_FOR_PLAYER_TO_LEAVE_DOORWAY as u8;
-    } else {
-        // ::BUGTESTING remember to test the "can enter a monster_door room outside a doorway" feature::
-        a = State.WAIT_A_BIT as u8;
+    x = parameter__flag;
+    if !zero {
+        zero = is_gs_flag_clear(x);
     }
+
+    if !zero {
+        // Flag is not None and flag is set
+        a = State.DISABLED as u8;
+    }
+    else {
+        a = player.state;
+        if a == player.State.WALK_THROUGH_DOORWAY as u8 {
+            a = State.WAIT_FOR_PLAYER_TO_LEAVE_DOORWAY as u8;
+        } else {
+            // ::BUGTESTING remember to test the "can enter a monster_door room outside a doorway" feature::
+            a = State.WAIT_A_BIT as u8;
+        }
+    }
+
+SetState:
     state = a as State;
 
     counter = 0;
@@ -83,6 +97,7 @@ const process_state_functions = [
     process__spawn_enemies,
     process__wait_until_enemies_defeated,
     process__unlock_doors,
+    process__disabled,
 ];
 
 
@@ -198,7 +213,10 @@ func process__spawn_enemies() {
 func process__wait_until_enemies_defeated() {
     zero = is_all_enemies_defeated();
     if zero {
-        // No more smoke to spawn, start spawning enemies
+        x = parameter__flag;
+        if !zero {
+            set_gs_flag(x);
+        }
 
         queue_sound_effect(sound_effects.door_open);
 
@@ -228,6 +246,13 @@ func process__unlock_doors() {
         // Unlock the next door on the next frame.
         counter++;
     }
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process__disabled() {
 }
 
 

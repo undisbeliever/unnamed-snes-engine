@@ -20,10 +20,13 @@ in code {
 // DB = 0x7e
 #[mem8, idx8]
 func init() {
-    audio.songs_start_paused();
-    audio.load_song_if_changed(resources.songs.BossTheme);
+    room_events.monster_doors.init();
 
-    ^return room_events.monster_doors.init();
+    a = room_events.monster_doors.state as u8;
+    if a < room_events.monster_doors.State.DISABLED as u8 {
+        audio.songs_start_paused();
+        audio.load_song_if_changed(resources.songs.BossTheme);
+    }
 }
 
 
