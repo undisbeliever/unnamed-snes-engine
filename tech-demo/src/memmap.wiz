@@ -13,7 +13,7 @@ config {
 
     // ::TODO give this game a name::
     title = "UNNAMED TECH DEMO",
-    version = 1,
+    version = 3,
 }
 
 
