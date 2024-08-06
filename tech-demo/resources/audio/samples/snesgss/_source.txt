@@ -1,0 +1,9 @@
+BRR samples converted from stock GSI instruments from SNESGSS
+
+Samples are tuned to B +21 cents (wavelength of 32, 64, 128 or 256 samples per loop)
+
+SNESGSS was released under the Apache 2.0 License when released as a Google Code repo, of which the Github repo linked is a fork of that repo plus the versions that were not included in the repo.
+
+SOURCE:
+ * https://shiru.untergrund.net/software.shtml (SNES Game Sound System v1.42)
+ * https://github.com/KungFuFurby/snesgss

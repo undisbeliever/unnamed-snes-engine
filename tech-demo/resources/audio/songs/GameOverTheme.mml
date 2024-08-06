@@ -19,7 +19,7 @@
 ;Instrument Definitions
 @Strings8 Strings8
 @Strings8WF Strings8 adsr 2 7 7 0
-@Trumpet4 Trumpet4
+@trumpet_2 trumpet_2
 @PIANO_C5 PIANO_C5 adsr 15 7 7 14
 @PianoC2_16 PianoC2_16 adsr 15 7 7 10
 
@@ -86,7 +86,7 @@ E V128 p64 o1e2& A15,7,7,9 e2^1
 
 F E0 @Strings8 V24 p80
 F [o3g4f+4]4 o3e2e2e2d+2
-F @Trumpet4 V128 p64 o3e2& A15,7,7,9 e2^1
+F @trumpet_2 V128 p64 o3e2& A15,7,7,9 e2^1
 
 G E0 @Strings8 V24 
 G [o3e4d4]4 o3c2<b2b2b2

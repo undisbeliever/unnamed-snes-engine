@@ -69,8 +69,8 @@
       "comment": null
     },
     {
-      "name": "Trumpet4",
-      "source": "samples/nesdoug/Trumpet4.brr",
+      "name": "trumpet_2",
+      "source": "samples/snesgss/trumpet_2.brr",
       "freq": 1000.0,
       "loop": "none",
       "first_octave": 0,

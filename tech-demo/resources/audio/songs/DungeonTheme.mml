@@ -18,7 +18,7 @@
 ;Instrument Definitions
 @Strings8 Strings8
 @Strings8Detache Strings8 adsr 15 7 7 25
-@Trumpet4 Trumpet4
+@trumpet_2 trumpet_2
 @TimpaniB TimpaniB adsr 15 7 7 19
 @Crash2 Crash2
 @Crash2A Crash2 adsr 15 7 7 14
@@ -114,7 +114,7 @@ E !ERiff1 ~8,2 o5a16 : g16f+16e16>e16]6 o5g16f+16e16b16
 E @PianoC2_16 V64 E0 ~0 [o3a2]12 [o3b2]3 o3b4b4 [o3e4]6 o3e2
 
 F l1 r^^^^^^^^^^^^^
-F @Trumpet4 V96 E0 o3e^f^e^f^
+F @trumpet_2 V96 E0 o3e^f^e^f^
 F l4 [o3e]6e2 L V96 E0
 F l1 o3e^^^^^^^^^^^^^
 F l1 o3a.b2
@@ -130,7 +130,7 @@ F o7b2& GD6 b2 GF96 o7a8&b8& [a32&b32&]2 [a64&b64&]4 GD6 a2
 F GF96 o7g2& GD6 g2 GF96 o7f+2 <b4>e4
 !FRiff2 ~8,2 o5a4>e4^16c32d32e16g16
 !FRiff2 o6f+16Q4d16Q8d16<a16>d16f+8g48f+48e48f+8d8
-F r4 @Trumpet4 V64 !FRiff2
+F r4 @trumpet_2 V64 !FRiff2
 F ~8,2 o5a32b32>c32d32e32f+32g48a48b48
 F o7c4<b8>c16<b16 e8d8e8b8 a4g4f+4d4
 F o6e4 !FRiff2 ~8,2 o6f+8g16a16
