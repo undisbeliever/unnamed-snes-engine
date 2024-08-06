@@ -11,6 +11,9 @@ Build Requirements
 ==================
  * [Wiz](https://github.com/wiz-lang/wiz), a high level assembly language (included as a git submodule)
  * A C++17 compiler (see the [wiz README](https://github.com/wiz-lang/wiz#building-source) for more details)
+ * Terrific Audio Driver's `tad-compiler`  
+   (see the [Terrific Audio Driver README](https://github.com/undisbeliever/terrific-audio-driver/blob/main/README.md#build-requirements)
+   for the full build requirements)
  * GNU Make
  * Python 3
  * [Python Pillow Imaging Library](https://pillow.readthedocs.io/en/stable/)
