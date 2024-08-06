@@ -6,7 +6,7 @@
   "instruments": [
     {
       "name": "noise",
-      "source": "samples/noise.brr",
+      "source": "samples/undisbeliever/noise.brr",
       "freq": 500.0,
       "loop": "none",
       "first_octave": 1,
@@ -16,7 +16,7 @@
     },
     {
       "name": "sine",
-      "source": "samples/sine.wav",
+      "source": "samples/undisbeliever/sine.wav",
       "freq": 500.0,
       "loop": "dupe_block_hack",
       "loop_setting": 3,
@@ -27,7 +27,7 @@
     },
     {
       "name": "square",
-      "source": "samples/square.wav",
+      "source": "samples/undisbeliever/square.wav",
       "freq": 500.0,
       "loop": "loop_reset_filter",
       "loop_setting": 0,
@@ -38,7 +38,7 @@
     },
     {
       "name": "sawtooth",
-      "source": "samples/sawtooth.wav",
+      "source": "samples/undisbeliever/sawtooth.wav",
       "freq": 500.0,
       "loop": "dupe_block_hack",
       "loop_setting": 2,
@@ -49,7 +49,7 @@
     },
     {
       "name": "triangle",
-      "source": "samples/triangle.wav",
+      "source": "samples/undisbeliever/triangle.wav",
       "freq": 500.0,
       "loop": "dupe_block_hack",
       "loop_setting": 4,
