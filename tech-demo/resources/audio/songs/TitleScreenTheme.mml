@@ -18,7 +18,7 @@
 ;Instrument Definitions
 @Strings8 Strings8
 @Strings8Detache Strings8 adsr 15 7 7 25
-@Trumpet4 Trumpet4
+@trumpet_2 trumpet_2
 @TimpaniB TimpaniB adsr 15 7 7 15
 @Crash2 Crash2 adsr 15 7 7 18
 @Clarinet Clarinet
@@ -89,7 +89,7 @@ B [!BRiff4 ]2
 B E1 @Strings8 V80 p72
 B [GI7 o4c4& GD7 r4 GI7 o3b4& GD7 r4 GI7 o3a4& GD7 r4 GI7 o3b4& GD7 r4]2
 B GI7 [o3a4 @Strings8 V52 o4c4<b4:g4]2 o4d4
-B @Trumpet4 V64 p64 ~8,4
+B @trumpet_2 V64 p64 ~8,4
 B r16o5g+32g+32 o6d+8c8d+16g16
 B o6f8d8c8<a+8 >c4g4f+4d8a8
 B o6b4..Q4>e32e32 Q8e2 ~0
@@ -123,7 +123,7 @@ C !BRiff3
 C @Flute1 V12 [!CRiff1 !CRiff2 !CRiff1 !CRiff3 ]4
 
 D E1
-D l1 r^ [@Trumpet4 V64 
+D l1 r^ [@trumpet_2 V64 
 !DRiff1 ~8,4 o5a4>e16d16e16<a16 b16>c16d24c24<a24b8g8
 !DRiff1 o5a4>e16<a16>c16e16 f+24e24d48e48 f+16g16a16d16e16f+16
 !DRiff1 o6e8<g8>c8e8 d24c24<b48>c48 d16c16<b16g16b16>d16
@@ -135,7 +135,7 @@ D o6g+4.. Q4o7e32e32 Q8o7e2 ~0
 D @Crash2 V120 o5c^
 D ]2 L
 D [~0 @Crash2 V120 o5c16
-D @Trumpet4 V64 ~8,4
+D @trumpet_2 V64 ~8,4
 D o6e32e32b16e16g+16:e16g+16b16
 D o6a8g+16a32g+32 f+16d16f+16a16
 D o6g8f+16g32f+32 e16c16e16g16
@@ -143,11 +143,11 @@ D o6f+8d8f+8a8]2
 D o6b16>e16f+16 g+16a32g+32f+16e16d16e16f+16a16
 D o7g8e8c8g8 f+4a4
 D ~0 @Crash2 V120 o5c16
-D @Trumpet4 V64 ~8,4 Q4o7g32g32e16c16e16c16e16Q8g16
+D @trumpet_2 V64 ~8,4 Q4o7g32g32e16c16e16c16e16Q8g16
 D ~0 @Crash2 V120 o5c16
-D @Trumpet4 V64 ~8,4 Q4o7a32a32f+16d16f+16d16f+16Q8a16
+D @trumpet_2 V64 ~8,4 Q4o7a32a32f+16d16f+16d16f+16Q8a16
 D ~0 @Crash2 V120 o5c16
-D @Trumpet4 V64 ~8,4 Q4o7b32b32g16e16c16e16g16Q8b16
+D @trumpet_2 V64 ~8,4 Q4o7b32b32g16e16c16e16g16Q8b16
 D o7a8g8f+8d8
 D ~0 @Crash2 V120 o5c16
 D @Clarinet V16 ~8,4 Q4o6c32d32e16c16e16g16e16>c16
@@ -170,7 +170,7 @@ D l48 o4geg>c<g>cecegeg>c<g>c<gegecec<g>c
 D l48 o4af+a>d<a>df+df+af+a>d<a>d<af+af+df+d<a>d
 D [l48 o4bg+b>e<b>eg+eg+bg+b>e<b>e<bg+bg+eg+e<b>e]2
 D @Crash2 V120 o5c1^1
-D @Trumpet4 V64 ~8,4 !DRiff1
+D @trumpet_2 V64 ~8,4 !DRiff1
 
 E E0 @Strings8 V32
 !ERiff1 l2 [o2agaa]2

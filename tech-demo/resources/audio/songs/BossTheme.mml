@@ -17,7 +17,7 @@
 
 ;Instrument Definitions
 @Strings8 Strings8
-@Trumpet4 Trumpet4
+@trumpet_2 trumpet_2
 @TimpaniB TimpaniB adsr 15 7 7 16
 @Crash2 Crash2 adsr 15 7 7 16
 @HatClosed HatClosed
@@ -73,7 +73,7 @@ B [o7d+<g+d+<g+d+<g+d+g+>d+g+>d+g+]2
 B [o7e<ae<ae<aea>ea>ea]2]2
 B [o7f+<bf+<bf+<bf+b>f+b>f+b]8
 
-C @Trumpet4 V72 r16 ~8,2 E1 o5b32b32b16b16>f+16<b16>f+16a16
+C @trumpet_2 V72 r16 ~8,2 E1 o5b32b32b16b16>f+16<b16>f+16a16
 C o6g8f+16g16f+16e16d16e16 f4c+8f8 f+8d8f+8a8
 C o6b16 L r4.. r2 l1r^^
 C [r16 o5b32b32b16>c+16d16<b16>d16f+16 : o6e8d16e32d32c+16<a16e16a16]2
@@ -87,7 +87,7 @@ C o7f+4<b8>c+8 d8.e16f+12g12a12
 C Q4 [[o7b32<b32:b32]3 [o7b32<b32b32]2 : o7a32<a32]4 o7b32<b32 Q8
 C @Flute1 V224 ~0 [o3b64>c64]16 V64 [o4b64>c64]16 V32 [o5b64>c64]16
 C V16 [o6b64>c64]4 V32 [o5b64>c64]4 V64 [o4b64>c64]4 V224 [o3b64>c64]4
-C @Trumpet4 V72 ~8,2 [r8 o5b8>e8f+8 g8.f+32g32f+8:d8]2 a8
+C @trumpet_2 V72 ~8,2 [r8 o5b8>e8f+8 g8.f+32g32f+8:d8]2 a8
 C r8 o6b8g8e8f+8.f+32g32f+16d16<b16>e16
 C r8 o6g8b8>c+8 d8.<a32g32f+16d16<a16>d16
 C [o6e16<b32b32b16>e16f+16<b32b32b16>f+16
