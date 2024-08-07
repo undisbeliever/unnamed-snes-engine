@@ -170,7 +170,7 @@ D l48 o4geg>c<g>cecegeg>c<g>c<gegecec<g>c
 D l48 o4af+a>d<a>df+df+af+a>d<a>d<af+af+df+d<a>d
 D [l48 o4bg+b>e<b>eg+eg+bg+b>e<b>e<bg+bg+eg+e<b>e]2
 D @Crash2 V120 o5c1^1
-D @trumpet_2 V64 ~8,4 !DRiff1
+D @trumpet_2 V64 !DRiff1
 
 E E0 @Strings8 V32
 !ERiff1 l2 [o2agaa]2
@@ -232,8 +232,8 @@ G o4c4<g8>c8d4<a4
 G o4e1
 G @Strings8Detache
 
-H E1 @Strings8Detache V160
-H l1 r^^^^^^^^ L V80
+H E1
+H l1 r^^^^^^^^ L @Strings8Detache V80
 H [!BRiff1 ]2
 H [!BRiff2 ]2
 !HRiff1 o4d16d32d32
@@ -252,4 +252,3 @@ H @Strings8 V40
 H o4c8<a+8g+8g+8a+4f4
 H o3g4e8g8a4f+4
 H o3b1
-H @Strings8Detache
