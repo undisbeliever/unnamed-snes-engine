@@ -87,15 +87,15 @@ def generate_wiz_code(mappings: Mappings, audio_project: AudioProject) -> str:
     with StringIO() as out:
         out.write("namespace resources {\n\n")
 
-        out.write(f"let MS_FS_DATA_BANK = { mappings.memory_map.first_resource_bank + MS_FS_DATA_BANK_OFFSET };\n")
+        out.write(f"let MS_FS_DATA_BANK = 0x{mappings.memory_map.first_resource_bank + MS_FS_DATA_BANK_OFFSET:02x};\n")
         out.write(
-            f"let DYNAMIC_SPRITE_TILES_DATA_BANK = { mappings.memory_map.first_resource_bank + DYNAMIC_SPRITE_TILES_BANK_OFFSET };\n"
+            f"let DYNAMIC_SPRITE_TILES_DATA_BANK = 0x{mappings.memory_map.first_resource_bank + DYNAMIC_SPRITE_TILES_BANK_OFFSET:02x};\n"
         )
-        out.write(f"let ROOM_DATA_BANK = { mappings.memory_map.first_resource_bank + ROOM_DATA_BANK_OFFSET };\n\n")
+        out.write(f"let ROOM_DATA_BANK = 0x{mappings.memory_map.first_resource_bank + ROOM_DATA_BANK_OFFSET:02x};\n\n")
 
         out.write(f"let _STARTING_ROOM = { room_id_for_name(mappings.starting_room) };\n\n")
 
-        out.write(f"let _USB2SNES_DATA_ADDR = { resources_over_usb2snes_data_addr(mappings.memory_map) };\n")
+        out.write(f"let _USB2SNES_DATA_ADDR = 0x{resources_over_usb2snes_data_addr(mappings.memory_map):06x};\n")
         out.write(f"let _BANK_SIZE = { mappings.memory_map.mode.bank_size };\n\n")
 
         out.write(f"let N_SECOND_LAYERS = { len(mappings.second_layers) };\n\n")
