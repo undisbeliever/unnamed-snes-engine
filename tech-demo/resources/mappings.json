@@ -1,9 +1,9 @@
 {
  "game_title": "UNNAMED TECH DEMO",
  "memory_map": {
-   "mode": "lorom",
-   "first_resource_bank": "82",
-   "n_resource_banks": 6
+   "mode": "hirom",
+   "first_resource_bank": "c1",
+   "n_resource_banks": 3
  },
  "tad_binary_directory": "../../terrific-audio-driver/target/release/",
 

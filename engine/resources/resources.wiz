@@ -54,11 +54,9 @@ struct PpuData_Dma0 {
 
 
 // Hack to provide access into `resourceEntries` fields by `unaligned xx` addressing.
-//
-// ASSUMES `radata0` is in bank 0xc1.
 namespace _RE {
-    let addr        = 0xc10000 as far *u16;
-    let addrBank    = 0xc10002 as far *u8;
+    let addr        = (MEMMAP_RODATA0_BANK << 16) as far *u16;
+    let addrBank    = ((MEMMAP_RODATA0_BANK << 16) | 2) as far *u8;
 };
 
 

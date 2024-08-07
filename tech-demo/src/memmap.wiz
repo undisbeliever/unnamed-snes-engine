@@ -6,7 +6,7 @@ import "engine/common/reset";
 
 
 config {
-    map_mode = "lorom",
+    map_mode = "hirom",
     expansion_type = "none",
     fastrom = false,
     region = "ntsc",
@@ -17,10 +17,15 @@ config {
 }
 
 
+bank rodata0    @ 0xc00000 : [constdata; 0x8000];
 bank code       @ 0x808000 : [constdata; 0x8000];
-bank rodata0    @ 0x818000 : [constdata; 0x8000];
 
-bank _resources @ 0x828000 : [constdata; 0x8000 * 6];
+bank _resources @ 0xc10000 : [constdata; 0x10000 * 3];
+
+
+let BANK_START_ADDR = 0x0000;
+let MEMMAP_RODATA0_BANK = 0xc0;
+
 
 // NOTE: *_roomstate variables will be saved on every room change
 //       and may be restored if the player backtracks into the previous room.
