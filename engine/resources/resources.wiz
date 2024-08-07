@@ -66,8 +66,9 @@ in rodata0 {
     let N_RESOURCE_TYPES = resources.n_resources_per_type.len;
 
     // Number of resources for each resource resource type.
-    // (byte ROM table)
-    const __NResourcesPerTypeTable : [ u8 ] = [ i for let i in resources.n_resources_per_type ];
+    // (ROM table)
+    // ::TODO make this table a u8::
+    const __NResourcesPerTypeTable : [ u16 ] = [ i for let i in resources.n_resources_per_type ];
     let NResourcesPerTypeTable = far &__NResourcesPerTypeTable as far *u8;
 
     // resource entry = ResourceEntryTable[type][resourceId]
@@ -198,7 +199,7 @@ var _tmp : u16 in zpTmp_word_0;
 
     // This function MUST ONLY use zeropage variables
 
-    if a >= NResourcesPerTypeTable[xx] {
+    if a >= NResourcesPerTypeTable[unaligned xx] {
         a = 0;
     }
 

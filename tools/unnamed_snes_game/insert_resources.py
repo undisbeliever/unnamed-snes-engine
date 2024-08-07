@@ -215,7 +215,7 @@ class ResourceInserter:
         nrptt_addr = self.symbols["resources.__NResourcesPerTypeTable"]
         retable_addr = self.symbols["resources.__ResourceEntryTable"]
 
-        expected_n_resources = self.read_u8(nrptt_addr + resource_type_id)
+        expected_n_resources = self.read_u16(nrptt_addr + resource_type_id * 2)
         resource_table_addr = self.read_u16(retable_addr + resource_type_id * 2) | (retable_addr & 0xFF0000)
 
         return resource_table_addr, expected_n_resources
