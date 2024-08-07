@@ -106,7 +106,7 @@ class EngineData:
 
 
 def lorom_address_to_rom_offset(addr: int) -> int:
-    if addr & 0x3F0000 < 0x40 and addr & 0xFFFF < 0x8000:
+    if addr & 0x3F_0000 < 0x40_0000 and addr & 0xFFFF < 0x8000:
         raise ValueError(f"addr is not a ROM address: 0x{addr:06x}")
 
     if addr >> 16 == 0x7E or addr >> 16 == 0x7F:
@@ -116,7 +116,7 @@ def lorom_address_to_rom_offset(addr: int) -> int:
 
 
 def hirom_address_to_rom_offset(addr: int) -> int:
-    if addr & 0x3F0000 < 0x40 and addr & 0xFFFF < 0x8000:
+    if addr & 0x7F_0000 < 0x40_0000 and addr & 0xFFFF < 0x8000:
         raise ValueError(f"addr is not a ROM address: 0x{addr:06x}")
 
     if addr >> 16 == 0x7E or addr >> 16 == 0x7F:
