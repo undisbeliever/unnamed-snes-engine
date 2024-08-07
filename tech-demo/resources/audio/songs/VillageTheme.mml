@@ -1,0 +1,67 @@
+;Village Theme for unnamed-snes-game
+;By KungFuFurby
+;Made for undisbeliever's Terrific Audio Driver v0.0.10
+
+#Title Village Theme
+#Game unnamed-snes-game
+#Author KungFuFurby
+#Composer KungFuFurby
+#Copyright 2024 undisbeliever
+#Date 2024
+#License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
+
+;Instrument Definitions
+@HatClosed HatClosed
+@Flute1 Flute1
+@Kick3 Kick3
+@GuitarB2 GuitarB2
+@Bongo Bongo
+
+#ZenLen 192
+
+A T80
+A V128 L
+A @Kick3 _+0 o6c8 @Bongo _-2 o5e16e16e8 @Kick3 _+0 o6c8
+A [@Kick3 _+0 o6c8 @Bongo _-2 o5e8]2
+
+B @HatClosed L V64 o5c8 V16 o5c8c8c8
+
+!CRiff1 r8 Q3o5d+8f8g8 Q8a+8Q4g+16a+16 Q8g+8Q4g16g+16
+!CRiff1 Q8g8Q4f16g16 Q8f8Q4d+16f16 Q8o5d+8Q4d16d+16 Q8o5d8
+!CRiff2 l8 o5d+dcdd+dd+fd+dcdd+fgd+
+!CRiff2 o5fd+dd+fd+<a+>d+fd+fgg+
+C L l1 r^^^^^^^ @Flute1 V56
+C [!CRiff1
+C Q8o5c8
+C o4a+8g8g+8a+8 g4.a+8 g+4a+4>c4d4
+C !CRiff1
+C Q8o5d+8
+C o5f8d+8f8g8 a+4.g8 d+4<a+4:g+4a+4]2 o5d+4f4
+C !CRiff2 o5g8f8d+8
+C r8Q3o5d+8g+8a+8Q8>c8Q4<a+16>c16Q8<g+8Q4d+16g+16
+C Q8o5a+8>c8<a+8g+8 g8Q4f16g16 Q8d+8<a+8
+C r8o4f8a+8>f8d8<a+8>d8f8
+C l8 o5d+dcdd+<a+>d+f
+C !CRiff2 o5a+8d+8a+8
+C o6c8[d32c32]12d16c16<a+4g+4g4d+8g8
+C o5f4d+4d4f4d+1
+
+D r8^48 @GuitarB2 A15,7,7,17 V56 L
+D [o4d+8.^24d+4^48d+8.^24d+4^48c+8.^24c+4^48c+8.^24c+4^48[d+8.^24d+4^48]4]6
+D [[o4d+8.^24d+4^48]14 o3a+8.^24a+4^48a+8.^24a+4^48]2
+
+!ERiff1 o4g8.^48g4^24g8.^48g4^24
+!ERiff2 o4g+8.^48g+4^24g+8.^48g+4^24
+!ERiff3 o4f8.^48f4^24f8.^48f4^24
+E r8^24 @GuitarB2 A15,7,7,17 V56 p80 L
+E [[!ERiff1 :!ERiff3 ]2!ERiff2 ]6
+E [[!ERiff2 !ERiff1 !ERiff3 :!ERiff1 ]2
+E o4d+8.^48d+4^24d+8.^48d+4^24]2
+
+F @GuitarB2 A15,7,7,14 V64 L
+F l2 [o2d+d+c+c+[d+]4]6
+F [o2g+d+gd+f[d+]3]4
+
+G r8 @GuitarB2 A15,7,7,17 V56 p48 L
+G l4 [o3[a+]4[g+]4[a+]8]6
+G [[o4[c]4<[a+]8:[a+]4]2 [g]4]2

@@ -167,6 +167,26 @@
       "last_octave": 7,
       "envelope": "gain F127",
       "comment": null
+    },
+    {
+      "name": "GuitarB2",
+      "source": "samples/nesdoug/GuitarB2.brr",
+      "freq": 1000.0,
+      "loop": "none",
+      "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
+    },
+    {
+      "name": "Bongo",
+      "source": "samples/nesdoug/Bongo.brr",
+      "freq": 1000.0,
+      "loop": "none",
+      "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
     }
   ],
   "samples": [
@@ -253,6 +273,10 @@
     {
       "name": "RainAmbienceWThunder",
       "source": "songs/RainAmbienceWThunder.mml"
+    },
+    {
+      "name": "VillageTheme",
+      "source": "songs/VillageTheme.mml"
     }
   ]
 }
