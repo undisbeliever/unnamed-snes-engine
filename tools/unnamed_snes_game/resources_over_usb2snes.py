@@ -828,14 +828,16 @@ class ResourcesOverUsb2Snes:
             self.signals.sleep(UPDATE_ROM_SPINLOOP_SLEEP_DELAY)
             zeropage = self.usb2snes.read_wram_addr(0x7E0000, 256)
 
+    R_TYPE_MUL: Final = 3
+
     def read_request(self) -> Optional[Request]:
         rb = self.usb2snes.read_wram_addr(self.request_addr, 4)
 
         r_type_id = rb[1]
 
         rt: Union[ResourceType, SpecialRequestType]
-        if r_type_id < N_RESOURCE_TYPES * 2:
-            rt = ResourceType(r_type_id >> 1)
+        if r_type_id < N_RESOURCE_TYPES * self.R_TYPE_MUL:
+            rt = ResourceType(r_type_id // self.R_TYPE_MUL)
         else:
             try:
                 rt = SpecialRequestType(r_type_id)

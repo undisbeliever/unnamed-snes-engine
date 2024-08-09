@@ -15,6 +15,7 @@ from .ansi_color import NoAnsiColors, AnsiColors
 MS_FS_DATA_BANK_OFFSET = 0
 DYNAMIC_SPRITE_TILES_BANK_OFFSET = 1
 ROOM_DATA_BANK_OFFSET = 2
+RESOURCE_ADDR_TABLE_BANK_OFFSET = 2
 
 # Reuse Room Data Bank for resources_over_usb2snes response data
 USB2SNES_DATA_BANK_OFFSET = ROOM_DATA_BANK_OFFSET

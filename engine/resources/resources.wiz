@@ -52,29 +52,27 @@ struct PpuData_Dma0 {
 }
 
 
+struct ResourceTypeTableEntry {
+    // Number of resources of that type
+    nResources: u8,
+
+    // Address of `_ResourceTableEntry` entries
+    // 16-bit pointer to `RESOURCE_ADDR_TABLE_BANK` bank
+    addr: u16,
+}
+
 
 // Hack to provide access into `resourceEntries` fields by `unaligned xx` addressing.
 namespace _RE {
-    let addr        = (MEMMAP_RODATA0_BANK << 16) as far *u16;
-    let addrBank    = ((MEMMAP_RODATA0_BANK << 16) | 2) as far *u8;
+    let addr        = (RESOURCE_ADDR_TABLE_BANK << 16) as far *u16;
+    let addrBank    = ((RESOURCE_ADDR_TABLE_BANK << 16) | 2) as far *u8;
 };
 
 
 in rodata0 {
-    let N_RESOURCE_TYPES = resources.n_resources_per_type.len;
-
-    // Number of resources for each resource resource type.
-    // (ROM table)
-    // ::TODO make this table a u8::
-    const __NResourcesPerTypeTable : [ u16 ] = [ i for let i in resources.n_resources_per_type ];
-    let NResourcesPerTypeTable = far &__NResourcesPerTypeTable as far *u8;
-
-    // resource entry = ResourceEntryTable[type][resourceId]
-    const __ResourceEntryTable : [ *const u8 ] = [
-        @[ 0u8 ; sizeof(_ResourceTableEntry) * i ] for let i in resources.n_resources_per_type
-    ];
-    let ResourceEntryTable = far &__ResourceEntryTable as far * const *_ResourceTableEntry;
-
+    const ResourceTypeTable : [u8 ; N_RESOURCE_TYPES * sizeof(ResourceTypeTableEntry)] = [ 'R' ; N_RESOURCE_TYPES * 3];
+        let ResourceTypeTable_nResources = (far &ResourceTypeTable as u24 + offsetof(ResourceTypeTableEntry, nResources)) as far *u8;
+        let ResourceTypeTable_addr       = (far &ResourceTypeTable as u24 + offsetof(ResourceTypeTableEntry, addr)) as far *u16;
 
     let INVALID_ROOM_ADDR = 0xffff;
 
@@ -179,27 +177,23 @@ inline func load_resource__dynamic_ram_no_copy__inline_axy(let rType: ResourceTy
 // DB unknown
 #[mem8, idx16]
 inline func __load_resource(let rType: ResourceType, resourceId : u8 in a) {
-    __load_resource__xx2(rType as u16 * 2, a);
+    __load_resource__xx3(rType as u16 * 3, a);
 }
 
 
 // Load a resource
 //
-// ASSUMES: `rTypeTimes2` is always valid.
-// ASSUMES: `rTypeTimes2` is `ResourceType as u16 * 2.
+// ASSUMES: `rTypeTimes3` is always valid.
+// ASSUMES: `rTypeTimes3` is `ResourceType as u16 * 3`.
 //
 // OUT: a:xx resource address
 //
 // DB unknown
 #[mem8, idx16]
-func __load_resource__xx2(rTypeTimes2 : u16 in xx, resourceId : u8 in a) {
+func __load_resource__xx3(rTypeTimes3 : u16 in xx, resourceId : u8 in a) {
 var _tmp : u16 in zpTmp_word_0;
 
     // This function MUST ONLY use zeropage variables
-
-    if a >= NResourcesPerTypeTable[unaligned xx] {
-        a = 0;
-    }
 
     // Save resourceId in `yy`, UseResourcesOverUsb2Snes test clobbers `a` (no `bit long` instructions).
     #[idx8] {
@@ -210,14 +204,19 @@ var _tmp : u16 in zpTmp_word_0;
         resources_over_usb2snes.load_resource(xx, yy);
     }
     else {
+        a = y;
+        if a >= ResourceTypeTable_nResources[unaligned xx] {
+            a = 0;
+        }
+
         mem16_idx16();
         #[mem16] {
             // Multiply low byte of y by 3
-            _tmp = aa = yy & 0xff;
+            _tmp = aa = aa & 0xff;
             // +# is safe: carry always clear
             aa = (aa << 1) +# _tmp;
             // +# is safe: carry always clear (`0xff * 2 + 0xff < 0x8000`)
-            aa +#= ResourceEntryTable[unaligned xx] as u16;
+            aa +#= ResourceTypeTable_addr[unaligned xx];
             xx = aa;
 
 
@@ -291,15 +290,15 @@ func __copy_fixed_size_data_and_prep_dynamic_sized_data(addr: u16 in xx, bankbyt
 // DB = 0x80
 inline func __load_ppu_only_resource(let rType : ResourceType, resourceId : u8 in a) : PpuData_Dma0 in ppuData
 {
-    __load_ppu_only_resource__xx2(rType as u16 * 2, a);
+    __load_ppu_only_resource__xx3(rType as u16 * 3, a);
     return ppuData;
 }
 
 // OUT: PpuData_Dma0 in ppuData
 // DB = 0x80
 #[fallthrough, mem8, idx16]
-func __load_ppu_only_resource__xx2(rTypeTimesTwo : u16 in xx, resourceId : u8 in a) {
-    __load_resource__xx2(xx, a);
+func __load_ppu_only_resource__xx3(rTypeTimes3 : u16 in xx, resourceId : u8 in a) {
+    __load_resource__xx3(xx, a);
 
 // Fallthrough
 }

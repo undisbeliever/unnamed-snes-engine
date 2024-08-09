@@ -294,6 +294,11 @@ class DataStore:
             return list(self._errors.values())
 
     # Assumes no errors in the DataStore
+    def get_n_resources(self) -> int:
+        with self._lock:
+            return sum(len(self._resources[r_type]) for r_type in ResourceType)
+
+    # Assumes no errors in the DataStore
     def get_all_data_for_type(self, r_type: ResourceType) -> list[EngineData]:
         with self._lock:
             return [r.data for r in self._resources[r_type]]  # type: ignore

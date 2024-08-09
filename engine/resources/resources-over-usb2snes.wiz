@@ -151,7 +151,7 @@ in code {
 //
 // DB unknown
 #[mem8, idx8]
-func __send_request(rTypeTimes2 : u8 in x, resourceId : u8 in y) : u8 in a {
+func __send_request(rTypeTimes3 : u8 in x, resourceId : u8 in y) : u8 in a {
 
     // Annoying hack to access var struct elements with far addressing
     in wram7e {

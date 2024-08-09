@@ -458,7 +458,8 @@ inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
         // Setup subsystems and load resources to WRAM and PPU.
         idx16();
         #[idx16] {
-            metatiles.load_tileset__forceblank(room.tileset);
+            // ::TODO get tileset_id from somewhere::
+            metatiles.load_tileset__forceblank(0);
 
             metasprites.setup__forceblank();
 

@@ -21,8 +21,9 @@ from unnamed_snes_game.json_formats import (
 )
 from unnamed_snes_game.common import (
     MS_FS_DATA_BANK_OFFSET,
-    ROOM_DATA_BANK_OFFSET,
     DYNAMIC_SPRITE_TILES_BANK_OFFSET,
+    ROOM_DATA_BANK_OFFSET,
+    RESOURCE_ADDR_TABLE_BANK_OFFSET,
     USB2SNES_DATA_BANK_OFFSET,
     ResourceType,
 )
@@ -101,7 +102,11 @@ def generate_wiz_code(mappings: Mappings, audio_project: AudioProject) -> str:
         out.write(
             f"let DYNAMIC_SPRITE_TILES_DATA_BANK = 0x{mappings.memory_map.first_resource_bank + DYNAMIC_SPRITE_TILES_BANK_OFFSET:02x};\n"
         )
-        out.write(f"let ROOM_DATA_BANK = 0x{mappings.memory_map.first_resource_bank + ROOM_DATA_BANK_OFFSET:02x};\n\n")
+        out.write(f"let ROOM_DATA_BANK = 0x{mappings.memory_map.first_resource_bank + ROOM_DATA_BANK_OFFSET:02x};\n")
+        out.write(
+            f"let RESOURCE_ADDR_TABLE_BANK = 0x{mappings.memory_map.first_resource_bank + RESOURCE_ADDR_TABLE_BANK_OFFSET:02x};\n\n"
+        )
+        out.write(f"let N_RESOURCE_TYPES = { len(ResourceType) };\n\n")
 
         out.write(f"let _STARTING_ROOM = { room_id_for_name(mappings.starting_room) };\n\n")
 
@@ -109,15 +114,6 @@ def generate_wiz_code(mappings: Mappings, audio_project: AudioProject) -> str:
         out.write(f"let _BANK_SIZE = { mappings.memory_map.mode.bank_size };\n\n")
 
         out.write(f"let N_SECOND_LAYERS = { len(mappings.second_layers) };\n\n")
-
-        out.write("let n_resources_per_type = [")
-        for rt in ResourceType:
-            if rt == ResourceType.audio_data:
-                l = len(audio_project.songs) + 1
-            else:
-                l = len(getattr(mappings, rt.name))
-            out.write(f"{ l }, ")
-        out.write("];\n\n")
 
         for rt in ResourceType:
             if rt == ResourceType.audio_data:
