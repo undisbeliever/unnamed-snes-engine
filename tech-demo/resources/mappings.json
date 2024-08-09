@@ -36,16 +36,6 @@
    "licenses_bg1",
    "licenses_bg2"
  ],
-
- "songs": [
-   "__null__common_data__",
-   "DungeonTheme",
-   "BossTheme",
-   "GameOverTheme",
-   "CreditsTheme",
-   "TitleScreenTheme"
- ],
-
  "interactive_tile_functions": [
    "player_tile_collision_test",
    "doorway",

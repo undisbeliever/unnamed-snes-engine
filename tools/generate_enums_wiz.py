@@ -59,6 +59,15 @@ def write_enum_inc_by_2(out: TextIO, name: Name, name_list: list[Name]) -> None:
     out.write("};\n\n")
 
 
+def write_songs_enum(out: TextIO, audio_project: AudioProject) -> None:
+    out.write("enum songs : u8 {\n")
+    out.write("  blank,\n")
+    for s in audio_project.songs.values():
+        out.write(f"  { s.name },\n")
+    out.write("};\n")
+    out.write(f"let N_SONGS = { len(audio_project.songs) + 1};\n\n")
+
+
 def write_sound_effects(out: TextIO, sfx_eo: SfxExportOrder) -> None:
     out.write("enum sound_effects : u8 {\n")
 
@@ -71,7 +80,8 @@ def write_sound_effects(out: TextIO, sfx_eo: SfxExportOrder) -> None:
             out.write("  // high priority sound effects\n")
         out.write(f"  { n },\n")
 
-    out.write("};\n\n")
+    out.write("};\n")
+    out.write(f"let N_SOUND_EFFECTS = { len(sfx_eo.export_order) };\n\n")
 
 
 def write_gamemodes_enum(out: TextIO, gamemodes: list[GameMode]) -> None:
@@ -99,21 +109,25 @@ def generate_wiz_code(mappings: Mappings, audio_project: AudioProject) -> str:
         out.write(f"let _BANK_SIZE = { mappings.memory_map.mode.bank_size };\n\n")
 
         out.write(f"let N_SECOND_LAYERS = { len(mappings.second_layers) };\n\n")
-        out.write(f"let N_SONGS = { len(mappings.songs) };\n\n")
 
         out.write("let n_resources_per_type = [")
         for rt in ResourceType:
-            l = len(getattr(mappings, rt.name))
+            if rt == ResourceType.songs:
+                l = len(audio_project.songs) + 1
+            else:
+                l = len(getattr(mappings, rt.name))
             out.write(f"{ l }, ")
         out.write("];\n\n")
 
         for rt in ResourceType:
-            write_enum(out, rt.name, getattr(mappings, rt.name))
+            if rt == ResourceType.songs:
+                write_songs_enum(out, audio_project)
+            else:
+                write_enum(out, rt.name, getattr(mappings, rt.name))
 
         out.write("}\n\n")
 
         write_sound_effects(out, audio_project.sound_effects)
-        out.write(f"let N_SOUND_EFFECTS = { len(audio_project.sound_effects) };\n\n")
 
         write_gamemodes_enum(out, mappings.gamemodes)
 

@@ -688,8 +688,6 @@ class Mappings(NamedTuple):
     sl_callbacks: OrderedDict[Name, SecondLayerCallback]
     memory_map: MemoryMap
 
-    # ::TODO remove songs from mappings (somehow)
-    songs: list[Name]
     # Location of the directory containing tad-compiler
     tad_binary_directory: Filename
 
@@ -791,7 +789,6 @@ def load_mappings_json(filename: Filename) -> Mappings:
         sl_callbacks=jh.get_sl_callbacks("sl_callbacks"),
         memory_map=jh.get_memory_map("memory_map"),
         gamemodes=jh.get_gamemodes("gamemodes"),
-        songs=jh.get_name_list("songs"),
         tad_binary_directory=jh.get_string("tad_binary_directory"),
     )
 

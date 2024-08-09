@@ -150,31 +150,23 @@ class DataStore:
             self._not_room_counter: int = 0
 
     # Must be called before data is inserted
-    def reset_data(self, mappings: Mappings) -> None:
+    def reset_data(self, r_type: ResourceType, n_items: int) -> None:
         with self._lock:
-            # Confirm Mappings is immutable
-            assert isinstance(mappings, tuple)
-            self._mappings = mappings
+            assert n_items >= 0
 
-            for rt in ResourceType:
-                n_resources = len(getattr(mappings, rt.name))
-                self._resources[rt] = [None] * n_resources
+            self._resources[r_type] = [None] * n_items
 
-            self._msfs_lists = [None] * len(mappings.ms_spritesheets)
-            self._rooms = [None] * self.ROOMS_PER_WORLD
-
-            self._dynamic_ms_data = None
-            self._msfs_and_entity_data = None
-            self._msfs_and_entity_data_valid = False
+            if r_type == ResourceType.ms_spritesheets:
+                self._msfs_lists = [None] * n_items
+                self._dynamic_ms_data = None
+                self._msfs_and_entity_data = None
+                self._msfs_and_entity_data_valid = False
 
     def reset_resources(self, rt_to_reset: Iterable[Optional[ResourceType]]) -> None:
         with self._lock:
-            # Confirm mappings exists and is immutable
-            assert isinstance(self._mappings, tuple)
-
             for rt in rt_to_reset:
                 if rt is not None:
-                    n_resources = len(getattr(self._mappings, rt.name))
+                    n_resources = len(self._resources[rt])
                     self._resources[rt] = [None] * n_resources
                 else:
                     self._rooms = [None] * self.ROOMS_PER_WORLD
@@ -184,6 +176,10 @@ class DataStore:
 
             self._msfs_and_entity_data = None
             self._msfs_and_entity_data_valid = False
+
+    def set_mappings(self, mappings: Optional[Mappings]) -> None:
+        with self._lock:
+            self._mappings = mappings
 
     def set_symbols(self, symbols: Optional[dict[ScopedName, int]]) -> None:
         with self._lock:
@@ -410,6 +406,8 @@ MS_SPRITESHEET_FILE_REGEX: Final = re.compile(r"^metasprites/(\w+)/")
 
 
 class BaseResourceCompiler(metaclass=ABCMeta):
+    # The SharedInputType that contains the export order
+    EXPORT_ORDER_SI: Optional[SharedInputType]
     # The Shared inputs that are used by the compiler
     SHARED_INPUTS: Sequence[SharedInputType]
     USES_PALETTES: bool
@@ -427,11 +425,19 @@ class BaseResourceCompiler(metaclass=ABCMeta):
     # Called when mappings.json is successfully loaded
     @final
     def update_name_list(self) -> None:
-        self.name_list = getattr(self._shared_input.mappings, self.rt_name).copy()
+        self.name_list = self._get_name_list()
         self.name_map = dict((n, i) for i, n in enumerate(self.name_list))
+
+    @final
+    def n_items(self) -> int:
+        return len(self.name_list)
 
     # Called when a shared input is successfully loaded
     def shared_input_changed(self, s_type: SharedInputType) -> None:
+        pass
+
+    @abstractmethod
+    def _get_name_list(self) -> list[Name]:
         pass
 
     # Returns resource id if the filename is used by the compiler
@@ -493,6 +499,12 @@ class MsSpritesheetCompiler(BaseResourceCompiler):
     SHARED_INPUTS = (SharedInputType.MS_EXPORT_ORDER,)
     USES_PALETTES = False
 
+    EXPORT_ORDER_SI = SharedInputType.MAPPINGS
+
+    def _get_name_list(self) -> list[Name]:
+        assert self._shared_input.mappings
+        return self._shared_input.mappings.ms_spritesheets.copy()
+
     def compile_resource(self, resource_id: int) -> BaseResourceData:
         assert self._shared_input.ms_export_order
 
@@ -526,6 +538,11 @@ class PaletteCompiler(OtherResourcesCompiler):
 
     SHARED_INPUTS = (SharedInputType.OTHER_RESOURCES,)
     USES_PALETTES = False
+    EXPORT_ORDER_SI = SharedInputType.MAPPINGS
+
+    def _get_name_list(self) -> list[Name]:
+        assert self._shared_input.mappings
+        return self._shared_input.mappings.palettes.copy()
 
     def compile_resource(self, resource_id: int) -> BaseResourceData:
         assert self._shared_input.other_resources
@@ -554,6 +571,11 @@ class MetaTileTilesetCompiler(SimpleResourceCompiler):
 
     SHARED_INPUTS = (SharedInputType.MAPPINGS,)
     USES_PALETTES = True
+    EXPORT_ORDER_SI = SharedInputType.MAPPINGS
+
+    def _get_name_list(self) -> list[Name]:
+        assert self._shared_input.mappings
+        return self._shared_input.mappings.mt_tilesets.copy()
 
     def compile_resource(self, resource_id: int) -> BaseResourceData:
         assert self._shared_input.mappings
@@ -596,6 +618,11 @@ class SecondLayerCompiler(OtherResourcesCompiler):
     )
     USES_PALETTES = True
     USES_MT_TILESETS = True
+    EXPORT_ORDER_SI = SharedInputType.MAPPINGS
+
+    def _get_name_list(self) -> list[Name]:
+        assert self._shared_input.mappings
+        return self._shared_input.mappings.second_layers.copy()
 
     def _compile(self, r_name: Name) -> EngineData:
         assert self._shared_input.mappings
@@ -621,6 +648,11 @@ class TileCompiler(OtherResourcesCompiler):
 
     SHARED_INPUTS = (SharedInputType.OTHER_RESOURCES,)
     USES_PALETTES = False
+    EXPORT_ORDER_SI = SharedInputType.MAPPINGS
+
+    def _get_name_list(self) -> list[Name]:
+        assert self._shared_input.mappings
+        return self._shared_input.mappings.tiles.copy()
 
     def _compile(self, r_name: Name) -> EngineData:
         assert self._shared_input.other_resources
@@ -647,6 +679,11 @@ class BgImageCompiler(OtherResourcesCompiler):
 
     SHARED_INPUTS = (SharedInputType.OTHER_RESOURCES,)
     USES_PALETTES = True
+    EXPORT_ORDER_SI = SharedInputType.MAPPINGS
+
+    def _get_name_list(self) -> list[Name]:
+        assert self._shared_input.mappings
+        return self._shared_input.mappings.bg_images.copy()
 
     def _compile(self, r_name: Name) -> EngineData:
         assert self._shared_input.other_resources
@@ -696,6 +733,11 @@ class SongCompiler(SimpleResourceCompiler):
 
     SHARED_INPUTS = (SharedInputType.MAPPINGS, SharedInputType.AUDIO_PROJECT)
     USES_PALETTES = False
+    EXPORT_ORDER_SI = SharedInputType.AUDIO_PROJECT
+
+    def _get_name_list(self) -> list[Name]:
+        assert self._shared_input.audio_project
+        return [COMMON_AUDIO_DATA_RESOURCE_NAME] + list(self._shared_input.audio_project.songs)
 
     def _compile(self, r_name: Name) -> EngineData:
         assert self.compiler
@@ -719,6 +761,7 @@ class RoomCompiler:
 
     SHARED_INPUTS = (SharedInputType.MAPPINGS, SharedInputType.ENTITIES, SharedInputType.OTHER_RESOURCES)
     USES_PALETTES = False
+    EXPORT_ORDER_SI = None
 
     def shared_input_changed(self, s_type: SharedInputType) -> None:
         if s_type == SharedInputType.MAPPINGS or s_type == SharedInputType.OTHER_RESOURCES:
@@ -789,13 +832,12 @@ def _build_st_rt_map(
     out = dict()
 
     for s_type in SharedInputType:
-        if s_type is SharedInputType.MAPPINGS:
-            s = list(ResourceType) + [None]
-        else:
-            s = list()
-            for rc in compilers:
-                if s_type in rc.SHARED_INPUTS:
-                    s.append(rc.resource_type)
+        s = list()
+        for rc in compilers:
+            if s_type in rc.SHARED_INPUTS:
+                s.append(rc.resource_type)
+            if s_type == rc.EXPORT_ORDER_SI:
+                s.append(rc.resource_type)
         out[s_type] = frozenset(s)
 
     return out
@@ -969,17 +1011,15 @@ class ProjectCompiler:
             self.data_store.add_non_resource_error(error)
             return
 
-        if s_type == SharedInputType.MAPPINGS:
-            assert self.__shared_input.mappings
-
-            self.data_store.reset_data(self.__shared_input.mappings)
-
-            for c in self.__resource_compilers:
+        for c in self.__resource_compilers:
+            if s_type == c.EXPORT_ORDER_SI:
                 c.update_name_list()
+                self.data_store.reset_data(c.resource_type, c.n_items())
 
+        if s_type == SharedInputType.MAPPINGS:
+            self.data_store.set_mappings(self.__shared_input.mappings)
         elif s_type == SharedInputType.SYMBOLS:
             self.data_store.set_symbols(self.__shared_input.symbols)
-
         elif s_type == SharedInputType.ENTITIES:
             if self.__shared_input.entities:
                 n_entities = len(self.__shared_input.entities.entities)
