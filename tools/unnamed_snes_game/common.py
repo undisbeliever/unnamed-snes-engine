@@ -34,7 +34,7 @@ class ResourceType(IntEnum):
     ms_spritesheets = 3
     tiles = 4
     bg_images = 5
-    songs = 6
+    audio_data = 6
 
 
 class FixedSizedData:

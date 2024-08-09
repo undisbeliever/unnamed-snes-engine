@@ -443,7 +443,7 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
         if r is not None:
             if isinstance(r, ResourceData):
                 # Test if common audio data changed.
-                if r.resource_type == ResourceType.songs and r.resource_id == 0:
+                if r.resource_type == ResourceType.audio_data and r.resource_id == 0:
                     self.signals.send_command(COMMON_AUDIO_DATA_CHANGED_COMMAND)
             elif isinstance(r, SharedInputType):
                 if r.rebuild_required():

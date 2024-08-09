@@ -112,7 +112,7 @@ def generate_wiz_code(mappings: Mappings, audio_project: AudioProject) -> str:
 
         out.write("let n_resources_per_type = [")
         for rt in ResourceType:
-            if rt == ResourceType.songs:
+            if rt == ResourceType.audio_data:
                 l = len(audio_project.songs) + 1
             else:
                 l = len(getattr(mappings, rt.name))
@@ -120,7 +120,7 @@ def generate_wiz_code(mappings: Mappings, audio_project: AudioProject) -> str:
         out.write("];\n\n")
 
         for rt in ResourceType:
-            if rt == ResourceType.songs:
+            if rt == ResourceType.audio_data:
                 write_songs_enum(out, audio_project)
             else:
                 write_enum(out, rt.name, getattr(mappings, rt.name))

@@ -694,7 +694,7 @@ class BgImageCompiler(OtherResourcesCompiler):
 
 class SongCompiler(SimpleResourceCompiler):
     def __init__(self, shared_input: SharedInput) -> None:
-        super().__init__(ResourceType.songs, shared_input)
+        super().__init__(ResourceType.audio_data, shared_input)
 
         self.compiler: Optional[AudioCompiler] = None
 

@@ -21,7 +21,7 @@ enum ResourceType : u8 {
   ms_spritesheet,
   tiles,
   bg_image,
-  songs,
+  audio_data,
 };
 
 
@@ -168,7 +168,7 @@ inline func load_resource__ppu_data__forceblank__inline(let rType: ResourceType,
 //
 // DB = 0x80
 #[mem8, idx16]
-inline func load_resource__dynamic_ram_no_copy__inline_axy(let rType: ResourceType, resourceId : resources.songs in a) {
+inline func load_resource__dynamic_ram_no_copy__inline_axy(let rType: ResourceType, resourceId : u8 in a) {
     __load_resource(rType, a);
     __read_dynamic_sized_data_size(xx, a);
 }
