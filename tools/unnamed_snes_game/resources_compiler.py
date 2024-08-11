@@ -773,9 +773,10 @@ class RoomCompiler:
             self._room_dependencies = None
             if self._shared_input.mappings and self._shared_input.other_resources:
                 # ::TODO get second-layers from dungeon::
-                sl = next(iter(self._shared_input.other_resources.second_layers.values()))
+                # sl = next(iter(self._shared_input.other_resources.second_layers.values()))
+                sl = None
 
-                if sl.callback:
+                if sl and sl.callback:
                     sl_callback = self._shared_input.mappings.sl_callbacks.get(sl.callback)
                     if sl_callback is None:
                         raise RuntimeError(f"Unknown second-layer callback: {sl.callback}")

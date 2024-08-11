@@ -47,7 +47,7 @@ class RoomError(SimpleMultilineError):
 
 # Storing room dependencies in a NamedTuple as I am planning to add more in the future
 class RoomDependencies(NamedTuple):
-    second_layer: SecondLayerInput
+    second_layer: Optional[SecondLayerInput]
     sl_callback: Optional[SecondLayerCallback]
 
 
@@ -442,7 +442,7 @@ def process_room(
     else:
         room_event_data = parse_callback_parameters(ROOM_CALLBACK, room_event, tmx_map.parameters, mapping, room_doors, error_list)
 
-    if dependencies.second_layer.part_of_room:
+    if dependencies.second_layer and dependencies.second_layer.part_of_room:
         if dependencies.sl_callback:
             assert dependencies.sl_callback.room_parameters, "part-of-room second-layer must not have a callback with room_parameters"
 
