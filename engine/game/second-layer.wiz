@@ -275,7 +275,7 @@ in code {
 //
 // DB = 0x80
 #[mem8, idx16]
-func setup__forceblank__inline(second_layer_id : u8 in a) : bool in carry {
+func setup__forceblank(second_layer_id : u8 in a) : bool in carry {
     if a >= resources.N_SECOND_LAYERS {
         __clear_sl_data_header__inline();
         return false;

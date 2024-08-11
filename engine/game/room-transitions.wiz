@@ -471,7 +471,7 @@ inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
             engine_hooks.room_transitions__setup_ppu__forceblank();
 
             // ::TODO get second_layer id from room data::
-            carry = second_layer.setup__forceblank__inline(0xff);
+            carry = second_layer.setup__forceblank(0xff);
         }
         idx8();
 
