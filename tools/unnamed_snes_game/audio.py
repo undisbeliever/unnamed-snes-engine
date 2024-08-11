@@ -13,6 +13,8 @@ COMMON_AUDIO_DATA_RESOURCE_NAME: Final = "__null__common_data__"
 
 TAD_COMPILER_BINARY_PATH: Final = "tad-compiler"
 
+BLANK_SONG_NAME: Final = "blank"
+
 
 class TadCompilerError(Exception):
     pass

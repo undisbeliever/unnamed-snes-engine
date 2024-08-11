@@ -27,6 +27,7 @@ from unnamed_snes_game.common import (
     USB2SNES_DATA_BANK_OFFSET,
     ResourceType,
 )
+from unnamed_snes_game.audio import BLANK_SONG_NAME
 
 
 def room_id_for_name(room_name: RoomName) -> int:
@@ -62,7 +63,7 @@ def write_enum_inc_by_2(out: TextIO, name: Name, name_list: list[Name]) -> None:
 
 def write_songs_enum(out: TextIO, audio_project: AudioProject) -> None:
     out.write("enum songs : u8 {\n")
-    out.write("  blank,\n")
+    out.write(f"  {BLANK_SONG_NAME},\n")
     for s in audio_project.songs.values():
         out.write(f"  { s.name },\n")
     out.write("};\n")
