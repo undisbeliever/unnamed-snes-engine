@@ -1,0 +1,14 @@
+{
+  "dungeons": [
+  {
+    "name": "dungeon",
+    "path": "rooms",
+    "width": 15,
+    "height": 16,
+    "tileset": "dungeon",
+    "second_layer": null,
+    "ms_spritesheet": "dungeon",
+    "song": "DungeonTheme"
+  }
+  ]
+}

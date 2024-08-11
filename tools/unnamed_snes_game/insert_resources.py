@@ -9,15 +9,14 @@ from typing import Callable, Final, NamedTuple, Optional, Union
 from .common import (
     MS_FS_DATA_BANK_OFFSET,
     DYNAMIC_SPRITE_TILES_BANK_OFFSET,
-    ROOM_DATA_BANK_OFFSET,
     RESOURCE_ADDR_TABLE_BANK_OFFSET,
     ResourceType,
     USE_RESOURCES_OVER_USB2SNES_LABEL,
 )
-from .common import EngineData, FixedSizedData, print_error
+from .common import EngineData, print_error
 from .json_formats import Filename, Mappings, MemoryMap
 from .entity_data import ENTITY_ROM_DATA_LABEL, validate_entity_rom_data_symbols, expected_blank_entity_rom_data
-from .resources_compiler import DataStore, ProjectCompiler, ResourceError, ResourceData
+from .resources_compiler import DataStore, ProjectCompiler, ResourceError, ResourceData, append_room_data_to_dungeons
 
 Address = int
 RomOffset = int
@@ -214,29 +213,6 @@ class ResourceInserter:
 
         return addr
 
-    def next_bank_addr(self, bank_id: int) -> Address:
-        u16_addr = self.bank_positions[bank_id]
-        return ((self.bank_offset + bank_id) << 16) + u16_addr
-
-    # Raises an exception if addr != address of the next free spot in the bank
-    def insert_blob_into_bank(self, bank_id: int, addr: Address, blob: bytes) -> None:
-        blob_size = len(blob)
-        assert blob_size > 0
-
-        u16_addr = self.bank_positions[bank_id]
-
-        if addr != ((self.bank_offset + bank_id) << 16) + u16_addr:
-            raise RuntimeError("addr mismatch (insert_blob_into_bank)")
-
-        if blob_size > self.BANK_END:
-            raise RuntimeError("Cannot fit blob of size { blob_size } into binary")
-
-        rom_offset = self.address_to_rom_offset(addr)
-
-        self.view[rom_offset : rom_offset + blob_size] = blob
-
-        self.bank_positions[bank_id] += blob_size
-
     def confirm_initial_data_is_correct(self, label: str, expected_data: bytes) -> None:
         o = self.label_offset(label)
         if self.view[o : o + len(expected_data)] != expected_data:
@@ -269,33 +245,6 @@ class ResourceInserter:
             table_pos += 3
         self.res_table_pos = table_pos
 
-    def insert_room_data(self, bank_offset: int, rooms: list[Optional[EngineData]]) -> None:
-        assert len(rooms) == 256
-        ROOM_TABLE_SIZE: Final = 0x100 * 2
-
-        room_table = bytearray([0xFF]) * ROOM_TABLE_SIZE
-        room_data_blob = bytearray()
-
-        room_data_addr = self.next_bank_addr(bank_offset)
-        room_addr = room_data_addr & 0xFFFF
-
-        for room_id, room_data in enumerate(rooms):
-            if room_data:
-                assert isinstance(room_data.ram_data, FixedSizedData)
-                assert room_data.ppu_data is None
-
-                rd = room_data.ram_data.data()
-
-                room_table[room_id * 2 + 0] = room_addr & 0xFF
-                room_table[room_id * 2 + 1] = room_addr >> 8
-                room_data_blob += rd
-                room_addr += len(rd)
-
-        room_table_offset = self.label_offset("resources.__RoomsTable")
-        self.view[room_table_offset : room_table_offset + ROOM_TABLE_SIZE] = room_table
-
-        self.insert_blob_into_bank(bank_offset, room_data_addr, room_data_blob)
-
 
 def insert_resources(sfc_view: memoryview, data_store: DataStore) -> ResourceUsage:
     # sfc_view is a memoryview of a bytearray containing the SFC file
@@ -312,8 +261,6 @@ def insert_resources(sfc_view: memoryview, data_store: DataStore) -> ResourceUsa
 
     ri = ResourceInserter(sfc_view, symbols, mappings, data_store.get_n_resources())
     ri.confirm_initial_data_is_correct(ENTITY_ROM_DATA_LABEL, expected_blank_entity_rom_data(symbols, n_entities))
-
-    ri.insert_room_data(ROOM_DATA_BANK_OFFSET, data_store.get_data_for_all_rooms())
 
     ri.insert_blob_into_start_of_bank(MS_FS_DATA_BANK_OFFSET, msfs_entity_data.msfs_data)
     ri.insert_blob_into_start_of_bank(DYNAMIC_SPRITE_TILES_BANK_OFFSET, dynamic_ms_data.tile_data)
@@ -386,6 +333,8 @@ def compile_data(resources_directory: Filename, symbols_file: Filename, n_proces
     compiler: Final = ProjectCompiler(data_store, symbols_file_relpath, n_processes, print_resource_error, null_print_function)
 
     compiler.compile_everything()
+
+    append_room_data_to_dungeons(data_store, print_resource_error)
 
     os.chdir(cwd)
 

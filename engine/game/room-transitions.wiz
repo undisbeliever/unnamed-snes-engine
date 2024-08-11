@@ -4,6 +4,7 @@
 import "src/memmap";
 import "../registers";
 
+import "dungeon";
 import "room";
 import "gamestate";
 import "metasprites";
@@ -175,13 +176,12 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _load_room_and_check_if_ok_to_scroll(roomPosition : u8 in a, playerX : u8 in x, playerY : u8 in y) : bool in carry {
+func _load_room_and_check_if_ok_to_scroll(playerX : u8 in x, playerY : u8 in y) : bool in carry {
 
 var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u16 - MEMMAP_ROOMSTATE_WRAM7E as u16] : typeof(room.tileset);
 
     push8(x);
     push8(y);
-    push8(a);
     {
         _reset_camera();
         _clear_sprite_list();
@@ -191,10 +191,7 @@ var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u1
         __backup_room_state();
     }
 
-    a = pop8();
-    gamestate.data.currentRoom = a;
-
-    carry = resources.load_room(a);
+    carry = dungeon.load_room();
     // Set player position after room is loaded.
     // (safe. plx and ply does not modify carry)
     y = pop8();
@@ -444,7 +441,7 @@ inline func __clear_room_memory() {
 // DB = 0x7e
 #[mem8, idx8]
 inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
-
+    // ::TODO move into dungeon::
 
     wait_frame_and_change_brightness(INIDISP_FORCE_BLANK | INIDISP_BRIGHTNESS_MASK);
 
@@ -458,20 +455,17 @@ inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
         // Setup subsystems and load resources to WRAM and PPU.
         idx16();
         #[idx16] {
-            // ::TODO get tileset_id from somewhere::
-            metatiles.load_tileset__forceblank(0);
+            metatiles.load_tileset__forceblank(dungeon.data.tileset);
 
             metasprites.setup__forceblank();
 
-            // ::TODO get spritesheet_id from somewhere::
-            metasprites.load_ms_spritesheet_ppu_data__forceblank(1);
+            metasprites.load_ms_spritesheet_ppu_data__forceblank(dungeon.data.msSpritesheet);
 
             textbox.setup_ppu__forceblank();
 
             engine_hooks.room_transitions__setup_ppu__forceblank();
 
-            // ::TODO get second_layer id from room data::
-            carry = second_layer.setup__forceblank(0xff);
+            carry = second_layer.setup__forceblank(dungeon.data.secondLayer);
         }
         idx8();
 
@@ -550,9 +544,24 @@ func fadein_reset_player() {
     // Also causes the player's MetaSprite frame to be reset in a scrolling room transition.
     engine_hooks.room_transitions__reset_player__inline();
 
+    // ::HACK load the dungeon.  Dungeons must be loaded before loading rooms::
+    // ::TODO add dungeons to gamestate::
+    // ::TODO add a method of swapping between dungeons::
+    idx16();
+    #[idx16] {
+        push16(0x7e80);
+        data_bank = pop8();
+    // DB = 0x80
+
+        dungeon.load_dungeon__forceblank(0);
+
+        data_bank = pop8();
+    // DB = 0x7e
+    }
+    mem8_idx8();
+
     // Load the room the player was last in
-    _load_room_and_check_if_ok_to_scroll(gamestate.data.currentRoom,
-                                         gamestate.data.playerState.xPos, gamestate.data.playerState.yPos);
+    _load_room_and_check_if_ok_to_scroll(gamestate.data.playerState.xPos, gamestate.data.playerState.yPos);
 
     // ::TODO what should happen if the room/position is not valid??::
 
@@ -571,8 +580,7 @@ func load_room__fadein() {
 
     // ::TODO how do I handle a fadein to a missing room?::
 
-    _load_room_and_check_if_ok_to_scroll(gamestate.data.roomToLoad,
-                                         gamestate.data.roomToLoad_xPos, gamestate.data.roomToLoad_yPos);
+    _load_room_and_check_if_ok_to_scroll(gamestate.data.roomToLoad_xPos, gamestate.data.roomToLoad_yPos);
 
     return _fadein__room_partially_loaded();
 }
@@ -685,8 +693,7 @@ func __fadein__(partiallyLoadedRoom : u8 in a) {
 // DB = 0x7e
 #[mem8, idx8]
 func fadeout() {
-    _load_room_and_check_if_ok_to_scroll(gamestate.data.roomToLoad,
-                                         gamestate.data.roomToLoad_xPos, gamestate.data.roomToLoad_yPos);
+    _load_room_and_check_if_ok_to_scroll(gamestate.data.roomToLoad_xPos, gamestate.data.roomToLoad_yPos);
 
     return __fadeout__room_partially_loaded();
 }
@@ -736,14 +743,24 @@ func __fadeout__room_partially_loaded() {
 // Returns true if the transition completed successfully.
 // Returns false if there is a solid tile at the player's new position.
 //
+// ASSUMES: _scrollDirection is valid
+//
 // If this function returns false, then `_scrolling_room_transition__rollback` MUST be called.
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _scrolling_room_transition(roomPosition : u8 in a, _scrollDirection : ScrollDirection in scrollDirection,
-                                playerX : u8 in x, playerY : u8 in y) : bool in carry {
+func _scrolling_room_transition(_scrollDirection : ScrollDirection in x,
+                                playerX : u8 in a, playerY : u8 in y) : bool in carry {
 
-    carry = _load_room_and_check_if_ok_to_scroll(a, x, y);
+    push8(a);
+
+    scrollDirection = x as ScrollDirection;
+    gamestate.data.roomToLoad_x = a = gamestate.data.currentRoom_x + ScrollDirection_RoomOffset_x[x] as u8;
+    gamestate.data.roomToLoad_y = a = gamestate.data.currentRoom_y + ScrollDirection_RoomOffset_y[x] as u8;
+
+    x = pop8();
+
+    carry = _load_room_and_check_if_ok_to_scroll(x, y);
     if !carry {
         __fadeout__room_partially_loaded();
         return true;
@@ -926,13 +943,8 @@ func _scrolling_room_transition__rollback(_scrollDirection_ : u8 in a, playerXpo
 // DB = 0x7e
 #[mem8, idx8]
 func scroll_right() {
-    a = ScrollDirection.RIGHT as u8;
-    scrollDirection = a as ScrollDirection;
-
-    a = gamestate.data.currentRoom;
-    a++;
-
-    carry = _scrolling_room_transition(a, scrollDirection, PLAYER_XPOS_AFTER_RIGHT_TRANSITION, player.yPos.px);
+    carry = _scrolling_room_transition(ScrollDirection.RIGHT,
+                                       PLAYER_XPOS_AFTER_RIGHT_TRANSITION, player.yPos.px);
     if !carry {
         // Transition failed, rollback room transition
         return _scrolling_room_transition__rollback(ScrollDirection.ROLLBACK_RIGHT as u8,
@@ -949,13 +961,8 @@ func scroll_right() {
 // DB = 0x7e
 #[mem8, idx8]
 func scroll_left() {
-    a = ScrollDirection.LEFT as u8;
-    scrollDirection = a as ScrollDirection;
-
-    a = gamestate.data.currentRoom;
-    a--;
-
-    carry = _scrolling_room_transition(a, scrollDirection, PLAYER_XPOS_AFTER_LEFT_TRANSITION, player.yPos.px);
+    carry = _scrolling_room_transition(ScrollDirection.LEFT,
+                                       PLAYER_XPOS_AFTER_LEFT_TRANSITION, player.yPos.px);
     if !carry {
         // Transition failed, rollback room transition
         return _scrolling_room_transition__rollback(ScrollDirection.ROLLBACK_LEFT as u8,
@@ -972,10 +979,7 @@ func scroll_left() {
 // DB = 0x7e
 #[mem8, idx8]
 func scroll_down() {
-    a = ScrollDirection.DOWN as u8;
-    scrollDirection = a as ScrollDirection;
-
-    carry = _scrolling_room_transition(a = gamestate.data.currentRoom + 0x10, scrollDirection,
+    carry = _scrolling_room_transition(ScrollDirection.DOWN,
                                        player.xPos.px, PLAYER_YPOS_AFTER_DOWN_TRANSITION);
     if !carry {
         // Transition failed, rollback room transition
@@ -993,10 +997,7 @@ func scroll_down() {
 // DB = 0x7e
 #[mem8, idx8]
 func scroll_up() {
-    a = ScrollDirection.UP as u8;
-    scrollDirection = a as ScrollDirection;
-
-    carry = _scrolling_room_transition(a = gamestate.data.currentRoom - 0x10, scrollDirection,
+    carry = _scrolling_room_transition(ScrollDirection.UP,
                                        player.xPos.px, PLAYER_YPOS_AFTER_UP_TRANSITION);
     if !carry {
         // Transition failed, rollback room transition
@@ -1226,6 +1227,14 @@ in rodata0 {
 
     let ScrollDirectionVelocityX = (far&_ScrollDirectionVelocityX as far *i16);
     let ScrollDirectionVelocityY = (far&_ScrollDirectionVelocityY as far *i16);
+
+
+    const _ScrollDirection_RoomOffset : [i8 ; 8 * 2] =
+        // x   y   x   y   x   y   x   y   x   y   x   y   x   y   x   y
+        [  0, -1,  0,  1, -1,  0,  1,  0,  0,  1,  0, -1,  1,  0, -1,  0];
+
+    let ScrollDirection_RoomOffset_x = ((far&_ScrollDirection_RoomOffset as u24 + 0) as far *i8);
+    let ScrollDirection_RoomOffset_y = ((far&_ScrollDirection_RoomOffset as u24 + 1) as far *i8);
 }
 
 }

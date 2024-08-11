@@ -554,9 +554,9 @@ def get_list_of_tmx_files(directory: str) -> list[str]:
 ROOM_LOCATION_REGEX = re.compile(r"(\d+)-(\d+)-.+.tmx$")
 
 
-def extract_room_id(basename: str) -> int:
+def extract_room_position(basename: str) -> tuple[int, int]:
     m = ROOM_LOCATION_REGEX.match(basename)
     if not m:
         raise RuntimeError("Invalid room filename")
 
-    return int(m.group(1), 10) + 16 * int(m.group(2), 10)
+    return int(m.group(1), 10), int(m.group(2), 10)

@@ -8,6 +8,7 @@ import "src/memmap";
 import "../resources/resources";
 
 import "src/engine-hooks";
+import "gen/enums";
 
 
 in lowram {
@@ -47,20 +48,25 @@ struct GameStateData {
     checksum : u16,
 
 
-    // The location of the current room
-    currentRoom : u8,
+    // ::TODO add dungron_id::
+
+    // The current room within the dungeon
+    currentRoom_x : u8,
+    currentRoom_y : u8,
 
     // The player's state at the start of the room
     // (or when saving, loading or starting a new game)
     playerState : PlayerState,
 
 
+    // ::TODO remove::
     // The room to load in a non-scrolling room transition.
     //
     // Is not used by scrolling room transition.
     //
     // Will only be read by the ROOM_TRANSITION_FADEOUT and LOAD_ROOM_FADEIN transitions.
-    roomToLoad : u8,
+    roomToLoad_x : u8,
+    roomToLoad_y : u8,
 
     // The location to place the player in a non-scrolling room transition.
     //
@@ -143,9 +149,15 @@ func new_game() {
     }
     mem8_idx8();
 
-    a = resources.rooms.STARTING_ROOM;
-    data.currentRoom = a;
-    data.roomToLoad = a;
+
+    // ::TODO improve how start position is determined::
+    x = resources.STARTING_ROOM_X;
+    y = resources.STARTING_ROOM_Y;
+
+    data.currentRoom_x = x;
+    data.roomToLoad_x = x;
+    data.currentRoom_y = y;
+    data.roomToLoad_y = y;
 }
 
 

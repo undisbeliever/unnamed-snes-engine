@@ -1234,3 +1234,52 @@ def load_other_resources_json(filename: Filename) -> OtherResources:
         bg_images=bg_images,
         second_layers=second_layers,
     )
+
+
+#
+# dungeons.json
+#
+
+
+class DungeonInput(NamedTuple):
+    name: Name
+    id: int
+    path: Filename
+    width: int
+    height: int
+    tileset: Name
+    second_layer: Optional[Name]
+    ms_spritesheet: Name
+    song: Optional[Name]
+
+
+class DungeonsJson(NamedTuple):
+    dungeons: dict[Name, DungeonInput]
+
+
+MAX_DUNGEONS: Final = 254
+
+
+def load_dungeons_json(filename: Filename) -> DungeonsJson:
+    jh = _load_json_file(filename, _Helper)
+
+    dirname = os.path.dirname(filename)
+
+    dungeons = jh.build_ordered_dict_from_list(
+        "dungeons",
+        DungeonInput,
+        MAX_DUNGEONS,
+        lambda sj, name, i: DungeonInput(
+            name=name,
+            id=i,
+            path=os.path.join(dirname, sj.get_string("path")),
+            width=sj.get_int("width"),
+            height=sj.get_int("height"),
+            tileset=sj.get_name("tileset"),
+            second_layer=sj.get_optional_name("second_layer"),
+            ms_spritesheet=sj.get_name("ms_spritesheet"),
+            song=sj.get_optional_name("song"),
+        ),
+    )
+
+    return DungeonsJson(dungeons)

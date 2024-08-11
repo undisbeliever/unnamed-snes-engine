@@ -5,7 +5,6 @@ import "src/memmap";
 import "../registers";
 
 import "dma";
-import "../game/room";
 
 import "gen/enums";
 
@@ -22,6 +21,7 @@ enum ResourceType : u8 {
   tiles,
   bg_image,
   audio_data,
+  dungeons,
 };
 
 
@@ -51,6 +51,8 @@ struct PpuData_Dma0 {
     remaining : u16,
 }
 
+extern var DMA0_A_BUS_FARADDR @ &A1T0 : far *u8;
+
 
 struct ResourceTypeTableEntry {
     // Number of resources of that type
@@ -74,17 +76,6 @@ in rodata0 {
         let ResourceTypeTable_nResources = (far &ResourceTypeTable as u24 + offsetof(ResourceTypeTableEntry, nResources)) as far *u8;
         let ResourceTypeTable_addr       = (far &ResourceTypeTable as u24 + offsetof(ResourceTypeTableEntry, addr)) as far *u16;
 
-    let INVALID_ROOM_ADDR = 0xffff;
-
-    // Table of room addresses.
-    //
-    // If a room address is `INVALID_ROOM_ADDR` the room does not exist.
-    //
-    // (256 word address, pointing to RoomData)
-    const __RoomsTable : [ *const RoomData ; 0x100 ] = [ INVALID_ROOM_ADDR as *const RoomData ; 0x100 ];
-    let RoomsTable = far &__RoomsTable as far * const * RoomData;
-
-
     // This value is set to 0 by `insert_resources.py`
     const UseResourcesOverUsb2Snes : u8 = 0xff;
 }
@@ -97,6 +88,29 @@ in zeropage {
 
 
 in code {
+
+
+// Load a resource with fixed RAM data and no PPU data.
+//
+// REQUIRES: Force-Blank
+// USES: DMA Channel 0
+//
+// NOTE: This function will only load RAM data to wram bank $7e.
+// OUT: A1T0/A1B0 = address after RAM data
+//
+// CAUTION: dungeon data at `DMA0_A_BUS_FARADDR` is not valid for resource-over-usb2snes.
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func load_resource__fixed_ram__forceblank_inline(let rType: ResourceType, resourceId : u8 in a, let wram_data_addr: *u8, let wram_data_size: u16) : far *u8 in DMA0_A_BUS_FARADDR {
+    __load_resource(rType, a);
+
+    // a:xx = resource address
+    WMADDML = yy = wram_data_addr as u16;
+    DMA0_A_BUS_FARADDR = __copy_fixed_size_data(xx, a, wram_data_size);
+
+    return DMA0_A_BUS_FARADDR;
+}
 
 
 // Load a resource with fixed RAM data and PPU data.
@@ -283,6 +297,35 @@ func __copy_fixed_size_data_and_prep_dynamic_sized_data(addr: u16 in xx, bankbyt
 
 
 
+// Copy fixed-size resource RAM data to Work-RAM
+//
+// Uses: DMA channel 0
+//
+// IN: WMADDML - the work RAM address to copy the RAM data to (NOTE: WMADDH will be set to 0 (bank $7e))
+//
+// OUT: A1T0/A1B0 = address after RAM data
+//
+// DB = 0x80
+#[mem8, idx16]
+func __copy_fixed_size_data(addr: u16 in xx, bankbyte: u8 in a, wram_data_size: u16 in yy) : far *u8 in DMA0_A_BUS_FARADDR {
+    WMADDH = 0;
+
+    // DMA size
+    DAS0 = yy;
+
+    // DMA A-Bus address
+    A1T0 = xx;
+    A1B0 = a;
+
+    dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_ONE, <:&WMDATA);
+
+    MDMAEN = a = MDMAEN_DMA0;
+
+    return DMA0_A_BUS_FARADDR;
+}
+
+
+
 // Load resource data that contains only dynamic sized PPU data.
 //
 // Uses: DMA channel 0
@@ -346,51 +389,6 @@ var _farPtr : far *u16 in zpTmp_farPtr;
     a = #:_farPtr;
 }
 
-
-// Load a room into memory
-//
-// DB = 0x7e
-#[mem8, idx8]
-func load_room(roomId : u8 in a) : bool in carry {
-var _farPtr : far *u8 in zpTmp_farPtr;
-
-    // Save roomId in `y`, UseResourcesOverUsb2Snes test clobbers `a` (no `bit long` instructions).
-    y = a;
-
-    a = *far &UseResourcesOverUsb2Snes;
-    if !zero {
-        ^return resources_over_usb2snes.load_room(y);
-    }
-
-    mem16_idx16();
-    #[mem16, idx16] {
-        // No need to mask high byte of `yy`, it is always 0
-        xx = aa = yy << 1;
-
-        aa = RoomsTable[unaligned xx] as u16;
-        if aa == INVALID_ROOM_ADDR {
-            mem8_idx8();
-            return false;
-        }
-
-        *(&_farPtr as *u16) = aa;
-    }
-    mem8();
-
-    #[idx16] {
-        #:_farPtr = a = ROOM_DATA_BANK;
-
-        // Copy room into memory.
-        yy = sizeof(typeof(room)) - 1;
-        do {
-            (&room as *u8)[yy] = a = _farPtr[yy];
-            yy--;
-        } while !negative;
-    }
-    mem8_idx8();
-
-    return true;
-}
 
 
 // Transfer a section of ppuData to CGRAM
@@ -549,15 +547,6 @@ var _header : u8 in zpTmp_byte_0;
 
 let load_bg_image_resource_into_vram_a = load_bg_image_resource_into_vram as func(u8 in a, u16 in xx, u16 in yy);
 
-}
-
-
-
-// Rooms
-// =====
-
-namespace rooms {
-    let STARTING_ROOM = _STARTING_ROOM;
 }
 
 }

@@ -1,0 +1,157 @@
+// Copyright (c) 2024, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+
+import "gamestate";
+import "room";
+import "../resources/resources";
+import "../resources/resources-over-usb2snes.wiz";
+import "../registers_math.wiz";
+
+namespace dungeon {
+
+
+// Dungeon data stored in RAM
+//
+// If the Dungeon data is in ROM (not resources-over-usb2snes), the ROM data is followed by:
+//   * `roomTable : [u16 ; width * height]` - Optional offset (after `roomTable`) for the dungeon's rooms.
+//     If offset is 0 then there is no room for that dungeon cell.
+//   * room data
+struct _RamDataFormat {
+    width: u8,
+    height: u8,
+
+    // ::TODO add palette (need to remove it from mt_tileset beforehand)::
+    tileset: u8,
+    secondLayer: u8,
+    msSpritesheet: u8,
+
+    // The song to play for this dungeon.
+    //
+    // If `song > N_SONGS`, the current song will not be changed.
+    // ::TODO play song in engine::
+    song: u8,
+
+    // ::TODO Should I add a callback??::
+    // ::TODO add sl_callback arguments::
+}
+
+in lowram_roomstate {
+    // ::TODO read this variable::
+    // (byte flag)
+    var _dungeonLoaded : u8;
+
+    var _dungeonId : u8;
+
+    var __data : _RamDataFormat;
+        const data @ &__data : _RamDataFormat;
+
+    // The far-address of the room table in ROM.
+    //
+    // CAUTON: Not valid if UseResourcesOverUsb2Snes is set.
+    var roomTable: far *u16;
+}
+
+
+in code {
+
+
+// Load dungeon into memory.
+//
+// REQUIRES: Force-Blank
+//
+// DB = 0x80
+#[mem8, idx16]
+func load_dungeon__forceblank(dungeon : u8 in a) {
+var _dmaFarAddr : far *u8 in resources.DMA0_A_BUS_FARADDR;
+
+    _dungeonId = a;
+
+    _dmaFarAddr = resources.load_resource__fixed_ram__forceblank_inline(resources.ResourceType.dungeons, a, &data as *u8, sizeof(typeof(data)));
+
+    *(&roomTable as *u16) = xx = *(&_dmaFarAddr as *u16);
+    *(&#:roomTable as *u8) = a = #:_dmaFarAddr;
+
+    _dungeonLoaded = a = 1;
+}
+
+
+
+// Load a room into memory.
+//
+// ASSUMES: Dungeon loaded
+//
+// RETURNS: true if the room exists.
+//
+// USES Multiplication registers
+//
+// DB = 0x7e
+#[mem8, idx8]
+func load_room() : bool in carry {
+var _farPtr : far *u16 in zpTmp_farPtr;
+
+    x = gamestate.data.roomToLoad_x;
+    y = gamestate.data.roomToLoad_y;
+
+    if x >= data.width || y >= data.height {
+        return false;
+    }
+
+    a = *far &resources.UseResourcesOverUsb2Snes;
+    if !zero {
+        carry = resources_over_usb2snes.load_room(_dungeonId, x, y);
+
+        // ::TODO optimise this away::
+        if carry {
+            gamestate.data.currentRoom_x = x = gamestate.data.roomToLoad_x;
+            gamestate.data.currentRoom_y = y = gamestate.data.roomToLoad_y;
+        }
+        return carry;
+    }
+
+    // Room data is stored in ROM, after the dungeon data.
+
+    *(far &WRMPYA) = a = y;
+    *(far &WRMPYB) = a = data.width;
+
+    #:_farPtr = a = *(&#:roomTable as *u8);
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        *(&_farPtr as *u16) = aa = *(&roomTable as *u16);
+
+        // calculate room offset
+        yy = aa = (xx + *(far &RDMPY)) << 1;
+
+        aa = _farPtr[unaligned yy];
+        if !zero {
+            *(&_farPtr as *u16) = aa = aa + *(&_farPtr as *u16);
+
+            // Copy room into memory.
+            // Assumes room data is a multiple of 2 in size
+            yy = sizeof(typeof(room)) - 2;
+            do {
+                (&room as *u16)[unaligned yy] = aa = _farPtr[unaligned yy];
+                yy--;
+                yy--;
+            } while !negative;
+
+            // Assumes room position is sequential
+            *(&gamestate.data.currentRoom_x as *u16) = aa = *(&gamestate.data.roomToLoad_x as *u16);
+
+            carry = true;
+        }
+        else {
+            // room does not exist
+            carry = false;
+        }
+    }
+    mem8_idx8();
+
+    return carry;
+}
+
+}
+}
+

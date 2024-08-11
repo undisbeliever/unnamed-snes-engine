@@ -22,7 +22,6 @@ from unnamed_snes_game.json_formats import (
 from unnamed_snes_game.common import (
     MS_FS_DATA_BANK_OFFSET,
     DYNAMIC_SPRITE_TILES_BANK_OFFSET,
-    ROOM_DATA_BANK_OFFSET,
     RESOURCE_ADDR_TABLE_BANK_OFFSET,
     USB2SNES_DATA_BANK_OFFSET,
     ResourceType,
@@ -30,13 +29,13 @@ from unnamed_snes_game.common import (
 from unnamed_snes_game.audio import BLANK_SONG_NAME
 
 
-def room_id_for_name(room_name: RoomName) -> int:
+def room_pos_for_name(room_name: RoomName) -> tuple[int, int]:
     m = re.match(r"(\d+)-(\d+)-.+$", room_name)
 
     if not m:
         raise ValueError("Invalid room name")
 
-    return int(m.group(1), 10) + 16 * int(m.group(2), 10)
+    return int(m.group(1), 10), int(m.group(2), 10)
 
 
 def resources_over_usb2snes_data_addr(memory_map: MemoryMap) -> int:
@@ -103,24 +102,28 @@ def generate_wiz_code(mappings: Mappings, audio_project: AudioProject) -> str:
         out.write(
             f"let DYNAMIC_SPRITE_TILES_DATA_BANK = 0x{mappings.memory_map.first_resource_bank + DYNAMIC_SPRITE_TILES_BANK_OFFSET:02x};\n"
         )
-        out.write(f"let ROOM_DATA_BANK = 0x{mappings.memory_map.first_resource_bank + ROOM_DATA_BANK_OFFSET:02x};\n")
         out.write(
             f"let RESOURCE_ADDR_TABLE_BANK = 0x{mappings.memory_map.first_resource_bank + RESOURCE_ADDR_TABLE_BANK_OFFSET:02x};\n\n"
         )
         out.write(f"let N_RESOURCE_TYPES = { len(ResourceType) };\n\n")
 
-        out.write(f"let _STARTING_ROOM = { room_id_for_name(mappings.starting_room) };\n\n")
+        starting_room = room_pos_for_name(mappings.starting_room)
+        out.write(f"let STARTING_ROOM_X = { starting_room[0] };\n")
+        out.write(f"let STARTING_ROOM_Y = { starting_room[1] };\n\n")
 
         out.write(f"let _USB2SNES_DATA_ADDR = 0x{resources_over_usb2snes_data_addr(mappings.memory_map):06x};\n")
         out.write(f"let _BANK_SIZE = { mappings.memory_map.mode.bank_size };\n\n")
 
         out.write(f"let N_SECOND_LAYERS = { len(mappings.second_layers) };\n\n")
 
-        for rt in ResourceType:
-            if rt == ResourceType.audio_data:
-                write_songs_enum(out, audio_project)
-            else:
-                write_enum(out, rt.name, getattr(mappings, rt.name))
+        write_enum(out, "palettes", mappings.palettes)
+        write_enum(out, "mt_tilesets", mappings.mt_tilesets)
+        write_enum(out, "second_layers", mappings.second_layers)
+        write_enum(out, "ms_spritesheets", mappings.ms_spritesheets)
+        write_enum(out, "tiles", mappings.tiles)
+        write_enum(out, "bg_images", mappings.bg_images)
+
+        write_songs_enum(out, audio_project)
 
         out.write("}\n\n")
 

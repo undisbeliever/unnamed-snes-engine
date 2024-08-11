@@ -19,7 +19,10 @@ in code {
 func init() {
     // ::TODO move into engine::
     audio.songs_start_immediately();
-    audio.load_song_if_changed(resources.songs.DungeonTheme);
+    a = dungeon.data.song;
+    if a < resources.N_SONGS {
+        audio.load_song_if_changed(dungeon.data.song as resources.songs);
+    }
 
     ^return spawn_all_room_entities();
 }
@@ -35,4 +38,7 @@ func process() {
 
 }
 }
+
+// ::TODO remove::
+import "engine/game/dungeon";
 

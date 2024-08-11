@@ -14,11 +14,10 @@ from .ansi_color import NoAnsiColors, AnsiColors
 # Offset between the first_resource_bank and the named data banks
 MS_FS_DATA_BANK_OFFSET = 0
 DYNAMIC_SPRITE_TILES_BANK_OFFSET = 1
-ROOM_DATA_BANK_OFFSET = 2
 RESOURCE_ADDR_TABLE_BANK_OFFSET = 2
 
-# Reuse Room Data Bank for resources_over_usb2snes response data
-USB2SNES_DATA_BANK_OFFSET = ROOM_DATA_BANK_OFFSET
+# Resource table data for resources_over_usb2snes response data
+USB2SNES_DATA_BANK_OFFSET = RESOURCE_ADDR_TABLE_BANK_OFFSET
 
 
 USE_RESOURCES_OVER_USB2SNES_LABEL = "resources.UseResourcesOverUsb2Snes"
@@ -36,6 +35,7 @@ class ResourceType(IntEnum):
     tiles = 4
     bg_images = 5
     audio_data = 6
+    dungeons = 7
 
 
 class FixedSizedData:

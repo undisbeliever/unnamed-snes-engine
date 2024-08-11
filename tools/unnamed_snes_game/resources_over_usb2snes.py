@@ -674,11 +674,12 @@ class Request(NamedTuple):
     request_id: int
     request_type: Union[ResourceType, SpecialRequestType]
     resource_id: int
+    room_pos: tuple[int, int]
     last_command_id: int
 
 
 # Must match `INIT_REQUEST` in `src/resources-over-usb2snes.wiz`
-INIT_REQUEST: Final = Request(0, SpecialRequestType.init, SpecialRequestType.init ^ 0xFF, 0xFF)
+INIT_REQUEST: Final = Request(0, SpecialRequestType.init, SpecialRequestType.init ^ 0xFF, (0x11, 0x22), 0xFF)
 
 
 # Must match `ResponseStatus` enum in `src/resources-over-usb2snes.wiz`
@@ -831,7 +832,7 @@ class ResourcesOverUsb2Snes:
     R_TYPE_MUL: Final = 3
 
     def read_request(self) -> Optional[Request]:
-        rb = self.usb2snes.read_wram_addr(self.request_addr, 4)
+        rb = self.usb2snes.read_wram_addr(self.request_addr, 6)
 
         r_type_id = rb[1]
 
@@ -845,7 +846,7 @@ class ResourcesOverUsb2Snes:
                 # r_type_id is invalid
                 return None
 
-        return Request(rb[0], rt, rb[2], rb[3])
+        return Request(rb[0], rt, rb[2], (rb[3], rb[4]), rb[5])
 
     # NOTE: This method will sleep until the resource data is valid
     def process_request(self, request: Request) -> None:
@@ -854,12 +855,14 @@ class ResourcesOverUsb2Snes:
         if request.request_id == 0:
             return
 
-        log_request(f"Request 0x{request.request_id:02x}: { request.request_type.name }[{ request.resource_id }]")
-
         try:
             if request.request_type == SpecialRequestType.rooms:
-                status, data = self.get_room(request.resource_id)
+                log_request(
+                    f"Request 0x{request.request_id:02x}: room [{ request.resource_id }, {request.room_pos[0]}, {request.room_pos[1]}]"
+                )
+                status, data = self.get_room(request.resource_id, request.room_pos)
             else:
+                log_request(f"Request 0x{request.request_id:02x}: { request.request_type.name }[{ request.resource_id }]")
                 status, data = self.get_resource(ResourceType(request.request_type), request.resource_id)
 
             if request.request_type in self.REQUEST_TYPE_USES_MSFS_OR_ENTITY_DATA:
@@ -876,17 +879,19 @@ class ResourcesOverUsb2Snes:
             self.write_response(request.request_id, ResponseStatus.ERROR, None)
             raise
 
-    def get_room(self, room_id: int) -> tuple[ResponseStatus, Optional[bytes]]:
-        co = self.data_store.get_room_data(room_id)
+    def get_room(self, dungeon_id: int, room_pos: tuple[int, int]) -> tuple[ResponseStatus, Optional[bytes]]:
+        room_x, room_y = room_pos
+
+        co = self.data_store.get_room_data(dungeon_id, room_x, room_y)
 
         if isinstance(co, ResourceError):
             log_compiler_error(co)
             log_notice("    Waiting until resource data is ready...")
-            self.signals.set_usb2snes_status(f"WAITING for room {room_id}")
+            self.signals.set_usb2snes_status(f"WAITING for room {dungeon_id} {room_x}, {room_y}")
 
             while isinstance(co, ResourceError):
                 self.signals.wait_until_resource_changed()
-                co = self.data_store.get_room_data(room_id)
+                co = self.data_store.get_room_data(dungeon_id, room_x, room_y)
 
         if isinstance(co, ResourceData):
             status = ResponseStatus.OK
