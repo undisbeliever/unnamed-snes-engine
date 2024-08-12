@@ -6,13 +6,13 @@
 import os.path
 from typing import Callable, Final, NamedTuple, Optional, Union
 
-from .common import (
+from .memory_map import (
     MS_FS_DATA_BANK_OFFSET,
     DYNAMIC_SPRITE_TILES_BANK_OFFSET,
     RESOURCE_ADDR_TABLE_BANK_OFFSET,
-    ResourceType,
     USE_RESOURCES_OVER_USB2SNES_LABEL,
 )
+from .enums import ResourceType
 from .errors import print_error
 from .json_formats import Filename, Mappings, MemoryMap
 from .entity_data import ENTITY_ROM_DATA_LABEL, validate_entity_rom_data_symbols, expected_blank_entity_rom_data

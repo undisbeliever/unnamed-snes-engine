@@ -51,9 +51,8 @@ from .insert_resources import read_binary_file, validate_sfc_file, ROM_HEADER_V3
 from .resources_compiler import ProjectCompiler, SharedInputType
 from .data_store import DataStore, ResourceError, ResourceData
 from .json_formats import Name, Filename, Mappings, MemoryMap
-
-from .common import (
-    ResourceType,
+from .enums import ResourceType
+from .memory_map import (
     MS_FS_DATA_BANK_OFFSET,
     DYNAMIC_SPRITE_TILES_BANK_OFFSET,
     USB2SNES_DATA_BANK_OFFSET,

@@ -11,7 +11,7 @@ from abc import abstractmethod, ABCMeta
 from enum import unique, auto, Enum
 from typing import cast, final, Any, Callable, Final, Iterable, Optional, Sequence, Set, Union
 
-from .common import ResourceType
+from .enums import ResourceType
 from .entity_data import create_entity_rom_data
 from .mt_tileset import convert_mt_tileset
 from .second_layers import convert_second_layer

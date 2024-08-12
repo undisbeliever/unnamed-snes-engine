@@ -19,13 +19,13 @@ from unnamed_snes_game.json_formats import (
     MemoryMap,
     GameMode,
 )
-from unnamed_snes_game.common import (
+from unnamed_snes_game.memory_map import (
     MS_FS_DATA_BANK_OFFSET,
     DYNAMIC_SPRITE_TILES_BANK_OFFSET,
     RESOURCE_ADDR_TABLE_BANK_OFFSET,
     USB2SNES_DATA_BANK_OFFSET,
-    ResourceType,
 )
+from unnamed_snes_game.enums import ResourceType
 from unnamed_snes_game.audio import BLANK_SONG_NAME
 
 

@@ -9,7 +9,7 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Final, Iterable, NamedTuple, Optional, Union
 
-from .common import ResourceType
+from .enums import ResourceType
 from .snes import ConstSmallTileMap
 from .json_formats import Name, ScopedName, Mappings
 

@@ -8,7 +8,7 @@ import os.path
 from collections import OrderedDict
 from typing import Any, Callable, Final, Generator, Literal, NamedTuple, NoReturn, Optional, Type, TypeVar, Union
 
-from .common import MemoryMapMode
+from .memory_map import MemoryMapMode
 from .errors import FileError
 
 
