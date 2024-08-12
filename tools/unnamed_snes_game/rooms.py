@@ -22,7 +22,8 @@ from .json_formats import (
     SecondLayerInput,
     Name,
 )
-from .common import EngineData, FixedSizedData, SimpleMultilineError
+from .common import EngineData, FixedSizedData
+from .errors import SimpleMultilineError
 from .callbacks import parse_callback_parameters, ROOM_CALLBACK, SL_ROOM_PARAMETERS, RoomDoors, parse_int
 
 from .second_layers import MT_TILE_PX as SECOND_LAYER_MT_TILE_PX

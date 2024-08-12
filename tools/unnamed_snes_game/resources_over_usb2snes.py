@@ -58,7 +58,7 @@ from .common import (
     USB2SNES_DATA_BANK_OFFSET,
     USE_RESOURCES_OVER_USB2SNES_LABEL,
 )
-from .common import print_error as __print_error
+from .errors import print_error as __print_error
 
 
 # Sleep delay when waiting for the device to run the correct ROM

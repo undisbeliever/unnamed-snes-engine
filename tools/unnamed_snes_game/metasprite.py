@@ -7,7 +7,8 @@ import os.path
 
 from typing import Callable, Final, Literal, NamedTuple, Optional, TextIO, TypeVar, Union
 
-from .common import EngineData, FixedSizedData, DynamicSizedData, MemoryMapMode, MultilineError
+from .common import EngineData, FixedSizedData, DynamicSizedData, MemoryMapMode
+from .errors import MultilineError
 from .snes import (
     split_large_tile,
     load_image_tile_extractor,

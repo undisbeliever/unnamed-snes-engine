@@ -10,7 +10,7 @@ import tkinter.ttk as ttk
 import tkinter.messagebox
 
 from ..resources_compiler import DataStore, ResourceError, NonResourceError
-from ..common import MultilineError
+from ..errors import MultilineError
 from ..snes import InvalidTilesError
 from ..json_formats import Filename
 from .. import metasprite as ms

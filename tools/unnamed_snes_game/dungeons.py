@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
-from .common import EngineData, FixedSizedData, SimpleMultilineError
+from .common import EngineData, FixedSizedData
+from .errors import SimpleMultilineError
 from .rooms import RoomDependencies
 from .audio import BLANK_SONG_NAME
 from .json_formats import DungeonInput, Mappings, OtherResources, AudioProject, Name

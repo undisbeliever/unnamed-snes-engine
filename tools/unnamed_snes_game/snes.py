@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from typing import Generator, Final, Iterable, Literal, NamedTuple, Optional, Sequence, TextIO, Union
 
 from .json_formats import Filename
-from .common import MultilineError, FileError
+from .errors import MultilineError, FileError
 
 
 SnesColor = int

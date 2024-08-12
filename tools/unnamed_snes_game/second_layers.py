@@ -6,7 +6,8 @@
 from enum import IntFlag
 from typing import Final, Iterable, NamedTuple, Optional
 
-from .common import EngineData, DynamicSizedData, SimpleMultilineError
+from .common import EngineData, DynamicSizedData
+from .errors import SimpleMultilineError
 from .palette import PaletteResource
 from .snes import (
     AbstractTilesetMap,
