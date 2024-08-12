@@ -13,11 +13,11 @@ from .common import (
     ResourceType,
     USE_RESOURCES_OVER_USB2SNES_LABEL,
 )
-from .common import EngineData
 from .errors import print_error
 from .json_formats import Filename, Mappings, MemoryMap
 from .entity_data import ENTITY_ROM_DATA_LABEL, validate_entity_rom_data_symbols, expected_blank_entity_rom_data
-from .resources_compiler import DataStore, ProjectCompiler, ResourceError, ResourceData, append_room_data_to_dungeons
+from .data_store import DataStore, ResourceError, ResourceData, EngineData
+from .resources_compiler import ProjectCompiler, append_room_data_to_dungeons
 
 Address = int
 RomOffset = int

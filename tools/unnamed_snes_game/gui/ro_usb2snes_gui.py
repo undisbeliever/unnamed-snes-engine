@@ -11,7 +11,7 @@ import tkinter.messagebox
 from .errors_tab import ErrorsTab
 
 from ..resources_over_usb2snes import FsWatcherSignals, BgThread
-from ..resources_compiler import DataStore
+from ..data_store import DataStore
 
 
 # https://tkdocs.com/tutorial/eventloop.html#threads

@@ -6,7 +6,7 @@ import re
 import subprocess
 from typing import Final
 
-from .common import EngineData, DynamicSizedData
+from .data_store import EngineData, DynamicSizedData
 from .json_formats import Filename, Name, Mappings
 
 COMMON_AUDIO_DATA_RESOURCE_NAME: Final = "__null__common_data__"

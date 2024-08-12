@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
-import struct
 from enum import IntEnum, Enum, unique
-from typing import Callable, Final, Optional, Union
+
+from typing import Callable
 
 
 # Offset between the first_resource_bank and the named data banks
@@ -31,74 +31,6 @@ class ResourceType(IntEnum):
     bg_images = 5
     audio_data = 6
     dungeons = 7
-
-
-class FixedSizedData:
-    "Engine Data with a fixed size"
-
-    def __init__(self, data: bytes):
-        if len(data) > 0xFFFF:
-            raise RuntimeError("data is too large")
-        self._data: Final = data
-
-    def size(self) -> int:
-        return len(self._data)
-
-    def data(self) -> bytes:
-        return self._data
-
-
-# ::TODO compress dynamic data::
-class DynamicSizedData:
-    "Engine data with an unknown size"
-
-    def __init__(self, data: bytes):
-        if len(data) > 0xFFFF:
-            raise RuntimeError("data is too large")
-        self._data: Final = struct.pack("<H", len(data)) + data
-
-    def size(self) -> int:
-        return len(self._data)
-
-    def data(self) -> bytes:
-        return self._data
-
-
-class EngineData:
-    def __init__(self, ram_data: Optional[Union[FixedSizedData, DynamicSizedData]], ppu_data: Optional[DynamicSizedData]):
-        self.ram_data: Final = ram_data
-        self.ppu_data: Final = ppu_data
-
-        if self.size() > 0xFFFF:
-            raise RuntimeError("data is too large")
-
-    def size(self) -> int:
-        size = 0
-        if self.ram_data is not None:
-            size += self.ram_data.size()
-        if self.ppu_data is not None:
-            size += self.ppu_data.size()
-        return size
-
-    def to_rou2s_data(self) -> bytes:
-        if self.ram_data and self.ppu_data:
-            return self.ram_data.data() + self.ppu_data.data()
-        elif self.ram_data:
-            return self.ram_data.data()
-        elif self.ppu_data:
-            return self.ppu_data.data()
-        else:
-            raise RuntimeError("No data")
-
-    def ram_and_ppu_size(self) -> tuple[int, int]:
-        if self.ram_data is not None and self.ppu_data is not None:
-            return self.ram_data.size(), self.ppu_data.size()
-        elif self.ram_data is not None:
-            return self.ram_data.size(), 0
-        elif self.ppu_data is not None:
-            return 0, self.ppu_data.size()
-        else:
-            raise RuntimeError("No data")
 
 
 def lorom_address_to_rom_offset(addr: int) -> int:

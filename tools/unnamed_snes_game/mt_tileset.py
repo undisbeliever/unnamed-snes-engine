@@ -18,7 +18,7 @@ from .snes import (
     extract_tiles_and_build_tilemap,
     convert_snes_tileset,
 )
-from .common import FixedSizedData, DynamicSizedData, EngineData
+from .data_store import FixedSizedData, DynamicSizedData, EngineData
 from .errors import SimpleMultilineError
 
 

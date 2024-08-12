@@ -22,7 +22,7 @@ from .json_formats import (
     SecondLayerInput,
     Name,
 )
-from .common import EngineData, FixedSizedData
+from .data_store import EngineData, FixedSizedData
 from .errors import SimpleMultilineError
 from .callbacks import parse_callback_parameters, ROOM_CALLBACK, SL_ROOM_PARAMETERS, RoomDoors, parse_int
 

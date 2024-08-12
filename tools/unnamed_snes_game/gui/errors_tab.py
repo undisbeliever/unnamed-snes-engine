@@ -9,7 +9,7 @@ import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.messagebox
 
-from ..resources_compiler import DataStore, ResourceError, NonResourceError
+from ..data_store import DataStore, ResourceError, NonResourceError
 from ..errors import MultilineError
 from ..snes import InvalidTilesError
 from ..json_formats import Filename

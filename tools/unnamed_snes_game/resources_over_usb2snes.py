@@ -48,7 +48,8 @@ from typing import final, Callable, Final, NamedTuple, Optional, Union
 from .ansi_color import AnsiColors
 from .entity_data import ENTITY_ROM_DATA_LABEL, ENTITY_ROM_DATA_BYTES_PER_ENTITY
 from .insert_resources import read_binary_file, validate_sfc_file, ROM_HEADER_V3_ADDR
-from .resources_compiler import DataStore, ProjectCompiler, SharedInputType, ResourceData, ResourceError
+from .resources_compiler import ProjectCompiler, SharedInputType
+from .data_store import DataStore, ResourceError, ResourceData
 from .json_formats import Name, Filename, Mappings, MemoryMap
 
 from .common import (

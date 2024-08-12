@@ -4,7 +4,7 @@
 
 from typing import Callable, Final, Iterable
 
-from .common import EngineData, FixedSizedData, DynamicSizedData
+from .data_store import EngineData, FixedSizedData, DynamicSizedData
 from .palette import PaletteResource
 
 from .snes import (
