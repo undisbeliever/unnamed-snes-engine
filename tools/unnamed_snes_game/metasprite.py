@@ -7,7 +7,7 @@ import os.path
 
 from typing import Callable, Final, Literal, NamedTuple, Optional, TextIO, TypeVar, Union
 
-from .common import RomData, EngineData, FixedSizedData, DynamicSizedData, MemoryMapMode, MultilineError
+from .common import EngineData, FixedSizedData, DynamicSizedData, MemoryMapMode, MultilineError
 from .snes import (
     split_large_tile,
     load_image_tile_extractor,
@@ -578,6 +578,81 @@ def dynamic_tiles_for_frame(frame: FrameData, settings: DynamicFsTileSettings, t
     dft.commit_pending_small_tiles()
 
     return dft
+
+
+#
+# RomData
+# =======
+#
+
+
+class RomData:
+    def __init__(self, addr: int, max_size: int) -> None:
+        self._out: bytearray = bytearray(max_size)
+
+        self._view: memoryview = memoryview(self._out)
+
+        self._pos: int = 0
+        self._addr: int = addr
+
+    def data(self) -> memoryview:
+        return self._view[0 : self._pos]
+
+    def allocate(self, size: int) -> tuple[memoryview, int]:
+        a = self._addr
+        v = self._view[self._pos : self._pos + size]
+
+        self._pos += size
+        self._addr += size
+
+        return v, a
+
+    def insert_data(self, data: bytes) -> int:
+        # ::TODO deduplicate data::
+        size = len(data)
+
+        a = self._addr
+        self._view[self._pos : self._pos + size] = data
+
+        self._pos += size
+        self._addr += size
+
+        return a
+
+    def insert_data_addr_table(self, data_list: list[bytes]) -> int:
+        table_size = len(data_list) * 2
+        table, table_addr = self.allocate(table_size)
+
+        i = 0
+        for d in data_list:
+            addr = self.insert_data(d) & 0xFFFF
+
+            table[i] = addr & 0xFF
+            table[i + 1] = addr >> 8
+
+            i += 2
+
+        assert i == table_size
+
+        return table_addr
+
+    # Dynamic Metasprite data stores tile addresses before the frame data but the frame table must point to the frame data.
+    def insert_ms_frame_addr_table(self, data_list: list[tuple[bytes, int]]) -> int:
+        table_size = len(data_list) * 2
+        table, table_addr = self.allocate(table_size)
+
+        i = 0
+        for data, offset in data_list:
+            addr = (self.insert_data(data) + offset) & 0xFFFF
+
+            table[i] = addr & 0xFF
+            table[i + 1] = addr >> 8
+
+            i += 2
+
+        assert i == table_size
+
+        return table_addr
 
 
 #
