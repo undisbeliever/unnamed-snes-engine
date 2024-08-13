@@ -6,7 +6,7 @@
     "width": 15,
     "height": 16,
     "tileset": "dungeon",
-    "second_layer": null,
+    "second_layer": "scrolling_test",
     "ms_spritesheet": "dungeon",
     "song": "DungeonTheme"
   }

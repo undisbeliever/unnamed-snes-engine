@@ -117,6 +117,7 @@ let SL_DATA_HEADER_SIZE = offsetof(_RamDataFormat, mt_top_left);
 
 // Storing variables in lowram so they can be accessed by setup (DB=0x80) and process (DB=0x7e).
 // NOTE: These variables MUST NOT be modified by the sl_callback
+// NOTE: Must NOT be in lowram_roomstate to prevent interference when rolling back a room transition.
 in lowram {
     // Range of memory addresses to clear in `init_and_draw__forceblank__inline()`
     let __LOWRAM_VARS_START = far &right as *u8;
@@ -124,21 +125,12 @@ in lowram {
 
 
     // The rightmost position
+    // (0 if part-of-room)
     var right : u16;
 
     // The leftmost position
+    // (0 if part-of-room)
     var bottom : u16;
-
-
-    // `sl_data.map` size (in bytes)
-    var mapSize : u16;
-
-    // Number of bytes per column in `sl_data.map`
-    var mapStride : u16;
-
-    // The `sl_data.map` offset between `mapPos` and the row to draw above the viewport.
-    // (equal to `mapStride * (VRAM_TILEMAP_MT_TILE_HEIGHT - 1)`)
-    var mapAboveViewportOffset : u16;  // ::DBEUG find better name::
 
 
     var xScrollShadow : u16 in bgB_scroll_x;
@@ -149,88 +141,101 @@ in lowram {
         var yScrollShadow_h : u8 in >:yScrollShadow;
 
 
-    // The x-component of the map position.
-    //
-    // NOTE: The mapPos is on the bottom-right (start + VRAM_TILEMAP_MT_TILE_WIDTH - 1 columns).
-    //
-    // MUST BE:
-    //   * less than `mapStride`
-    //
-    // (index into sl_data.map)
-    var mapPos_x : u16;
-
-    // The y-component of the map position.
-    //
-    // NOTE: The mapPos is on the bottom-right (start + VRAM_TILEMAP_MT_TILE_HEIGHT - 1 rows).
-    //
-    // MUST BE:
-    //   * a multiple of `mapStride`
-    //   * less than `mapSize`
-    //
-    // (index into sl_data.map)
-    var mapPos_y : u16;
-
-
     // VBlank flags to determine which buffer (if any) to transfer on the next VBlank.
     var bufferState : u8;
-        let BUFFER_STATE__VERTICAL_BIT = 7;
+        let BUFFER_STATE__VERTICAL_BIT = 0;
         let BUFFER_STATE__HORIZONTAL_BIT = 6;
+        let BUFFER_STATE__PART_OF_ROOM_BIT = 7;
 
-    // Bitflags to signal if the vertical_buffer or horizontal_buffer should be skipped.
-    //
-    // Vertical buffer updates can be skipped if the second-layer is 32 or 64 tiles wide.
-    // Horizontal buffer updates can be skipped if the second-layer is 32 tiles tall.
-    var skipFlags : u8;
-        let SKIP_FLAGS__VERTICAL_BIT = 7;
-        let SKIP_FLAGS__HORIZONTAL_BIT = 6;
 
-    namespace vertical_buffer {
-        var vramWordAddr : u16;
+    namespace image {
+        // `sl_data.map` size (in bytes)
+        var mapSize : u16;
 
-        // The masked previous position.
-        // This value is updated when a VRAM tile boundary is crossed.
+        // Number of bytes per column in `sl_data.map`
+        var mapStride : u16;
+
+        // The `sl_data.map` offset between `mapPos` and the row to draw above the viewport.
+        // (equal to `mapStride * (VRAM_TILEMAP_MT_TILE_HEIGHT - 1)`)
+        var mapAboveViewportOffset : u16;  // ::DBEUG find better name::
+
+        // The x-component of the map position.
         //
-        // This value MUST be masked by `POSITION_V_TILE_MASK` at all times.
+        // NOTE: The mapPos is on the bottom-right (start + VRAM_TILEMAP_MT_TILE_WIDTH - 1 columns).
         //
-        // Used:
-        //  * to determine scrolling direction.
-        //  * to determine if xPos/yPos has advanced past an 8px VRAM tile boundary.
-        //  * to limit xPos/yPos to a single VRAM tile update per frame.
-        //    (since I'm auto-wrapping xPos/yPos, I may as well limit it to the actual location)
-        //  * to determine when to advance the mapPos
-        var maskedPrevXPos : u16;
+        // MUST BE:
+        //   * less than `mapStride`
+        //
+        // (index into sl_data.map)
+        var mapPos_x : u16;
 
-        // The 8px VRAM tile position within the buffer.
-        // (named `cursor` to differentiate it from the mapPos).
-        // Used to calculate `buffer` index.
-        // Used to calculate `horizontal_buffer.vramWordAddr1` & `horizontal_buffer.vramWordAddr2`.
-        // Used to determine if the top or bottom half of the MetaTile is written to `horizontal_buffer.buffer`
-        // NOTE: not masked, `cursor` can be out of bounds.
-        var cursor : u16;
+        // The y-component of the map position.
+        //
+        // NOTE: The mapPos is on the bottom-right (start + VRAM_TILEMAP_MT_TILE_HEIGHT - 1 rows).
+        //
+        // MUST BE:
+        //   * a multiple of `mapStride`
+        //   * less than `mapSize`
+        //
+        // (index into sl_data.map)
+        var mapPos_y : u16;
 
-        // Offset between `sl_callbacks.xPos_px` and `xScrollShadow`.
-        // Used because `xScrollShadow` might be changed outside this subsystem.
-        var viewportXOffset : u16;
-    }
+        // Bitflags to signal if the vertical_buffer or horizontal_buffer should be skipped.
+        //
+        // Vertical buffer updates can be skipped if the second-layer is 32 or 64 tiles wide.
+        // Horizontal buffer updates can be skipped if the second-layer is 32 tiles tall.
+        var skipFlags : u8;
+            let SKIP_FLAGS__VERTICAL_BIT = 7;
+            let SKIP_FLAGS__HORIZONTAL_BIT = 6;
+
+        namespace vertical_buffer {
+            var vramWordAddr : u16;
+
+            // The masked previous position.
+            // This value is updated when a VRAM tile boundary is crossed.
+            //
+            // This value MUST be masked by `POSITION_V_TILE_MASK` at all times.
+            //
+            // Used:
+            //  * to determine scrolling direction.
+            //  * to determine if xPos/yPos has advanced past an 8px VRAM tile boundary.
+            //  * to limit xPos/yPos to a single VRAM tile update per frame.
+            //    (since I'm auto-wrapping xPos/yPos, I may as well limit it to the actual location)
+            //  * to determine when to advance the mapPos
+            var maskedPrevXPos : u16;
+
+            // The 8px VRAM tile position within the buffer.
+            // (named `cursor` to differentiate it from the mapPos).
+            // Used to calculate `buffer` index.
+            // Used to calculate `horizontal_buffer.vramWordAddr1` & `horizontal_buffer.vramWordAddr2`.
+            // Used to determine if the top or bottom half of the MetaTile is written to `horizontal_buffer.buffer`
+            // NOTE: not masked, `cursor` can be out of bounds.
+            var cursor : u16;
+
+            // Offset between `sl_callbacks.xPos_px` and `xScrollShadow`.
+            // Used because `xScrollShadow` might be changed outside this subsystem.
+            var viewportXOffset : u16;
+        }
 
 
-    namespace horizontal_buffer {
-        var vramWordAddr1 : u16;
-        var vramWordAddr2 : u16;
+        namespace horizontal_buffer {
+            var vramWordAddr1 : u16;
+            var vramWordAddr2 : u16;
 
-        // See `vertical_buffer.maskedPrevYPos`
-        var maskedPrevYPos : u16;
+            // See `vertical_buffer.maskedPrevYPos`
+            var maskedPrevYPos : u16;
 
-        // The 8px VRAM tile position within the buffer.
-        // (named `cursor` to differentiate it from the mapPos).
-        // Used to calculate `buffer` index.
-        // Used to calculate `vertical_buffer.vramWordAddr`.
-        // NOTE: not masked, `cursor` can be out of bounds.
-        var cursor : u16;
+            // The 8px VRAM tile position within the buffer.
+            // (named `cursor` to differentiate it from the mapPos).
+            // Used to calculate `buffer` index.
+            // Used to calculate `vertical_buffer.vramWordAddr`.
+            // NOTE: not masked, `cursor` can be out of bounds.
+            var cursor : u16;
 
-        // Offset between `sl_callbacks.yPos_px` and `yScrollShadow`.
-        // Used because `yScrollShadow` might be changed outside this subsystem.
-        var viewportYOffset : u16;
+            // Offset between `sl_callbacks.yPos_px` and `yScrollShadow`.
+            // Used because `yScrollShadow` might be changed outside this subsystem.
+            var viewportYOffset : u16;
+        }
     }
 
     var _lowramEndVariable : u8;
@@ -246,15 +251,16 @@ in wram7e {
     const sl_parameters @ &sl_data.callback_parameters[0] : typeof(sl_data.callback_parameters);
     const room_sl_parameters @ (far &__far_room) as u24 + offsetof(RoomData, sl_parameters) : typeof(room.sl_parameters);
 
-    namespace vertical_buffer {
-        var buffer : [u16 ; 32];
-        let BUFFER_INDEX_MT_MASK = 15 * 4;
-    }
-
-    namespace horizontal_buffer {
-        // NOTE: This buffer requires 2 transfers to load into VRAM.
-        var buffer : [u16 ; 64];
-        let BUFFER_INDEX_MT_MASK = 31 * 4;
+    namespace image {
+        namespace vertical_buffer {
+            var buffer : [u16 ; 32];
+            let BUFFER_INDEX_MT_MASK = 15 * 4;
+        }
+        namespace horizontal_buffer {
+            // NOTE: This buffer requires 2 transfers to load into VRAM.
+            var buffer : [u16 ; 64];
+            let BUFFER_INDEX_MT_MASK = 31 * 4;
+        }
     }
 }
 
@@ -297,6 +303,7 @@ func setup__forceblank(second_layer_id : u8 in a) : bool in carry {
             xx--;
         } while !negative;
     }
+
     mem8_idx8();
     #[mem8, idx8] {
         a = sl_data.callback_index;
@@ -311,10 +318,23 @@ func setup__forceblank(second_layer_id : u8 in a) : bool in carry {
     }
     idx16();
 
+    // zero lowram variables
+    xx = __LOWRAM_VARS_SIZE - 1;
+    do {
+        __LOWRAM_VARS_START[unaligned xx] = 0;
+        xx--;
+    } while !negative;
+
+    swapBg1AndBg2ScrollShadows = a = sl_data.flags & flags.ABOVE_METATILES;
+
+    a = sl_data.flags;
+
     data_bank = pop8();
 // DB = 0x80
 
-    __init_and_draw_fullscreen.init_and_draw__forceblank__inline();
+    ^if (a & flags.PART_OF_ROOM) == 0 {
+        image.__setup.init_and_draw__forceblank__inline();
+    }
 
     return true;
 }
@@ -363,13 +383,179 @@ var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
 }
 
 
-namespace __init_and_draw_fullscreen {
+
+
+// REQUIRES: VBlank or Force-Blank
+// Uses DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func transfer_buffers__vblank() {
+    // MUST NOT modify zpTmp variables
+
+    a = bufferState;
+    if !zero {
+        if !negative {
+            image.transfer_buffers__vblank(a);
+        }
+
+        bufferState = 0;
+    }
+}
+
+
+// Returns true if the second layer is part of the room.
+//
+// DB = 0x7e
+#[mem8]
+inline func is_part_of_room() : bool in negative {
+    // Assumes flags.PART_OF_ROOM_BIT == 7
+    bit(sl_data.flags);
+    return negative;
+}
+
+
+
+// Execute the second-layer callback function.
+//
+// NOTE: This function will not directly call `scroll_tilemap()`.
+//       The `scroll_tilemap()` call must be preformed in the callback function.
+//
+//       This will allow the callback function to access the scroll shadow variables
+//       (ie, for HDMA effects) after `scroll_tilemap()` has modified them.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func process__inline() {
+    x = sl_data.callback_index;
+    sl_callbacks.process_function_table[unaligned x]();
+}
+
+
+
+// Scroll the second-layer to `sl_callbacks.xPos_px`/`sl_callbacks.yPos_px`, updating the VRAM
+// tilemap as required.
+//
+// This function will update `sl_callbacks.xPos_px` and `sl_callbacks.yPos_px` to ensure it is
+// within the bounds of the second-layer.
+//   * If the position is negative, it will be wrapped to the bottom and/or right side of the
+//     second-layer map.
+//   * The second-layer can be scrolled a maximum of 8-pixels per frame.
+//     If this limit is exceeded, the position will be clipped.
+//
+// This function MUST only be called once per frame.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func scroll_tilemap() {
+    // Forbid `scroll_tilemap()` if either:
+    //  * PART_OF_ROOM flag is set
+    //  * the buffers are populated
+    a = bufferState;
+    if !zero || sl_data.flags $ flags.PART_OF_ROOM_BIT {
+        return;
+    }
+
+    image.scroll_tilemap__inline();
+}
+
+
+// REQUIRES: PART_OF_ROOM flag is clear
+namespace image {
+
+// DB = 0x7e
+#[mem8, idx8]
+inline func scroll_tilemap__inline() {
+    mem16_idx16();
+    #[mem16, idx16] {
+        // assumes SKIP_FLAGS__VERTICAL_BIT == 7
+        bit((&skipFlags as *u16)[unaligned -1]);
+        if negative {
+            aa = sl_callbacks.xPos_px;
+            ^goto _EndIf_Vertical;
+        }
+        // ^else
+        {
+            vertical_buffer.update__inline();
+
+            // Can use |, `viewportXOffset` is tile aligned
+            aa = (sl_callbacks.xPos_px & V_TILE_PX_MASK) | image.vertical_buffer.viewportXOffset;
+        }
+    _EndIf_Vertical:
+        xScrollShadow = aa;
+
+
+        // assumes SKIP_FLAGS__HORIZONTAL_BIT == 6
+        bit((&skipFlags as *u16)[unaligned -1]);
+        if overflow {
+            aa = sl_callbacks.yPos_px;
+            aa--;
+            ^goto _EndIf_Horizontal;
+        }
+        // ^else
+        {
+            horizontal_buffer.update__inline();
+
+            // Must use + here, `viewportYOffset` is not tile aligned
+            aa = (sl_callbacks.yPos_px & V_TILE_PX_MASK) + image.horizontal_buffer.viewportYOffset;
+        }
+    _EndIf_Horizontal:
+        yScrollShadow = aa;
+    }
+    mem8_idx8();
+}
+
+
+// REQUIRES: VBlank or Force-Blank
+// Uses DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func transfer_buffers__vblank(_bufferState : u8 in a) {
+    a >>>= 1;
+    if carry {
+        VMAIN = a = VMAIN_INCREMENT_HIGH | VMAIN_INCREMENT_32;
+        VMADD = xx = vertical_buffer.vramWordAddr;
+
+        dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_TWO, <:&VMDATA);
+
+        A1T0 = xx = &vertical_buffer.buffer as u16;
+        A1B0 = a = #:far &vertical_buffer.buffer;
+
+        DAS0 = xx = sizeof(typeof(vertical_buffer.buffer));
+
+        MDMAEN = a = MDMAEN_DMA0;
+    }
+
+    if bufferState $ BUFFER_STATE__HORIZONTAL_BIT {
+        VMAIN = a = VMAIN_INCREMENT_HIGH | VMAIN_INCREMENT_1;
+
+        // Transfer the first half of the buffer to the left nametable
+        VMADD = xx = horizontal_buffer.vramWordAddr1;
+
+        dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_TWO, <:&VMDATA);
+
+        A1T0 = xx = &horizontal_buffer.buffer as u16;
+        A1B0 = a = #:far &horizontal_buffer.buffer;
+
+        DAS0 = xx = sizeof(typeof(horizontal_buffer.buffer)) / 2;
+
+        MDMAEN = a = MDMAEN_DMA0;
+
+        // Transfer the second half of the buffer to the right nametable
+        VMADD = yy = horizontal_buffer.vramWordAddr2;
+
+        DAS0 = xx;
+        MDMAEN = a;
+    }
+}
+
+
+namespace __setup {
     in zeropage {
         // The tile position of the top-left `sl_data.map` cell to draw to VRAM
         var _tilePos_x : u8 in zpTmp_byte_0;
         var _tilePos_y : u8 in zpTmp_byte_1;
-
-        var _flags : u8 in zpTmp_byte_2;
 
         var _mapTileSize : u16 in zpTmp_word_0;
             var _mapWidth : u8 in <:_mapTileSize;
@@ -382,80 +568,6 @@ namespace __init_and_draw_fullscreen {
     }
 
 
-    // Initialise the state variables and draw the second layer to VRAM.
-    //
-    // REQUIRES: Force-Blank
-    // REQUIRES: Second layer loaded
-    //
-    // DB = 0x80
-    #[mem8, idx16]
-    inline func init_and_draw__forceblank__inline() {
-        // zero lowram variables
-        xx = __LOWRAM_VARS_SIZE - 1;
-        do {
-            __LOWRAM_VARS_START[unaligned xx] = 0;
-            xx--;
-        } while !negative;
-
-
-        VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
-        VMADD = xx = VRAM_SECOND_LAYER_MAP_WADDR;
-
-        var __sl_data_flags @ &__far_sl_data.flags : u8;
-        _flags = a = *(far &__sl_data_flags);
-
-        swapBg1AndBg2ScrollShadows = a = a & flags.ABOVE_METATILES;
-
-        push8(p);
-        mem16();
-        idx8();
-        #[mem16, idx8] {
-            // Copy map width AND height to zeropage
-            var __sl_data_mapTileSize @ &__far_sl_data.width : u16;
-            _mapTileSize = aa = *(far &__sl_data_mapTileSize);
-
-            WRMPYA_WRMPYB = aa; // Also writes height to WRMPYB
-            // Must wait 8 CPU cycles before reading RDMPY
-
-            aa &= 0xff;
-            mapStride = aa;
-            // assumes VRAM_TILEMAP_MT_TILE_HEIGHT == 16
-            mapAboveViewportOffset = aa = (aa <<< 4) - mapStride;
-
-            mapSize = aa = RDMPY;
-
-            x = _mapWidth;
-            right = aa = xx <<< 4;
-
-            y = _mapHeight;
-            bottom = aa = yy <<< 4;
-
-            // Assumes flags.PART_OF_ROOM_BIT == 7
-            x = _flags;
-            ^if !negative {
-                __init_state__normal__inline();
-            }
-            else {
-                __init_state__part_of_room__inline();
-            }
-        }
-        p = pop8();
-
-
-        WRMPYA = a = _mapWidth;
-        WRMPYB = a = _tilePos_y;
-        // Must wait 8 CPU cycles before reading RDMPY
-
-        if !(_flags $ flags.PART_OF_ROOM_BIT) {
-            __draw_tilemaps__normal__forceblank__inline();
-        }
-        else {
-            __draw_tilemaps__part_of_room__forceblank__inline();
-        }
-    }
-
-
-    // REQUIRES: partOfRoom is False
     // OUT: The tile x/y position for __draw_nametable__forceblank();
     //
     // DB access lowram
@@ -491,99 +603,103 @@ namespace __init_and_draw_fullscreen {
     }
 
 
-    // DB = 0x80
-    #[mem16, idx8]
-    inline func __init_state__normal__inline() {
-        // Note: horizontal_buffer and vertical_buffer state variables have been reset to 0
-
-        x = __clamp_pos(&sl_callbacks.xPos_px, &right, &vertical_buffer.maskedPrevXPos, VIEWPORT_X_OFFSET_PX);
-        y = _mapWidth;
-        if y == VRAM_TILEMAP_MT_TILE_WIDTH || y == NAMETABLE_MT_TILE_WIDTH {
-            // _mapWidth matches VRAM tilemap width.
-            // Disable the vertical buffer.
-            skipFlags = y = 1 << SKIP_FLAGS__VERTICAL_BIT;
-
-            x = y = 0;
-            aa = sl_callbacks.xPos_px;
-        } else {
-            y = VIEWPORT_X_OFFSET_PX;
-
-            aa = sl_callbacks.xPos_px;
-            if aa & V_TILE_PX != 0 {
-                y = VIEWPORT_X_OFFSET_PX + V_TILE_PX;
-                horizontal_buffer.cursor++;
-            }
-            aa = (aa & MT_TILE_PX_MASK) | VIEWPORT_X_OFFSET_PX;
-        }
-        _tilePos_x = x;
-        xScrollShadow = aa;
-        vertical_buffer.viewportXOffset = aa = yy;
-
-        x = __clamp_pos(&sl_callbacks.yPos_px, &bottom, &horizontal_buffer.maskedPrevYPos, VIEWPORT_Y_OFFSET_PX);
-        y = _mapHeight;
-        if y == VRAM_TILEMAP_MT_TILE_HEIGHT {
-            // _mapHeight matches VRAM tilemap height.
-            // Disable the horizontal buffer.
-            test_and_set(*(&skipFlags as *u16), aa = 1 << SKIP_FLAGS__HORIZONTAL_BIT);
-
-            x = y = 0;
-            aa = sl_callbacks.yPos_px;
-            aa--;
-        }
-        else {
-            y = VIEWPORT_Y_OFFSET_PX - 1;
-
-            aa = sl_callbacks.yPos_px;
-            if aa & V_TILE_PX != 0 {
-                y = VIEWPORT_Y_OFFSET_PX + V_TILE_PX - 1;
-                vertical_buffer.cursor++;
-            }
-            aa = (aa & MT_TILE_PX_MASK) | VIEWPORT_Y_OFFSET_PX;
-            aa--;
-        }
-        _tilePos_y = x;
-        yScrollShadow = aa;
-        horizontal_buffer.viewportYOffset = aa = yy;
-    }
-
-
-    // DB = 0x80
-    #[mem16, idx8]
-    inline func __init_state__part_of_room__inline() {
-        aa = *(far &room_sl_parameters as far *u16);
-        x = a;
-        swap_bytes(aa);
-        y = a;
-
-        if x >= _mapWidth {
-            x = 0;
-        }
-        _tilePos_x = x;
-
-        if y >= _mapHeight {
-            y = 0;
-        }
-        _tilePos_y = y;
-
-        // Note: horizontal_buffer and vertical_buffer state variables have been reset to 0
-
-        xScrollShadow = 0;
-
-        aa = -1 as u16;
-        yScrollShadow = aa;
-        horizontal_buffer.viewportYOffset = aa;
-    }
-
-
-    // REQUIRES: Force-Blank
+    // Initialise the state variables and draw the second layer to VRAM.
     //
-    // IN: VMADD = vram address to write to
-    // IN: WRMPYA = _mapWidth
-    // IN: RDMPY = tileY * tileWidth
+    // REQUIRES: Force-Blank
+    // REQUIRES: Second layer loaded
     //
     // DB = 0x80
     #[mem8, idx16]
-    inline func __draw_tilemaps__normal__forceblank__inline() {
+    inline func init_and_draw__forceblank__inline() {
+        VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+        VMADD = xx = VRAM_SECOND_LAYER_MAP_WADDR;
+
+        push8(p);
+        mem16();
+        idx8();
+        #[mem16, idx8] {
+            // Copy map width AND height to zeropage
+            var __sl_data_mapTileSize @ &__far_sl_data.width : u16;
+            _mapTileSize = aa = *(far &__sl_data_mapTileSize);
+
+            WRMPYA_WRMPYB = aa; // Also writes height to WRMPYB
+            // Must wait 8 CPU cycles before reading RDMPY
+
+            aa &= 0xff;
+            mapStride = aa;
+            // assumes VRAM_TILEMAP_MT_TILE_HEIGHT == 16
+            mapAboveViewportOffset = aa = (aa <<< 4) - mapStride;
+
+            mapSize = aa = RDMPY;
+
+            x = _mapWidth;
+            right = aa = xx <<< 4;
+
+            y = _mapHeight;
+            bottom = aa = yy <<< 4;
+
+            // Note: horizontal_buffer and vertical_buffer state variables have been reset to 0
+
+            x = __clamp_pos(&sl_callbacks.xPos_px, &right, &vertical_buffer.maskedPrevXPos, VIEWPORT_X_OFFSET_PX);
+            y = _mapWidth;
+            if y == VRAM_TILEMAP_MT_TILE_WIDTH || y == NAMETABLE_MT_TILE_WIDTH {
+                // _mapWidth matches VRAM tilemap width.
+                // Disable the vertical buffer.
+                skipFlags = y = 1 << SKIP_FLAGS__VERTICAL_BIT;
+
+                x = y = 0;
+                aa = sl_callbacks.xPos_px;
+            } else {
+                y = VIEWPORT_X_OFFSET_PX;
+
+                aa = sl_callbacks.xPos_px;
+                if aa & V_TILE_PX != 0 {
+                    y = VIEWPORT_X_OFFSET_PX + V_TILE_PX;
+                    horizontal_buffer.cursor++;
+                }
+                aa = (aa & MT_TILE_PX_MASK) | VIEWPORT_X_OFFSET_PX;
+            }
+            _tilePos_x = x;
+            xScrollShadow = aa;
+            vertical_buffer.viewportXOffset = aa = yy;
+
+            x = __clamp_pos(&sl_callbacks.yPos_px, &bottom, &horizontal_buffer.maskedPrevYPos, VIEWPORT_Y_OFFSET_PX);
+            y = _mapHeight;
+            if y == VRAM_TILEMAP_MT_TILE_HEIGHT {
+                // _mapHeight matches VRAM tilemap height.
+                // Disable the horizontal buffer.
+                test_and_set(*(&skipFlags as *u16), aa = 1 << SKIP_FLAGS__HORIZONTAL_BIT);
+
+                x = y = 0;
+                aa = sl_callbacks.yPos_px;
+                aa--;
+            }
+            else {
+                y = VIEWPORT_Y_OFFSET_PX - 1;
+
+                aa = sl_callbacks.yPos_px;
+                if aa & V_TILE_PX != 0 {
+                    y = VIEWPORT_Y_OFFSET_PX + V_TILE_PX - 1;
+                    vertical_buffer.cursor++;
+                }
+                aa = (aa & MT_TILE_PX_MASK) | VIEWPORT_Y_OFFSET_PX;
+                aa--;
+            }
+            _tilePos_y = x;
+            yScrollShadow = aa;
+            horizontal_buffer.viewportYOffset = aa = yy;
+        }
+        p = pop8();
+
+
+        // Draw second-layer to map
+        WRMPYA = a = _mapWidth;
+        WRMPYB = a = _tilePos_y;
+        // Must wait 8 CPU cycles before reading RDMPY
+
+        // IN: VMADD = vram address to write to
+        // IN: WRMPYA = _mapWidth
+        // IN: RDMPY = tileY * tileWidth
         a = _tilePos_x;
         __draw_nametable__forceblank(a);
 
@@ -613,21 +729,6 @@ namespace __init_and_draw_fullscreen {
             mapPos_y = aa = RDMPY;
         }
         mem8();
-    }
-
-
-    // REQUIRES: Force-Blank
-    //
-    // IN: VMADD = vram address to write to
-    // IN: WRMPYA = _mapWidth
-    // IN: RDMPY = tileY * tileWidth
-    //
-    // DB = 0x80
-    #[mem8, idx16]
-    inline func __draw_tilemaps__part_of_room__forceblank__inline() {
-        __draw_nametable__forceblank(_tilePos_x);
-
-        // No need to set `mapPos`, mapPos has been reset to 0
     }
 
 
@@ -719,157 +820,22 @@ namespace __init_and_draw_fullscreen {
 }
 
 
-// REQUIRES: VBlank or Force-Blank
-// Uses DMA channel 0
-//
-// DB = 0x80
-#[mem8, idx16]
-inline func transfer_buffers__vblank() {
-    // MUST NOT modify zpTmp variables
-
-    a = bufferState;
-    if !zero {
-        if negative {
-            VMAIN = a = VMAIN_INCREMENT_HIGH | VMAIN_INCREMENT_32;
-            VMADD = xx = vertical_buffer.vramWordAddr;
-
-            dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_TWO, <:&VMDATA);
-
-            A1T0 = xx = &vertical_buffer.buffer as u16;
-            A1B0 = a = #:far &vertical_buffer.buffer;
-
-            DAS0 = xx = sizeof(typeof(vertical_buffer.buffer));
-
-            MDMAEN = a = MDMAEN_DMA0;
-        }
-
-        if bufferState $ BUFFER_STATE__HORIZONTAL_BIT {
-            VMAIN = a = VMAIN_INCREMENT_HIGH | VMAIN_INCREMENT_1;
-
-            // Transfer the first half of the buffer to the left nametable
-            VMADD = xx = horizontal_buffer.vramWordAddr1;
-
-            dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_TWO, <:&VMDATA);
-
-            A1T0 = xx = &horizontal_buffer.buffer as u16;
-            A1B0 = a = #:far &horizontal_buffer.buffer;
-
-            DAS0 = xx = sizeof(typeof(horizontal_buffer.buffer)) / 2;
-
-            MDMAEN = a = MDMAEN_DMA0;
-
-            // Transfer the second half of the buffer to the right nametable
-            VMADD = yy = horizontal_buffer.vramWordAddr2;
-
-            DAS0 = xx;
-            MDMAEN = a;
-        }
-
-        bufferState = 0;
-    }
-}
-
-
-// Returns true if the second layer is part of the room.
-//
-// DB = 0x7e
-#[mem8]
-inline func is_part_of_room() : bool in negative {
-    // Assumes flags.PART_OF_ROOM_BIT == 7
-    bit(sl_data.flags);
-    return negative;
-}
-
-
-
-// Execute the second-layer callback function.
-//
-// NOTE: This function will not directly call `scroll_tilemap()`.
-//       The `scroll_tilemap()` call must be preformed in the callback function.
-//
-//       This will allow the callback function to access the scroll shadow variables
-//       (ie, for HDMA effects) after `scroll_tilemap()` has modified them.
-//
-// DB = 0x7e
-#[mem8, idx8]
-inline func process__inline() {
-    x = sl_data.callback_index;
-    sl_callbacks.process_function_table[unaligned x]();
-}
-
-
-
-// Scroll the second-layer to `sl_callbacks.xPos_px`/`sl_callbacks.yPos_px`, updating the VRAM
-// tilemap as required.
-//
-// This function will update `sl_callbacks.xPos_px` and `sl_callbacks.yPos_px` to ensure it is
-// within the bounds of the second-layer.
-//   * If the position is negative, it will be wrapped to the bottom and/or right side of the
-//     second-layer map.
-//   * The second-layer can be scrolled a maximum of 8-pixels per frame.
-//     If this limit is exceeded, the position will be clipped.
-//
-// This function MUST only be called once per frame.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func scroll_tilemap() {
-    // Forbid `scroll_tilemap()` if either:
-    //  * partOfRoom is set
-    //  * the buffers are populated
-    a = bufferState;
-    if !zero || sl_data.flags $ flags.PART_OF_ROOM_BIT {
-        return;
-    }
-
-    mem16_idx16();
-    #[mem16, idx16] {
-        // assumes SKIP_FLAGS__VERTICAL_BIT == 7
-        bit((&skipFlags as *u16)[unaligned -1]);
-        if negative {
-            aa = sl_callbacks.xPos_px;
-            ^goto _EndIf_Vertical;
-        }
-        // ^else
-        {
-            vertical_buffer.update__inline();
-
-            // Can use |, `viewportXOffset` is tile aligned
-            aa = (sl_callbacks.xPos_px & V_TILE_PX_MASK) | vertical_buffer.viewportXOffset;
-        }
-    _EndIf_Vertical:
-        xScrollShadow = aa;
-
-
-        // assumes SKIP_FLAGS__HORIZONTAL_BIT == 6
-        bit((&skipFlags as *u16)[unaligned -1]);
-        if overflow {
-            aa = sl_callbacks.yPos_px;
-            aa--;
-            ^goto _EndIf_Horizontal;
-        }
-        // ^else
-        {
-            horizontal_buffer.update__inline();
-
-            // Must use + here, `viewportYOffset` is not tile aligned
-            aa = (sl_callbacks.yPos_px & V_TILE_PX_MASK) + horizontal_buffer.viewportYOffset;
-        }
-    _EndIf_Horizontal:
-        yScrollShadow = aa;
-    }
-    mem8_idx8();
-}
-
-
 
 namespace vertical_buffer {
 
     // Process any changes to `sl_callbacks.xPos_px` and populate the `vertical_buffer` as required.
     //
+    // REQUIRES: PART_OF_ROOM flag clear
+    //
     // DB = 0x7e
     #[mem16, idx16]
     inline func update__inline() {
+        var _bufferEndIndex : u16 in zpTmp_word_0;
+        var _rowStartIndex  : u16 in zpTmp_word_1;
+        var _mapIndex       : u16 in zpTmp_word_2;
+
+    UpdateVerticalBuffer:
+
         aa = sl_callbacks.xPos_px - maskedPrevXPos;
         if negative {
             // Forbid xPos moving more than 1 8px tile
@@ -909,8 +875,6 @@ namespace vertical_buffer {
             xx = aa;
 
             aa = horizontal_buffer.pre_decrement_cursor__inline__keep_xx();
-
-            populate_buffer(xx, aa);
         }
         else if aa >= V_TILE_PX {
             // Forbid xPos moving more than 1 8px tile
@@ -938,21 +902,15 @@ namespace vertical_buffer {
 
             aa = horizontal_buffer.post_increment_cursor__inline__keep_xx();
             aa--;   // Fixes an off-by-one glitch when changing velocity in the middle of a MetaTile
-
-            populate_buffer(xx, aa);
         }
-    }
+        else {
+            ^return;
+        }
 
 
     // IN: xx = x-component of `sl_data.map` index
     // IN: aa = horizontal cursor byte index
-    //
-    // DB = 0x7e
-    #[mem16, idx16]
-    func populate_buffer(sl_map_xComponent : u16 in xx, horizontalCursor : u16 in aa) {
-        var _bufferEndIndex : u16 in zpTmp_word_0;
-        var _rowStartIndex  : u16 in zpTmp_word_1;
-        var _mapIndex       : u16 in zpTmp_word_2;
+    PopulateVirticalBuffer:
 
         aa &= (VRAM_TILEMAP_V_TILE_WIDTH - 1);
         if aa & 32 != 0 {
@@ -990,8 +948,6 @@ namespace vertical_buffer {
                 }
                 xx = aa;
             } while yy != _bufferEndIndex;
-
-            return;
         }
         else {
             do {
@@ -1013,8 +969,6 @@ namespace vertical_buffer {
                 }
                 xx = aa;
             } while yy != _bufferEndIndex;
-
-            return;
         }
     }
 
@@ -1047,9 +1001,17 @@ namespace vertical_buffer {
 namespace horizontal_buffer {
     // Process any changes to `sl_callbacks.yPos_px` and populate the `horizontal_buffer` as required.
     //
+    // REQUIRES: PART_OF_ROOM flag clear
+    //
     // DB = 0x7e
     #[mem16, idx16]
     inline func update__inline() {
+        var _mapRowPtr      : *u16 in zpTmp_word_0; // Using *u16 to simplify loading with 16 bit A.
+        var _bufferEndIndex : u8 in zpTmp_byte_0;
+        var _rowIndex       : u8 in zpTmp_byte_1;
+
+    UpdateHorizontalBuffer:
+
         aa = sl_callbacks.yPos_px - maskedPrevYPos;
         if negative {
             // Forbid xPos moving more than 1 8px tile
@@ -1087,8 +1049,6 @@ namespace horizontal_buffer {
             xx = aa;
 
             aa = vertical_buffer.pre_decrement_cursor__inline__keep_xx();
-
-            populate_buffer(xx, aa);
         }
         else if aa >= V_TILE_PX {
             // Forbid yPos moving more than 1 8px tile
@@ -1119,21 +1079,15 @@ namespace horizontal_buffer {
 
             aa = vertical_buffer.post_increment_cursor__inline__keep_xx();
             aa--;   // Fixes an off-by-one glitch when changing velocity in the middle of a MetaTile
-
-            populate_buffer(xx, aa);
         }
-    }
+        else {
+            ^return;
+        }
 
 
     // IN: xx = y-component of `sl_data.map` index
     // IN: aa = vertical cursor byte index
-    //
-    // DB = 0x7e
-    #[mem16, idx16]
-    func populate_buffer(sl_map_yComponent: u16 in xx, verticalCursor : u16 in aa) {
-        var _mapRowPtr      : *u16 in zpTmp_word_0; // Using *u16 to simplify loading with 16 bit A.
-        var _bufferEndIndex : u8 in zpTmp_byte_0;
-        var _rowIndex       : u8 in zpTmp_byte_1;
+    PopulateHorizontalBuffer:
 
         // Assumes VRAM_BG2_MAP_WADDR is a multiple of 0x800.
         aa &= (VRAM_TILEMAP_V_TILE_HEIGHT - 1);
@@ -1187,9 +1141,6 @@ namespace horizontal_buffer {
                     }
                     y--;
                 } while x != _bufferEndIndex;
-
-                mem16_idx16();
-                return;
             }
             else {
                 do {
@@ -1223,11 +1174,9 @@ namespace horizontal_buffer {
                     }
                     y--;
                 } while x != _bufferEndIndex;
-
-                mem16_idx16();
-                return;
             }
         }
+        mem16_idx16();
     }
 
 
@@ -1253,8 +1202,10 @@ namespace horizontal_buffer {
         return aa;
     }
 }
+}
 
 
+// REQUIRES: PART_OF_ROOM flag set
 namespace part_of_room {
     // ASSUMES: metatiles.transitions.TRANSITION_SPEED == TILE_PX
     let TRANSITION_SPEED = TILE_PX;
@@ -1262,205 +1213,42 @@ namespace part_of_room {
 
     // Calculates the new mapPos for the room and scrollDirection.
     //
-    // MUST ONLY be called if `sl_data.partOfRoom` is set.
+    // MUST ONLY be called if PART_OF_ROOM flag is set
     //
     // ASSUMES: Room is loaded into memory.
     //
     // DB = 0x7e
     #[mem8, idx8]
     func start_room_transition(scrollDirection : room_transitions.ScrollDirection in x) {
-        // second layer x tile position
-        a = room_sl_parameters[0];
-        if a >= sl_data.width {
-            a = 0;
-        }
-
-        // Fixes an off-by-one error
-        // (done here to avoid signed numbers in `ScrollDirectionTileSeamOffsets_y`)
-        if a == 0 {
-            a = sl_data.width;
-        }
-        a--;
-
-        a += ScrollDirectionTileSeamOffsets_x[x];
-        if carry || a >= sl_data.width {
-            a -= sl_data.width;
-            // wrap a second time as max(ScrollDirectionTileSeamOffsets_x) is 64 and min(sl_data.width) is 32
-            if a >= sl_data.width {
-                a -= sl_data.width;
-            }
-        }
-        y = a;
-
-
-        // second layer y tile position
-        a = room_sl_parameters[1];
-        if a >= sl_data.height {
-            a = 0;
-        }
-
-        // Fixes an off-by-one error
-        // (done here to avoid signed numbers in `ScrollDirectionTileSeamOffsets_y`)
-        if a == 0 {
-            a = sl_data.height;
-        }
-        a--;
-
-        a += ScrollDirectionTileSeamOffsets_y[x];
-        if carry || a >= sl_data.height {
-            a -= sl_data.height;
-        }
-        // y = xTilePos
-        // a = yTilePos
-
-
-        *(far &WRMPYA) = a;
-        *(far &WRMPYB) = a = sl_data.width;
-        // Must wait 8 CPU cycles before reading RDMPY
-
-        mem16();
-        #[mem16, idx8] {
-            // high byte of yy clear
-            mapPos_x = aa = yy;
-            mapPos_y = aa = *(far &RDMPY);
-        }
-        mem8_idx8();
-    }
-
-    in rodata0 {
-        let _N_SCROLL_DIRECTIONS = 8;
-
-        let _HB_WIDTH  = sizeof(typeof(horizontal_buffer.buffer)) / 4;
-        let _VB_HEIGHT = sizeof(typeof(vertical_buffer.buffer)) / 4;
-
-        let _DISPLAY_TW = DISPLAY_MT_TILE_WIDTH;
-        let _DISPLAY_TH = DISPLAY_MT_TILE_HEIGHT;
-
-        // Tiles before rollback
-        let _TBR = room_transitions.N_TRANSITION_FRAMES_BEFORE_SOLID_CHECK / 2;
-
-        // Offset between the map tile position and the VRAM tilemap seam.
-        //
-        // NOTE: mapPos is at the bottom.
-        //
-        // Order MUST match `room_transitions.ScrollDirection`
-        const _ScrollDirectionTileSeamOffsets : [u8 ; _N_SCROLL_DIRECTIONS * 2] = [
-            _HB_WIDTH,                          _DISPLAY_TH + 1,    // UP
-            _HB_WIDTH,                          0,                  // DOWN
-            _HB_WIDTH - _DISPLAY_TW + 1,        _VB_HEIGHT,         // LEFT
-            0,                                  _VB_HEIGHT,         // RIGHT
-
-            _HB_WIDTH,                          _TBR + 1,           // ROLLBACK_UP
-            _HB_WIDTH,                          _DISPLAY_TH - _TBR, // ROLLBACK_DOWN
-            _HB_WIDTH - _DISPLAY_TW - _TBR + 1, _VB_HEIGHT,         // ROLLBACK_LEFT
-            _TBR,                               _VB_HEIGHT,         // ROLLBACK_RIGHT
-        ];
-
-        let ScrollDirectionTileSeamOffsets_x = ((far &_ScrollDirectionTileSeamOffsets as u24 + 0) as far *u8);
-        let ScrollDirectionTileSeamOffsets_y = ((far &_ScrollDirectionTileSeamOffsets as u24 + 1) as far *u8);
-    }
-
-
-    // DB = 0x7e
-    #[mem16, idx16]
-    func _update_scroll_shadows() {
-        xScrollShadow = aa = vertical_buffer.viewportXOffset;
-        yScrollShadow = aa = horizontal_buffer.viewportYOffset;
+        // ::TODO implement::
     }
 
 
     // DB = 0x7e
     #[mem16, idx16]
     func scroll_up__process__mem16_idx16() {
-        xx = mapPos_y;
-
-        horizontal_buffer.viewportYOffset = aa = horizontal_buffer.viewportYOffset - V_TILE_PX;
-        if aa & V_TILE_PX == 0 {
-            aa = xx - mapStride;
-            if !carry {
-                aa = mapSize - mapStride;
-            }
-            mapPos_y = aa;
-            xx = aa;
-        }
-
-        aa = vertical_buffer.pre_decrement_cursor__inline__keep_xx();
-
-        horizontal_buffer.populate_buffer(xx, aa);
-
-        return _update_scroll_shadows();
+        // ::TODO implement::
     }
 
 
     // DB = 0x7e
     #[mem16, idx16]
     func scroll_down__process__mem16_idx16() {
-        xx = mapPos_y;
-
-        horizontal_buffer.viewportYOffset = aa = horizontal_buffer.viewportYOffset + V_TILE_PX;
-        if aa & V_TILE_PX == 0 {
-            aa = xx + mapStride;
-            if aa >= mapSize {
-                aa = 0;
-            }
-            mapPos_y = aa;
-            xx = aa;
-        }
-
-        aa = vertical_buffer.post_increment_cursor__inline__keep_xx();
-        aa += DISPLAY_V_TILE_HEIGHT;
-
-        horizontal_buffer.populate_buffer(xx, aa);
-
-        return _update_scroll_shadows();
+        // ::TODO implement::
     }
 
 
     // DB = 0x7e
     #[mem16, idx16]
     func scroll_left__process__mem16_idx16() {
-        xx = mapPos_x;
-
-        vertical_buffer.viewportXOffset = aa = vertical_buffer.viewportXOffset - V_TILE_PX;
-        if aa & V_TILE_PX != 0 {
-            xx--;
-            if negative {
-                xx = mapStride;
-                xx--;
-            }
-            mapPos_x = xx;
-        }
-
-        aa = horizontal_buffer.pre_decrement_cursor__inline__keep_xx();
-
-        vertical_buffer.populate_buffer(xx, aa);
-
-        ^return _update_scroll_shadows();
+        // ::TODO implement::
     }
 
 
     // DB = 0x7e
     #[mem16, idx16]
     func scroll_right__process__mem16_idx16() {
-        xx = mapPos_x;
-
-        vertical_buffer.viewportXOffset = aa = vertical_buffer.viewportXOffset + V_TILE_PX;
-        if aa & V_TILE_PX != 0 {
-            xx++;
-            if xx >= mapStride {
-                xx = 0;
-            }
-            mapPos_x = xx;
-        }
-
-        aa = horizontal_buffer.post_increment_cursor__inline__keep_xx();
-
-        // Advance aa to the other nametable.
-        aa = aa ^ NAMETABLE_V_TILE_WIDTH;
-
-        vertical_buffer.populate_buffer(xx, aa);
-
-        ^return _update_scroll_shadows();
+        // ::TODO implement::
     }
 
 

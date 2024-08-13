@@ -73,11 +73,17 @@
     "scrolling_test": {
       "source": "second-layers/scrolling-test.png",
       "palette": "dungeon",
-      "mt_tileset": "dungeon",
+      "mt_tileset": null,
       "above_metatiles": true,
       "tile_priority": 1,
-      "part_of_room": true,
-      "default_room_pos": "0x28 0x19"
+      "part_of_room": false,
+      "callback": "fixed_velocity",
+      "parameters": {
+        "xPos": 0,
+        "yPos": 0,
+        "xVelocity": -1.25,
+        "yVelocity": -1.5
+      }
     }
   }
 }
