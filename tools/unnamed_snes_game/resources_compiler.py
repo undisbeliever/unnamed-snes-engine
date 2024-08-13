@@ -6,10 +6,9 @@
 import re
 import os
 import os.path
-import multiprocessing
 from abc import abstractmethod, ABCMeta
 from enum import unique, auto, Enum
-from typing import cast, final, Any, Callable, Final, Iterable, Optional, Sequence, Set, Union
+from typing import cast, final, Any, Callable, Final, Optional, Sequence, Set, Union
 
 from .enums import ResourceType
 from .entity_data import create_entity_rom_data
@@ -680,7 +679,6 @@ class ProjectCompiler:
         self,
         data_store: DataStore,
         sym_filename: Filename,
-        n_processes: Optional[int],
         err_handler: Callable[[Union[ResourceError, Exception, str]], None],
         message_handler: Callable[[str], None],
     ) -> None:
@@ -688,7 +686,6 @@ class ProjectCompiler:
 
         self.__sym_filename: Final = sym_filename
         self.__shared_input: Final = SharedInput(sym_filename)
-        self.__n_processes: Final = n_processes
 
         self.log_message: Final = message_handler
         self.log_error: Final = err_handler
@@ -911,6 +908,15 @@ class ProjectCompiler:
 
         self.data_store.set_msfs_and_entity_data(data)
 
+    def __compile_list(self, rt: ResourceType) -> list[BaseResourceData]:
+        c = self.__resource_compilers[rt]
+        rt_data = [c.compile_resource(i) for i in range(len(c.name_list))]
+        for co in rt_data:
+            self.data_store.insert_data(co)
+            if isinstance(co, ResourceError):
+                self.log_error(co)
+        return rt_data
+
     def __compile_resource_lists(self, to_recompile: Set[Optional[ResourceType]]) -> None:
         # Uses multiprocessing to speed up the compilation
 
@@ -931,52 +937,34 @@ class ProjectCompiler:
                 else:
                     self.log_message("Compiling all rooms")
 
-        with multiprocessing.Pool(processes=self.__n_processes) as mp:
-            co_lists: list[Iterable[BaseResourceData]] = list()
+        if ResourceType.palettes in to_recompile:
+            to_recompile.remove(ResourceType.palettes)
+            pal_l = self.__compile_list(ResourceType.palettes)
 
-            if ResourceType.palettes in to_recompile:
-                to_recompile.remove(ResourceType.palettes)
+            self.__palettes.clear()
+            self.__palettes.update((co.resource_name, co.palette) for co in pal_l if isinstance(co, PaletteResourceData))
 
-                c = self.__resource_compilers[ResourceType.palettes]
-                pal_l = list(mp.imap_unordered(c.compile_resource, range(len(c.name_list))))
+        if ResourceType.mt_tilesets in to_recompile:
+            to_recompile.remove(ResourceType.mt_tilesets)
+            mt_l = self.__compile_list(ResourceType.mt_tilesets)
 
-                co_lists.append(pal_l)
+            self.__mt_tileset_tiles.clear()
+            self.__mt_tileset_tiles.update((co.resource_name, co.tile_map) for co in mt_l if isinstance(co, MtTilesetResourceData))
 
-                self.__palettes.clear()
-                self.__palettes.update((co.resource_name, co.palette) for co in pal_l if isinstance(co, PaletteResourceData))
+        for rt in to_recompile:
+            if rt is not None:
+                self.__compile_list(rt)
 
-            if ResourceType.mt_tilesets in to_recompile:
-                to_recompile.remove(ResourceType.mt_tilesets)
+        if None in to_recompile:
+            assert self.__shared_input.dungeons
 
-                c = self.__resource_compilers[ResourceType.mt_tilesets]
-                mt_l = list(mp.imap_unordered(c.compile_resource, range(len(c.name_list))))
+            self.__room_compiler.build_room_dependencies(self.data_store)
 
-                co_lists.append(mt_l)
-
-                self.__mt_tileset_tiles.clear()
-                self.__mt_tileset_tiles.update((co.resource_name, co.tile_map) for co in mt_l if isinstance(co, MtTilesetResourceData))
-
-            for rt in to_recompile:
-                if rt is not None:
-                    c = self.__resource_compilers[rt]
-                    co_lists.append(mp.imap_unordered(c.compile_resource, range(len(c.name_list))))
-
-            for co_l in co_lists:
-                for co in co_l:
-                    self.data_store.insert_data(co)
-                    if isinstance(co, ResourceError):
-                        self.log_error(co)
-
-            if None in to_recompile:
-                assert self.__shared_input.dungeons
-
-                self.__room_compiler.build_room_dependencies(self.data_store)
-
-                room_filenames = find_all_tmx_files(self.__shared_input.dungeons)
-                for co in mp.imap_unordered(self.__room_compiler.compile_room, room_filenames):
-                    self.data_store.insert_data(co)
-                    if isinstance(co, ResourceError):
-                        self.log_error(co)
+            for fn in find_all_tmx_files(self.__shared_input.dungeons):
+                co = self.__room_compiler.compile_room(fn)
+                self.data_store.insert_data(co)
+                if isinstance(co, ResourceError):
+                    self.log_error(co)
 
         if ResourceType.ms_spritesheets in to_recompile:
             self.__compile_dynamic_metasprites()

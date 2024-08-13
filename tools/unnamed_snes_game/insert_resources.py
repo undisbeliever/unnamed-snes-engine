@@ -314,7 +314,7 @@ def null_print_function(message: str) -> None:
     pass
 
 
-def compile_data(resources_directory: Filename, symbols_file: Filename, n_processes: Optional[int]) -> Optional[DataStore]:
+def compile_data(resources_directory: Filename, symbols_file: Filename) -> Optional[DataStore]:
     valid = True
 
     def print_resource_error(e: Union[ResourceError, Exception, str]) -> None:
@@ -331,7 +331,7 @@ def compile_data(resources_directory: Filename, symbols_file: Filename, n_proces
     os.chdir(resources_directory)
 
     data_store: Final = DataStore()
-    compiler: Final = ProjectCompiler(data_store, symbols_file_relpath, n_processes, print_resource_error, null_print_function)
+    compiler: Final = ProjectCompiler(data_store, symbols_file_relpath, print_resource_error, null_print_function)
 
     compiler.compile_everything()
 

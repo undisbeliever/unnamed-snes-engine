@@ -398,14 +398,12 @@ class BgThread(threading.Thread):
 
 # ASSUMES: current working directory is the resources directory
 class FsEventHandler(watchdog.events.FileSystemEventHandler):
-    def __init__(self, signals: FsWatcherSignals, data_store: DataStore, sym_filename: Filename, n_processes: Optional[int]):
+    def __init__(self, signals: FsWatcherSignals, data_store: DataStore, sym_filename: Filename):
         super().__init__()
 
         self.signals: Final = signals
         self.data_store: Final = data_store
-        self._project_compiler: Final = ProjectCompiler(
-            data_store, sym_filename, n_processes, log_compiler_error, log_compiler_message
-        )
+        self._project_compiler: Final = ProjectCompiler(data_store, sym_filename, log_compiler_error, log_compiler_message)
 
         signals.set_fs_watcher_status("Compiling")
 
@@ -475,20 +473,17 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
 
 
 class FsWatcherThread(BgThread):
-    def __init__(
-        self, data_store: DataStore, signals: FsWatcherSignals, sfc_file_relpath: Filename, n_processes: Optional[int]
-    ) -> None:
+    def __init__(self, data_store: DataStore, signals: FsWatcherSignals, sfc_file_relpath: Filename) -> None:
         super().__init__(signals, name="FS Watcher")
 
         self.data_store: Final = data_store
         self.sym_file_relpath: Final = os.path.splitext(sfc_file_relpath)[0] + ".sym"
-        self.n_processes: Final = n_processes
 
     @final
     def run_bg_thread(self) -> None:
         try:
             log_fs_watcher("Starting filesystem watcher")
-            fs_handler = FsEventHandler(self.signals, self.data_store, self.sym_file_relpath, self.n_processes)
+            fs_handler = FsEventHandler(self.signals, self.data_store, self.sym_file_relpath)
 
             fs_observer = watchdog.observers.Observer()  # type: ignore[no-untyped-call]
             fs_observer.schedule(fs_handler, path=".", recursive=True)  # type: ignore[no-untyped-call]
