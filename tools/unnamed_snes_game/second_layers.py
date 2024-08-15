@@ -73,7 +73,7 @@ class SecondLayerImage(NamedTuple):
     width: int
     height: int
     metatiles: bytes
-    sl_map: bytes
+    sl_map: Optional[bytes]
     tile_data: bytes
 
 
@@ -149,6 +149,41 @@ def convert_sl_image(
     )
 
 
+def convert_sl_part_of_room(
+    image: ImageTileExtractor,
+    tile_priority: bool,
+    palette: PaletteResource,
+    mt_tiles: Optional[ConstSmallTileMap],
+) -> SecondLayerImage:
+    if image.width_px != 256 or image.height_px != 256:
+        raise ImageError(
+            image.filename, f"PART_OF_ROOM second layer must be 256x256px in size (image is {image.width_px} x {image.height_px})"
+        )
+
+    width: Final = image.width_px // MT_TILE_PX
+    height: Final = image.height_px // MT_TILE_PX
+
+    tileset: Final = SecondLayerTilesetMap(mt_tiles)
+    tilemap8: Final = extract_tiles_and_build_tilemap(image, tileset, palette.create_map(SECOND_LAYER_BPP))
+
+    mt = list()
+
+    # ::TODO create a function that builds the tilemap in metatile order::
+    assert len(tilemap8.grid) == 32 * 32
+    for xoffset, yoffset in ((0, 0), (1, 0), (0, 1), (1, 1)):
+        for y in range(yoffset, 32, 2):
+            for x in range(xoffset, 32, 2):
+                mt.append(tilemap8.get_tile(x, y))
+
+    return SecondLayerImage(
+        width=width,
+        height=height,
+        metatiles=create_tilemap_data(mt, tile_priority),
+        sl_map=None,
+        tile_data=convert_snes_tileset(tileset.tiles(), SECOND_LAYER_BPP),
+    )
+
+
 def convert_second_layer(
     sli: SecondLayerInput, palettes: dict[Name, PaletteResource], mt_tileset_tiles: dict[Name, ConstSmallTileMap], mapping: Mappings
 ) -> EngineData:
@@ -166,7 +201,17 @@ def convert_second_layer(
             raise RuntimeError(f"Cannot load MetaTile tileset {sli.mt_tileset}")
 
     image = load_image_tile_extractor(image_filename)
-    sl = convert_sl_image(image, sli.tile_priority, pal, mt_tiles)
+
+    flags = SlFlags(0)
+
+    if sli.part_of_room:
+        flags |= SlFlags.PART_OF_ROOM
+        sl = convert_sl_part_of_room(image, sli.tile_priority, pal, mt_tiles)
+    else:
+        sl = convert_sl_image(image, sli.tile_priority, pal, mt_tiles)
+
+    if sli.above_metatiles:
+        flags |= SlFlags.ABOVE_METATILES
 
     if sl.width * sl.height > MAX_SL_CELLS:
         raise ImageError(image_filename, f"Image is too large ({sl.width * sl.height} cells, max: {MAX_SL_CELLS})")
@@ -177,23 +222,12 @@ def convert_second_layer(
             f"Image is too large ({sl.width * MT_TILE_PX} x {sl.height * MT_TILE_PX}, max: {0xff * MT_TILE_PX} x {0xff * MT_TILE_PX}",
         )
 
-    flags = SlFlags(0)
-
-    if sli.part_of_room:
-        flags |= SlFlags.PART_OF_ROOM
-
-    if sli.above_metatiles:
-        flags |= SlFlags.ABOVE_METATILES
-
     error_list: list[str] = list()
 
     if sli.callback:
         sl_callback = mapping.sl_callbacks.get(sli.callback)
         if sl_callback is None:
             raise RuntimeError(f"Unknown sl_callback: {sli.callback}")
-
-        if sli.part_of_room and sl_callback.room_parameters:
-            error_list.append("part_of_room second-layer cannot use a callback that contains room_parameters")
 
         sl_callback_id = sl_callback.id
         callback_parameters = parse_callback_parameters(
@@ -209,9 +243,6 @@ def convert_second_layer(
     if len(sl.metatiles) != N_SL_METATILES * 4 * 2:
         raise RuntimeError("Invalid sl.metatiles size")
 
-    if len(sl.sl_map) > MAX_SL_CELLS:
-        raise RuntimeError("sl_map is too large")
-
     ram_data = (
         bytes(
             [
@@ -223,7 +254,15 @@ def convert_second_layer(
         )
         + callback_parameters
         + sl.metatiles
-        + sl.sl_map
     )
+    assert len(ram_data) == 12 + 2048
+
+    if flags & SlFlags.PART_OF_ROOM:
+        assert sl.sl_map is None
+    else:
+        assert sl.sl_map
+        if len(sl.sl_map) > MAX_SL_CELLS:
+            raise RuntimeError("sl_map is too large")
+        ram_data += sl.sl_map
 
     return EngineData(ram_data=DynamicSizedData(ram_data), ppu_data=DynamicSizedData(sl.tile_data))

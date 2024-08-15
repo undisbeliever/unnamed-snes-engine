@@ -84,6 +84,15 @@
         "xVelocity": -1.25,
         "yVelocity": -1.5
       }
+    },
+    "sl_floor": {
+      "source": "second-layers/sl_floor.png",
+      "palette": "dungeon",
+      "mt_tileset": null,
+      "above_metatiles": false,
+      "tile_priority": 0,
+      "part_of_room": true,
+      "callback": null
     }
   }
 }

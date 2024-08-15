@@ -17,7 +17,8 @@
    "dungeon"
  ],
  "second_layers": [
-   "scrolling_test"
+   "scrolling_test",
+   "sl_floor"
  ],
  "ms_spritesheets": [
    "common",
@@ -43,7 +44,7 @@
    "heal",
    "poison"
  ],
- "starting_room": "08-15-entrance",
+ "starting_room": "00-00-top-left",
  "gamestate_flags": [
    "first_key_room__left_key",
    "first_key_room__right_key",

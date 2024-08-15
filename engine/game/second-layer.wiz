@@ -87,8 +87,10 @@ namespace flags {
 // PPU data format: 4bpp tiles (note, to be placed at the end of BG1/BG2 tile data)
 struct _RamDataFormat {
     // Map tile width (minimum value: 32)
+    // OPTIONAL: Only read if PART_OF_ROOM flag clear.
     width: u8,
     // Map tile height (minimum value: 32)
+    // OPTIONAL Only read if PART_OF_ROOM flag clear.
     height: u8,
 
     // See the `flags` namespace
@@ -107,6 +109,7 @@ struct _RamDataFormat {
 
     // Map data (contagious row major order)
     // index into the four MetaTile arrays.
+    // OPTIONAL: not used if the PART_OF_ROOM flag is set
     // NOTE: map data may be smaller then `MAX_SL_MAP_CELLS`
     map: [u8; MAX_SL_MAP_CELLS]
 };
@@ -238,6 +241,14 @@ in lowram {
         }
     }
 
+
+    namespace part_of_room {
+        var vramWordAddr : u16;
+
+        // The VMAIN value to use when transferring the buffer to VRAM.
+        var vmainShadow : u8;
+    }
+
     var _lowramEndVariable : u8;
 }
 
@@ -262,6 +273,31 @@ in wram7e {
             let BUFFER_INDEX_MT_MASK = 31 * 4;
         }
     }
+
+    namespace part_of_room {
+        // BG offset for the second-layer BG.
+        // Used because `xScrollShadow`/`yScrollShadow` might be changed outside this subsystem.
+        var viewportXOffset : u16;
+        var viewportYOffset : u16;
+
+        // The current position with `room.sl_map`.
+        var slMapCursor : u8;
+
+        // The horizontal and vertical tile seam (with `buffer`)
+        // Used to determine which half of the MetaTile to draw.
+        // Used to calculate the VRAM word address of the column or row to draw.
+        // (index into `buffer`)
+        var horizontalBufferCursor : u16;
+        var verticalBufferCursor : u16;
+            var __buffer_cursors @ &horizontalBufferCursor : u16;
+
+        // The buffer to draw a scrolling room transition to.
+        //
+        // (VRAM tilemap data)
+        var buffer : [u16 ; 32];
+
+        let BUFFER_INDEX_MT_MASK = 15 * 4;
+    }
 }
 
 
@@ -272,6 +308,8 @@ in code {
 //
 // If `second_layer_id >= N_SECOND_LAYERS`, the second layer is disabled and
 // will not be loaded.
+//
+// Will not draw the tilemap if PART_OF_ROOM is set.
 //
 // REQUIRES: Force-Blank
 // REQUIRES: Room loaded
@@ -359,6 +397,7 @@ inline func __clear_sl_data_header__inline() {
 // Load a second-layer into memory and the PPU.
 //
 // NOTE: Does not initialize state variables.
+// NOTE: Does not draw the tilemap if PART_OF_ROOM is set
 //
 // REQUIRES: Force-Blank
 // Uses DMA channel 0
@@ -394,9 +433,12 @@ inline func transfer_buffers__vblank() {
     // MUST NOT modify zpTmp variables
 
     a = bufferState;
-    if !zero {
-        if !negative {
-            image.transfer_buffers__vblank(a);
+    ^if !zero {
+        if negative {
+            part_of_room._transfer_buffers__vblank__inline(a);
+        }
+        else {
+            image._transfer_buffers__vblank__inline(a);
         }
 
         bufferState = 0;
@@ -429,6 +471,58 @@ inline func is_part_of_room() : bool in negative {
 inline func process__inline() {
     x = sl_data.callback_index;
     sl_callbacks.process_function_table[unaligned x]();
+}
+
+
+
+// Draw the room's sl_map if the PART_OF_ROOM flag is set.
+//
+// REQUIRES: Force-Blank
+// REQUIRES: Room and second-layer loaded into memory
+//
+// DB = 0x7e
+#[mem8, idx16]
+inline func draw_room_sl_map__forceblank__db_7e__inline() {
+    negative = second_layer.is_part_of_room();
+    if negative {
+        part_of_room._draw__forceblank__db_7e__inline();
+    }
+}
+
+
+
+// Called at the start of a room transition
+//
+// REQUIRES: Room is loaded into memory.
+// REQUIRES: `load_second_layer__forceblank__inline()` has been called.
+// REQUIRES: `room_transitions.scrollDirection` set.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func start_room_transition() {
+    negative = second_layer.is_part_of_room();
+    if negative {
+        part_of_room._start_room_transition__inline(room_transitions.scrollDirection);
+    }
+}
+
+
+
+// Process a part-of-room room transition.
+//
+// REQUIRES: Room is loaded into memory.
+// REQUIRES: `start_room_transition__inline()` has been called.
+// REQUIRES: `room_transitions.scrollDirection` set and unchanged from the `start_room_transition__inline()` call.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func process_room_transition__inline() {
+    process__inline();
+
+    negative = is_part_of_room();
+    if negative {
+        part_of_room._process_room_transition__inline(room_transitions.scrollDirection);
+    }
 }
 
 
@@ -511,7 +605,7 @@ inline func scroll_tilemap__inline() {
 //
 // DB = 0x80
 #[mem8, idx16]
-inline func transfer_buffers__vblank(_bufferState : u8 in a) {
+inline func _transfer_buffers__vblank__inline(_bufferState : u8 in a) {
     a >>>= 1;
     if carry {
         VMAIN = a = VMAIN_INCREMENT_HIGH | VMAIN_INCREMENT_32;
@@ -910,7 +1004,7 @@ namespace vertical_buffer {
 
     // IN: xx = x-component of `sl_data.map` index
     // IN: aa = horizontal cursor byte index
-    PopulateVirticalBuffer:
+    PopulateVerticalBuffer:
 
         aa &= (VRAM_TILEMAP_V_TILE_WIDTH - 1);
         if aa & 32 != 0 {
@@ -1210,53 +1304,428 @@ namespace part_of_room {
     // ASSUMES: metatiles.transitions.TRANSITION_SPEED == TILE_PX
     let TRANSITION_SPEED = TILE_PX;
 
+    let ROOM_WIDTH = ROOM_MAP_WIDTH;
+    let ROOM_HEIGHT = ROOM_MAP_HEIGHT;
+    let ROOM_SIZE = ROOM_WIDTH * ROOM_HEIGHT;
 
-    // Calculates the new mapPos for the room and scrollDirection.
+
+    // Draw the room.sl_map to the screen and initialise the state variables.
     //
-    // MUST ONLY be called if PART_OF_ROOM flag is set
+    // REQUIRES: Force-Blank
+    // REQUIRES: Room and second-layer loaded into memory
+    // REQUIRES: PART_OF_ROOM flag set
     //
-    // ASSUMES: Room is loaded into memory.
+    // DB = 0x7e
+    #[mem8, idx16]
+    func _draw__forceblank__db_7e__inline() {
+        let ROWS_TO_DRAW = ROOM_MAP_HEIGHT;
+        let COLUMNS_TO_DRAW = ROOM_MAP_WIDTH;
+
+        var _rowCounter : u16 in zpTmp_word_0;
+        var _mapIndex : u16 in zpTmp_word_1;
+
+        mem16_idx16();
+        #[mem16, idx16] {
+            xx = 0;
+
+            *(far &VMADD) = aa = VRAM_SECOND_LAYER_MAP_WADDR;
+
+            do {
+                _mapIndex = xx;
+                _rowCounter = aa = COLUMNS_TO_DRAW;
+                do {
+                    yy = aa = ((&room.sl_map[0] as *u16)[unaligned xx] & 0xff) << 1;
+
+                    *(far& VMDATA) = aa = sl_data.mt_top_left[unaligned yy];
+                    *(far& VMDATA) = aa = sl_data.mt_top_right[unaligned yy];
+
+                    xx++;
+
+                    _rowCounter--;
+                } while !zero;
+
+                xx = _mapIndex;
+                _rowCounter = aa = COLUMNS_TO_DRAW;
+                do {
+                    yy = aa = ((&room.sl_map[0] as *u16)[unaligned xx] & 0xff) << 1;
+
+                    *(far& VMDATA) = aa = sl_data.mt_top_left[unaligned yy];
+                    *(far& VMDATA) = aa = sl_data.mt_top_right[unaligned yy];
+
+                    xx++;
+
+                    _rowCounter--;
+                } while !zero;
+            } while xx < (ROWS_TO_DRAW * COLUMNS_TO_DRAW);
+
+
+            viewportXOffset = 0;
+            xScrollShadow = 0;
+
+            viewportYOffset = yy = -1 as u16;
+            yScrollShadow = yy;
+
+            horizontalBufferCursor = 0;
+            verticalBufferCursor = 0;
+        }
+        mem8();
+
+        bufferState = 0;
+    }
+
+
+    // REQUIRES: VBlank or Force-Blank
+    // Uses DMA channel 0
+    //
+    // DB = 0x80
+    #[mem8, idx16]
+    inline func _transfer_buffers__vblank__inline(_bufferState : u8 in a) {
+        VMAIN = a = vmainShadow;
+        VMADD = xx = vramWordAddr;
+
+        dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_TWO, <:&VMDATA);
+
+        A1T0 = xx = &buffer as u16;
+        A1B0 = a = #:far &buffer;
+
+        DAS0 = xx = sizeof(typeof(buffer));
+        MDMAEN = a = MDMAEN_DMA0;
+    }
+
+
+
+    // REQUIRES: Room and second-layer is loaded into memory.
+    // REQUIRES: PART_OF_ROOM flag set
     //
     // DB = 0x7e
     #[mem8, idx8]
-    func start_room_transition(scrollDirection : room_transitions.ScrollDirection in x) {
-        // ::TODO implement::
+    inline func _start_room_transition__inline(scrollDirection : room_transitions.ScrollDirection in a) {
+        x = a = a >>> 1;
+        slMapCursor = a = ScrollDirectionCursor[unaligned x];
+    }
+
+
+    // REQUIRES: Room and second-layer is loaded into memory.
+    // REQUIRES: `_start_room_transition__inline()` has been called.
+    // REQUIRES: PART_OF_ROOM flag set
+    //
+    // DB = 0x7e
+    #[mem8, idx8]
+    inline func _process_room_transition__inline(scrollDirection : room_transitions.ScrollDirection in x) {
+        mem16();
+        #[mem16] {
+            part_of_room._ProcessRoomTransition_FunctionTable__mem16_idx8[unaligned x]();
+        }
+        mem8_idx8();
+    }
+
+
+    in rodata0 {
+        let _N_SCROLL_DIRECTIONS = 8;
+
+        // Buffer size
+        let BS = 16;
+
+        // Tiles before rollback
+        let TBR = room_transitions.N_TRANSITION_FRAMES_BEFORE_SOLID_CHECK / 2;
+
+        const _ScrollDirectionCursor : [u8 ; _N_SCROLL_DIRECTIONS] = [
+            ROOM_HEIGHT * ROOM_WIDTH + BS - 1,          // UP
+            0xff,                                       // DOWN
+            0,                                          // LEFT
+            0x100 - ROOM_WIDTH - 1,                     // RIGHT
+
+            (ROOM_HEIGHT - TBR) * ROOM_WIDTH + BS - 1,  // ROLLBACK_UP
+            (TBR * ROOM_WIDTH) - 1,                     // ROLLBACK_DOWN
+            0x100 - TBR,                                // ROLLBACK_LEFT
+            0x100 - ROOM_WIDTH - 1 + TBR,               // ROLLBACK_RIGHT
+        ];
+        let ScrollDirectionCursor = far &_ScrollDirectionCursor as far *u8;
+    }
+
+    // REQUIRES: PART_OF_ROOM flag set.
+    // DB = 0x7e
+    const _ProcessRoomTransition_FunctionTable__mem16_idx8 : [func ; _N_SCROLL_DIRECTIONS] = [
+        __room_transition__up__mem16_idx8,
+        __room_transition__down__mem16_idx8,
+        __room_transition__left__mem16_idx8,
+        __room_transition__right__mem16_idx8,
+
+        __room_transition__up_rollback__mem16_idx8,
+        __room_transition__down_rollback__mem16_idx8,
+        __room_transition__left_rollback__mem16_idx8,
+        __room_transition__right_rollback__mem16_idx8,
+    ];
+
+
+    // DB = 0x7e
+    #[mem16, idx8]
+    func __room_transition__up__mem16_idx8() {
+        x = slMapCursor;
+
+        viewportYOffset = aa = viewportYOffset - V_TILE_PX;
+        if aa & V_TILE_PX == 0 {
+            aa = xx - ROOM_WIDTH;
+            slMapCursor = x = a;
+        }
+
+        verticalBufferCursor--;
+        aa = verticalBufferCursor;
+
+        return __populate_horizontal_buffer(x, aa);
     }
 
 
     // DB = 0x7e
-    #[mem16, idx16]
-    func scroll_up__process__mem16_idx16() {
-        // ::TODO implement::
+    #[fallthrough, mem16, idx8]
+    func __room_transition__down__mem16_idx8() {
+        x = slMapCursor;
+
+        viewportYOffset = aa = viewportYOffset + V_TILE_PX;
+        if aa & V_TILE_PX == 0 {
+            aa = xx + ROOM_WIDTH;
+            slMapCursor = x = a;
+        }
+
+        aa = verticalBufferCursor + DISPLAY_V_TILE_HEIGHT;
+        verticalBufferCursor++;
+
+    // Fallthrough
     }
 
 
     // DB = 0x7e
-    #[mem16, idx16]
-    func scroll_down__process__mem16_idx16() {
-        // ::TODO implement::
+    #[mem16, idx8]
+    func __populate_horizontal_buffer(_slMapCursor: u8 in x, verticalBufferCursor: u16 in aa) {
+        var _bufferEndIndex : u8 in zpTmp_byte_0;
+        var _mapIndex       : u8 in zpTmp_byte_1;
+
+
+        // Assumes VRAM_SECOND_LAYER_MAP_WADDR is a multiple of 0x800.
+        aa &= (VRAM_TILEMAP_V_TILE_HEIGHT - 1);
+        aa = (aa <<< 5) | VRAM_SECOND_LAYER_MAP_WADDR;
+        vramWordAddr = aa;
+
+        aa = horizontalBufferCursor;
+        if (aa & NAMETABLE_V_TILE_WIDTH) != 0 {
+            vramWordAddr = aa = vramWordAddr | NAMETABLE_WORD_SIZE;
+        }
+
+        bufferState = y = 1 << BUFFER_STATE__PART_OF_ROOM_BIT;
+        vmainShadow = y = VMAIN_INCREMENT_HIGH | VMAIN_INCREMENT_1;
+
+        aa = (horizontalBufferCursor <<< 1) & BUFFER_INDEX_MT_MASK;
+        y = a;
+
+        _bufferEndIndex = y;
+
+        // Using the VRAM address (verticalCursor) to determine which half of the MetaTile to draw
+        aa = vramWordAddr;
+        if a & NAMETABLE_V_TILE_WIDTH == 0 {
+            do {
+                y--; y--; y--; y--;
+                if negative {
+                    y = sizeof(typeof(buffer)) - 4;
+                }
+
+                _mapIndex = x;
+
+                aa = (&room.sl_map[0] as *u16)[unaligned x];
+                x = a;
+                if negative {
+                    aa <<= 1;
+                    x = a;
+                    (&buffer[0])[unaligned y] = aa = (&sl_data.mt_top_left[0x80])[unaligned x];
+                    aa = (&sl_data.mt_top_right[0x80])[unaligned x];
+                }
+                else {
+                    aa <<= 1;
+                    x = a;
+                    (&buffer[0])[unaligned y] = aa = sl_data.mt_top_left[unaligned x];
+                    aa = sl_data.mt_top_right[unaligned x];
+                }
+                (&buffer[1])[unaligned y] = aa;
+
+                x = _mapIndex;
+                x--;
+
+            } while y != _bufferEndIndex;
+        }
+        else {
+            do {
+                y--; y--; y--; y--;
+                if negative {
+                    y = sizeof(typeof(buffer)) - 4;
+                }
+
+                _mapIndex = x;
+
+                aa = (&room.sl_map[0] as *u16)[unaligned x];
+                x = a;
+                if negative {
+                    aa <<= 1;
+                    x = a;
+                    (&buffer[0])[unaligned y] = aa = (&sl_data.mt_bottom_left[0x80])[unaligned x];
+                    aa = (&sl_data.mt_bottom_right[0x80])[unaligned x];
+                }
+                else {
+                    aa <<= 1;
+                    x = a;
+                    (&buffer[0])[unaligned y] = aa = sl_data.mt_bottom_left[unaligned x];
+                    aa = sl_data.mt_bottom_right[unaligned x];
+                }
+                (&buffer[1])[unaligned y] = aa;
+
+                x = _mapIndex;
+                x--;
+
+            } while y != _bufferEndIndex;
+        }
+
+        ^return __update_scroll_shadows();
     }
 
 
     // DB = 0x7e
-    #[mem16, idx16]
-    func scroll_left__process__mem16_idx16() {
-        // ::TODO implement::
+    #[mem16, idx8]
+    func __room_transition__left__mem16_idx8() {
+        x = slMapCursor;
+
+        viewportXOffset = aa = viewportXOffset - V_TILE_PX;
+        if aa & V_TILE_PX != 0 {
+            x--;
+            slMapCursor = x;
+        }
+
+        horizontalBufferCursor--;
+        aa = horizontalBufferCursor;
+
+        return __populate_vertical_buffer(x, aa);
     }
 
 
     // DB = 0x7e
-    #[mem16, idx16]
-    func scroll_right__process__mem16_idx16() {
-        // ::TODO implement::
+    #[fallthrough, mem16, idx8]
+    func __room_transition__right__mem16_idx8() {
+        x = slMapCursor;
+
+        viewportXOffset = aa = viewportXOffset + V_TILE_PX;
+        if aa & V_TILE_PX != 0 {
+            x++;
+            slMapCursor = x;
+        }
+
+        // Advance cursor to the other nametable.
+        aa = horizontalBufferCursor ^ NAMETABLE_V_TILE_WIDTH;
+        horizontalBufferCursor++;
+
+    // Fallthrough
     }
 
 
+    // DB = 0x7e
+    #[fallthrough, mem16, idx8]
+    func __populate_vertical_buffer(_slMapCursor: u8 in x, horizontalBufferCursor: u16 in aa) {
+        var _bufferEndIndex : u8 in zpTmp_byte_0;
+        var _mapIndex       : u8 in zpTmp_byte_1;
 
-    let scroll_up__rollback__mem16_idx16    = scroll_down__process__mem16_idx16;
-    let scroll_down__rollback__mem16_idx16  = scroll_up__process__mem16_idx16;
-    let scroll_left__rollback__mem16_idx16  = scroll_right__process__mem16_idx16;
-    let scroll_right__rollback__mem16_idx16 = scroll_left__process__mem16_idx16;
+
+        // Assumes VRAM_SECOND_LAYER_MAP_WADDR is a multiple of 0x800.
+        aa &= (VRAM_TILEMAP_V_TILE_WIDTH - 1);
+        if aa & 32 != 0 {
+            aa ^= 32 | NAMETABLE_WORD_SIZE;
+        }
+        vramWordAddr = aa = aa | VRAM_SECOND_LAYER_MAP_WADDR;
+
+        bufferState = y = 1 << BUFFER_STATE__PART_OF_ROOM_BIT;
+        vmainShadow = y = VMAIN_INCREMENT_HIGH | VMAIN_INCREMENT_32;
+
+        aa = (verticalBufferCursor <<< 1) & BUFFER_INDEX_MT_MASK;
+        y = a;
+
+        _bufferEndIndex = y;
+
+        // Using the VRAM address to determine which half of the MetaTile to draw
+        aa = vramWordAddr >>> 1;
+        if !carry {
+            do {
+                y--; y--; y--; y--;
+                if negative {
+                    y = sizeof(typeof(buffer)) - 4;
+                }
+
+                _mapIndex = x;
+
+                aa = (&room.sl_map[0] as *u16)[unaligned x];
+                x = a;
+                if negative {
+                    aa <<= 1;
+                    x = a;
+                    (&buffer[0])[unaligned y] = aa = (&sl_data.mt_top_left[0x80])[unaligned x];
+                    aa = (&sl_data.mt_bottom_left[0x80])[unaligned x];
+                }
+                else {
+                    aa <<= 1;
+                    x = a;
+                    (&buffer[0])[unaligned y] = aa = sl_data.mt_top_left[unaligned x];
+                    aa = sl_data.mt_bottom_left[unaligned x];
+                }
+                (&buffer[1])[unaligned y] = aa;
+
+                x = _mapIndex;
+                aa = xx - ROOM_WIDTH;
+                x = a;
+
+            } while y != _bufferEndIndex;
+        }
+        else {
+            do {
+                y--; y--; y--; y--;
+                if negative {
+                    y = sizeof(typeof(buffer)) - 4;
+                }
+
+                _mapIndex = x;
+
+                aa = (&room.sl_map[0] as *u16)[unaligned x];
+                x = a;
+                if negative {
+                    aa <<= 1;
+                    x = a;
+                    (&buffer[0])[unaligned y] = aa = (&sl_data.mt_top_right[0x80])[unaligned x];
+                    aa = (&sl_data.mt_bottom_right[0x80])[unaligned x];
+                }
+                else {
+                    aa <<= 1;
+                    x = a;
+                    (&buffer[0])[unaligned y] = aa = sl_data.mt_top_right[unaligned x];
+                    aa = sl_data.mt_bottom_right[unaligned x];
+                }
+                (&buffer[1])[unaligned y] = aa;
+
+                x = _mapIndex;
+                aa = xx - ROOM_WIDTH;
+                x = a;
+
+            } while y != _bufferEndIndex;
+        }
+
+    // Fallthrough
+    }
+
+
+    // DB = 0x7e
+    #[mem16, idx8]
+    func __update_scroll_shadows() {
+        xScrollShadow = aa = viewportXOffset;
+        yScrollShadow = aa = viewportYOffset;
+    }
+
+
+    let __room_transition__up_rollback__mem16_idx8    = __room_transition__down__mem16_idx8;
+    let __room_transition__down_rollback__mem16_idx8  = __room_transition__up__mem16_idx8;
+    let __room_transition__left_rollback__mem16_idx8  = __room_transition__right__mem16_idx8;
+    let __room_transition__right_rollback__mem16_idx8 = __room_transition__left__mem16_idx8;
 }
 
 

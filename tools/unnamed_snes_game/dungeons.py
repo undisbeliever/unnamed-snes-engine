@@ -98,6 +98,7 @@ def compile_dungeon_header(
         RoomDependencies(
             second_layer=second_layer,
             sl_callback=sl_callback,
+            mt_tileset=dungeon.tileset,
         ),
     )
 

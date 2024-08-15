@@ -1,13 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.10.2" class="normal" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="5" nextobjectid="12">
+<map version="1.10" tiledversion="1.11.0" class="normal" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="5" nextobjectid="12">
  <tileset firstgid="1" source="../metatiles/dungeon.tsx"/>
  <layer id="1" name="Tiles" class="normal" width="16" height="14">
   <data encoding="base64" compression="gzip">
    H4sIAAAAAAAAA+3LSQ2DQACF4RFQKALYBLBUQFkEQKmhAgZYfIADENf/QjKZTEgIN8LhO733P4QQBkxJgxYTZvxQK58nLNhw4EoGjFLfoVc+HnwECBFpbL1ui/G6+0v3C9YT/Z6tfyNBelCGHAVKfA6q8MUf2zHyJ4ADAAA=
   </data>
  </layer>
- <imagelayer id="4" name="SecondLayer" offsetx="-128" offsety="-144">
-  <image source="../second-layers/scrolling-test.png" trans="008000" width="768" height="512"/>
- </imagelayer>
  <objectgroup id="2" name="Enemies"/>
 </map>

@@ -26,8 +26,6 @@ from .data_store import EngineData, FixedSizedData
 from .errors import SimpleMultilineError
 from .callbacks import parse_callback_parameters, ROOM_CALLBACK, SL_ROOM_PARAMETERS, RoomDoors, parse_int
 
-from .second_layers import MT_TILE_PX as SECOND_LAYER_MT_TILE_PX
-
 
 MAP_WIDTH = 16
 MAP_HEIGHT = 14
@@ -38,6 +36,8 @@ MAP_HEIGHT_PX = MAP_HEIGHT * 16
 ENTITIES_IN_MAP = 8
 
 TILE_SIZE = 16
+
+GID_FLIP_MASK: Final = 0b1111 << (32 - 4)
 
 BLANK_SL_PARAMETERS: Final = bytes(SL_ROOM_PARAMETERS.parameter_size)
 
@@ -50,6 +50,7 @@ class RoomError(SimpleMultilineError):
 class RoomDependencies(NamedTuple):
     second_layer: Optional[SecondLayerInput]
     sl_callback: Optional[SecondLayerCallback]
+    mt_tileset: Name
 
 
 # `TmxMap` is a limited subset of the TMX data format
@@ -57,14 +58,13 @@ class RoomDependencies(NamedTuple):
 
 
 class TmxTileset(NamedTuple):
-    name: str
+    basename: str
     firstgid: int
 
 
-class TmxImageLayer(NamedTuple):
+class TmxLayer(NamedTuple):
     name: str
-    offset_x: int
-    offset_y: int
+    map: list[int]
 
 
 class TmxEntity(NamedTuple):
@@ -78,9 +78,8 @@ class TmxEntity(NamedTuple):
 
 class TmxMap(NamedTuple):
     map_class: str
-    tileset: TmxTileset
-    image_layer: Optional[TmxImageLayer]
-    map: list[int]
+    tilesets: list[TmxTileset]
+    layers: list[TmxLayer]
     entities: list[TmxEntity]
     parameters: OrderedDict[Name, str]
 
@@ -103,16 +102,21 @@ def read_tag_attr_int(tag: xml.etree.ElementTree.Element, name: str, error_list:
         return 0
 
 
-def parse_tileset_tag(tag: xml.etree.ElementTree.Element) -> Optional[TmxTileset]:
+def parse_tileset_tag(tag: xml.etree.ElementTree.Element) -> TmxTileset:
+    source = tag.attrib.get("source")
+
+    if source is None:
+        raise ValueError("Embedded tilesets are not supported")
+
     # basename without extension
-    tileset_name = posixpath.splitext(posixpath.basename(tag.attrib["source"]))[0]
+    basename = posixpath.splitext(posixpath.basename(source))[0]
 
     firstgid = int(tag.attrib["firstgid"])
 
-    return TmxTileset(tileset_name, firstgid)
+    return TmxTileset(basename, firstgid)
 
 
-def parse_layer_tag(tag: xml.etree.ElementTree.Element) -> list[int]:
+def parse_layer_tag(tag: xml.etree.ElementTree.Element) -> TmxLayer:
     layer_width = tag.attrib.get("width")
     layer_height = tag.attrib.get("height")
 
@@ -137,25 +141,9 @@ def parse_layer_tag(tag: xml.etree.ElementTree.Element) -> list[int]:
     if len(binary_data) != expected_binary_data_size:
         raise ValueError(f"Tile layer data size mismatch (got { len(binary_data) }, expected { expected_binary_data_size })")
 
-    tiles = [i[0] for i in struct.iter_unpack("<I", binary_data)]
-
-    return tiles
-
-
-def parse_imagelayer_tag(tag: xml.etree.ElementTree.Element) -> TmxImageLayer:
-    offset_x = tag.attrib.get("offsetx", 0)
-    offset_y = tag.attrib.get("offsety", 0)
-
-    try:
-        offset_x = int(offset_x)
-        offset_y = int(offset_y)
-    except ValueError:
-        raise ValueError(f"Invalid <imagelayer> offset, expected integer values: {offset_x}, {offset_y}")
-
-    return TmxImageLayer(
-        name=tag.attrib.get("name", "imagelayer"),
-        offset_x=offset_x,
-        offset_y=offset_y,
+    return TmxLayer(
+        tag.attrib.get("name", ""),
+        [i[0] for i in struct.iter_unpack("<I", binary_data)],
     )
 
 
@@ -248,36 +236,23 @@ def parse_tmx_map(et: xml.etree.ElementTree.ElementTree) -> TmxMap:
     if not map_class:
         error_list.append("<map>: Missing class/type attribute")
 
-    tileset = None
-    image_layer = None
-    tiles = None
+    tilesets = list()
+    layers = list()
     entities = None
     parameters = OrderedDict[Name, str]()
 
     for child in root:
         if child.tag == "tileset":
-            if tileset is not None:
-                error_list.append("Expected only one <tileset> tag")
             try:
-                tileset = parse_tileset_tag(child)
+                tilesets.append(parse_tileset_tag(child))
             except Exception as e:
                 error_list.append(f"<tileset>: { e }")
 
         elif child.tag == "layer":
-            if tiles is not None:
-                error_list.append("Expected only one <layer> tag")
             try:
-                tiles = parse_layer_tag(child)
+                layers.append(parse_layer_tag(child))
             except Exception as e:
                 error_list.append(f"<layer>: { e }")
-
-        elif child.tag == "imagelayer":
-            if image_layer is not None:
-                error_list.append("Expected only one <imagelayer> tag")
-            try:
-                image_layer = parse_imagelayer_tag(child)
-            except Exception as e:
-                error_list.append(f"<imagelayer>: { e }")
 
         elif child.tag == "objectgroup":
             if entities is not None:
@@ -292,21 +267,24 @@ def parse_tmx_map(et: xml.etree.ElementTree.ElementTree) -> TmxMap:
     if entities is None:
         entities = list()
 
-    if tileset is None:
+    if not tilesets:
         error_list.append("Missing <tileset> tag")
 
-    if tiles is None:
+    if not layers:
         error_list.append("Missing <layer> tag")
 
     if error_list:
         raise RoomError("Error reading TMX file", error_list)
 
     assert map_class
-    assert tileset
-    assert tiles
     assert entities is not None
 
-    return TmxMap(map_class, tileset, image_layer, tiles, entities, parameters)
+    return TmxMap(map_class, tilesets, layers, entities, parameters)
+
+
+class MapLayer(NamedTuple):
+    map: bytes
+    tileset_id: int
 
 
 class RoomEntity(NamedTuple):
@@ -323,6 +301,7 @@ class RoomIntermediate(NamedTuple):
     room_event: Callback
     room_event_data: bytes
     sl_parameters: bytes
+    sl_map: Optional[bytes]
 
 
 def process_room_entities(
@@ -390,25 +369,78 @@ def process_room_entities(
     return out
 
 
-def part_of_room_sl_parameters(image_layer: TmxImageLayer, error_list: list[str]) -> bytes:
-    # ::TODO limit offset to second layer image size::
-    # ::TODO implement image wraparound for positive offset values::
-
-    if image_layer.offset_x > 0:
-        error_list.append("<imagelayer> offsetx must be negative")
-
-    if image_layer.offset_y > 0:
-        error_list.append("<imagelayer> offsety must be negative")
-
-    tile_pos_x, x_div = divmod(abs(image_layer.offset_x), SECOND_LAYER_MT_TILE_PX)
-    tile_pos_y, y_div = divmod(abs(image_layer.offset_y), SECOND_LAYER_MT_TILE_PX)
-
-    return bytes((tile_pos_x, tile_pos_y))
-
-
 # ::TODO make configurable::
 LOCKED_DOOR_TILE_IDS: Final = (0x80, 0xA0, 0xC0, 0xE0)
 OPEN_DOOR_TILE_IDS: Final = (0x82, 0xA2, 0xC2, 0xE2)
+
+
+def process_layer(tilemap: TmxTileset, layer: TmxLayer, error_list: list[str]) -> Optional[bytes]:
+    firstgid: Final = tilemap.firstgid
+    try:
+        return bytes([i - firstgid if i != 0 else 0 for i in layer.map])
+    except ValueError:
+        # There is a bad cell in the map
+        lastgid = firstgid + 256 - 1
+
+        for i, t in enumerate(layer.map):
+            if t != 0 and (t < firstgid or t > lastgid):
+                x, y = divmod(i, MAP_WIDTH)
+                if t & GID_FLIP_MASK != 0:
+                    error_list.append(f'<layer name="{layer.name}"> {x}, {y}: flipped tiles are not allowed')
+                else:
+                    error_list.append(f'<layer name="{layer.name}"> {x}, {y}: invalid tile {t} (wrong tileset?)')
+
+        return None
+
+
+def is_mt_tileset(tileset: TmxTileset, dependencies: RoomDependencies) -> bool:
+    return tileset.basename == dependencies.mt_tileset
+
+
+def process_layers_and_tilesets(
+    tmx_map: TmxMap, dependencies: RoomDependencies, error_list: list[str]
+) -> tuple[Optional[bytes], Optional[bytes]]:
+
+    if dependencies.second_layer and dependencies.second_layer.part_of_room:
+        if len(tmx_map.tilesets) == 2 and len(tmx_map.layers) == 2:
+            if dependencies.second_layer.above_metatiles:
+                mt_map, sl_map = tmx_map.layers[0], tmx_map.layers[1]
+            else:
+                mt_map, sl_map = tmx_map.layers[1], tmx_map.layers[0]
+
+            if is_mt_tileset(tmx_map.tilesets[0], dependencies):
+                mt_tileset, sl_tileset = tmx_map.tilesets[0], tmx_map.tilesets[1]
+            elif is_mt_tileset(tmx_map.tilesets[1], dependencies):
+                mt_tileset, sl_tileset = tmx_map.tilesets[1], tmx_map.tilesets[0]
+            else:
+                error_list.append(f'Cannot find dungeon metatile tileset "{dependencies.mt_tileset}"')
+                return None, None
+
+            if sl_tileset.basename != dependencies.second_layer.name:
+                error_list.append(f'<tileset {sl_tileset.basename}> does not match second-layer "{dependencies.second_layer.name}"')
+
+            return process_layer(mt_tileset, mt_map, error_list), process_layer(sl_tileset, sl_map, error_list)
+        else:
+            if len(tmx_map.tilesets) != 2:
+                error_list.append("Expected two <tileset> tags.  Second-Layer is part_of_room.")
+            if len(tmx_map.layers) != 2:
+                error_list.append("Expected two <layer> tags.  Second-Layer is part_of_room.")
+            return None, None
+
+    else:
+        if len(tmx_map.tilesets) == 1 and len(tmx_map.layers) == 1:
+            mt_tileset, mt_map = tmx_map.tilesets[0], tmx_map.layers[0]
+
+            if not is_mt_tileset(mt_tileset, dependencies):
+                error_list.append("<tileset> does not match dungeon metatile tileset")
+
+            return process_layer(mt_tileset, mt_map, error_list), None
+        else:
+            if len(tmx_map.layers) != 1:
+                error_list.append("Expected one <tileset> tag.  There is only one room layer")
+            if len(tmx_map.layers) != 1:
+                error_list.append("Expected one <layer> tag.  There is only one room layer")
+            return None, None
 
 
 def process_room(
@@ -416,48 +448,33 @@ def process_room(
 ) -> RoomIntermediate:
     error_list: list[str] = list()
 
-    try:
-        tileset_id = mapping.mt_tilesets.index(tmx_map.tileset.name)
-    except ValueError:
-        error_list.append("Unknown MetaTile tileset name: { tmx_map.tileset.name }")
+    # ::TODO remove tileset_id from room data::
+    tileset_id = 0
 
-    try:
-        map_data = bytes([i - tmx_map.tileset.firstgid for i in tmx_map.map])
-    except ValueError:
-        error_list.append(
-            "Unknown tile in map.  There must be a maximum of 256 tiles in the tileset and no transparent or flipped tiles in the map."
-        )
+    mt_map, sl_map = process_layers_and_tilesets(tmx_map, dependencies, error_list)
 
     room_entities = process_room_entities(tmx_map.entities, all_entities, mapping, error_list)
-
-    assert len(map_data) == MAP_WIDTH * MAP_HEIGHT
-    room_doors = RoomDoors(
-        map_data=map_data,
-        locked_door_tiles=LOCKED_DOOR_TILE_IDS,
-        open_door_tiles=OPEN_DOOR_TILE_IDS,
-    )
 
     room_event = mapping.room_events.get(tmx_map.map_class)
     if not room_event:
         error_list.append("Unknown room event: { tmx_map.map_class }")
-    else:
-        room_event_data = parse_callback_parameters(ROOM_CALLBACK, room_event, tmx_map.parameters, mapping, room_doors, error_list)
 
-    if dependencies.second_layer and dependencies.second_layer.part_of_room:
-        if dependencies.sl_callback:
-            assert dependencies.sl_callback.room_parameters, "part-of-room second-layer must not have a callback with room_parameters"
+    if error_list:
+        raise RoomError("Error compiling room", error_list)
 
-        if tmx_map.image_layer:
-            sl_parameters = part_of_room_sl_parameters(tmx_map.image_layer, error_list)
-        else:
-            drp = dependencies.second_layer.default_room_pos
-            if drp:
-                sl_parameters = bytes((drp.x, drp.y))
-            else:
-                error_list.append(
-                    "Cannot position part-of-room second-layer: No <imagelayer> in map or default_room_pos in second-layer"
-                )
-    elif dependencies.sl_callback:
+    assert mt_map is not None
+    assert room_event is not None
+
+    assert len(mt_map) == MAP_WIDTH * MAP_HEIGHT
+    room_doors = RoomDoors(
+        map_data=mt_map,
+        locked_door_tiles=LOCKED_DOOR_TILE_IDS,
+        open_door_tiles=OPEN_DOOR_TILE_IDS,
+    )
+
+    room_event_data = parse_callback_parameters(ROOM_CALLBACK, room_event, tmx_map.parameters, mapping, room_doors, error_list)
+
+    if dependencies.sl_callback:
         sl_parameters = parse_callback_parameters(
             SL_ROOM_PARAMETERS, dependencies.sl_callback, tmx_map.parameters, mapping, None, error_list
         )
@@ -467,9 +484,7 @@ def process_room(
     if error_list:
         raise RoomError("Error compiling room", error_list)
 
-    assert room_event is not None
-
-    return RoomIntermediate(map_data, tileset_id, room_entities, room_event, room_event_data, sl_parameters)
+    return RoomIntermediate(mt_map, tileset_id, room_entities, room_event, room_event_data, sl_parameters, sl_map)
 
 
 def create_room_entities_soa(entities: list[RoomEntity]) -> bytes:
@@ -517,6 +532,9 @@ def create_map_data(room: RoomIntermediate) -> bytes:
     data += room.sl_parameters
 
     data += create_room_entities_soa(room.entities)
+
+    if room.sl_map:
+        data += room.sl_map
 
     return data
 

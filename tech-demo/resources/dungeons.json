@@ -1,6 +1,16 @@
 {
   "dungeons": [
   {
+    "name": "playground",
+    "path": "dungeons/playground",
+    "width": 4,
+    "height": 4,
+    "tileset": "dungeon",
+    "second_layer": "sl_floor",
+    "ms_spritesheet": "dungeon",
+    "song": "blank"
+  },
+  {
     "name": "dungeon",
     "path": "rooms",
     "width": 15,

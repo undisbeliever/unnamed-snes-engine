@@ -36,6 +36,11 @@ struct RoomData {
     entity_yPos      : [u8 ; N_ENTITIES_IN_ROOM_DATA],
     entity_type      : [u8 ; N_ENTITIES_IN_ROOM_DATA],
     entity_parameter : [u8 ; N_ENTITIES_IN_ROOM_DATA],
+
+
+    // The second-layer map
+    // OPTIONAL: Only used if a PART_OF_ROOM second-layer is loaded
+    sl_map           : [ u8 ; ROOM_MAP_WIDTH * ROOM_MAP_HEIGHT ],
 };
 
 
