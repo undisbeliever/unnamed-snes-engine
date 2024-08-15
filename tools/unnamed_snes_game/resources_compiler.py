@@ -17,7 +17,7 @@ from .second_layers import convert_second_layer
 from .palette import convert_palette, PaletteResource
 from .metasprite import convert_static_spritesheet, convert_dynamic_spritesheet, build_ms_fs_data, MsFsEntry, DynamicMsSpritesheet
 from .dungeons import compile_dungeon_header, combine_dungeon_and_room_data
-from .rooms import extract_room_position, compile_room, RoomDependencies
+from .rooms import extract_room_position, compile_room, build_room_dependencies__noexcept, RoomDependencies
 from .snes import ConstSmallTileMap
 from .other_resources import convert_tiles, convert_bg_image
 from .audio import AudioCompiler, COMMON_AUDIO_DATA_RESOURCE_NAME
@@ -559,7 +559,7 @@ class DungeonCompiler(SimpleResourceCompiler):
         r_name = self.name_list[resource_id]
         try:
             dungeon = self._shared_input.dungeons.dungeons[r_name]
-            header, room_dependencies = compile_dungeon_header(
+            header = compile_dungeon_header(
                 dungeon, self._shared_input.mappings, self._shared_input.other_resources, self._shared_input.audio_project
             )
             return DungeonResourceData(
@@ -567,7 +567,6 @@ class DungeonCompiler(SimpleResourceCompiler):
                 resource_id,
                 r_name,
                 header,
-                room_dependencies,
                 includes_room_data=False,
             )
         except Exception as e:
@@ -581,24 +580,24 @@ class RoomCompiler:
     def __init__(self, shared_input: SharedInput) -> None:
         self._shared_input: Final = shared_input
         self.resource_type: Final = None
-        self._dungeon_paths: dict[str, int] = dict()
-        self._room_dependencies: list[Optional[RoomDependencies]] = list()
+        self._dungeon_paths: dict[str, tuple[int, Optional[RoomDependencies]]] = dict()
 
-    SHARED_INPUTS = (SharedInputType.MAPPINGS, SharedInputType.ENTITIES, SharedInputType.DUNGEONS)
+    SHARED_INPUTS = (SharedInputType.MAPPINGS, SharedInputType.OTHER_RESOURCES, SharedInputType.ENTITIES, SharedInputType.DUNGEONS)
     EXPORT_ORDER_SI = None
 
     def shared_input_changed(self, s_type: SharedInputType) -> None:
-        if s_type == SharedInputType.DUNGEONS:
-            self._dungeon_paths.clear()
-            if self._shared_input.dungeons:
-                for d in self._shared_input.dungeons.dungeons.values():
-                    self._dungeon_paths[d.path] = d.id
+        if s_type == SharedInputType.DUNGEONS or s_type == SharedInputType.MAPPINGS or s_type == SharedInputType.OTHER_RESOURCES:
+            dungeons = self._shared_input.dungeons
+            mappings = self._shared_input.mappings
+            other_resources = self._shared_input.other_resources
 
-    def build_room_dependencies(self, data_store: DataStore) -> None:
-        assert self._shared_input.dungeons
-
-        dungeons = data_store.get_resource_data_list(ResourceType.dungeons)
-        self._room_dependencies = [d.room_dependencies if isinstance(d, DungeonResourceData) else None for d in dungeons]
+            if dungeons and mappings and other_resources:
+                self._dungeon_paths = {
+                    d.path: (d.id, build_room_dependencies__noexcept(d, mappings, other_resources)) for d in dungeons.dungeons.values()
+                }
+                # ::TODO only compile the dungeons that changed::
+            else:
+                self._dungeon_paths.clear()
 
     def compile_room(self, filename: Filename) -> BaseResourceData:
         assert self._shared_input.mappings
@@ -609,14 +608,15 @@ class RoomCompiler:
             dirname, basename = os.path.split(filename)
             name = os.path.splitext(basename)[0]
 
-            dungeon_id = self._dungeon_paths.get(dirname)
-            if dungeon_id is None:
+            _dungeon = self._dungeon_paths.get(dirname)
+            if _dungeon is None:
                 raise RuntimeError(f"Unknown dungeon path: {dirname}")
+
+            dungeon_id, deps = _dungeon
 
             position = extract_room_position(basename)
             room_id = (dungeon_id << 16) | ((position[1] & 0xFF) << 8) | (position[0] & 0xFF)
 
-            deps = self._room_dependencies[dungeon_id]
             if deps is None:
                 raise RuntimeError("Dependency error")
 
@@ -957,8 +957,6 @@ class ProjectCompiler:
 
         if None in to_recompile:
             assert self.__shared_input.dungeons
-
-            self.__room_compiler.build_room_dependencies(self.data_store)
 
             for fn in find_all_tmx_files(self.__shared_input.dungeons):
                 co = self.__room_compiler.compile_room(fn)

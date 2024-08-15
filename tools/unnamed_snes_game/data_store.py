@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from .resources_compiler import SharedInputType
     from .palette import PaletteResource
     from .metasprite import MsFsEntry, DynamicMsSpritesheet
-    from .rooms import RoomDependencies
 
 
 class FixedSizedData:
@@ -126,7 +125,6 @@ class MtTilesetResourceData(ResourceData):
 
 @dataclass(frozen=True)
 class DungeonResourceData(ResourceData):
-    room_dependencies: "RoomDependencies"
     includes_room_data: bool
 
 

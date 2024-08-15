@@ -20,6 +20,8 @@ from .json_formats import (
     SecondLayerCallback,
     Callback,
     SecondLayerInput,
+    DungeonInput,
+    OtherResources,
     Name,
 )
 from .data_store import EngineData, FixedSizedData
@@ -554,6 +556,31 @@ def compile_room(filename: str, dependencies: RoomDependencies, entities: Entiti
         ram_data=FixedSizedData(map_data),
         ppu_data=None,
     )
+
+
+# Must not raise an exception
+# Does not preform error checking, that will be done in the dungeon compiler.
+def build_room_dependencies__noexcept(
+    dungeon: DungeonInput, mappings: Mappings, other_resources: OtherResources
+) -> Optional[RoomDependencies]:
+    try:
+        if dungeon.second_layer:
+            second_layer = other_resources.second_layers.get(dungeon.second_layer)
+        else:
+            second_layer = None
+
+        if second_layer and second_layer.callback:
+            sl_callback = mappings.sl_callbacks[second_layer.callback]
+        else:
+            sl_callback = None
+
+        return RoomDependencies(
+            second_layer=second_layer,
+            sl_callback=sl_callback,
+            mt_tileset=dungeon.tileset,
+        )
+    except Exception:
+        return None
 
 
 def get_list_of_tmx_files(directory: str) -> list[str]:

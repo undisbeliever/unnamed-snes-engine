@@ -3,7 +3,6 @@
 
 from .data_store import EngineData, FixedSizedData
 from .errors import SimpleMultilineError
-from .rooms import RoomDependencies
 from .audio import BLANK_SONG_NAME
 from .json_formats import DungeonInput, Mappings, OtherResources, AudioProject, Name
 
@@ -50,7 +49,7 @@ def get_song_id(name: Optional[Name], audio_project: AudioProject, error_list: l
 
 def compile_dungeon_header(
     dungeon: DungeonInput, mappings: Mappings, other_resources: OtherResources, audio_project: AudioProject
-) -> tuple[EngineData, RoomDependencies]:
+) -> EngineData:
     error_list = list()
 
     if dungeon.width < 0 or dungeon.width > MAX_WIDTH or dungeon.height < 0 or dungeon.height > MAX_HEIGHT:
@@ -90,16 +89,9 @@ def compile_dungeon_header(
         ]
     )
 
-    return (
-        EngineData(
-            ram_data=FixedSizedData(ram_data),
-            ppu_data=None,
-        ),
-        RoomDependencies(
-            second_layer=second_layer,
-            sl_callback=sl_callback,
-            mt_tileset=dungeon.tileset,
-        ),
+    return EngineData(
+        ram_data=FixedSizedData(ram_data),
+        ppu_data=None,
     )
 
 
