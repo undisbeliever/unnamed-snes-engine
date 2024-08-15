@@ -347,7 +347,6 @@ def compile_data(resources_directory: Filename, symbols_file: Filename) -> Optio
 
 def print_resource_sizes(data_store: DataStore) -> None:
     total_line = "-" * 70
-    mappings = data_store.get_mappings()
 
     dynamic_ms_data = data_store.get_dynamic_ms_data()
     if dynamic_ms_data is not None:
@@ -364,12 +363,10 @@ def print_resource_sizes(data_store: DataStore) -> None:
 
     for rt in ResourceType:
         print(f"{rt.name}:")
-        n_resources = len(getattr(mappings, rt.name))
         total_ram_size = 0
         total_ppu_size = 0
 
-        for i in range(n_resources):
-            d = data_store.get_resource_data(rt, i)
+        for i, d in enumerate(data_store.get_resource_data_list(rt)):
             if isinstance(d, ResourceData):
                 ram_size, ppu_size = d.data.ram_and_ppu_size()
                 total_ram_size += ram_size
