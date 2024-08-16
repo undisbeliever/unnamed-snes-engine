@@ -12,10 +12,9 @@ let ROOM_MAP_HEIGHT = 14;
 
 
 // Map data format
+// MUST be a multiple of 2 in size.
 struct RoomData {
     map         : [ u8 ; ROOM_MAP_WIDTH * ROOM_MAP_HEIGHT ],
-
-    tileset     : u8,
 
     // The room event for this room
     // (index into room event function tables)
@@ -41,6 +40,9 @@ struct RoomData {
     // The second-layer map
     // OPTIONAL: Only used if a PART_OF_ROOM second-layer is loaded
     sl_map           : [ u8 ; ROOM_MAP_WIDTH * ROOM_MAP_HEIGHT ],
+
+
+    __padding : u8,
 };
 
 

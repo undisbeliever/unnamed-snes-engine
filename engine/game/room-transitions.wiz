@@ -141,6 +141,11 @@ in wram7e {
         var camera_y_h : u8 in >:camera_y;
 
 
+    // True if the previously loaded room was invalid;
+    //
+    // (byte flag)
+    var roomValid : u8;
+
     // The scroll direction of the current room transition.
     var scrollDirection : ScrollDirection;
 
@@ -162,23 +167,19 @@ in wram7e {
 in code {
 
 
-// Load the room into memory, check if the MetaTile tileset has changed and populates the sprite list.
+// Load the room into memory and populate the metaTile collisions.
 //
 // `playerX` and `playerY` contain the expected position of the player AFTER the room transition
 // ends and play resumes (the new player position might be used by an entity init routine)
 //
-// Returns true if it is OK to preform a scroll transition into the next room without glitches.
-//
-// NOTE: This function DOES NOT update map tile properties, process entities or start room events.
+// NOTE: This function DOES NOT process entities or start room events.
 //       `_finish_loading_room()` MUST be called to do so.  If this function returns
 //       false, `_finish_loading_room() must be called AFTER the MetaSprites and
 //       MetaTiles are loaded into memory.
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _load_room_and_check_if_ok_to_scroll(playerX : u8 in x, playerY : u8 in y) : bool in carry {
-
-var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u16 - MEMMAP_ROOMSTATE_WRAM7E as u16] : typeof(room.tileset);
+func _load_room(playerX : u8 in x, playerY : u8 in y) {
 
     push8(x);
     push8(y);
@@ -192,6 +193,7 @@ var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u1
     }
 
     carry = dungeon.load_room();
+
     // Set player position after room is loaded.
     // (safe. plx and ply does not modify carry)
     y = pop8();
@@ -202,7 +204,11 @@ var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u1
     player.yPos.px = y;
     player.yPos.sx = 0;
 
-    if !carry {
+
+    // store carry in roomValid.
+    a = 0;
+    roomValid = a = a +# 0;
+    if zero {
         // room is missing from map - create an empty dummy map
         //
         // `metatiles.populate_map_tile_properties()` will fill the dummy
@@ -211,29 +217,9 @@ var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u1
         // back.
 
         __clear_room_memory();
-        room.tileset = a = 0xff;
 
         metatiles.populate_map_tile_properties__all_tiles_solid();
-
-        // Always prefer a scrolling room transition
-        return true;
     }
-
-
-    // Get the tileset id from the backup and test if the tileset has changed.
-    a = room.tileset;
-    if a != _roomStateBackup__room_tileset {
-        return false;
-    }
-
-
-    // Check if a fadeout transition was requested
-    a = roomstate.forceFadeoutRoomTransition;
-    if !zero {
-        return false;
-    }
-
-    return true;
 }
 
 
@@ -255,9 +241,8 @@ func _finish_loading_room() {
     entityloop.init();
 
     // Only process room events and map-tile properties if the room exists
-    // A tileset of 0xff means the room is the empty dummy room.
-    a = room.tileset;
-    if a != 0xff {
+    a = roomValid;
+    if !zero {
         metatiles.populate_map_tile_properties();
         room_events._init__inline();
 
@@ -560,8 +545,7 @@ func fadein_reset_player() {
     }
     mem8_idx8();
 
-    // Load the room the player was last in
-    _load_room_and_check_if_ok_to_scroll(gamestate.data.playerState.xPos, gamestate.data.playerState.yPos);
+    _load_room(gamestate.data.playerState.xPos, gamestate.data.playerState.yPos);
 
     // ::TODO what should happen if the room/position is not valid??::
 
@@ -580,7 +564,7 @@ func load_room__fadein() {
 
     // ::TODO how do I handle a fadein to a missing room?::
 
-    _load_room_and_check_if_ok_to_scroll(gamestate.data.roomToLoad_xPos, gamestate.data.roomToLoad_yPos);
+    _load_room(gamestate.data.roomToLoad_xPos, gamestate.data.roomToLoad_yPos);
 
     return _fadein__room_partially_loaded();
 }
@@ -695,7 +679,7 @@ func __fadein__(partiallyLoadedRoom : u8 in a) {
 // DB = 0x7e
 #[mem8, idx8]
 func fadeout() {
-    _load_room_and_check_if_ok_to_scroll(gamestate.data.roomToLoad_xPos, gamestate.data.roomToLoad_yPos);
+    _load_room(gamestate.data.roomToLoad_xPos, gamestate.data.roomToLoad_yPos);
 
     return __fadeout__room_partially_loaded();
 }
@@ -762,8 +746,11 @@ func _scrolling_room_transition(_scrollDirection : ScrollDirection in x,
 
     x = pop8();
 
-    carry = _load_room_and_check_if_ok_to_scroll(x, y);
-    if !carry {
+    _load_room(x, y);
+
+    // Check if a fadeout transition was requested
+    a = roomstate.forceFadeoutRoomTransition;
+    if !zero {
         __fadeout__room_partially_loaded();
         return true;
     }

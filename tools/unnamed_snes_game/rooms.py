@@ -284,11 +284,6 @@ def parse_tmx_map(et: xml.etree.ElementTree.ElementTree) -> TmxMap:
     return TmxMap(map_class, tilesets, layers, entities, parameters)
 
 
-class MapLayer(NamedTuple):
-    map: bytes
-    tileset_id: int
-
-
 class RoomEntity(NamedTuple):
     xpos: int
     ypos: int
@@ -298,7 +293,6 @@ class RoomEntity(NamedTuple):
 
 class RoomIntermediate(NamedTuple):
     map_data: bytes
-    tileset_id: int
     entities: list[RoomEntity]
     room_event: Callback
     room_event_data: bytes
@@ -450,9 +444,6 @@ def process_room(
 ) -> RoomIntermediate:
     error_list: list[str] = list()
 
-    # ::TODO remove tileset_id from room data::
-    tileset_id = 0
-
     mt_map, sl_map = process_layers_and_tilesets(tmx_map, dependencies, error_list)
 
     room_entities = process_room_entities(tmx_map.entities, all_entities, mapping, error_list)
@@ -486,7 +477,7 @@ def process_room(
     if error_list:
         raise RoomError("Error compiling room", error_list)
 
-    return RoomIntermediate(mt_map, tileset_id, room_entities, room_event, room_event_data, sl_parameters, sl_map)
+    return RoomIntermediate(mt_map, room_entities, room_event, room_event_data, sl_parameters, sl_map)
 
 
 def create_room_entities_soa(entities: list[RoomEntity]) -> bytes:
@@ -519,11 +510,8 @@ def create_room_entities_soa(entities: list[RoomEntity]) -> bytes:
     return data
 
 
-def create_map_data(room: RoomIntermediate) -> bytes:
+def create_room_data(room: RoomIntermediate) -> bytes:
     data = bytearray(room.map_data)
-
-    # Tileset byte
-    data.append(room.tileset_id)
 
     # Room event
     assert len(room.room_event_data) == 4
@@ -549,7 +537,7 @@ def compile_room(filename: str, dependencies: RoomDependencies, entities: Entiti
 
     room = process_room(tmx_map, dependencies, mapping, entities.entities)
 
-    map_data = create_map_data(room)
+    map_data = create_room_data(room)
 
     # ::TODO compress room data with lz4::
     return EngineData(
