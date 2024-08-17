@@ -1244,6 +1244,7 @@ class DungeonInput(NamedTuple):
     name: Name
     id: int
     path: Filename
+    infinite: bool
     width: int
     height: int
     tileset: Name
@@ -1272,6 +1273,7 @@ def load_dungeons_json(filename: Filename) -> DungeonsJson:
             name=name,
             id=i,
             path=os.path.join(dirname, sj.get_string("path")),
+            infinite=sj.get_bool("infinite"),
             width=sj.get_int("width"),
             height=sj.get_int("height"),
             tileset=sj.get_name("tileset"),

@@ -41,6 +41,11 @@ let RESTORE_ROOMSTATE_OFFSET_X = 8;
 let RESTORE_ROOMSTATE_OFFSET_Y = 4;
 
 
+namespace DungeonFlags {
+    let INFINITE_BIT = 7;
+}
+
+
 // Dungeon data stored in RAM
 //
 // If the Dungeon data is in ROM (not resources-over-usb2snes), the ROM data is followed by:
@@ -48,6 +53,8 @@ let RESTORE_ROOMSTATE_OFFSET_Y = 4;
 //     If offset is 0 then there is no room for that dungeon cell.
 //   * room data
 struct _RamDataFormat {
+    flags: u8,
+
     width: u8,
     height: u8,
 
@@ -370,7 +377,30 @@ var _farPtr : far *u16 in zpTmp_farPtr;
     y = roomToLoad.roomPos_y;
 
     if x >= dungeonData.width || y >= dungeonData.height {
-        return false;
+        if !(dungeonData.flags $ DungeonFlags.INFINITE_BIT) {
+            return false;
+        }
+
+        a = x;
+        if negative {
+            x = dungeonData.width;
+            x--;
+        }
+        else if x >= dungeonData.width {
+            x = 0;
+        }
+
+        a = y;
+        if negative {
+            y = dungeonData.height;
+            y--;
+        }
+        else if y >= dungeonData.height {
+            y = 0;
+        }
+
+        roomToLoad.roomPos_x = x;
+        roomToLoad.roomPos_y = y;
     }
 
     a = *far &resources.UseResourcesOverUsb2Snes;

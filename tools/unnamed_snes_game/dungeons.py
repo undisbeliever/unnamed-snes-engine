@@ -12,6 +12,8 @@ from typing import Any, Final, Optional
 MAX_WIDTH: Final = 16
 MAX_HEIGHT: Final = 16
 
+INFINITE_FLAG: Final = 1 << 7
+
 
 class DungeonError(SimpleMultilineError):
     pass
@@ -59,6 +61,10 @@ def compile_dungeon_header(
     second_layer_id = get_optional_resource_id(dungeon.second_layer, mappings.second_layers, "second_layer", error_list)
     ms_spritesheet_id = get_resource_id(dungeon.ms_spritesheet, mappings.ms_spritesheets, "ms_spritesheet", error_list)
 
+    flags = 0
+    if dungeon.infinite:
+        flags |= INFINITE_FLAG
+
     song_id = get_song_id(dungeon.song, audio_project, error_list)
 
     # ::TODO verify tileset/second-layer will fit in VRAM::
@@ -80,6 +86,7 @@ def compile_dungeon_header(
 
     ram_data = bytes(
         [
+            flags,
             dungeon.width,
             dungeon.height,
             tileset_id,
@@ -102,8 +109,8 @@ def combine_dungeon_and_room_data(dungeon_name: Name, dungeon: EngineData, rooms
     errors = list()
 
     header: Final = dungeon.ram_data.data()
-    width: Final = header[0]
-    height: Final = header[1]
+    width: Final = header[1]
+    height: Final = header[2]
 
     room_table: Final = bytearray(width * height * 2)
     room_data = bytearray()
