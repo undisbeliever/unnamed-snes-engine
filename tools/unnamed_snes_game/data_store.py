@@ -343,7 +343,7 @@ class DataStore:
 
     def get_room_data(self, dungeon_id: int, room_x: int, room_y: int) -> Optional[BaseResourceData]:
         with self._lock:
-            return self._rooms[dungeon_id][(room_x, room_y)]
+            return self._rooms[dungeon_id].get((room_x, room_y))
 
     def get_dungeon_rooms(self, dungeon_id: int) -> dict[tuple[int, int], RoomData]:
         with self._lock:
