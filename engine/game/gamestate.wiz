@@ -59,23 +59,6 @@ struct GameStateData {
     playerState : PlayerState,
 
 
-    // ::TODO remove::
-    // The room to load in a non-scrolling room transition.
-    //
-    // Is not used by scrolling room transition.
-    //
-    // Will only be read by the ROOM_TRANSITION_FADEOUT and LOAD_ROOM_FADEIN transitions.
-    roomToLoad_x : u8,
-    roomToLoad_y : u8,
-
-    // The location to place the player in a non-scrolling room transition.
-    //
-    // NOTE: This value is unused by the scrolling room transitions.
-    // (u8 position)
-    roomToLoad_xPos : u8,
-    roomToLoad_yPos : u8,
-
-
     // Game State flags
     // (256 bit bitfield)
     gameFlags : [ u8 ; 256 / 8 ],
@@ -151,13 +134,8 @@ func new_game() {
 
 
     // ::TODO improve how start position is determined::
-    x = resources.STARTING_ROOM_X;
-    y = resources.STARTING_ROOM_Y;
-
-    data.currentRoom_x = x;
-    data.roomToLoad_x = x;
-    data.currentRoom_y = y;
-    data.roomToLoad_y = y;
+    data.currentRoom_x = x = resources.STARTING_ROOM_X;
+    data.currentRoom_y = y = resources.STARTING_ROOM_Y;
 }
 
 

@@ -482,10 +482,10 @@ inline func process__inline() {
 //
 // DB = 0x7e
 #[mem8, idx16]
-inline func draw_room_sl_map__forceblank__db_7e__inline() {
+inline func draw_room_sl_map__forceblank__mem8_idx16_db7e__inline() {
     negative = second_layer.is_part_of_room();
     if negative {
-        part_of_room._draw__forceblank__db_7e__inline();
+        part_of_room._draw__forceblank__mem8_idx16_db7e__inline();
     }
 }
 
@@ -1317,7 +1317,7 @@ namespace part_of_room {
     //
     // DB = 0x7e
     #[mem8, idx16]
-    func _draw__forceblank__db_7e__inline() {
+    func _draw__forceblank__mem8_idx16_db7e__inline() {
         let ROWS_TO_DRAW = ROOM_MAP_HEIGHT;
         let COLUMNS_TO_DRAW = ROOM_MAP_WIDTH;
 

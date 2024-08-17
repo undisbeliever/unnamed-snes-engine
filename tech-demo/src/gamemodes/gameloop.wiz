@@ -116,7 +116,7 @@ inline func _check_for_room_transition() {
         // Check if there is a room below this one
         a = gamestate.data.currentRoom_y;
         a++;
-        if a < dungeon.data.height {
+        if a < dungeon.dungeonData.height {
             set_next_game_mode_to_room_transition(RoomTransitions.scroll_down);
         }
 
@@ -136,7 +136,7 @@ inline func _check_for_room_transition() {
         // Check if there is a room to the right of this one
         a = gamestate.data.currentRoom_x;
         a++;
-        if a < dungeon.data.width {
+        if a < dungeon.dungeonData.width {
             set_next_game_mode_to_room_transition(RoomTransitions.scroll_right);
         }
     }

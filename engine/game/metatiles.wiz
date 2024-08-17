@@ -167,24 +167,17 @@ var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
 //
 // REQUIRES: Force-Blank, Tileset loaded into memory.
 //
-// DB = 0x80
+// DB = 0x7e
 #[mem8, idx8]
-func draw_map__forceblank() {
+func draw_map__forceblank__mem8_idx8_db7e__inline() {
 var _rowsLeft    : u8 in zpTmp_byte_0;
 var _columnsLeft : u8 in zpTmp_byte_1;
 
 
-    INIDISP = a = INIDISP_FORCE_BLANK | INIDISP_BRIGHTNESS_MASK;
+    *(far &VMAIN) = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+    *(far &VMADDL) = a = <:VRAM_METATILE_MAP_WADDR;
+    *(far &VMADDH) = a = >:VRAM_METATILE_MAP_WADDR;
 
-    VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
-    VMADDL = <:VRAM_METATILE_MAP_WADDR;
-    VMADDH = >:VRAM_METATILE_MAP_WADDR;
-
-
-
-    push8(a = 0x7e);
-    data_bank = pop8();
-// DB = 0x7e
 
 
     // ::TODO setup variables::
@@ -233,11 +226,6 @@ var _columnsLeft : u8 in zpTmp_byte_1;
     transitions._reset_state();
 
     drawTileBufferIndex = 0;
-
-
-    push8(program_bank);
-    data_bank = pop8();
-// DB = 0x80
 }
 
 

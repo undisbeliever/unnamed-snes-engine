@@ -13,6 +13,8 @@ namespace sl_callbacks {
 // =========
 
 // Storing variables in lowram so they can be accessed by _draw_fullscreen (DB=0x80) and process (DB=0x7e).
+//
+// Not storing these in roomstate as they change during a room transition.
 in lowram {
     let __STATE_START_ADDR = far &xPos_sx as u24;
 

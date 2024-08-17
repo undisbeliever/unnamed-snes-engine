@@ -78,3 +78,15 @@ in wram7e_roomstate {
 }
 
 
+struct RoomToLoad {
+    roomPos_x : u8,
+    roomPos_y : u8,
+    playerPos_x : u8,
+    playerPos_y : u8,
+}
+
+in wram7e {
+    var __roomToLoad : RoomToLoad;
+        var roomToLoad @ &__roomToLoad : RoomToLoad;
+}
+
