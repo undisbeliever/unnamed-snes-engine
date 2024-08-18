@@ -118,15 +118,15 @@ def combine_dungeon_and_room_data(dungeon_name: Name, dungeon: EngineData, rooms
     rd_offset: Final = len(room_table)
 
     for (x, y), r in rooms.items():
-        if x < 0 or x >= width or y < 0 or y >= height:
+        if x >= 0 and x < width and y >= 0 and y < height:
+            i = (y * width + x) * 2
+            o = rd_offset + len(room_data)
+            room_table[i] = o & 0xFF
+            room_table[i + 1] = o >> 8
+
+            room_data += r.data.ram_data.data()
+        else:
             errors.append(f"Invalid room position: {x}, {y}")
-
-        i = (y * width + x) * 2
-        o = rd_offset + len(room_data)
-        room_table[i] = o & 0xFF
-        room_table[i + 1] = o >> 8
-
-        room_data += r.data.ram_data.data()
 
     if errors:
         raise DungeonError(f"Cannot add rooms to dungeon '{dungeon_name}'", errors)
