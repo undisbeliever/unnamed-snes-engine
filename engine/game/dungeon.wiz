@@ -73,13 +73,18 @@ struct _RamDataFormat {
     // ::TODO add sl_callback arguments::
 }
 
+in lowram {
+    // Used to determine if the dungeon is loaded into memory.
+    // Set in `__load_dungeon()`
+    // Cleared in `reset_registers()`
+    // (byte flag)
+    var _dungeonLoaded : u8 in __dungeonLoadedFlag__;
+}
+
+
 in lowram_roomstate {
     var __dungeonData : _RamDataFormat;
         const dungeonData @ &__dungeonData : _RamDataFormat;
-
-    // ::TODO read this variable::
-    // (byte flag)
-    var _dungeonLoaded : u8;
 
     var _dungeonId : u8;
 }
@@ -190,6 +195,9 @@ var _restoreRoomState : u8 in __load_dungeon__restoreRoomState;
     // Fadeout if not in force-blank
     wait_multiple_frames_and_fadeout();
 
+    // Calling reset_registers here as it clears the _dungeonLoaded flag.
+    reset_registers();
+
     idx16();
     #[idx16] {
         push16(0x7e80);
@@ -203,7 +211,6 @@ var _restoreRoomState : u8 in __load_dungeon__restoreRoomState;
         *(&roomTable as *u16) = xx = *(&_dmaFarAddr as *u16);
         *(&#:roomTable as *u8) = a = #:_dmaFarAddr;
 
-        _dungeonLoaded = a = 1;
         room.dataType = RoomDataType.NO_ROOM;
 
         data_bank = pop8();
@@ -211,6 +218,7 @@ var _restoreRoomState : u8 in __load_dungeon__restoreRoomState;
     }
     mem8_idx8();
 
+    _dungeonLoaded = a = 1;
 
     a = _restoreRoomState;
     if zero {
@@ -230,9 +238,6 @@ var _restoreRoomState : u8 in __load_dungeon__restoreRoomState;
     // DB = 0x80
 
         // Load game subsystems
-
-        reset_registers();
-
         metasprites.setup__forceblank();
         metasprites.load_ms_spritesheet_ppu_data__forceblank(dungeonData.msSpritesheet);
         textbox.setup_ppu__forceblank();
@@ -321,6 +326,11 @@ var _restoreRoomState : u8 in __load_dungeon__restoreRoomState;
 #[mem8, idx8]
 func __load_room(_roomToLoad : RoomToLoad in roomToLoad) : bool in carry {
     var _warpRoom @ &room : WarpRoom;
+
+    a = _dungeonLoaded;
+    if zero {
+        return false;
+    }
 
     a = _dungeonId;
     if a != _roomToLoad.dungeon {

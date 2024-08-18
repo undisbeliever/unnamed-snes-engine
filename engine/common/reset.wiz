@@ -7,9 +7,13 @@ import "../registers";
 import "src/main";
 
 in lowram {
-    // ::HACK declare the `swapBg1AndBg2ScrollShadows` variables in `reset.wiz` to fix a::
+    // ::HACK declare the `swapBg1AndBg2ScrollShadows` variables in `reset.wiz`::
     // ::: to fix an "encountered a reference to `var bgB_scroll_y` before its type was known" error::
     var __swapBg1AndBg2ScrollShadows : u8;
+
+    // ::HACK declare the `_dungeonLoaded` flag in `reset.wiz`::
+    // ::: to fix an "encountered a reference to `var bgB_scroll_y` before its type was known" error::
+    var __dungeonLoadedFlag__ : u8;
 }
 
 
@@ -167,10 +171,12 @@ func reset_registers() {
                 x--;
             } while !negative;
         }
+        mem8();
 
 
-        // Reset scroll shadow state
+        // Reset flags
         __swapBg1AndBg2ScrollShadows = 0;
+        __dungeonLoadedFlag__ = 0;
     }
 
     data_bank = pop8();
