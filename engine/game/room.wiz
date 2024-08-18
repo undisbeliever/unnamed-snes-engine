@@ -11,6 +11,7 @@ let ROOM_MAP_HEIGHT = 14;
 
 
 enum RoomDataType : u8 {
+    NO_ROOM = 0,
     ROOM = 1,
     WARP = 2,
 }
@@ -18,6 +19,7 @@ enum RoomDataType : u8 {
 // Map data format
 // MUST be a multiple of 2 in size.
 struct RoomData {
+    // Also used to determine if a room is loaded into memory
     dataType: RoomDataType,
 
     map         : [ u8 ; ROOM_MAP_WIDTH * ROOM_MAP_HEIGHT ],

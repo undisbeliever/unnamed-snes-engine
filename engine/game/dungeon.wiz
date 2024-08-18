@@ -82,8 +82,6 @@ in lowram_roomstate {
     var _dungeonLoaded : u8;
 
     var _dungeonId : u8;
-
-    var _currentRoomValid : u8;
 }
 
 
@@ -206,7 +204,7 @@ var _restoreRoomState : u8 in __load_dungeon__restoreRoomState;
         *(&#:roomTable as *u8) = a = #:_dmaFarAddr;
 
         _dungeonLoaded = a = 1;
-        _currentRoomValid = 0;
+        room.dataType = RoomDataType.NO_ROOM;
 
         data_bank = pop8();
     // DB = 0x7e
@@ -222,7 +220,7 @@ var _restoreRoomState : u8 in __load_dungeon__restoreRoomState;
         restore_room_state_from_backup();
     }
 
-    // ::TODO test _currentRoomValid::
+    // ::TODO test if room loaded::
 
 
     idx16();
@@ -313,6 +311,8 @@ var _restoreRoomState : u8 in __load_dungeon__restoreRoomState;
 
 // Load a room into memory.
 //
+// Returns: true if a scrolling room transition can be preformed on `roomToLoad`.
+//
 // ASSUMES: Dungeon loaded into memory
 //
 // USES Multiplication registers
@@ -327,36 +327,36 @@ func __load_room(_roomToLoad : RoomToLoad in roomToLoad) : bool in carry {
         return false;
     }
 
-    carry = __load_room_into_memory__inline();
+    room.dataType = RoomDataType.NO_ROOM;
 
-    if carry {
-        a = room.dataType as u8;
-        if a == RoomDataType.ROOM as u8 {
-            _currentRoomValid = a = 1;
-            return true;
+    __load_room_into_memory__inline();
+
+    a = room.dataType as u8;
+    if a == RoomDataType.ROOM as u8 {
+        return true;
+    }
+    else if a == RoomDataType.WARP as u8 {
+        roomToLoad.dungeon = a = _warpRoom.dungeon;
+        roomToLoad.roomPos_x = a = _warpRoom.room_x;
+        roomToLoad.roomPos_y = a = _warpRoom.room_y;
+
+        if _warpRoom.flags $ WarpRoomFlags.MOVE_PLAYER_BIT {
+            roomToLoad.playerPos_x = a = _warpRoom.player_x;
+            roomToLoad.playerPos_y = a = _warpRoom.player_y;
+            return false;
         }
-        else if a == RoomDataType.WARP as u8 {
-            roomToLoad.dungeon = a = _warpRoom.dungeon;
-            roomToLoad.roomPos_x = a = _warpRoom.room_x;
-            roomToLoad.roomPos_y = a = _warpRoom.room_y;
-
-            if _warpRoom.flags $ WarpRoomFlags.MOVE_PLAYER_BIT {
-                roomToLoad.playerPos_x = a = _warpRoom.player_x;
-                roomToLoad.playerPos_y = a = _warpRoom.player_y;
-                return false;
-            }
-            if _warpRoom.flags $ WarpRoomFlags.FADEOUT_BIT {
-                return false;
-            }
-
+        else if _warpRoom.flags $ WarpRoomFlags.FADEOUT_BIT {
+            return false;
+        }
+        else {
             ^return __load_room(roomToLoad);
         }
     }
-
-    // Room is not valid
-    _currentRoomValid = 0;
-    __clear_room_memory();
-    return true;
+    else {
+        // Room is not valid
+        __clear_room_memory();
+        return true;
+    }
 }
 
 
@@ -372,8 +372,8 @@ func __finish_loading_room() {
     // Reset entity subsystem
     entityloop.init();
 
-    a = _currentRoomValid;
-    if !zero {
+    a = room.dataType as u8;
+    if a == RoomDataType.ROOM as u8 {
         metatiles.populate_map_tile_properties();
         room_events._init__inline();
 
@@ -404,17 +404,17 @@ func __finish_loading_room() {
 
 
 
-// Load a room into memory.
+// Load a room into memory if the room exists.
+//
+// CAUTION: Does not write to memory if the room does not exist.
 //
 // ASSUMES: Dungeon loaded
-//
-// RETURNS: true if the room exists.
 //
 // USES Multiplication registers
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func __load_room_into_memory__inline() : bool in carry {
+inline func __load_room_into_memory__inline() {
 var _farPtr : far *u16 in zpTmp_farPtr;
 
     x = roomToLoad.roomPos_x;
@@ -422,7 +422,7 @@ var _farPtr : far *u16 in zpTmp_farPtr;
 
     if x >= dungeonData.width || y >= dungeonData.height {
         if !(dungeonData.flags $ DungeonFlags.INFINITE_BIT) {
-            return false;
+            return;
         }
 
         a = x;
@@ -449,48 +449,39 @@ var _farPtr : far *u16 in zpTmp_farPtr;
 
     a = *far &resources.UseResourcesOverUsb2Snes;
     if !zero {
-        carry = resources_over_usb2snes.load_room(_dungeonId, x, y);
-
-        return carry;
+        resources_over_usb2snes.load_room(_dungeonId, x, y);
     }
+    else {
+        // Room data is stored in ROM, after the dungeon data.
 
-    // Room data is stored in ROM, after the dungeon data.
+        *(far &WRMPYA) = a = y;
+        *(far &WRMPYB) = a = dungeonData.width;
 
-    *(far &WRMPYA) = a = y;
-    *(far &WRMPYB) = a = dungeonData.width;
+        #:_farPtr = a = *(&#:roomTable as *u8);
 
-    #:_farPtr = a = *(&#:roomTable as *u8);
+        mem16_idx16();
+        #[mem16, idx16] {
+            *(&_farPtr as *u16) = aa = *(&roomTable as *u16);
 
-    mem16_idx16();
-    #[mem16, idx16] {
-        *(&_farPtr as *u16) = aa = *(&roomTable as *u16);
+            // calculate room offset
+            yy = aa = (xx + *(far &RDMPY)) << 1;
 
-        // calculate room offset
-        yy = aa = (xx + *(far &RDMPY)) << 1;
+            aa = _farPtr[unaligned yy];
+            if !zero {
+                *(&_farPtr as *u16) = aa = aa + *(&_farPtr as *u16);
 
-        aa = _farPtr[unaligned yy];
-        if !zero {
-            *(&_farPtr as *u16) = aa = aa + *(&_farPtr as *u16);
-
-            // Copy room into memory.
-            // Assumes room data is a multiple of 2 in size
-            yy = sizeof(typeof(room)) - 2;
-            do {
-                (&room as *u16)[unaligned yy] = aa = _farPtr[unaligned yy];
-                yy--;
-                yy--;
-            } while !negative;
-
-            carry = true;
+                // Copy room into memory.
+                // Assumes room data is a multiple of 2 in size
+                yy = sizeof(typeof(room)) - 2;
+                do {
+                    (&room as *u16)[unaligned yy] = aa = _farPtr[unaligned yy];
+                    yy--;
+                    yy--;
+                } while !negative;
+            }
         }
-        else {
-            // room does not exist
-            carry = false;
-        }
+        mem8_idx8();
     }
-    mem8_idx8();
-
-    return carry;
 }
 
 
