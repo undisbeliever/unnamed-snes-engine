@@ -166,6 +166,7 @@ func fadein_reset_player() {
     // Also causes the player's MetaSprite frame to be reset in a scrolling room transition.
     engine_hooks.room_transitions__reset_player__inline();
 
+    roomToLoad.dungeon = a = gamestate.data.currentDungeon;
     roomToLoad.roomPos_x = a = gamestate.data.currentRoom_x;
     roomToLoad.roomPos_y = a = gamestate.data.currentRoom_y;
     roomToLoad.playerPos_x = a = gamestate.data.playerState.xPos;
@@ -179,11 +180,19 @@ func fadein_reset_player() {
 // Fadeout the screen, load resources, load roomToLoad, fadein the screen.
 //
 // DB = 0x7e
-#[mem8, idx8]
+#[fallthrough, mem8, idx8]
 func _fadein_load_dungeon_and_room(roomToLoad : RoomToLoad in roomToLoad) {
-    // ::TODO select dungeon id::
-    dungeon.load_dungeon_and_room(0, roomToLoad);
+    dungeon.load_dungeon_and_room(roomToLoad);
 
+// Fallthrough
+}
+
+
+// Assumes dungeon is loaded
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _fadein_after_dungeon_load() {
     wait_multiple_frames_and_fadein();
 
     carry = _test_player_position_is_valid();
@@ -230,6 +239,7 @@ func _scrolling_room_transition(_scrollDirection : ScrollDirection in x,
     scrollDirection = x as ScrollDirection;
     roomToLoad.roomPos_x = a = gamestate.data.currentRoom_x + ScrollDirection_RoomOffset_x[x] as u8;
     roomToLoad.roomPos_y = a = gamestate.data.currentRoom_y + ScrollDirection_RoomOffset_y[x] as u8;
+    roomToLoad.dungeon = a = gamestate.data.currentDungeon;
 
     // Check if a fadeout transition was requested
     a = roomstate.forceFadeoutRoomTransition;
@@ -242,7 +252,13 @@ func _scrolling_room_transition(_scrollDirection : ScrollDirection in x,
     _clear_sprite_list();
     _add_entities_to_sprite_list();
 
-    dungeon.load_room__inline(roomToLoad);
+    carry = dungeon.load_room__inline(roomToLoad);
+    if !carry {
+        // ::TODO improve this::
+        dungeon.load_dungeon_and_room__no_roomstate_backup__inline(roomToLoad);
+        _fadein_after_dungeon_load();
+        return true;
+    }
 
     _add_entities_to_sprite_list_with_offset(scrollDirection);
     _sprite_list_set_player_with_offset(scrollDirection);

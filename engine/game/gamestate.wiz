@@ -51,6 +51,7 @@ struct GameStateData {
     // ::TODO add dungron_id::
 
     // The current room within the dungeon
+    currentDungeon : u8,
     currentRoom_x : u8,
     currentRoom_y : u8,
 
@@ -134,6 +135,7 @@ func new_game() {
 
 
     // ::TODO improve how start position is determined::
+    data.currentDungeon = 0;
     data.currentRoom_x = x = resources.STARTING_ROOM_X;
     data.currentRoom_y = y = resources.STARTING_ROOM_Y;
 }

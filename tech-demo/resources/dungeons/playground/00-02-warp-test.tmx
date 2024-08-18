@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.11" tiledversion="1.11.0" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="3" nextobjectid="2">
+ <objectgroup id="2" name="Warp">
+  <object id="1" x="16" y="16" width="224" height="48">
+   <text wrap="1">warp 01-01</text>
+  </object>
+ </objectgroup>
+</map>

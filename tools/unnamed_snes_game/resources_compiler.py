@@ -602,6 +602,7 @@ class RoomCompiler:
     def compile_room(self, filename: Filename) -> BaseResourceData:
         assert self._shared_input.mappings
         assert self._shared_input.entities
+        assert self._shared_input.dungeons
 
         try:
             room_id = -1
@@ -620,7 +621,7 @@ class RoomCompiler:
             if deps is None:
                 raise RuntimeError("Dependency error")
 
-            data = compile_room(filename, deps, self._shared_input.entities, self._shared_input.mappings)
+            data = compile_room(filename, deps, self._shared_input.entities, self._shared_input.mappings, self._shared_input.dungeons)
 
             return RoomData(None, room_id, name, data, dungeon_id=dungeon_id, position=position)
         except Exception as e:
