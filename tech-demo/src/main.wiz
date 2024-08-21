@@ -123,7 +123,7 @@ inline func main__inline() {
             audio.load_song(resources.songs.TitleScreenTheme);
         }
 
-        execute_game_mode__inline();
+        execute_game_mode();
     }
 }
 
