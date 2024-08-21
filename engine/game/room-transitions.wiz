@@ -141,7 +141,7 @@ in wram7e {
 
 in code {
 
-let load_room__fadein = _fadein_load_dungeon_and_room as func();
+let load_room__fadein = dungeon.load_dungeon_and_room as func;
 
 
 // Room Transitions
@@ -172,45 +172,7 @@ func fadein_reset_player() {
     roomToLoad.playerPos_x = a = gamestate.data.playerState.xPos;
     roomToLoad.playerPos_y = a = gamestate.data.playerState.yPos;
 
-
-// Fallthrough
-}
-
-
-// Fadeout the screen, load resources, load roomToLoad, fadein the screen.
-//
-// DB = 0x7e
-#[fallthrough, mem8, idx8]
-func _fadein_load_dungeon_and_room(roomToLoad : RoomToLoad in roomToLoad) {
-    dungeon.load_dungeon_and_room(roomToLoad);
-
-// Fallthrough
-}
-
-
-// Assumes dungeon is loaded
-//
-// DB = 0x7e
-#[mem8, idx8]
-func _fadein_after_dungeon_load() {
-    wait_multiple_frames_and_fadein();
-
-    carry = _test_player_position_is_valid();
-    if !carry {
-        // Player is in an invalid position.
-        wait_one_second();
-
-        // ::TODO do something if the position is invalid a second time::
-        // ::TODO do something if backup is invalid::
-        dungeon.load_dungeon_and_restore_roomstate();
-        wait_multiple_frames_and_fadein();
-    }
-
-
-    // The player is in a valid position.  Make a backup of the game state.
-    gamestate.backup_gamestate();
-
-    set_next_game_mode(GameModes.GAME_LOOP);
+    ^return dungeon.load_dungeon_and_room(roomToLoad);
 }
 
 
@@ -244,21 +206,14 @@ func _scrolling_room_transition(_scrollDirection : ScrollDirection in x,
     // Check if a fadeout transition was requested
     a = roomstate.forceFadeoutRoomTransition;
     if !zero {
-        _fadein_load_dungeon_and_room(roomToLoad);
-        return true;
+        dungeon.load_dungeon_and_room(roomToLoad);
     }
 
     _reset_camera();
     _clear_sprite_list();
     _add_entities_to_sprite_list();
 
-    carry = dungeon.load_room__inline(roomToLoad);
-    if !carry {
-        // ::TODO improve this::
-        dungeon.load_dungeon_and_room__no_roomstate_backup__inline(roomToLoad);
-        _fadein_after_dungeon_load();
-        return true;
-    }
+    dungeon.load_room__inline(roomToLoad);
 
     _add_entities_to_sprite_list_with_offset(scrollDirection);
     _sprite_list_set_player_with_offset(scrollDirection);
