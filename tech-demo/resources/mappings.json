@@ -1,9 +1,9 @@
 {
  "game_title": "UNNAMED TECH DEMO",
  "memory_map": {
-   "mode": "lorom",
-   "first_resource_bank": "82",
-   "n_resource_banks": 6
+   "mode": "hirom",
+   "first_resource_bank": "c1",
+   "n_resource_banks": 3
  },
  "tad_binary_directory": "../../terrific-audio-driver/target/release/",
 
@@ -17,7 +17,8 @@
    "dungeon"
  ],
  "second_layers": [
-   "scrolling_test"
+   "scrolling_test",
+   "sl_floor"
  ],
  "ms_spritesheets": [
    "common",
@@ -36,16 +37,6 @@
    "licenses_bg1",
    "licenses_bg2"
  ],
-
- "songs": [
-   "__null__common_data__",
-   "DungeonTheme",
-   "BossTheme",
-   "GameOverTheme",
-   "CreditsTheme",
-   "TitleScreenTheme"
- ],
-
  "interactive_tile_functions": [
    "player_tile_collision_test",
    "doorway",
@@ -53,7 +44,7 @@
    "heal",
    "poison"
  ],
- "starting_room": "08-15-entrance",
+ "starting_room": "00-00-top-left",
  "gamestate_flags": [
    "first_key_room__left_key",
    "first_key_room__right_key",

@@ -4,7 +4,7 @@
 
 import os
 import argparse
-from unnamed_snes_game.resources_compiler import DataStore
+from unnamed_snes_game.data_store import DataStore
 from unnamed_snes_game.resources_over_usb2snes import FsWatcherThread, WebsocketThread
 from unnamed_snes_game.gui.ro_usb2snes_gui import Rou2sWindow
 
@@ -12,7 +12,6 @@ from unnamed_snes_game.gui.ro_usb2snes_gui import Rou2sWindow
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("-a", "--address", required=False, default="ws://localhost:8080", help="Websocket address")
-    parser.add_argument("-j", "--processes", required=False, type=int, default=None, help="Number of processors to use (default=all)")
     parser.add_argument("resources_directory", action="store", help="resources directory")
     parser.add_argument("sfc_file", action="store", help="sfc file (without resources)")
 
@@ -25,7 +24,7 @@ def main() -> None:
     gui = Rou2sWindow(data_store)
     signals = gui.signals
 
-    gui.add_bg_thread(FsWatcherThread(data_store, signals, sfc_file_relpath, args.processes))
+    gui.add_bg_thread(FsWatcherThread(data_store, signals, sfc_file_relpath))
     gui.add_bg_thread(WebsocketThread(data_store, signals, sfc_file_relpath, args.address))
 
     gui.mainloop()

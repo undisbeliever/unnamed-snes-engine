@@ -1,0 +1,26 @@
+{
+  "dungeons": [
+  {
+    "name": "playground",
+    "path": "dungeons/playground",
+    "infinite": true,
+    "width": 2,
+    "height": 3,
+    "tileset": "dungeon",
+    "second_layer": "sl_floor",
+    "ms_spritesheet": "dungeon",
+    "song": "blank"
+  },
+  {
+    "name": "dungeon",
+    "path": "rooms",
+    "infinite": false,
+    "width": 15,
+    "height": 16,
+    "tileset": "dungeon",
+    "second_layer": null,
+    "ms_spritesheet": "dungeon",
+    "song": "DungeonTheme"
+  }
+  ]
+}

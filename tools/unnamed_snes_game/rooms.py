@@ -11,7 +11,7 @@ import struct
 import xml.etree.ElementTree
 import posixpath
 from collections import OrderedDict
-from typing import Final, NamedTuple, Optional
+from typing import Final, NamedTuple, Optional, Union
 
 from .json_formats import (
     Mappings,
@@ -20,12 +20,14 @@ from .json_formats import (
     SecondLayerCallback,
     Callback,
     SecondLayerInput,
+    DungeonsJson,
+    DungeonInput,
+    OtherResources,
     Name,
 )
-from .common import EngineData, FixedSizedData, SimpleMultilineError
+from .data_store import EngineData, FixedSizedData
+from .errors import SimpleMultilineError
 from .callbacks import parse_callback_parameters, ROOM_CALLBACK, SL_ROOM_PARAMETERS, RoomDoors, parse_int
-
-from .second_layers import MT_TILE_PX as SECOND_LAYER_MT_TILE_PX
 
 
 MAP_WIDTH = 16
@@ -38,7 +40,17 @@ ENTITIES_IN_MAP = 8
 
 TILE_SIZE = 16
 
+GID_FLIP_MASK: Final = 0b1111 << (32 - 4)
+
 BLANK_SL_PARAMETERS: Final = bytes(SL_ROOM_PARAMETERS.parameter_size)
+
+
+ROOM_DATA_TYPE: Final = 1
+WARP_ROOM_DATA_TYPE: Final = 2
+
+
+WARP_ROOM_MOVE_PLAYER_FLAG: Final = 1 << 7
+WARP_ROOM_FADEOUT_FLAG: Final = 1 << 6
 
 
 class RoomError(SimpleMultilineError):
@@ -47,8 +59,10 @@ class RoomError(SimpleMultilineError):
 
 # Storing room dependencies in a NamedTuple as I am planning to add more in the future
 class RoomDependencies(NamedTuple):
-    second_layer: SecondLayerInput
+    dungeon: DungeonInput
+    second_layer: Optional[SecondLayerInput]
     sl_callback: Optional[SecondLayerCallback]
+    mt_tileset: Name
 
 
 # `TmxMap` is a limited subset of the TMX data format
@@ -56,14 +70,13 @@ class RoomDependencies(NamedTuple):
 
 
 class TmxTileset(NamedTuple):
-    name: str
+    basename: str
     firstgid: int
 
 
-class TmxImageLayer(NamedTuple):
+class TmxLayer(NamedTuple):
     name: str
-    offset_x: int
-    offset_y: int
+    map: list[int]
 
 
 class TmxEntity(NamedTuple):
@@ -77,11 +90,14 @@ class TmxEntity(NamedTuple):
 
 class TmxMap(NamedTuple):
     map_class: str
-    tileset: TmxTileset
-    image_layer: Optional[TmxImageLayer]
-    map: list[int]
+    tilesets: list[TmxTileset]
+    layers: list[TmxLayer]
     entities: list[TmxEntity]
     parameters: OrderedDict[Name, str]
+
+
+class TmxWarpRoom(NamedTuple):
+    warp_string: str
 
 
 def validate_tag_attr(tag: xml.etree.ElementTree.Element, name: str, value: str, error_list: list[str]) -> None:
@@ -102,16 +118,21 @@ def read_tag_attr_int(tag: xml.etree.ElementTree.Element, name: str, error_list:
         return 0
 
 
-def parse_tileset_tag(tag: xml.etree.ElementTree.Element) -> Optional[TmxTileset]:
+def parse_tileset_tag(tag: xml.etree.ElementTree.Element) -> TmxTileset:
+    source = tag.attrib.get("source")
+
+    if source is None:
+        raise ValueError("Embedded tilesets are not supported")
+
     # basename without extension
-    tileset_name = posixpath.splitext(posixpath.basename(tag.attrib["source"]))[0]
+    basename = posixpath.splitext(posixpath.basename(source))[0]
 
     firstgid = int(tag.attrib["firstgid"])
 
-    return TmxTileset(tileset_name, firstgid)
+    return TmxTileset(basename, firstgid)
 
 
-def parse_layer_tag(tag: xml.etree.ElementTree.Element) -> list[int]:
+def parse_layer_tag(tag: xml.etree.ElementTree.Element) -> TmxLayer:
     layer_width = tag.attrib.get("width")
     layer_height = tag.attrib.get("height")
 
@@ -136,30 +157,15 @@ def parse_layer_tag(tag: xml.etree.ElementTree.Element) -> list[int]:
     if len(binary_data) != expected_binary_data_size:
         raise ValueError(f"Tile layer data size mismatch (got { len(binary_data) }, expected { expected_binary_data_size })")
 
-    tiles = [i[0] for i in struct.iter_unpack("<I", binary_data)]
-
-    return tiles
-
-
-def parse_imagelayer_tag(tag: xml.etree.ElementTree.Element) -> TmxImageLayer:
-    offset_x = tag.attrib.get("offsetx", 0)
-    offset_y = tag.attrib.get("offsety", 0)
-
-    try:
-        offset_x = int(offset_x)
-        offset_y = int(offset_y)
-    except ValueError:
-        raise ValueError(f"Invalid <imagelayer> offset, expected integer values: {offset_x}, {offset_y}")
-
-    return TmxImageLayer(
-        name=tag.attrib.get("name", "imagelayer"),
-        offset_x=offset_x,
-        offset_y=offset_y,
+    return TmxLayer(
+        tag.attrib.get("name", ""),
+        [i[0] for i in struct.iter_unpack("<I", binary_data)],
     )
 
 
-def parse_objectgroup_tag(tag: xml.etree.ElementTree.Element, error_list: list[str]) -> list[TmxEntity]:
+def parse_objectgroup_tag(tag: xml.etree.ElementTree.Element, error_list: list[str]) -> tuple[list[TmxEntity], Optional[TmxWarpRoom]]:
     objects = list()
+    warp_room = None
 
     if "offsetx" in tag.attrib or "offsety" in tag.attrib:
         error_list.append("<objectgroup> tag must not have an offset")
@@ -171,39 +177,49 @@ def parse_objectgroup_tag(tag: xml.etree.ElementTree.Element, error_list: list[s
             def add_error(msg: str) -> None:
                 error_list.append(f'<object id="{ o_id_str }">: { msg }')
 
-            o_id = read_tag_attr_int(child, "id", error_list)
-            o_name = child.attrib.get("name")
-            o_x = read_tag_attr_int(child, "x", error_list)
-            o_y = read_tag_attr_int(child, "y", error_list)
-            o_type = child.attrib.get("class", child.attrib.get("type"))  # Tiled 1.9 renamed 'type' attribute to 'class'
+            if len(child) == 1 and child[0].tag == "text":
+                c = child[0]
+                if warp_room is None:
+                    warp_text = c.text
+                    if warp_text:
+                        warp_room = TmxWarpRoom(warp_text)
+                    else:
+                        add_error("No text")
+                else:
+                    add_error("Only one <text> tag is allowed per room")
+            else:
+                o_id = read_tag_attr_int(child, "id", error_list)
+                o_name = child.attrib.get("name")
+                o_x = read_tag_attr_int(child, "x", error_list)
+                o_y = read_tag_attr_int(child, "y", error_list)
+                o_type = child.attrib.get("class", child.attrib.get("type"))  # Tiled 1.9 renamed 'type' attribute to 'class'
 
-            if not o_type:
-                add_error("Missing type")
-                o_type = "__ERROR__"
+                if not o_type:
+                    add_error("Missing type")
+                    o_type = "__ERROR__"
 
-            parameter = None
+                parameter = None
 
-            if not any([c.tag == "point" for c in child]):
-                add_error("Object must be a point")
+                if not any([c.tag == "point" for c in child]):
+                    add_error("Object must be a point")
 
-            for c in child:
-                if c.tag == "properties":
-                    for p in c:
-                        if p.tag == "property":
-                            if parameter is None:
-                                p_name = p.attrib.get("name", "")
-                                if p_name == "parameter":
-                                    parameter = p.attrib.get("value")
-                                    if not parameter:
-                                        add_error("Missing parameter value")
+                for c in child:
+                    if c.tag == "properties":
+                        for p in c:
+                            if p.tag == "property":
+                                if parameter is None:
+                                    p_name = p.attrib.get("name", "")
+                                    if p_name == "parameter":
+                                        parameter = p.attrib.get("value")
+                                        if not parameter:
+                                            add_error("Missing parameter value")
+                                    else:
+                                        add_error(f"Unknown property: { p_name }")
                                 else:
-                                    add_error(f"Unknown property: { p_name }")
-                            else:
-                                add_error("Only one parameter is allowed per entity")
+                                    add_error("Only one parameter is allowed per entity")
+                objects.append(TmxEntity(o_id, o_name, o_x, o_y, o_type, parameter))
 
-            objects.append(TmxEntity(o_id, o_name, o_x, o_y, o_type, parameter))
-
-    return objects
+    return objects, warp_room
 
 
 def parse_map_parameters_tag(tag: xml.etree.ElementTree.Element, error_list: list[str]) -> OrderedDict[Name, str]:
@@ -227,7 +243,7 @@ def parse_map_parameters_tag(tag: xml.etree.ElementTree.Element, error_list: lis
     return out
 
 
-def parse_tmx_map(et: xml.etree.ElementTree.ElementTree) -> TmxMap:
+def parse_tmx_map(et: xml.etree.ElementTree.ElementTree) -> Union[TmxMap | TmxWarpRoom]:
     error_list: list[str] = list()
 
     root = et.getroot()
@@ -243,69 +259,71 @@ def parse_tmx_map(et: xml.etree.ElementTree.ElementTree) -> TmxMap:
     validate_tag_attr(root, "tileheight", str(TILE_SIZE), error_list)
     validate_tag_attr(root, "infinite", "0", error_list)
 
-    map_class = root.attrib.get("class", root.attrib.get("type"))  # Tiled 1.9 renamed 'type' attribute to 'class'
-    if not map_class:
-        error_list.append("<map>: Missing class/type attribute")
-
-    tileset = None
-    image_layer = None
-    tiles = None
+    tilesets = list()
+    layers = list()
     entities = None
+    warp_room = None
     parameters = OrderedDict[Name, str]()
 
     for child in root:
         if child.tag == "tileset":
-            if tileset is not None:
-                error_list.append("Expected only one <tileset> tag")
             try:
-                tileset = parse_tileset_tag(child)
+                tilesets.append(parse_tileset_tag(child))
             except Exception as e:
                 error_list.append(f"<tileset>: { e }")
 
         elif child.tag == "layer":
-            if tiles is not None:
-                error_list.append("Expected only one <layer> tag")
             try:
-                tiles = parse_layer_tag(child)
+                layers.append(parse_layer_tag(child))
             except Exception as e:
                 error_list.append(f"<layer>: { e }")
-
-        elif child.tag == "imagelayer":
-            if image_layer is not None:
-                error_list.append("Expected only one <imagelayer> tag")
-            try:
-                image_layer = parse_imagelayer_tag(child)
-            except Exception as e:
-                error_list.append(f"<imagelayer>: { e }")
 
         elif child.tag == "objectgroup":
             if entities is not None:
                 error_list.append("Expected only one <objectgroup> tag")
-            entities = parse_objectgroup_tag(child, error_list)
+            entities, warp_room = parse_objectgroup_tag(child, error_list)
 
         elif child.tag == "properties":
             if parameters:
                 error_list.append("Expected only one <properties> tag")
             parameters = parse_map_parameters_tag(child, error_list)
 
-    if entities is None:
-        entities = list()
+    if warp_room:
+        if tilesets:
+            error_list.append("<tileset> tag not allowed in a warp room")
 
-    if tileset is None:
-        error_list.append("Missing <tileset> tag")
+        if layers:
+            error_list.append("<layer> tag not allowed in a warp room")
 
-    if tiles is None:
-        error_list.append("Missing <layer> tag")
+        if entities:
+            error_list.append("Entities are not allowed in a warp room")
 
-    if error_list:
-        raise RoomError("Error reading TMX file", error_list)
+        if error_list:
+            raise RoomError("Error reading TMX file", error_list)
 
-    assert map_class
-    assert tileset
-    assert tiles
-    assert entities is not None
+        return warp_room
 
-    return TmxMap(map_class, tileset, image_layer, tiles, entities, parameters)
+    else:
+        map_class = root.attrib.get("class", root.attrib.get("type"))  # Tiled 1.9 renamed 'type' attribute to 'class'
+        if not map_class:
+            error_list.append("<map>: Missing class/type attribute")
+
+        if entities is None:
+            entities = list()
+
+        if not tilesets:
+            error_list.append("Missing <tileset> tag")
+
+        if not layers:
+            error_list.append("Missing <layer> tag")
+
+        if error_list:
+            raise RoomError("Error reading TMX file", error_list)
+
+        assert map_class
+        assert entities is not None
+
+        return TmxMap(map_class, tilesets, layers, entities, parameters)
 
 
 class RoomEntity(NamedTuple):
@@ -317,11 +335,11 @@ class RoomEntity(NamedTuple):
 
 class RoomIntermediate(NamedTuple):
     map_data: bytes
-    tileset_id: int
     entities: list[RoomEntity]
     room_event: Callback
     room_event_data: bytes
     sl_parameters: bytes
+    sl_map: Optional[bytes]
 
 
 def process_room_entities(
@@ -389,25 +407,78 @@ def process_room_entities(
     return out
 
 
-def part_of_room_sl_parameters(image_layer: TmxImageLayer, error_list: list[str]) -> bytes:
-    # ::TODO limit offset to second layer image size::
-    # ::TODO implement image wraparound for positive offset values::
-
-    if image_layer.offset_x > 0:
-        error_list.append("<imagelayer> offsetx must be negative")
-
-    if image_layer.offset_y > 0:
-        error_list.append("<imagelayer> offsety must be negative")
-
-    tile_pos_x, x_div = divmod(abs(image_layer.offset_x), SECOND_LAYER_MT_TILE_PX)
-    tile_pos_y, y_div = divmod(abs(image_layer.offset_y), SECOND_LAYER_MT_TILE_PX)
-
-    return bytes((tile_pos_x, tile_pos_y))
-
-
 # ::TODO make configurable::
 LOCKED_DOOR_TILE_IDS: Final = (0x80, 0xA0, 0xC0, 0xE0)
 OPEN_DOOR_TILE_IDS: Final = (0x82, 0xA2, 0xC2, 0xE2)
+
+
+def process_layer(tilemap: TmxTileset, layer: TmxLayer, error_list: list[str]) -> Optional[bytes]:
+    firstgid: Final = tilemap.firstgid
+    try:
+        return bytes([i - firstgid if i != 0 else 0 for i in layer.map])
+    except ValueError:
+        # There is a bad cell in the map
+        lastgid = firstgid + 256 - 1
+
+        for i, t in enumerate(layer.map):
+            if t != 0 and (t < firstgid or t > lastgid):
+                x, y = divmod(i, MAP_WIDTH)
+                if t & GID_FLIP_MASK != 0:
+                    error_list.append(f'<layer name="{layer.name}"> {x}, {y}: flipped tiles are not allowed')
+                else:
+                    error_list.append(f'<layer name="{layer.name}"> {x}, {y}: invalid tile {t} (wrong tileset?)')
+
+        return None
+
+
+def is_mt_tileset(tileset: TmxTileset, dependencies: RoomDependencies) -> bool:
+    return tileset.basename == dependencies.mt_tileset
+
+
+def process_layers_and_tilesets(
+    tmx_map: TmxMap, dependencies: RoomDependencies, error_list: list[str]
+) -> tuple[Optional[bytes], Optional[bytes]]:
+
+    if dependencies.second_layer and dependencies.second_layer.part_of_room:
+        if len(tmx_map.tilesets) == 2 and len(tmx_map.layers) == 2:
+            if dependencies.second_layer.above_metatiles:
+                mt_map, sl_map = tmx_map.layers[0], tmx_map.layers[1]
+            else:
+                mt_map, sl_map = tmx_map.layers[1], tmx_map.layers[0]
+
+            if is_mt_tileset(tmx_map.tilesets[0], dependencies):
+                mt_tileset, sl_tileset = tmx_map.tilesets[0], tmx_map.tilesets[1]
+            elif is_mt_tileset(tmx_map.tilesets[1], dependencies):
+                mt_tileset, sl_tileset = tmx_map.tilesets[1], tmx_map.tilesets[0]
+            else:
+                error_list.append(f'Cannot find dungeon metatile tileset "{dependencies.mt_tileset}"')
+                return None, None
+
+            if sl_tileset.basename != dependencies.second_layer.name:
+                error_list.append(f'<tileset {sl_tileset.basename}> does not match second-layer "{dependencies.second_layer.name}"')
+
+            return process_layer(mt_tileset, mt_map, error_list), process_layer(sl_tileset, sl_map, error_list)
+        else:
+            if len(tmx_map.tilesets) != 2:
+                error_list.append("Expected two <tileset> tags.  Second-Layer is part_of_room.")
+            if len(tmx_map.layers) != 2:
+                error_list.append("Expected two <layer> tags.  Second-Layer is part_of_room.")
+            return None, None
+
+    else:
+        if len(tmx_map.tilesets) == 1 and len(tmx_map.layers) == 1:
+            mt_tileset, mt_map = tmx_map.tilesets[0], tmx_map.layers[0]
+
+            if not is_mt_tileset(mt_tileset, dependencies):
+                error_list.append("<tileset> does not match dungeon metatile tileset")
+
+            return process_layer(mt_tileset, mt_map, error_list), None
+        else:
+            if len(tmx_map.layers) != 1:
+                error_list.append("Expected one <tileset> tag.  There is only one room layer")
+            if len(tmx_map.layers) != 1:
+                error_list.append("Expected one <layer> tag.  There is only one room layer")
+            return None, None
 
 
 def process_room(
@@ -415,48 +486,30 @@ def process_room(
 ) -> RoomIntermediate:
     error_list: list[str] = list()
 
-    try:
-        tileset_id = mapping.mt_tilesets.index(tmx_map.tileset.name)
-    except ValueError:
-        error_list.append("Unknown MetaTile tileset name: { tmx_map.tileset.name }")
-
-    try:
-        map_data = bytes([i - tmx_map.tileset.firstgid for i in tmx_map.map])
-    except ValueError:
-        error_list.append(
-            "Unknown tile in map.  There must be a maximum of 256 tiles in the tileset and no transparent or flipped tiles in the map."
-        )
+    mt_map, sl_map = process_layers_and_tilesets(tmx_map, dependencies, error_list)
 
     room_entities = process_room_entities(tmx_map.entities, all_entities, mapping, error_list)
-
-    assert len(map_data) == MAP_WIDTH * MAP_HEIGHT
-    room_doors = RoomDoors(
-        map_data=map_data,
-        locked_door_tiles=LOCKED_DOOR_TILE_IDS,
-        open_door_tiles=OPEN_DOOR_TILE_IDS,
-    )
 
     room_event = mapping.room_events.get(tmx_map.map_class)
     if not room_event:
         error_list.append("Unknown room event: { tmx_map.map_class }")
-    else:
-        room_event_data = parse_callback_parameters(ROOM_CALLBACK, room_event, tmx_map.parameters, mapping, room_doors, error_list)
 
-    if dependencies.second_layer.part_of_room:
-        if dependencies.sl_callback:
-            assert dependencies.sl_callback.room_parameters, "part-of-room second-layer must not have a callback with room_parameters"
+    if error_list:
+        raise RoomError("Error compiling room", error_list)
 
-        if tmx_map.image_layer:
-            sl_parameters = part_of_room_sl_parameters(tmx_map.image_layer, error_list)
-        else:
-            drp = dependencies.second_layer.default_room_pos
-            if drp:
-                sl_parameters = bytes((drp.x, drp.y))
-            else:
-                error_list.append(
-                    "Cannot position part-of-room second-layer: No <imagelayer> in map or default_room_pos in second-layer"
-                )
-    elif dependencies.sl_callback:
+    assert mt_map is not None
+    assert room_event is not None
+
+    assert len(mt_map) == MAP_WIDTH * MAP_HEIGHT
+    room_doors = RoomDoors(
+        map_data=mt_map,
+        locked_door_tiles=LOCKED_DOOR_TILE_IDS,
+        open_door_tiles=OPEN_DOOR_TILE_IDS,
+    )
+
+    room_event_data = parse_callback_parameters(ROOM_CALLBACK, room_event, tmx_map.parameters, mapping, room_doors, error_list)
+
+    if dependencies.sl_callback:
         sl_parameters = parse_callback_parameters(
             SL_ROOM_PARAMETERS, dependencies.sl_callback, tmx_map.parameters, mapping, None, error_list
         )
@@ -466,9 +519,7 @@ def process_room(
     if error_list:
         raise RoomError("Error compiling room", error_list)
 
-    assert room_event is not None
-
-    return RoomIntermediate(map_data, tileset_id, room_entities, room_event, room_event_data, sl_parameters)
+    return RoomIntermediate(mt_map, room_entities, room_event, room_event_data, sl_parameters, sl_map)
 
 
 def create_room_entities_soa(entities: list[RoomEntity]) -> bytes:
@@ -501,11 +552,12 @@ def create_room_entities_soa(entities: list[RoomEntity]) -> bytes:
     return data
 
 
-def create_map_data(room: RoomIntermediate) -> bytes:
-    data = bytearray(room.map_data)
+def create_room_data(room: RoomIntermediate) -> bytes:
+    data = bytearray()
 
-    # Tileset byte
-    data.append(room.tileset_id)
+    data.append(ROOM_DATA_TYPE)
+
+    data += room.map_data
 
     # Room event
     assert len(room.room_event_data) == 4
@@ -517,24 +569,111 @@ def create_map_data(room: RoomIntermediate) -> bytes:
 
     data += create_room_entities_soa(room.entities)
 
+    if room.sl_map:
+        data += room.sl_map
+
     return data
 
 
-def compile_room(filename: str, dependencies: RoomDependencies, entities: EntitiesJson, mapping: Mappings) -> EngineData:
+WARP_REGEX: Final = re.compile(r"^warp\s+(\w+\s+)?(\d+)-(\d+)(-[^\s]*)?(\s+\d+\s*,\s*\d+)?(\s+fadeout)?$")
+WARP_FORMAT: Final = "warp [dungeon] <room> [playerY,playerY] [fadeout]"
+
+
+def process_warp_room(warp_room: TmxWarpRoom, dependencies: RoomDependencies, dungeons: DungeonsJson) -> bytes:
+    error_list: list[str] = list()
+
+    m = WARP_REGEX.match(warp_room.warp_string)
+
+    if not m:
+        raise RoomError("error compiling warp room", [f'Unknown warp string, expected "{WARP_FORMAT}"'])
+
+    flags = 0
+
+    dungeon_name = m.group(1)
+    room_x: Final = int(m.group(2))
+    room_y: Final = int(m.group(3))
+    player_pos: Final = m.group(5)
+    fadeout: Final = m.group(6)
+
+    if dungeon_name:
+        dungeon_name = dungeon_name.strip()
+        dungeon = dungeons.dungeons.get(dungeon_name)
+        if dungeon is None:
+            error_list.append(f"Unknown dungeon: {dungeon_name}")
+            dungeon = dependencies.dungeon
+    else:
+        dungeon = dependencies.dungeon
+
+    if room_x < 0 or room_x >= dungeon.width or room_y < 0 or room_y >= dungeon.height:
+        error_list.append(f"room location out of bounds: {room_x}, {room_y} (dungeon is {dungeon.width}x{dungeon.height})")
+
+    if player_pos:
+        flags |= WARP_ROOM_MOVE_PLAYER_FLAG
+        _pos = player_pos.split(",")
+        player_x = int(_pos[0].strip())
+        player_y = int(_pos[1].strip())
+
+        if player_x < 0 or player_x >= MAP_WIDTH_PX or player_y < 0 or player_y >= MAP_HEIGHT_PX:
+            error_list.append(f"player position outside the room: {player_x}, {player_y}")
+    else:
+        player_x = MAP_WIDTH_PX // 2
+        player_y = MAP_HEIGHT_PX // 2
+
+    if fadeout:
+        flags |= WARP_ROOM_FADEOUT_FLAG
+
+    if error_list:
+        raise RoomError("Error compiling warp room", error_list)
+
+    return bytes((WARP_ROOM_DATA_TYPE, flags, dungeon.id, room_x, room_y, player_x, player_y))
+
+
+def compile_room(
+    filename: str, dependencies: RoomDependencies, entities: EntitiesJson, mapping: Mappings, dungeons: DungeonsJson
+) -> EngineData:
     with open(filename, "r") as fp:
         tmx_et = xml.etree.ElementTree.parse(fp)
 
     tmx_map = parse_tmx_map(tmx_et)
 
-    room = process_room(tmx_map, dependencies, mapping, entities.entities)
-
-    map_data = create_map_data(room)
+    if isinstance(tmx_map, TmxMap):
+        room = process_room(tmx_map, dependencies, mapping, entities.entities)
+        map_data = create_room_data(room)
+    else:
+        assert isinstance(tmx_map, TmxWarpRoom)
+        map_data = process_warp_room(tmx_map, dependencies, dungeons)
 
     # ::TODO compress room data with lz4::
     return EngineData(
         ram_data=FixedSizedData(map_data),
         ppu_data=None,
     )
+
+
+# Must not raise an exception
+# Does not preform error checking, that will be done in the dungeon compiler.
+def build_room_dependencies__noexcept(
+    dungeon: DungeonInput, mappings: Mappings, other_resources: OtherResources
+) -> Optional[RoomDependencies]:
+    try:
+        if dungeon.second_layer:
+            second_layer = other_resources.second_layers.get(dungeon.second_layer)
+        else:
+            second_layer = None
+
+        if second_layer and second_layer.callback:
+            sl_callback = mappings.sl_callbacks[second_layer.callback]
+        else:
+            sl_callback = None
+
+        return RoomDependencies(
+            dungeon=dungeon,
+            second_layer=second_layer,
+            sl_callback=sl_callback,
+            mt_tileset=dungeon.tileset,
+        )
+    except Exception:
+        return None
 
 
 def get_list_of_tmx_files(directory: str) -> list[str]:
@@ -554,9 +693,9 @@ def get_list_of_tmx_files(directory: str) -> list[str]:
 ROOM_LOCATION_REGEX = re.compile(r"(\d+)-(\d+)-.+.tmx$")
 
 
-def extract_room_id(basename: str) -> int:
+def extract_room_position(basename: str) -> tuple[int, int]:
     m = ROOM_LOCATION_REGEX.match(basename)
     if not m:
         raise RuntimeError("Invalid room filename")
 
-    return int(m.group(1), 10) + 16 * int(m.group(2), 10)
+    return int(m.group(1), 10), int(m.group(2), 10)

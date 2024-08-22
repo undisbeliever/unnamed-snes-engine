@@ -7,7 +7,9 @@ import os.path
 
 from typing import Callable, Final, Literal, NamedTuple, Optional, TextIO, TypeVar, Union
 
-from .common import RomData, EngineData, FixedSizedData, DynamicSizedData, MemoryMapMode, MultilineError
+from .data_store import EngineData, FixedSizedData, DynamicSizedData
+from .memory_map import MemoryMapMode
+from .errors import MultilineError
 from .snes import (
     split_large_tile,
     load_image_tile_extractor,
@@ -173,19 +175,19 @@ class FramesetData(NamedTuple):
     animations: list[bytes]
 
 
-class TileCharAttr(NamedTuple):
+class TileIdAndFlip(NamedTuple):
     tile_id: int
     hflip: bool
     vflip: bool
 
-    def new_hflip(self) -> "TileCharAttr":
-        return TileCharAttr(self.tile_id, not self.hflip, self.vflip)
+    def new_hflip(self) -> "TileIdAndFlip":
+        return TileIdAndFlip(self.tile_id, not self.hflip, self.vflip)
 
-    def new_vflip(self) -> "TileCharAttr":
-        return TileCharAttr(self.tile_id, self.hflip, not self.vflip)
+    def new_vflip(self) -> "TileIdAndFlip":
+        return TileIdAndFlip(self.tile_id, self.hflip, not self.vflip)
 
-    def new_hvflip(self) -> "TileCharAttr":
-        return TileCharAttr(self.tile_id, not self.hflip, not self.vflip)
+    def new_hvflip(self) -> "TileIdAndFlip":
+        return TileIdAndFlip(self.tile_id, not self.hflip, not self.vflip)
 
 
 # MsFramesetFormat and MsFsData intermediate
@@ -248,11 +250,11 @@ class StaticTileset:
         self.small_tile_pos: int = 4
         self.small_tile_offset: int = 0
 
-        self._tile_map: dict[SmallOrLargeTileData, TileCharAttr] = dict()
+        self._tile_map: dict[SmallOrLargeTileData, TileIdAndFlip] = dict()
 
         self.first_large_tile_pos: Final = self.large_tile_pos
 
-    def tile_map(self) -> dict[SmallOrLargeTileData, TileCharAttr]:
+    def tile_map(self) -> dict[SmallOrLargeTileData, TileIdAndFlip]:
         return self._tile_map
 
     def get_tiles(self) -> list[SmallTileData]:
@@ -333,10 +335,10 @@ class StaticTileset:
             v_tile_data = vflip_tile(tile_data)
             hv_tile_data = vflip_tile(h_tile_data)
 
-            self._tile_map[tile_data] = TileCharAttr(tile_id, False, False)
-            self._tile_map.setdefault(h_tile_data, TileCharAttr(tile_id, True, False))
-            self._tile_map.setdefault(v_tile_data, TileCharAttr(tile_id, False, True))
-            self._tile_map.setdefault(hv_tile_data, TileCharAttr(tile_id, True, True))
+            self._tile_map[tile_data] = TileIdAndFlip(tile_id, False, False)
+            self._tile_map.setdefault(h_tile_data, TileIdAndFlip(tile_id, True, False))
+            self._tile_map.setdefault(v_tile_data, TileIdAndFlip(tile_id, False, True))
+            self._tile_map.setdefault(hv_tile_data, TileIdAndFlip(tile_id, True, True))
 
     def add_large_tile(self, tile_data: LargeTileData) -> None:
         assert len(tile_data) == 256
@@ -350,10 +352,10 @@ class StaticTileset:
             v_tile_data = vflip_large_tile(tile_data)
             hv_tile_data = vflip_large_tile(h_tile_data)
 
-            self._tile_map[tile_data] = TileCharAttr(tile_id, False, False)
-            self._tile_map.setdefault(h_tile_data, TileCharAttr(tile_id, True, False))
-            self._tile_map.setdefault(v_tile_data, TileCharAttr(tile_id, False, True))
-            self._tile_map.setdefault(hv_tile_data, TileCharAttr(tile_id, True, True))
+            self._tile_map[tile_data] = TileIdAndFlip(tile_id, False, False)
+            self._tile_map.setdefault(h_tile_data, TileIdAndFlip(tile_id, True, False))
+            self._tile_map.setdefault(v_tile_data, TileIdAndFlip(tile_id, False, True))
+            self._tile_map.setdefault(hv_tile_data, TileIdAndFlip(tile_id, True, True))
 
             for i, st in enumerate(small_tiles):
                 small_tile_id = tile_id + SMALL_TILE_OFFSETS[i]
@@ -362,15 +364,15 @@ class StaticTileset:
                 v_st = vflip_tile(st)
                 hv_st = vflip_tile(h_st)
 
-                self._tile_map[st] = TileCharAttr(small_tile_id, False, False)
-                self._tile_map.setdefault(h_st, TileCharAttr(small_tile_id, True, False))
-                self._tile_map.setdefault(v_st, TileCharAttr(small_tile_id, False, True))
-                self._tile_map.setdefault(hv_st, TileCharAttr(small_tile_id, True, True))
+                self._tile_map[st] = TileIdAndFlip(small_tile_id, False, False)
+                self._tile_map.setdefault(h_st, TileIdAndFlip(small_tile_id, True, False))
+                self._tile_map.setdefault(v_st, TileIdAndFlip(small_tile_id, False, True))
+                self._tile_map.setdefault(hv_st, TileIdAndFlip(small_tile_id, True, True))
 
 
 def build_static_tileset(
     framesets: list[FramesetData], ms_input: MsSpritesheet
-) -> tuple[list[SmallTileData], dict[SmallOrLargeTileData, TileCharAttr]]:
+) -> tuple[list[SmallTileData], dict[SmallOrLargeTileData, TileIdAndFlip]]:
     tileset = StaticTileset(ms_input.first_tile, ms_input.end_tile)
 
     # Process the small tiles after the large tiles have been added to the tileset.
@@ -482,9 +484,9 @@ class DynamicFrameTiles:
         self._n_small_tiles = 0
 
         self._tile16_addresses: Final[list[WordAddr]] = list()
-        self._tile_map: Final[dict[SmallOrLargeTileData, TileCharAttr]] = dict()
+        self._tile_map: Final[dict[SmallOrLargeTileData, TileIdAndFlip]] = dict()
 
-    def tile_map(self) -> dict[SmallOrLargeTileData, TileCharAttr]:
+    def tile_map(self) -> dict[SmallOrLargeTileData, TileIdAndFlip]:
         return self._tile_map
 
     def tile_addresses(self) -> list[WordAddr]:
@@ -506,7 +508,7 @@ class DynamicFrameTiles:
             v_large_tile = vflip_large_tile(large_tile)
             hv_large_tile = vflip_large_tile(h_large_tile)
 
-            out = TileCharAttr(tile_id, hflip, vflip)
+            out = TileIdAndFlip(tile_id, hflip, vflip)
             self._tile_map[large_tile] = out
             self._tile_map.setdefault(h_large_tile, out.new_hflip())
             self._tile_map.setdefault(v_large_tile, out.new_vflip())
@@ -520,7 +522,7 @@ class DynamicFrameTiles:
                 v_st = vflip_tile(st)
                 hv_st = vflip_tile(h_st)
 
-                st_out = TileCharAttr(small_tile_id, hflip, vflip)
+                st_out = TileIdAndFlip(small_tile_id, hflip, vflip)
                 self._tile_map.setdefault(st, st_out)
                 self._tile_map.setdefault(h_st, st_out.new_hflip())
                 self._tile_map.setdefault(v_st, st_out.new_vflip())
@@ -543,10 +545,10 @@ class DynamicFrameTiles:
             v_small_tile = vflip_tile(small_tile)
             hv_small_tile = vflip_tile(h_small_tile)
 
-            self._tile_map[small_tile] = TileCharAttr(tile_id, False, False)
-            self._tile_map.setdefault(h_small_tile, TileCharAttr(tile_id, True, False))
-            self._tile_map.setdefault(v_small_tile, TileCharAttr(tile_id, False, True))
-            self._tile_map.setdefault(hv_small_tile, TileCharAttr(tile_id, True, True))
+            self._tile_map[small_tile] = TileIdAndFlip(tile_id, False, False)
+            self._tile_map.setdefault(h_small_tile, TileIdAndFlip(tile_id, True, False))
+            self._tile_map.setdefault(v_small_tile, TileIdAndFlip(tile_id, False, True))
+            self._tile_map.setdefault(hv_small_tile, TileIdAndFlip(tile_id, True, True))
 
     def commit_pending_small_tiles(self) -> None:
         if len(self._pending_small_tiles) != 0:
@@ -578,6 +580,81 @@ def dynamic_tiles_for_frame(frame: FrameData, settings: DynamicFsTileSettings, t
     dft.commit_pending_small_tiles()
 
     return dft
+
+
+#
+# RomData
+# =======
+#
+
+
+class RomData:
+    def __init__(self, addr: int, max_size: int) -> None:
+        self._out: bytearray = bytearray(max_size)
+
+        self._view: memoryview = memoryview(self._out)
+
+        self._pos: int = 0
+        self._addr: int = addr
+
+    def data(self) -> memoryview:
+        return self._view[0 : self._pos]
+
+    def allocate(self, size: int) -> tuple[memoryview, int]:
+        a = self._addr
+        v = self._view[self._pos : self._pos + size]
+
+        self._pos += size
+        self._addr += size
+
+        return v, a
+
+    def insert_data(self, data: bytes) -> int:
+        # ::TODO deduplicate data::
+        size = len(data)
+
+        a = self._addr
+        self._view[self._pos : self._pos + size] = data
+
+        self._pos += size
+        self._addr += size
+
+        return a
+
+    def insert_data_addr_table(self, data_list: list[bytes]) -> int:
+        table_size = len(data_list) * 2
+        table, table_addr = self.allocate(table_size)
+
+        i = 0
+        for d in data_list:
+            addr = self.insert_data(d) & 0xFFFF
+
+            table[i] = addr & 0xFF
+            table[i + 1] = addr >> 8
+
+            i += 2
+
+        assert i == table_size
+
+        return table_addr
+
+    # Dynamic Metasprite data stores tile addresses before the frame data but the frame table must point to the frame data.
+    def insert_ms_frame_addr_table(self, data_list: list[tuple[bytes, int]]) -> int:
+        table_size = len(data_list) * 2
+        table, table_addr = self.allocate(table_size)
+
+        i = 0
+        for data, offset in data_list:
+            addr = (self.insert_data(data) + offset) & 0xFFFF
+
+            table[i] = addr & 0xFF
+            table[i + 1] = addr >> 8
+
+            i += 2
+
+        assert i == table_size
+
+        return table_addr
 
 
 #
@@ -1085,7 +1162,7 @@ def build_frameset(
 
 
 def build_engine_frame_data(
-    frame: FrameData, tile_map: dict[SmallOrLargeTileData, TileCharAttr], dynamic_tiles: Optional[list[WordAddr]]
+    frame: FrameData, tile_map: dict[SmallOrLargeTileData, TileIdAndFlip], dynamic_tiles: Optional[list[WordAddr]]
 ) -> tuple[bytes, int]:
     data = bytearray()
 
@@ -1135,7 +1212,7 @@ def build_msfs_entry(fs: FramesetData, frames: list[tuple[bytes, int]], spritesh
 
 
 def build_static_msfs_entries(
-    framesets: list[FramesetData], ms_input: MsSpritesheet, tile_map: dict[SmallOrLargeTileData, TileCharAttr]
+    framesets: list[FramesetData], ms_input: MsSpritesheet, tile_map: dict[SmallOrLargeTileData, TileIdAndFlip]
 ) -> list[MsFsEntry]:
     spritesheet_name: Final = ms_input.name
 

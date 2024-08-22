@@ -34,8 +34,7 @@ let fadein_reset_player = room_transitions.fadein_reset_player;
 
 
 // Fadeout the screen, load a room, fadein the screen and start the gameloop.
-// `currentRoom` contains room to load.
-// To be used if the screen is blank.
+// `dungeon.roomToLoad` contains room to load.
 let fadein              = room_transitions.load_room__fadein;
 
 

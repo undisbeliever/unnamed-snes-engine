@@ -48,17 +48,17 @@ from typing import final, Callable, Final, NamedTuple, Optional, Union
 from .ansi_color import AnsiColors
 from .entity_data import ENTITY_ROM_DATA_LABEL, ENTITY_ROM_DATA_BYTES_PER_ENTITY
 from .insert_resources import read_binary_file, validate_sfc_file, ROM_HEADER_V3_ADDR
-from .resources_compiler import DataStore, ProjectCompiler, SharedInputType, ResourceData, ResourceError
+from .resources_compiler import ProjectCompiler, SharedInputType
+from .data_store import DataStore, ResourceError, ResourceData
 from .json_formats import Name, Filename, Mappings, MemoryMap
-
-from .common import (
-    ResourceType,
+from .enums import ResourceType
+from .memory_map import (
     MS_FS_DATA_BANK_OFFSET,
     DYNAMIC_SPRITE_TILES_BANK_OFFSET,
     USB2SNES_DATA_BANK_OFFSET,
     USE_RESOURCES_OVER_USB2SNES_LABEL,
 )
-from .common import print_error as __print_error
+from .errors import print_error as __print_error
 
 
 # Sleep delay when waiting for the device to run the correct ROM
@@ -398,14 +398,12 @@ class BgThread(threading.Thread):
 
 # ASSUMES: current working directory is the resources directory
 class FsEventHandler(watchdog.events.FileSystemEventHandler):
-    def __init__(self, signals: FsWatcherSignals, data_store: DataStore, sym_filename: Filename, n_processes: Optional[int]):
+    def __init__(self, signals: FsWatcherSignals, data_store: DataStore, sym_filename: Filename):
         super().__init__()
 
         self.signals: Final = signals
         self.data_store: Final = data_store
-        self._project_compiler: Final = ProjectCompiler(
-            data_store, sym_filename, n_processes, log_compiler_error, log_compiler_message
-        )
+        self._project_compiler: Final = ProjectCompiler(data_store, sym_filename, log_compiler_error, log_compiler_message)
 
         signals.set_fs_watcher_status("Compiling")
 
@@ -443,7 +441,7 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
         if r is not None:
             if isinstance(r, ResourceData):
                 # Test if common audio data changed.
-                if r.resource_type == ResourceType.songs and r.resource_id == 0:
+                if r.resource_type == ResourceType.audio_data and r.resource_id == 0:
                     self.signals.send_command(COMMON_AUDIO_DATA_CHANGED_COMMAND)
             elif isinstance(r, SharedInputType):
                 if r.rebuild_required():
@@ -475,20 +473,17 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
 
 
 class FsWatcherThread(BgThread):
-    def __init__(
-        self, data_store: DataStore, signals: FsWatcherSignals, sfc_file_relpath: Filename, n_processes: Optional[int]
-    ) -> None:
+    def __init__(self, data_store: DataStore, signals: FsWatcherSignals, sfc_file_relpath: Filename) -> None:
         super().__init__(signals, name="FS Watcher")
 
         self.data_store: Final = data_store
         self.sym_file_relpath: Final = os.path.splitext(sfc_file_relpath)[0] + ".sym"
-        self.n_processes: Final = n_processes
 
     @final
     def run_bg_thread(self) -> None:
         try:
             log_fs_watcher("Starting filesystem watcher")
-            fs_handler = FsEventHandler(self.signals, self.data_store, self.sym_file_relpath, self.n_processes)
+            fs_handler = FsEventHandler(self.signals, self.data_store, self.sym_file_relpath)
 
             fs_observer = watchdog.observers.Observer()  # type: ignore[no-untyped-call]
             fs_observer.schedule(fs_handler, path=".", recursive=True)  # type: ignore[no-untyped-call]
@@ -674,11 +669,12 @@ class Request(NamedTuple):
     request_id: int
     request_type: Union[ResourceType, SpecialRequestType]
     resource_id: int
+    room_pos: tuple[int, int]
     last_command_id: int
 
 
 # Must match `INIT_REQUEST` in `src/resources-over-usb2snes.wiz`
-INIT_REQUEST: Final = Request(0, SpecialRequestType.init, SpecialRequestType.init ^ 0xFF, 0xFF)
+INIT_REQUEST: Final = Request(0, SpecialRequestType.init, SpecialRequestType.init ^ 0xFF, (0x11, 0x22), 0xFF)
 
 
 # Must match `ResponseStatus` enum in `src/resources-over-usb2snes.wiz`
@@ -828,14 +824,16 @@ class ResourcesOverUsb2Snes:
             self.signals.sleep(UPDATE_ROM_SPINLOOP_SLEEP_DELAY)
             zeropage = self.usb2snes.read_wram_addr(0x7E0000, 256)
 
+    R_TYPE_MUL: Final = 3
+
     def read_request(self) -> Optional[Request]:
-        rb = self.usb2snes.read_wram_addr(self.request_addr, 4)
+        rb = self.usb2snes.read_wram_addr(self.request_addr, 6)
 
         r_type_id = rb[1]
 
         rt: Union[ResourceType, SpecialRequestType]
-        if r_type_id < N_RESOURCE_TYPES * 2:
-            rt = ResourceType(r_type_id >> 1)
+        if r_type_id < N_RESOURCE_TYPES * self.R_TYPE_MUL:
+            rt = ResourceType(r_type_id // self.R_TYPE_MUL)
         else:
             try:
                 rt = SpecialRequestType(r_type_id)
@@ -843,7 +841,7 @@ class ResourcesOverUsb2Snes:
                 # r_type_id is invalid
                 return None
 
-        return Request(rb[0], rt, rb[2], rb[3])
+        return Request(rb[0], rt, rb[2], (rb[3], rb[4]), rb[5])
 
     # NOTE: This method will sleep until the resource data is valid
     def process_request(self, request: Request) -> None:
@@ -852,12 +850,14 @@ class ResourcesOverUsb2Snes:
         if request.request_id == 0:
             return
 
-        log_request(f"Request 0x{request.request_id:02x}: { request.request_type.name }[{ request.resource_id }]")
-
         try:
             if request.request_type == SpecialRequestType.rooms:
-                status, data = self.get_room(request.resource_id)
+                log_request(
+                    f"Request 0x{request.request_id:02x}: room [{ request.resource_id }, {request.room_pos[0]}, {request.room_pos[1]}]"
+                )
+                status, data = self.get_room(request.resource_id, request.room_pos)
             else:
+                log_request(f"Request 0x{request.request_id:02x}: { request.request_type.name }[{ request.resource_id }]")
                 status, data = self.get_resource(ResourceType(request.request_type), request.resource_id)
 
             if request.request_type in self.REQUEST_TYPE_USES_MSFS_OR_ENTITY_DATA:
@@ -874,17 +874,19 @@ class ResourcesOverUsb2Snes:
             self.write_response(request.request_id, ResponseStatus.ERROR, None)
             raise
 
-    def get_room(self, room_id: int) -> tuple[ResponseStatus, Optional[bytes]]:
-        co = self.data_store.get_room_data(room_id)
+    def get_room(self, dungeon_id: int, room_pos: tuple[int, int]) -> tuple[ResponseStatus, Optional[bytes]]:
+        room_x, room_y = room_pos
+
+        co = self.data_store.get_room_data(dungeon_id, room_x, room_y)
 
         if isinstance(co, ResourceError):
             log_compiler_error(co)
             log_notice("    Waiting until resource data is ready...")
-            self.signals.set_usb2snes_status(f"WAITING for room {room_id}")
+            self.signals.set_usb2snes_status(f"WAITING for room {dungeon_id} {room_x}, {room_y}")
 
             while isinstance(co, ResourceError):
                 self.signals.wait_until_resource_changed()
-                co = self.data_store.get_room_data(room_id)
+                co = self.data_store.get_room_data(dungeon_id, room_x, room_y)
 
         if isinstance(co, ResourceData):
             status = ResponseStatus.OK

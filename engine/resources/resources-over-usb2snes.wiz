@@ -61,8 +61,10 @@ struct Request {
     // (`resources.ResourceType * 2` or `SpecialRequestType`)
     request_type : u8,
 
-    // ::SHOULDDO increase to u16 when implementing multiple-worlds ::
     resource_id  : u8,
+
+    room_x : u8,
+    room_y : u8,
 
     // The last rou2s command that has been processed the console.
     last_command_id: u8,
@@ -73,6 +75,8 @@ let INIT_REQUEST = Request{
         request_id      = 0,
         request_type    = SpecialRequestType.init as u8,
         resource_id     = ~(SpecialRequestType.init as u8),
+        room_x          = 0x11,
+        room_y          = 0x22,
         last_command_id = 0xff
 };
 
@@ -142,6 +146,37 @@ in rodata0 {
 in code {
 
 
+let __send_room_request = __send_room_request__ as func(u8 in a, u8 in x, u8 in y) : u8 in a;
+
+// Send a ROOM request to `resources_over_usb2snes.py`
+//
+// ASSUMES: type is not `SpecialRequestType.init`
+// ASSUMES `resources_over_usb2snes.py` is running.
+//
+// Returns `request_id`.
+//
+// DB unknown
+#[fallthrough, mem8, idx8]
+func __send_room_request__(dungeonId : u8 in a, room_x: u8 in x, room_y: u8 in y) {
+
+    // Annoying hack to access var struct elements with far addressing
+    in wram7e {
+        extern var __room_x  @ &request.room_x : u8;
+        extern var __room_y  @ &request.room_y : u8;
+    }
+
+    push8(a);
+
+    *(far& __room_x) = a = x;
+    *(far& __room_y) = a = y;
+
+    x = SpecialRequestType.room as u8;
+    y = pop8();
+
+// Fallthrough
+}
+
+
 // Send a request to `resources_over_usb2snes.py`
 //
 // ASSUMES: type is not `SpecialRequestType.init`
@@ -151,7 +186,7 @@ in code {
 //
 // DB unknown
 #[mem8, idx8]
-func __send_request(rTypeTimes2 : u8 in x, resourceId : u8 in y) : u8 in a {
+func __send_request(rTypeTimes3 : u8 in x, resourceId : u8 in y) : u8 in a {
 
     // Annoying hack to access var struct elements with far addressing
     in wram7e {
@@ -380,9 +415,9 @@ func load_resource(resourceType : u16 in xx, resourceId : u16 in yy) {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func load_room(roomId : u8 in y) : bool in carry {
+func load_room(dungeonId : u8 in a, room_x : u8 in x, room_y : u8 in y) : bool in carry {
 
-    y = a = __send_request(SpecialRequestType.room as u8, y);
+    y = a = __send_room_request(a, x, y);
 
     // Wait until the response_id matches request_id and status is OK or NOT_FOUND
     do {

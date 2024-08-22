@@ -1,0 +1,598 @@
+// Copyright (c) 2024, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "../registers";
+import "../registers_math.wiz";
+
+import "../vram-map";
+
+import "gamestate";
+import "room";
+
+import "metasprites";
+import "metatiles";
+import "second-layer";
+import "entityloop";
+
+import "../room-events-api";
+import "../entity_api";
+
+import "../textbox";
+import "../wait-frame";
+
+import "../common/reset";
+import "../resources/resources";
+
+import "../resources/resources";
+import "../resources/resources-over-usb2snes.wiz";
+
+import "src/engine-hooks";
+import "gen/enums";
+
+namespace dungeon {
+
+// Offset to shift the player, when restoring the gamestate and the player is
+// on the edge of the screen.
+//
+// Prevents an infinite loop.
+// Ensures the player is visible when restoring the gamestate in the middle of a doorway.
+let RESTORE_ROOMSTATE_OFFSET_X = 8;
+let RESTORE_ROOMSTATE_OFFSET_Y = 4;
+
+
+namespace DungeonFlags {
+    let INFINITE_BIT = 7;
+}
+
+
+// Dungeon data stored in RAM
+//
+// If the Dungeon data is in ROM (not resources-over-usb2snes), the ROM data is followed by:
+//   * `roomTable : [u16 ; width * height]` - Optional offset (after `roomTable`) for the dungeon's rooms.
+//     If offset is 0 then there is no room for that dungeon cell.
+//   * room data
+struct _RamDataFormat {
+    flags: u8,
+
+    width: u8,
+    height: u8,
+
+    // ::TODO add palette (need to remove it from mt_tileset beforehand)::
+    tileset: u8,
+    secondLayer: u8,
+    msSpritesheet: u8,
+
+    // The song to play for this dungeon.
+    //
+    // If `song > N_SONGS`, the current song will not be changed.
+    // ::TODO play song in engine::
+    song: u8,
+
+    // ::TODO Should I add a callback??::
+    // ::TODO add sl_callback arguments::
+}
+
+in lowram {
+    // Used to determine if the dungeon is loaded into memory.
+    // Set in `__load_dungeon()`
+    // Cleared in `reset_registers()`
+    // (byte flag)
+    var _dungeonLoaded : u8 in __dungeonLoadedFlag__;
+}
+
+
+in lowram_roomstate {
+    var __dungeonData : _RamDataFormat;
+        const dungeonData @ &__dungeonData : _RamDataFormat;
+
+    var _dungeonId : u8;
+}
+
+
+in lowram {
+    // The far-address of the room table in ROM.
+    //
+    // CAUTON: Not valid if UseResourcesOverUsb2Snes is set.
+    var roomTable: far *u16;
+}
+
+in wram7e {
+    var __load_dungeon__restoreRoomState : u8;
+
+    // Backup of the room state.
+    // Created on __roomToLoad().
+    // Restored in restore_room_state_from_backup().
+    var __roomStateBackup_lowram : [ u8 ; MEMMAP_ROOMSTATE_LOWRAM_SIZE ];
+    var __roomStateBackup_wram7e : [ u8 ; MEMMAP_ROOMSTATE_WRAM7E_SIZE ];
+}
+
+
+in code {
+
+
+// Load a dungeon and a room into memory
+//
+// CAUTION: Will fade the screen.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func load_dungeon_and_room(_roomToLoad : RoomToLoad in roomToLoad) {
+    __backup_room_state();
+    return __load_dungeon(roomToLoad.dungeon, 0);
+}
+
+
+// Load a dungeon, initialize subsystems and restore roomstate from backup
+//
+// CAUTION: Will fade the screen.
+//
+// ASSUMES: gamestate backup created
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func load_dungeon_and_room__no_roomstate_backup__inline(_roomToLoad : RoomToLoad in roomToLoad) {
+    __load_dungeon(roomToLoad.dungeon, 0);
+}
+
+
+
+// Load a dungeon, initialize subsystems and restore roomstate from backup
+//
+// CAUTION: Will fade the screen.
+//
+// ASSUMES: gamestate backup created
+//
+// DB = 0x7e
+#[mem8, idx8]
+func load_dungeon_and_restore_roomstate() {
+    var _roomStateBackup__dungeonId @ &__roomStateBackup_lowram[&_dungeonId as u16 - MEMMAP_ROOMSTATE_LOWRAM as u16] : typeof(_dungeonId);
+
+    return __load_dungeon(_roomStateBackup__dungeonId, 1);
+}
+
+
+
+// Load a room into memory.
+//
+// ASSUMES: Dungeon loaded
+//
+// CAUTION: Does not draw entities
+//
+// USES Multiplication registers
+//
+// Returns: True if the dungeon is loaded and correct.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func load_room__inline(_roomToLoad : RoomToLoad in roomToLoad) : bool in carry {
+    // ::TODO improve this function::
+
+    __backup_room_state();
+    carry = __load_room(roomToLoad);
+
+    if carry {
+        __finish_loading_room();
+        carry = true;
+    }
+    return carry;
+}
+
+
+
+// Load dungeon into memory and initialise game subsystems
+//
+// DB = 0x7e
+#[mem8, idx8]
+func __load_dungeon(dungeon : u8 in a, restoreRoomState : u8 in y) {
+var _dmaFarAddr : far *u8 in resources.DMA0_A_BUS_FARADDR;
+
+var _restoreRoomState : u8 in __load_dungeon__restoreRoomState;
+
+    _restoreRoomState = y;
+    _dungeonId = a;
+
+    // Fadeout if not in force-blank
+    wait_multiple_frames_and_fadeout();
+
+    // Calling reset_registers here as it clears the _dungeonLoaded flag.
+    reset_registers();
+
+    idx16();
+    #[idx16] {
+        push16(0x7e80);
+        data_bank = pop8();
+    // DB = 0x80
+
+        _dmaFarAddr = resources.load_resource__fixed_ram__forceblank_inline(
+                        resources.ResourceType.dungeons, _dungeonId,
+                        &dungeonData as *u8, sizeof(typeof(dungeonData)));
+
+        *(&roomTable as *u16) = xx = *(&_dmaFarAddr as *u16);
+        *(&#:roomTable as *u8) = a = #:_dmaFarAddr;
+
+        room.dataType = RoomDataType.NO_ROOM;
+
+        data_bank = pop8();
+    // DB = 0x7e
+    }
+    mem8_idx8();
+
+    _dungeonLoaded = a = 1;
+
+    a = _restoreRoomState;
+    if zero {
+        __load_room(roomToLoad);
+    }
+    else {
+        restore_room_state_from_backup();
+    }
+
+    // ::TODO test if room loaded::
+
+
+    idx16();
+    #[idx16] {
+        push16(0x7e80);
+        data_bank = pop8();
+    // DB = 0x80
+
+        // Load game subsystems
+        metasprites.setup__forceblank();
+        metasprites.load_ms_spritesheet_ppu_data__forceblank(dungeonData.msSpritesheet);
+        textbox.setup_ppu__forceblank();
+
+        engine_hooks.load_dungeon__setup_ppu__forceblank();
+
+        metatiles.load_tileset__forceblank(dungeonData.tileset);
+        carry = second_layer.setup__forceblank(dungeonData.secondLayer);
+
+        // second-layer is disabled if carry is false (`second_layer_id` was invalid).
+        a = TM_BG1 | TM_BG3 | TM_OBJ;
+        if carry {
+            a = TM_BG1 | TM_BG2 | TM_BG3 | TM_OBJ;
+        }
+        TM = a;
+
+
+        // Setup VRAM MAP
+        BGMODE = a = BGMODE_MODE_1_BG3_PRIORITY;
+
+        // Setup BG1 and BG2 tilemap.
+        // Which background is used by which subsystem is controlled by the
+        // `swapBg1AndBg2ScrollShadows` flag, which is set by the second_layer subsystem.
+        let MT_SC = ((VRAM_METATILE_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_64x32;
+        let SL_SC = ((VRAM_SECOND_LAYER_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_64x32;
+
+        xx = MT_SC | (SL_SC << 8);
+        a = swapBg1AndBg2ScrollShadows;
+        if !zero {
+            xx = SL_SC | (MT_SC << 8);
+        }
+        *(&BG1SC as *u16) = xx;
+
+        BG3SC = a = ((VRAM_BG3_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_32x32;
+
+        BG12NBA = a =   ((VRAM_MTSL_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG1_SHIFT)
+                      | ((VRAM_MTSL_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG2_SHIFT);
+        BG34NBA = a = ((VRAM_BG3_TILES_WADDR / BG34NBA_WALIGN) << BG34NBA_BG3_SHIFT);
+
+
+        data_bank = pop8();
+    // DB = 0x7e
+
+        second_layer.draw_room_sl_map__forceblank__mem8_idx16_db7e__inline();
+    }
+    mem8_idx8();
+
+
+    a = *far &resources.UseResourcesOverUsb2Snes;
+    if !zero {
+        // If resources-over-usb2snes is active, the MetaSprite data may have changed and the
+        // player's MetaSprite animations must be reset.
+        //
+        // This is only done if resources-over-usb2snes is active as resetting player animations
+        // could cause glitches (ie, resetting the player's sword animation mid-swing).
+        engine_hooks.init_player_metasprites__inline();
+    }
+
+
+    engine_hooks.load_dungeon__init();
+
+    a = _restoreRoomState;
+    if zero {
+        __finish_loading_room();
+    }
+
+    metatiles.draw_map__forceblank__mem8_idx8_db7e__inline();
+
+    entityloop.draw_entities();
+
+    // Ensure next room transition is a normal transition.
+    roomstate.forceFadeoutRoomTransition = 0;
+}
+
+
+
+// Load a room into memory.
+//
+// Returns: true if a scrolling room transition can be preformed on `roomToLoad`.
+//
+// ASSUMES: Dungeon loaded into memory
+//
+// USES Multiplication registers
+//
+// DB = 0x7e
+#[mem8, idx8]
+func __load_room(_roomToLoad : RoomToLoad in roomToLoad) : bool in carry {
+    var _warpRoom @ &room : WarpRoom;
+
+    a = _dungeonLoaded;
+    if zero {
+        return false;
+    }
+
+    a = _dungeonId;
+    if a != _roomToLoad.dungeon {
+        return false;
+    }
+
+    room.dataType = RoomDataType.NO_ROOM;
+
+    __load_room_into_memory__inline();
+
+    a = room.dataType as u8;
+    if a == RoomDataType.ROOM as u8 {
+        return true;
+    }
+    else if a == RoomDataType.WARP as u8 {
+        roomToLoad.dungeon = a = _warpRoom.dungeon;
+        roomToLoad.roomPos_x = a = _warpRoom.room_x;
+        roomToLoad.roomPos_y = a = _warpRoom.room_y;
+
+        if _warpRoom.flags $ WarpRoomFlags.MOVE_PLAYER_BIT {
+            roomToLoad.playerPos_x = a = _warpRoom.player_x;
+            roomToLoad.playerPos_y = a = _warpRoom.player_y;
+            return false;
+        }
+        else if _warpRoom.flags $ WarpRoomFlags.FADEOUT_BIT {
+            return false;
+        }
+        else {
+            ^return __load_room(roomToLoad);
+        }
+    }
+    else {
+        // Room is not valid
+        __clear_room_memory();
+        return true;
+    }
+}
+
+
+
+// Load a room into memory.
+//
+// REQUIRES: __load_room() called, subsystems loaded into memory.
+// CAUTION: Does not draw entities
+//
+// DB = 0x7e
+#[mem8, idx8]
+func __finish_loading_room() {
+    // Reset entity subsystem
+    entityloop.init();
+
+    a = room.dataType as u8;
+    if a == RoomDataType.ROOM as u8 {
+        metatiles.populate_map_tile_properties();
+        room_events._init__inline();
+
+        // The room event may have modified the map, rebuild map tile properties
+        metatiles.populate_map_tile_properties();
+
+        gamestate.data.currentDungeon = a = roomToLoad.dungeon;
+        gamestate.data.currentRoom_x = x = roomToLoad.roomPos_x;
+        gamestate.data.currentRoom_y = y = roomToLoad.roomPos_y;
+    }
+    else {
+        // Room does not exist.
+        //
+        // `metatiles.populate_map_tile_properties()` will fill the dummy
+        // room's `mapTileProperties` with solid tiles.  This ensures any
+        // scrolling room transition into a missing room will always be rolled
+        // back.
+        metatiles.populate_map_tile_properties__all_tiles_solid();
+    }
+
+    player.xPos.px = a = roomToLoad.playerPos_x;
+    player.xPos.sx = 0;
+    player.yPos.px = a = roomToLoad.playerPos_y;
+    player.yPos.sx = 0;
+
+    entityloop.sort_active_entities();
+}
+
+
+
+// Load a room into memory if the room exists.
+//
+// CAUTION: Does not write to memory if the room does not exist.
+//
+// ASSUMES: Dungeon loaded
+//
+// USES Multiplication registers
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func __load_room_into_memory__inline() {
+var _farPtr : far *u16 in zpTmp_farPtr;
+
+    x = roomToLoad.roomPos_x;
+    y = roomToLoad.roomPos_y;
+
+    if x >= dungeonData.width || y >= dungeonData.height {
+        if !(dungeonData.flags $ DungeonFlags.INFINITE_BIT) {
+            return;
+        }
+
+        a = x;
+        if negative {
+            x = dungeonData.width;
+            x--;
+        }
+        else if x >= dungeonData.width {
+            x = 0;
+        }
+
+        a = y;
+        if negative {
+            y = dungeonData.height;
+            y--;
+        }
+        else if y >= dungeonData.height {
+            y = 0;
+        }
+
+        roomToLoad.roomPos_x = x;
+        roomToLoad.roomPos_y = y;
+    }
+
+    a = *far &resources.UseResourcesOverUsb2Snes;
+    if !zero {
+        resources_over_usb2snes.load_room(_dungeonId, x, y);
+    }
+    else {
+        // Room data is stored in ROM, after the dungeon data.
+
+        *(far &WRMPYA) = a = y;
+        *(far &WRMPYB) = a = dungeonData.width;
+
+        #:_farPtr = a = *(&#:roomTable as *u8);
+
+        mem16_idx16();
+        #[mem16, idx16] {
+            *(&_farPtr as *u16) = aa = *(&roomTable as *u16);
+
+            // calculate room offset
+            yy = aa = (xx + *(far &RDMPY)) << 1;
+
+            aa = _farPtr[unaligned yy];
+            if !zero {
+                *(&_farPtr as *u16) = aa = aa + *(&_farPtr as *u16);
+
+                // Copy room into memory.
+                // Assumes room data is a multiple of 2 in size
+                yy = sizeof(typeof(room)) - 2;
+                do {
+                    (&room as *u16)[unaligned yy] = aa = _farPtr[unaligned yy];
+                    yy--;
+                    yy--;
+                } while !negative;
+            }
+        }
+        mem8_idx8();
+    }
+}
+
+
+
+// Clear room memory
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func __clear_room_memory() {
+
+    idx16();
+    #[idx16] {
+        xx = sizeof(typeof(room)) - 1;
+        do {
+            (&room as *u8)[xx] = 0;
+            xx--;
+        } while !negative;
+    }
+    idx8();
+}
+
+
+
+// Backup the roomstate variables
+//
+// DB = 0x7e
+#[mem8, idx8]
+func __backup_room_state() {
+
+let _roomstate_lowram = MEMMAP_ROOMSTATE_LOWRAM as far *u8;
+let _roomstate_wram7e = MEMMAP_ROOMSTATE_WRAM7E as far *u8;
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        // Parameter order is destination, source::
+        load_dec_repeat(#:far &__roomStateBackup_lowram, yy = &__roomStateBackup_lowram as u16,
+                        #:_roomstate_lowram,           xx = _roomstate_lowram as u16,
+                        aa = MEMMAP_ROOMSTATE_LOWRAM_SIZE - 1);
+
+        load_dec_repeat(#:far &__roomStateBackup_wram7e, yy = &__roomStateBackup_wram7e as u16,
+                        #:_roomstate_wram7e,           xx = _roomstate_wram7e as u16,
+                        aa = MEMMAP_ROOMSTATE_WRAM7E_SIZE - 1);
+
+    // NOTE: load_dec_repeat changes the data bank
+    //       (safe as target is in bank 0x7e)
+    }
+    mem8_idx8();
+}
+
+
+
+// Restore roomstate backup
+//
+// MUST ONLY be called by the room-transitions subsystem.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func restore_room_state_from_backup() {
+
+let _roomstate_lowram = MEMMAP_ROOMSTATE_LOWRAM as far *u8;
+let _roomstate_wram7e = MEMMAP_ROOMSTATE_WRAM7E as far *u8;
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        // Parameter order is destination, source::
+        load_dec_repeat(#:_roomstate_lowram,             yy = _roomstate_lowram as u16,
+                        #:far &__roomStateBackup_lowram, xx = &__roomStateBackup_lowram as u16,
+                        aa = MEMMAP_ROOMSTATE_LOWRAM_SIZE - 1);
+
+        load_dec_repeat(#:_roomstate_wram7e,             yy = _roomstate_wram7e as u16,
+                        #:far &__roomStateBackup_wram7e, xx = &__roomStateBackup_wram7e as u16,
+                        aa = MEMMAP_ROOMSTATE_WRAM7E_SIZE - 1);
+
+    // NOTE: load_dec_repeat changes the data bank
+    //       (safe as target is in bank 0x7e)
+    }
+    mem8_idx8();
+
+
+    // Move the player away from the edge to prevent an infinite loop
+    x = player.xPos.px;
+    y = player.yPos.px;
+
+    if x < RESTORE_ROOMSTATE_OFFSET_X {
+        x = RESTORE_ROOMSTATE_OFFSET_X;
+    }
+    else if x >= DISPLAY_WIDTH - RESTORE_ROOMSTATE_OFFSET_X {
+        x = DISPLAY_WIDTH - RESTORE_ROOMSTATE_OFFSET_X;
+    }
+
+    if y < RESTORE_ROOMSTATE_OFFSET_Y {
+        y = RESTORE_ROOMSTATE_OFFSET_Y;
+    }
+    else if y >= DISPLAY_HEIGHT - RESTORE_ROOMSTATE_OFFSET_Y {
+        y = DISPLAY_HEIGHT - RESTORE_ROOMSTATE_OFFSET_Y;
+    }
+
+    player.xPos.px = x;
+    player.yPos.px = y;
+}
+
+}
+}
+

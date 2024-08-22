@@ -6,7 +6,7 @@ import "engine/common/reset";
 
 
 config {
-    map_mode = "lorom",
+    map_mode = "hirom",
     expansion_type = "none",
     fastrom = false,
     region = "ntsc",
@@ -17,10 +17,14 @@ config {
 }
 
 
+bank rodata0    @ 0xc00000 : [constdata; 0x8000];
 bank code       @ 0x808000 : [constdata; 0x8000];
-bank rodata0    @ 0x818000 : [constdata; 0x8000];
 
-bank _resources @ 0x828000 : [constdata; 0x8000 * 6];
+bank _resources @ 0xc10000 : [constdata; 0x10000 * 3];
+
+
+let BANK_START_ADDR = 0x0000;
+
 
 // NOTE: *_roomstate variables will be saved on every room change
 //       and may be restored if the player backtracks into the previous room.
@@ -29,8 +33,8 @@ bank zeropage                   @ 0x000000 : [vardata;     0x100];
 bank lowram_roomstate           @ 0x7e0100 : [vardata;     0x100];
 bank lowram                     @ 0x7e0200 : [vardata;    0x1d80];
 bank stack                      @ 0x7e1f80 : [vardata;      0x80];
-bank wram7e_roomstate           @ 0x7e2000 : [vardata;     0x800];
-bank wram7e                     @ 0x7e2800 : [vardata;    0xd800];
+bank wram7e_roomstate           @ 0x7e2000 : [vardata;     0x900];
+bank wram7e                     @ 0x7e2900 : [vardata;    0xd700];
 bank wram7f                     @ 0x7f0000 : [vardata;    0xff00];
 bank wram7f_gamestatebackup     @ 0x7fff00 : [vardata;     0x100];
 
@@ -39,7 +43,7 @@ let MEMMAP_ROOMSTATE_LOWRAM      = 0x7e0100;
 let MEMMAP_ROOMSTATE_LOWRAM_SIZE =    0x100;
 
 let MEMMAP_ROOMSTATE_WRAM7E      = 0x7e2000;
-let MEMMAP_ROOMSTATE_WRAM7E_SIZE =    0x800;
+let MEMMAP_ROOMSTATE_WRAM7E_SIZE =    0x900;
 
 // Number of bytes to clear, within the second WRAM bank, on reset.
 // This will cause the gamestate backup to survive resets

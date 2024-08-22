@@ -6,17 +6,18 @@
 import os.path
 from typing import Callable, Final, NamedTuple, Optional, Union
 
-from .common import (
+from .memory_map import (
     MS_FS_DATA_BANK_OFFSET,
     DYNAMIC_SPRITE_TILES_BANK_OFFSET,
-    ROOM_DATA_BANK_OFFSET,
-    ResourceType,
+    RESOURCE_ADDR_TABLE_BANK_OFFSET,
     USE_RESOURCES_OVER_USB2SNES_LABEL,
 )
-from .common import EngineData, FixedSizedData, print_error
+from .enums import ResourceType
+from .errors import print_error
 from .json_formats import Filename, Mappings, MemoryMap
 from .entity_data import ENTITY_ROM_DATA_LABEL, validate_entity_rom_data_symbols, expected_blank_entity_rom_data
-from .resources_compiler import DataStore, ProjectCompiler, ResourceError, ResourceData
+from .data_store import DataStore, ResourceError, ResourceData, EngineData
+from .resources_compiler import ProjectCompiler, append_room_data_to_dungeons
 
 Address = int
 RomOffset = int
@@ -109,9 +110,12 @@ class ResourceUsage(NamedTuple):
 
 class ResourceInserter:
     BANK_END = 0x10000
-    BLANK_RESOURCE_ENTRY = bytes(3)
+    BLANK_RESOURCE_ENTRY: Final = bytes([0xFF, 0xFF, 0xFF])
+    BLANK_RESOURCE_TYPE_ENTRY: Final = "RRR".encode("ASCII")
 
-    def __init__(self, sfc_view: memoryview, symbols: dict[str, int], mappings: Mappings):
+    def __init__(self, sfc_view: memoryview, symbols: dict[str, int], mappings: Mappings, n_resources: int):
+        assert n_resources > 0
+
         memory_map = mappings.memory_map
 
         self.view: memoryview = sfc_view
@@ -127,6 +131,12 @@ class ResourceInserter:
         self.n_resource_banks: int = memory_map.n_resource_banks
 
         self.bank_positions: list[int] = [self.bank_start] * memory_map.n_resource_banks
+
+        self.res_table_addr: Final = (self.bank_offset + RESOURCE_ADDR_TABLE_BANK_OFFSET) << 16
+        self.res_table_pos: int = 0
+        self.res_table: memoryview = self.subview_addr(self.res_table_addr, n_resources * 3)
+
+        self.bank_positions[RESOURCE_ADDR_TABLE_BANK_OFFSET] = n_resources * 3
 
         validate_sfc_file(sfc_view, symbols, mappings)
 
@@ -192,7 +202,7 @@ class ResourceInserter:
         if u16_addr != self.bank_start:
             raise RuntimeError("Bank is not empty")
 
-        if blob_size > self.BANK_END:
+        if u16_addr + blob_size > self.BANK_END:
             raise RuntimeError("Cannot fit blob of size { blob_size } into binary")
 
         addr: Address = ((self.bank_offset + bank_id) << 16) + u16_addr
@@ -209,61 +219,32 @@ class ResourceInserter:
         if self.view[o : o + len(expected_data)] != expected_data:
             raise RuntimeError(f"ROM data does not match expected data: { label }")
 
-    def resource_table_for_type(self, resource_type: ResourceType) -> tuple[Address, int]:
-        resource_type_id = resource_type.value
-
-        nrptt_addr = self.symbols["resources.__NResourcesPerTypeTable"]
-        retable_addr = self.symbols["resources.__ResourceEntryTable"]
-
-        expected_n_resources = self.read_u8(nrptt_addr + resource_type_id)
-        resource_table_addr = self.read_u16(retable_addr + resource_type_id * 2) | (retable_addr & 0xFF0000)
-
-        return resource_table_addr, expected_n_resources
-
     def insert_resources(self, resource_type: ResourceType, resource_data: list[EngineData]) -> None:
-        table_addr, expected_n_resources = self.resource_table_for_type(resource_type)
+        table_pos = self.res_table_pos
 
-        if len(resource_data) != expected_n_resources:
-            raise RuntimeError(f"NResourcesPerTypeTable mismatch in sfc_file: { resource_type }")
+        if table_pos + len(resource_data) * 3 > len(self.res_table):
+            raise RuntimeError("Cannot fit resources into resource table")
 
-        table_pos = self.address_to_rom_offset(table_addr)
+        # ResourceTypeTableEntry
+        r_table_addr: Final = table_pos + self.bank_start
+        rtt_addr = self.symbols["resources.ResourceTypeTable"] + int(resource_type) * 3
+        rtt_pos = self.address_to_rom_offset(rtt_addr)
+        assert self.view[rtt_pos : rtt_pos + 3] == self.BLANK_RESOURCE_TYPE_ENTRY
+        self.view[rtt_pos] = len(resource_data)
+        self.view[rtt_pos + 1] = r_table_addr & 0xFF
+        self.view[rtt_pos + 2] = r_table_addr >> 8
 
         for data in resource_data:
             addr = self.insert_engine_data(data)
 
-            assert self.view[table_pos : table_pos + 3] == self.BLANK_RESOURCE_ENTRY
+            assert self.res_table[table_pos : table_pos + 3] == self.BLANK_RESOURCE_ENTRY
 
-            self.view[table_pos + 0] = addr & 0xFF
-            self.view[table_pos + 1] = (addr >> 8) & 0xFF
-            self.view[table_pos + 2] = addr >> 16
+            self.res_table[table_pos + 0] = addr & 0xFF
+            self.res_table[table_pos + 1] = (addr >> 8) & 0xFF
+            self.res_table[table_pos + 2] = addr >> 16
 
             table_pos += 3
-
-    def insert_room_data(self, bank_offset: int, rooms: list[Optional[EngineData]]) -> None:
-        assert len(rooms) == 256
-        ROOM_TABLE_SIZE: Final = 0x100 * 2
-
-        room_table = bytearray([0xFF]) * ROOM_TABLE_SIZE
-        room_data_blob = bytearray()
-
-        room_addr = self.bank_start + len(room_data_blob)
-
-        for room_id, room_data in enumerate(rooms):
-            if room_data:
-                assert isinstance(room_data.ram_data, FixedSizedData)
-                assert room_data.ppu_data is None
-
-                rd = room_data.ram_data.data()
-
-                room_table[room_id * 2 + 0] = room_addr & 0xFF
-                room_table[room_id * 2 + 1] = room_addr >> 8
-                room_data_blob += rd
-                room_addr += len(rd)
-
-        room_table_offset = self.label_offset("resources.__RoomsTable")
-        self.view[room_table_offset : room_table_offset + ROOM_TABLE_SIZE] = room_table
-
-        self.insert_blob_into_start_of_bank(bank_offset, room_data_blob)
+        self.res_table_pos = table_pos
 
 
 def insert_resources(sfc_view: memoryview, data_store: DataStore) -> ResourceUsage:
@@ -279,10 +260,8 @@ def insert_resources(sfc_view: memoryview, data_store: DataStore) -> ResourceUsa
 
     validate_entity_rom_data_symbols(symbols, n_entities)
 
-    ri = ResourceInserter(sfc_view, symbols, mappings)
+    ri = ResourceInserter(sfc_view, symbols, mappings, data_store.get_n_resources())
     ri.confirm_initial_data_is_correct(ENTITY_ROM_DATA_LABEL, expected_blank_entity_rom_data(symbols, n_entities))
-
-    ri.insert_room_data(ROOM_DATA_BANK_OFFSET, data_store.get_data_for_all_rooms())
 
     ri.insert_blob_into_start_of_bank(MS_FS_DATA_BANK_OFFSET, msfs_entity_data.msfs_data)
     ri.insert_blob_into_start_of_bank(DYNAMIC_SPRITE_TILES_BANK_OFFSET, dynamic_ms_data.tile_data)
@@ -335,7 +314,7 @@ def null_print_function(message: str) -> None:
     pass
 
 
-def compile_data(resources_directory: Filename, symbols_file: Filename, n_processes: Optional[int]) -> Optional[DataStore]:
+def compile_data(resources_directory: Filename, symbols_file: Filename) -> Optional[DataStore]:
     valid = True
 
     def print_resource_error(e: Union[ResourceError, Exception, str]) -> None:
@@ -352,9 +331,11 @@ def compile_data(resources_directory: Filename, symbols_file: Filename, n_proces
     os.chdir(resources_directory)
 
     data_store: Final = DataStore()
-    compiler: Final = ProjectCompiler(data_store, symbols_file_relpath, n_processes, print_resource_error, null_print_function)
+    compiler: Final = ProjectCompiler(data_store, symbols_file_relpath, print_resource_error, null_print_function)
 
     compiler.compile_everything()
+
+    append_room_data_to_dungeons(data_store, print_resource_error)
 
     os.chdir(cwd)
 
@@ -366,7 +347,6 @@ def compile_data(resources_directory: Filename, symbols_file: Filename, n_proces
 
 def print_resource_sizes(data_store: DataStore) -> None:
     total_line = "-" * 70
-    mappings = data_store.get_mappings()
 
     dynamic_ms_data = data_store.get_dynamic_ms_data()
     if dynamic_ms_data is not None:
@@ -383,12 +363,10 @@ def print_resource_sizes(data_store: DataStore) -> None:
 
     for rt in ResourceType:
         print(f"{rt.name}:")
-        n_resources = len(getattr(mappings, rt.name))
         total_ram_size = 0
         total_ppu_size = 0
 
-        for i in range(n_resources):
-            d = data_store.get_resource_data(rt, i)
+        for i, d in enumerate(data_store.get_resource_data_list(rt)):
             if isinstance(d, ResourceData):
                 ram_size, ppu_size = d.data.ram_and_ppu_size()
                 total_ram_size += ram_size

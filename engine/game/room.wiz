@@ -10,12 +10,19 @@ let ROOM_MAP_WIDTH = 16;
 let ROOM_MAP_HEIGHT = 14;
 
 
+enum RoomDataType : u8 {
+    NO_ROOM = 0,
+    ROOM = 1,
+    WARP = 2,
+}
 
 // Map data format
+// MUST be a multiple of 2 in size.
 struct RoomData {
-    map         : [ u8 ; ROOM_MAP_WIDTH * ROOM_MAP_HEIGHT ],
+    // Also used to determine if a room is loaded into memory
+    dataType: RoomDataType,
 
-    tileset     : u8,
+    map         : [ u8 ; ROOM_MAP_WIDTH * ROOM_MAP_HEIGHT ],
 
     // The room event for this room
     // (index into room event function tables)
@@ -36,7 +43,34 @@ struct RoomData {
     entity_yPos      : [u8 ; N_ENTITIES_IN_ROOM_DATA],
     entity_type      : [u8 ; N_ENTITIES_IN_ROOM_DATA],
     entity_parameter : [u8 ; N_ENTITIES_IN_ROOM_DATA],
+
+
+    // The second-layer map
+    // OPTIONAL: Only used if a PART_OF_ROOM second-layer is loaded
+    sl_map           : [ u8 ; ROOM_MAP_WIDTH * ROOM_MAP_HEIGHT ],
 };
+
+
+namespace WarpRoomFlags {
+    let MOVE_PLAYER_BIT = 7;
+    let FADEOUT_BIT = 6;
+}
+
+
+struct WarpRoom {
+    dataType: RoomDataType,
+
+    // See WarpRoomFlags
+    flags: u8,
+
+    dungeon: u8,
+    room_x: u8,
+    room_y: u8,
+
+    // Only read if MOVE_PLAYER_BIT flag is set
+    player_x: u8,
+    player_y: u8,
+}
 
 
 in wram7e_roomstate {
@@ -70,4 +104,17 @@ in wram7e_roomstate {
 
 }
 
+
+struct RoomToLoad {
+    dungeon : u8,
+    roomPos_x : u8,
+    roomPos_y : u8,
+    playerPos_x : u8,
+    playerPos_y : u8,
+}
+
+in wram7e {
+    var __roomToLoad : RoomToLoad;
+        var roomToLoad @ &__roomToLoad : RoomToLoad;
+}
 

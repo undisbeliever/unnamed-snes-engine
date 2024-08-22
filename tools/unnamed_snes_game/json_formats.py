@@ -8,7 +8,8 @@ import os.path
 from collections import OrderedDict
 from typing import Any, Callable, Final, Generator, Literal, NamedTuple, NoReturn, Optional, Type, TypeVar, Union
 
-from .common import MemoryMapMode, FileError
+from .memory_map import MemoryMapMode
+from .errors import FileError
 
 
 Name = str
@@ -688,8 +689,6 @@ class Mappings(NamedTuple):
     sl_callbacks: OrderedDict[Name, SecondLayerCallback]
     memory_map: MemoryMap
 
-    # ::TODO remove songs from mappings (somehow)
-    songs: list[Name]
     # Location of the directory containing tad-compiler
     tad_binary_directory: Filename
 
@@ -791,7 +790,6 @@ def load_mappings_json(filename: Filename) -> Mappings:
         sl_callbacks=jh.get_sl_callbacks("sl_callbacks"),
         memory_map=jh.get_memory_map("memory_map"),
         gamemodes=jh.get_gamemodes("gamemodes"),
-        songs=jh.get_name_list("songs"),
         tad_binary_directory=jh.get_string("tad_binary_directory"),
     )
 
@@ -1161,7 +1159,6 @@ class SecondLayerInput(NamedTuple):
     above_metatiles: bool
     mt_tileset: Optional[Name]  # If defined, the second-layer will reuse tiles in a MetaTile Tileset
     part_of_room: bool
-    default_room_pos: Optional[Position]  # Used if `part_of_room` is True and the room does not have a <imagelayer>
     callback: Optional[Name]
     parameters: Optional[dict[Name, str]]
 
@@ -1225,7 +1222,6 @@ def load_other_resources_json(filename: Filename) -> OtherResources:
             above_metatiles=t.get_bool("above_metatiles"),
             mt_tileset=t.get_optional_name("mt_tileset"),
             part_of_room=t.get_bool("part_of_room"),
-            default_room_pos=t.get_optional_u8_position("default_room_pos"),
             callback=t.get_optional_name("callback"),
             parameters=t.get_optional_parameter_dict("parameters"),
         ),
@@ -1237,3 +1233,54 @@ def load_other_resources_json(filename: Filename) -> OtherResources:
         bg_images=bg_images,
         second_layers=second_layers,
     )
+
+
+#
+# dungeons.json
+#
+
+
+class DungeonInput(NamedTuple):
+    name: Name
+    id: int
+    path: Filename
+    infinite: bool
+    width: int
+    height: int
+    tileset: Name
+    second_layer: Optional[Name]
+    ms_spritesheet: Name
+    song: Optional[Name]
+
+
+class DungeonsJson(NamedTuple):
+    dungeons: dict[Name, DungeonInput]
+
+
+MAX_DUNGEONS: Final = 254
+
+
+def load_dungeons_json(filename: Filename) -> DungeonsJson:
+    jh = _load_json_file(filename, _Helper)
+
+    dirname = os.path.dirname(filename)
+
+    dungeons = jh.build_ordered_dict_from_list(
+        "dungeons",
+        DungeonInput,
+        MAX_DUNGEONS,
+        lambda sj, name, i: DungeonInput(
+            name=name,
+            id=i,
+            path=os.path.join(dirname, sj.get_string("path")),
+            infinite=sj.get_bool("infinite"),
+            width=sj.get_int("width"),
+            height=sj.get_int("height"),
+            tileset=sj.get_name("tileset"),
+            second_layer=sj.get_optional_name("second_layer"),
+            ms_spritesheet=sj.get_name("ms_spritesheet"),
+            song=sj.get_optional_name("song"),
+        ),
+    )
+
+    return DungeonsJson(dungeons)

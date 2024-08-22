@@ -5,19 +5,16 @@ import "src/memmap";
 import "../registers";
 
 import "room";
+import "dungeon";
 import "gamestate";
 import "metasprites";
 import "metatiles";
 import "second-layer";
 
-import "../vram-map";
 import "../gamemodes";
-import "../textbox";
-import "../wait-frame";
-import "../common/reset";
-import "../resources/resources";
 
 import "entityloop";
+import "../wait-frame";
 import "../entity_api";
 import "../room-events-api";
 
@@ -30,15 +27,6 @@ namespace room_transitions {
 
 
 let PLAYER_MAP_TRANSITION_END_POS = 3;
-
-
-// Offset to shift the player, when rolling back a fadeout transition and the player is
-// on the edge of the screen.
-//
-// Prevents an infinite loop.
-// Ensures the player is visible when rolling back transition in the middle of a doorway.
-let FADEOUT_ROLLBACK_OFFSET_X = 8;
-let FADEOUT_ROLLBACK_OFFSET_Y = 4;
 
 
 // Value MUST BE even
@@ -147,385 +135,13 @@ in wram7e {
     //
     // (countdown display frame timer)
     var countdownToSolidCheck : u8;
-
-
-    // Backup of the room state.
-    // Created on room load.
-    // Restored on transition rollback.
-    var roomStateBackup_lowram : [ u8 ; MEMMAP_ROOMSTATE_LOWRAM_SIZE ];
-    var roomStateBackup_wram7e : [ u8 ; MEMMAP_ROOMSTATE_WRAM7E_SIZE ];
 }
 
 
 
 in code {
 
-
-// Load the room into memory, check if the MetaTile tileset has changed and populates the sprite list.
-//
-// `playerX` and `playerY` contain the expected position of the player AFTER the room transition
-// ends and play resumes (the new player position might be used by an entity init routine)
-//
-// Returns true if it is OK to preform a scroll transition into the next room without glitches.
-//
-// NOTE: This function DOES NOT update map tile properties, process entities or start room events.
-//       `_finish_loading_room()` MUST be called to do so.  If this function returns
-//       false, `_finish_loading_room() must be called AFTER the MetaSprites and
-//       MetaTiles are loaded into memory.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func _load_room_and_check_if_ok_to_scroll(roomPosition : u8 in a, playerX : u8 in x, playerY : u8 in y) : bool in carry {
-
-var _roomStateBackup__room_tileset @ &roomStateBackup_wram7e[&room.tileset as u16 - MEMMAP_ROOMSTATE_WRAM7E as u16] : typeof(room.tileset);
-
-    push8(x);
-    push8(y);
-    push8(a);
-    {
-        _reset_camera();
-        _clear_sprite_list();
-        _add_entities_to_sprite_list();
-
-
-        __backup_room_state();
-    }
-
-    a = pop8();
-    gamestate.data.currentRoom = a;
-
-    carry = resources.load_room(a);
-    // Set player position after room is loaded.
-    // (safe. plx and ply does not modify carry)
-    y = pop8();
-    x = pop8();
-    player.xPos.px = x;
-    player.xPos.sx = 0;
-
-    player.yPos.px = y;
-    player.yPos.sx = 0;
-
-    if !carry {
-        // room is missing from map - create an empty dummy map
-        //
-        // `metatiles.populate_map_tile_properties()` will fill the dummy
-        // room's `mapTileProperties` with solid tiles.  This ensures any
-        // scrolling room transition into a missing room will always be rolled
-        // back.
-
-        __clear_room_memory();
-        room.tileset = a = 0xff;
-
-        metatiles.populate_map_tile_properties__all_tiles_solid();
-
-        // Always prefer a scrolling room transition
-        return true;
-    }
-
-
-    // Get the tileset id from the backup and test if the tileset has changed.
-    a = room.tileset;
-    if a != _roomStateBackup__room_tileset {
-        return false;
-    }
-
-
-    // Check if a fadeout transition was requested
-    a = roomstate.forceFadeoutRoomTransition;
-    if !zero {
-        return false;
-    }
-
-    return true;
-}
-
-
-
-// Finish loading and initialising the room.
-//   * Starts entities
-//   * Starts room events
-//   * Populates the MetaTile tile properties
-//   * Load sprites into the sprite list
-//
-// ASSUMES: The room was just loaded
-// ASSUMES: This function HAS NOT been called on this room before
-//
-// DB = 0x7e
-#[mem8, idx8]
-func _finish_loading_room() {
-
-    // Reset entity subsystem
-    entityloop.init();
-
-    // Only process room events and map-tile properties if the room exists
-    // A tileset of 0xff means the room is the empty dummy room.
-    a = room.tileset;
-    if a != 0xff {
-        metatiles.populate_map_tile_properties();
-        room_events._init__inline();
-
-        // The room event have modified the map, rebuild map tile properties
-        metatiles.populate_map_tile_properties();
-    }
-
-    entityloop.sort_active_entities();
-
-    _add_entities_to_sprite_list_with_offset(scrollDirection);
-    _sprite_list_set_player_with_offset(scrollDirection);
-}
-
-
-
-// Restore the room state from backup, without moving player.
-//
-// ASSUMES: previous room is valid
-// ASSUMES: previous player position is valid
-#[mem8, idx8]
-#[fallthrough]
-func _load_room_from_backup__player_position_unchanged() {
-    var _roomStateBackup__player_xpos_px @ &roomStateBackup_wram7e[&player.xPos.px as u16 - MEMMAP_ROOMSTATE_WRAM7E as u16] : typeof(player.xPos.px);
-    var _roomStateBackup__player_ypos_px @ &roomStateBackup_wram7e[&player.yPos.px as u16 - MEMMAP_ROOMSTATE_WRAM7E as u16] : typeof(player.yPos.px);
-
-    x = _roomStateBackup__player_xpos_px;
-    y = _roomStateBackup__player_ypos_px;
-
-
-    // Move the player away from the edge to prevent an infinite loop
-    if x < FADEOUT_ROLLBACK_OFFSET_X {
-        x = FADEOUT_ROLLBACK_OFFSET_X;
-    }
-    else if x >= DISPLAY_HEIGHT - FADEOUT_ROLLBACK_OFFSET_X {
-        x = DISPLAY_HEIGHT - FADEOUT_ROLLBACK_OFFSET_X;
-    }
-
-    if y < FADEOUT_ROLLBACK_OFFSET_Y {
-        y = FADEOUT_ROLLBACK_OFFSET_Y;
-    }
-    else if y >= DISPLAY_HEIGHT - FADEOUT_ROLLBACK_OFFSET_Y {
-        y = DISPLAY_HEIGHT - FADEOUT_ROLLBACK_OFFSET_Y;
-    }
-
-// Fallthrough
-}
-
-
-
-// Restore the room state from backup, move the player to a specific location and populate the sprite list.
-//
-// ASSUMES: previous room is valid
-// ASSUMES: player position is valid (not stuck inside a solid tile)
-//
-// DB = 0x7e
-#[mem8, idx8]
-func _load_room_from_backup(playerXpos : u8 in x, playerYpos : u8 in y) {
-
-    // ::TODO test for an infinite rollback loop::
-    // ::TODO What should I do when there is an infinite rollback loop? ::
-
-
-    push8(x);
-    push8(y);
-
-
-    _clear_sprite_list();
-    _add_entities_to_sprite_list();
-
-
-    __restore_room_state_from_backup();
-
-    // Assumes previous map tile properties are still valid.
-
-
-    y = pop8();
-    x = pop8();
-
-    player.xPos.px = x;
-    player.yPos.px = y;
-
-
-    entityloop.sort_active_entities();
-
-    _add_entities_to_sprite_list_with_offset(scrollDirection);
-    _sprite_list_set_player_with_offset(scrollDirection);
-}
-
-
-
-// Backup the roomstate variables
-//
-// DB = 0x7e
-#[mem8, idx8]
-inline func __backup_room_state() {
-
-let _roomstate_lowram = MEMMAP_ROOMSTATE_LOWRAM as far *u8;
-let _roomstate_wram7e = MEMMAP_ROOMSTATE_WRAM7E as far *u8;
-
-    mem16_idx16();
-    #[mem16, idx16] {
-        // Parameter order is destination, source::
-        load_dec_repeat(#:far &roomStateBackup_lowram, yy = &roomStateBackup_lowram as u16,
-                        #:_roomstate_lowram,           xx = _roomstate_lowram as u16,
-                        aa = MEMMAP_ROOMSTATE_LOWRAM_SIZE - 1);
-
-        load_dec_repeat(#:far &roomStateBackup_wram7e, yy = &roomStateBackup_wram7e as u16,
-                        #:_roomstate_wram7e,           xx = _roomstate_wram7e as u16,
-                        aa = MEMMAP_ROOMSTATE_WRAM7E_SIZE - 1);
-
-    // NOTE: load_dec_repeat changes the data bank
-    //       (safe as target is in bank 0x7e)
-    }
-    mem8_idx8();
-}
-
-
-// Restore the roomstate variables from backup.
-//
-// DB = 0x7e
-#[mem8, idx8]
-inline func __restore_room_state_from_backup() {
-
-let _roomstate_lowram = MEMMAP_ROOMSTATE_LOWRAM as far *u8;
-let _roomstate_wram7e = MEMMAP_ROOMSTATE_WRAM7E as far *u8;
-
-    mem16_idx16();
-    #[mem16, idx16] {
-        // Parameter order is destination, source::
-        load_dec_repeat(#:_roomstate_lowram,           yy = _roomstate_lowram as u16,
-                        #:far &roomStateBackup_lowram, xx = &roomStateBackup_lowram as u16,
-                        aa = MEMMAP_ROOMSTATE_LOWRAM_SIZE - 1);
-
-        load_dec_repeat(#:_roomstate_wram7e,           yy = _roomstate_wram7e as u16,
-                        #:far &roomStateBackup_wram7e, xx = &roomStateBackup_wram7e as u16,
-                        aa = MEMMAP_ROOMSTATE_WRAM7E_SIZE - 1);
-
-    // NOTE: load_dec_repeat changes the data bank
-    //       (safe as target is in bank 0x7e)
-    }
-    mem8_idx8();
-}
-
-
-
-// Clear room memory
-//
-// DB = 0x7e
-#[mem8, idx8]
-inline func __clear_room_memory() {
-
-    idx16();
-    #[idx16] {
-        xx = sizeof(typeof(room)) - 1;
-        do {
-            (&room as *u8)[xx] = 0;
-            xx--;
-        } while !negative;
-    }
-    idx8();
-}
-
-
-
-// Setup PPU, reset graphics subsystems and draw graphics to the screen.
-//
-// This function will restore the following subsystems to a known good state:
-//  * PPU
-//  * MetaTiles
-//  * MetaSprite
-//  * Textbox
-//  * UI
-//
-// NOTE: This function DOES NOT draw the MetaTiles to screen.
-//
-// ASSUMES: room is partially or completely loaded into memory.
-//
-// NOTE: Enables Force-Blank.
-// NOTE: MUST ONLY BE CALLED ONCE IN THE CODE
-//
-// DB = 0x7e
-#[mem8, idx8]
-inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
-
-
-    wait_frame_and_change_brightness(INIDISP_FORCE_BLANK | INIDISP_BRIGHTNESS_MASK);
-
-
-    push8(program_bank);
-    data_bank = pop8();
-// DB = 0x80
-    {
-        reset_registers();
-
-        // Setup subsystems and load resources to WRAM and PPU.
-        idx16();
-        #[idx16] {
-            metatiles.load_tileset__forceblank(room.tileset);
-
-            metasprites.setup__forceblank();
-
-            // ::TODO get spritesheet_id from somewhere::
-            metasprites.load_ms_spritesheet_ppu_data__forceblank(1);
-
-            textbox.setup_ppu__forceblank();
-
-            engine_hooks.room_transitions__setup_ppu__forceblank();
-
-            // ::TODO get second_layer id from room data::
-            carry = second_layer.setup__forceblank__inline(0xff);
-        }
-        idx8();
-
-        // second-layer is disabled if carry is false (`second_layer_id` was invalid).
-        a = TM_BG1 | TM_BG3 | TM_OBJ;
-        if carry {
-            a = TM_BG1 | TM_BG2 | TM_BG3 | TM_OBJ;
-        }
-        TM = a;
-
-
-        // Setup VRAM MAP
-        BGMODE = a = BGMODE_MODE_1_BG3_PRIORITY;
-
-        // Setup BG1 and BG2 tilemap.
-        // Which background is used by which subsystem is controlled by the
-        // `swapBg1AndBg2ScrollShadows` flag, which is set by the second_layer subsystem.
-        x = ((VRAM_METATILE_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_64x32;
-        y = ((VRAM_SECOND_LAYER_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_64x32;
-
-        a = swapBg1AndBg2ScrollShadows;
-        if !zero {
-            // Swap x & y (uses fewer instructions when setting x/y)
-            a = x;
-            x = y;
-            y = a;
-        }
-        BG1SC = x;
-        BG2SC = y;
-
-        BG3SC = a = ((VRAM_BG3_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_32x32;
-
-        BG12NBA = a =   ((VRAM_MTSL_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG1_SHIFT)
-                      | ((VRAM_MTSL_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG2_SHIFT);
-        BG34NBA = a = ((VRAM_BG3_TILES_WADDR / BG34NBA_WALIGN) << BG34NBA_BG3_SHIFT);
-    }
-
-
-    push8(a = 0x7e);
-    data_bank = pop8();
-// DB = 0x7e
-
-    engine_hooks.room_transitions__init();
-
-    a = *far &resources.UseResourcesOverUsb2Snes;
-    if !zero {
-        // If resources-over-usb2snes is active, the MetaSprite data may have changed and the
-        // player's MetaSprite animations must be reset.
-        //
-        // This is only done if resources-over-usb2snes is active as resetting player animations
-        // could cause glitches (ie, resetting the player's sword animation mid-swing).
-        engine_hooks.room_transitions__init_player_metasprites__inline();
-    }
-}
-
+let load_room__fadein = _fadein_load_dungeon_and_room as func();
 
 
 // Room Transitions
@@ -539,9 +155,10 @@ inline func __setup_ppu_and_reset_graphics_subsystems__inline() {
 // ASSUMES: currentRoom and player position are valid.
 //
 // DB = 0x7e
-#[mem8, idx8]
+#[fallthrough, mem8, idx8]
 func fadein_reset_player() {
     wait_multiple_frames_and_fadeout();
+
 
     // Player cannot be initialised in a normal room transition.
     // No easy way to save/restore player gamestate when the Tileset or MetaSprites change
@@ -549,123 +166,44 @@ func fadein_reset_player() {
     // Also causes the player's MetaSprite frame to be reset in a scrolling room transition.
     engine_hooks.room_transitions__reset_player__inline();
 
-    // Load the room the player was last in
-    _load_room_and_check_if_ok_to_scroll(gamestate.data.currentRoom,
-                                         gamestate.data.playerState.xPos, gamestate.data.playerState.yPos);
+    roomToLoad.dungeon = a = gamestate.data.currentDungeon;
+    roomToLoad.roomPos_x = a = gamestate.data.currentRoom_x;
+    roomToLoad.roomPos_y = a = gamestate.data.currentRoom_y;
+    roomToLoad.playerPos_x = a = gamestate.data.playerState.xPos;
+    roomToLoad.playerPos_y = a = gamestate.data.playerState.yPos;
 
-    // ::TODO what should happen if the room/position is not valid??::
 
-    return _fadein__room_partially_loaded();
-
+// Fallthrough
 }
 
 
-// Load the room, fade in the screen
+// Fadeout the screen, load resources, load roomToLoad, fadein the screen.
 //
-// ASSUMES: in Force-Blank
+// DB = 0x7e
+#[fallthrough, mem8, idx8]
+func _fadein_load_dungeon_and_room(roomToLoad : RoomToLoad in roomToLoad) {
+    dungeon.load_dungeon_and_room(roomToLoad);
+
+// Fallthrough
+}
+
+
+// Assumes dungeon is loaded
 //
 // DB = 0x7e
 #[mem8, idx8]
-func load_room__fadein() {
-
-    // ::TODO how do I handle a fadein to a missing room?::
-
-    _load_room_and_check_if_ok_to_scroll(gamestate.data.roomToLoad,
-                                         gamestate.data.roomToLoad_xPos, gamestate.data.roomToLoad_yPos);
-
-    return _fadein__room_partially_loaded();
-}
-
-
-
-// Blank the screen, load graphics to PPU, fade in the screen, set next game mode to GAME_LOOP.
-//
-// ASSUMES: room is completely loaded into memory and the room was previously active.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func _fadein__room_completly_loaded() {
-    return __fadein__(0);
-}
-
-
-
-// Blank the screen, load graphics to PPU, fade in the screen, set next game mode to GAME_LOOP.
-//
-// ASSUMES: room is partially loaded into memory.
-//
-// DB = 0x7e
-#[mem8, idx8, fallthrough]
-func _fadein__room_partially_loaded() {
-    return __fadein__(1);
-}
-
-
-
-// Blank the screen, load graphics to PPU, fade in the screen, set next game mode to GAME_LOOP.
-//
-// ASSUMES: room is partially or completely loaded in memory
-//
-// INPUT: partiallyLoadedRoom:
-//          if zero: The room is loaded and was previously active in memory.
-//          non-zero: The room is partially loaded and `_finish_loading_room()` will be called.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func __fadein__(partiallyLoadedRoom : u8 in a) {
-
-    push8(a);
-
-    __setup_ppu_and_reset_graphics_subsystems__inline();
-
-    a = pop8();
-    if !zero {
-        // This is a new room and some subsystems are still uninitialised.
-        _finish_loading_room();
-    }
-    entityloop.draw_entities();
-
-
-    // Draw the MetaTile map to VRAM
-    // (the map must be drawn after _finish_loading_room() is called)
-    {
-        push16(0x7e80);
-        data_bank = pop8();
-    // DB = 0x80
-
-        metatiles.draw_map__forceblank();
-
-        data_bank = pop8();
-    // DB = 0x7e
-    }
-
-
-
-    // Ensure next room transition is a normal transition.
-    roomstate.forceFadeoutRoomTransition = 0;
-
-
-    // Fade in
-    {
-        a = 0 as u8;
-        do {
-            push8(a);
-            wait_frame_and_change_brightness(a);
-
-            a = pop8();
-            a++;
-        } while a != 16;
-    }
-
+func _fadein_after_dungeon_load() {
+    wait_multiple_frames_and_fadein();
 
     carry = _test_player_position_is_valid();
     if !carry {
         // Player is in an invalid position.
         wait_one_second();
 
-        _load_room_from_backup__player_position_unchanged();
-
-        ^return _fadein__room_completly_loaded();
+        // ::TODO do something if the position is invalid a second time::
+        // ::TODO do something if backup is invalid::
+        dungeon.load_dungeon_and_restore_roomstate();
+        wait_multiple_frames_and_fadein();
     }
 
 
@@ -673,55 +211,6 @@ func __fadein__(partiallyLoadedRoom : u8 in a) {
     gamestate.backup_gamestate();
 
     set_next_game_mode(GameModes.GAME_LOOP);
-}
-
-
-
-// Blank the screen, then load the next room and resources.
-//
-// INPUT: currentRoom is set to room to load
-//
-// DB = 0x7e
-#[mem8, idx8]
-func fadeout() {
-    _load_room_and_check_if_ok_to_scroll(gamestate.data.roomToLoad,
-                                         gamestate.data.roomToLoad_xPos, gamestate.data.roomToLoad_yPos);
-
-    return __fadeout__room_partially_loaded();
-}
-
-
-
-// Blank the screen, then load the next room and resources.
-//
-// ASSUMES: The room was just loaded into memory and `_finish_loading_room()` has not been called.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func __fadeout__room_partially_loaded() {
-
-    // Fadeout
-    a = 15;
-    do {
-        push8(a);
-        wait_frame_and_change_brightness(a);
-
-        a = pop8();
-        a--;
-    } while !negative;
-
-
-    // ::TODO how do I handle a fadeout/fadein when the room is already loaded and active in memory?::
-    _fadein__room_partially_loaded();
-
-
-    // ::TODO how do I handle a fadein to an invalid room::
-
-
-    // ::TODO check if player is on a non-solid tile::
-    // ::: must be done AFTER tileset is loaded into memory::
-    // ::: ::
-    // ::: How do I handle this case? ::
 }
 
 
@@ -735,27 +224,46 @@ func __fadeout__room_partially_loaded() {
 // Returns true if the transition completed successfully.
 // Returns false if there is a solid tile at the player's new position.
 //
+// ASSUMES: _scrollDirection is valid
+//
 // If this function returns false, then `_scrolling_room_transition__rollback` MUST be called.
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _scrolling_room_transition(roomPosition : u8 in a, _scrollDirection : ScrollDirection in scrollDirection,
-                                playerX : u8 in x, playerY : u8 in y) : bool in carry {
+func _scrolling_room_transition(_scrollDirection : ScrollDirection in x,
+                                playerX : u8 in a, playerY : u8 in y) : bool in carry {
 
-    carry = _load_room_and_check_if_ok_to_scroll(a, x, y);
-    if !carry {
-        __fadeout__room_partially_loaded();
+    roomToLoad.playerPos_x = a;
+    roomToLoad.playerPos_y = y;
+
+    scrollDirection = x as ScrollDirection;
+    roomToLoad.roomPos_x = a = gamestate.data.currentRoom_x + ScrollDirection_RoomOffset_x[x] as u8;
+    roomToLoad.roomPos_y = a = gamestate.data.currentRoom_y + ScrollDirection_RoomOffset_y[x] as u8;
+    roomToLoad.dungeon = a = gamestate.data.currentDungeon;
+
+    // Check if a fadeout transition was requested
+    a = roomstate.forceFadeoutRoomTransition;
+    if !zero {
+        _fadein_load_dungeon_and_room(roomToLoad);
         return true;
     }
 
-    // No need to load MetaTiles and MetaSprites into memory
-    // continue loading the room.
-    _finish_loading_room();
+    _reset_camera();
+    _clear_sprite_list();
+    _add_entities_to_sprite_list();
 
-    negative = second_layer.is_part_of_room();
-    if negative {
-        second_layer.part_of_room.start_room_transition(scrollDirection);
+    carry = dungeon.load_room__inline(roomToLoad);
+    if !carry {
+        // ::TODO improve this::
+        dungeon.load_dungeon_and_room__no_roomstate_backup__inline(roomToLoad);
+        _fadein_after_dungeon_load();
+        return true;
     }
+
+    _add_entities_to_sprite_list_with_offset(scrollDirection);
+    _sprite_list_set_player_with_offset(scrollDirection);
+
+    second_layer.start_room_transition();
 
     x = scrollDirection as u8;
     MetaTileTransition_Setup_FunctionTable[unaligned x]();
@@ -787,18 +295,6 @@ const MetaTileTransition_Process_FunctionTable : [func : bool in carry ; 8] = [
     metatiles.transitions.scroll_down__rollback,
     metatiles.transitions.scroll_left__rollback,
     metatiles.transitions.scroll_right__rollback,
-];
-
-const SecondLayerTransition_Process_FunctionTable__mem16_idx16 : [func ; 8] = [
-    second_layer.part_of_room.scroll_up__process__mem16_idx16,
-    second_layer.part_of_room.scroll_down__process__mem16_idx16,
-    second_layer.part_of_room.scroll_left__process__mem16_idx16,
-    second_layer.part_of_room.scroll_right__process__mem16_idx16,
-
-    second_layer.part_of_room.scroll_up__rollback__mem16_idx16,
-    second_layer.part_of_room.scroll_down__rollback__mem16_idx16,
-    second_layer.part_of_room.scroll_left__rollback__mem16_idx16,
-    second_layer.part_of_room.scroll_right__rollback__mem16_idx16,
 ];
 
 
@@ -833,17 +329,7 @@ func _scrolling_room_transition__loop() : bool in carry {
 
         move_camera_and_draw_sprite_list();
 
-        second_layer.process__inline();
-
-        negative = second_layer.is_part_of_room();
-        if negative {
-            x = scrollDirection as u8;
-            mem16_idx16();
-            #[mem16, idx16] {
-                SecondLayerTransition_Process_FunctionTable__mem16_idx16[unaligned x]();
-            }
-            mem8_idx8();
-        }
+        second_layer.process_room_transition__inline();
 
         x = scrollDirection as u8;
         MetaTileTransition_Process_FunctionTable[unaligned x]();
@@ -896,14 +382,28 @@ func _scrolling_room_transition__rollback(_scrollDirection_ : u8 in a, playerXpo
 
     scrollDirection = a as ScrollDirection;
 
-    _load_room_from_backup(x, y);
+    push8(x);
+    push8(y);
+
+    _clear_sprite_list();
+    _add_entities_to_sprite_list();
+
+    dungeon.restore_room_state_from_backup();
+
+    y = pop8();
+    x = pop8();
+    player.xPos.px = x;
+    player.yPos.px = y;
+
+    entityloop.sort_active_entities();
+
+    _add_entities_to_sprite_list_with_offset(scrollDirection);
+    _sprite_list_set_player_with_offset(scrollDirection);
+
 
     engine_hooks.room_transitions__scrolling_room_transition_rollback__inline();
 
-    negative = second_layer.is_part_of_room();
-    if zero {
-        second_layer.part_of_room.start_room_transition(scrollDirection);
-    }
+    second_layer.start_room_transition();
 
     mem16();
     #[mem16] {
@@ -925,13 +425,8 @@ func _scrolling_room_transition__rollback(_scrollDirection_ : u8 in a, playerXpo
 // DB = 0x7e
 #[mem8, idx8]
 func scroll_right() {
-    a = ScrollDirection.RIGHT as u8;
-    scrollDirection = a as ScrollDirection;
-
-    a = gamestate.data.currentRoom;
-    a++;
-
-    carry = _scrolling_room_transition(a, scrollDirection, PLAYER_XPOS_AFTER_RIGHT_TRANSITION, player.yPos.px);
+    carry = _scrolling_room_transition(ScrollDirection.RIGHT,
+                                       PLAYER_XPOS_AFTER_RIGHT_TRANSITION, player.yPos.px);
     if !carry {
         // Transition failed, rollback room transition
         return _scrolling_room_transition__rollback(ScrollDirection.ROLLBACK_RIGHT as u8,
@@ -948,13 +443,8 @@ func scroll_right() {
 // DB = 0x7e
 #[mem8, idx8]
 func scroll_left() {
-    a = ScrollDirection.LEFT as u8;
-    scrollDirection = a as ScrollDirection;
-
-    a = gamestate.data.currentRoom;
-    a--;
-
-    carry = _scrolling_room_transition(a, scrollDirection, PLAYER_XPOS_AFTER_LEFT_TRANSITION, player.yPos.px);
+    carry = _scrolling_room_transition(ScrollDirection.LEFT,
+                                       PLAYER_XPOS_AFTER_LEFT_TRANSITION, player.yPos.px);
     if !carry {
         // Transition failed, rollback room transition
         return _scrolling_room_transition__rollback(ScrollDirection.ROLLBACK_LEFT as u8,
@@ -971,10 +461,7 @@ func scroll_left() {
 // DB = 0x7e
 #[mem8, idx8]
 func scroll_down() {
-    a = ScrollDirection.DOWN as u8;
-    scrollDirection = a as ScrollDirection;
-
-    carry = _scrolling_room_transition(a = gamestate.data.currentRoom + 0x10, scrollDirection,
+    carry = _scrolling_room_transition(ScrollDirection.DOWN,
                                        player.xPos.px, PLAYER_YPOS_AFTER_DOWN_TRANSITION);
     if !carry {
         // Transition failed, rollback room transition
@@ -992,10 +479,7 @@ func scroll_down() {
 // DB = 0x7e
 #[mem8, idx8]
 func scroll_up() {
-    a = ScrollDirection.UP as u8;
-    scrollDirection = a as ScrollDirection;
-
-    carry = _scrolling_room_transition(a = gamestate.data.currentRoom - 0x10, scrollDirection,
+    carry = _scrolling_room_transition(ScrollDirection.UP,
                                        player.xPos.px, PLAYER_YPOS_AFTER_UP_TRANSITION);
     if !carry {
         // Transition failed, rollback room transition
@@ -1225,6 +709,14 @@ in rodata0 {
 
     let ScrollDirectionVelocityX = (far&_ScrollDirectionVelocityX as far *i16);
     let ScrollDirectionVelocityY = (far&_ScrollDirectionVelocityY as far *i16);
+
+
+    const _ScrollDirection_RoomOffset : [i8 ; 8 * 2] =
+        // x   y   x   y   x   y   x   y   x   y   x   y   x   y   x   y
+        [  0, -1,  0,  1, -1,  0,  1,  0,  0,  1,  0, -1,  1,  0, -1,  0];
+
+    let ScrollDirection_RoomOffset_x = ((far&_ScrollDirection_RoomOffset as u24 + 0) as far *i8);
+    let ScrollDirection_RoomOffset_y = ((far&_ScrollDirection_RoomOffset as u24 + 1) as far *i8);
 }
 
 }

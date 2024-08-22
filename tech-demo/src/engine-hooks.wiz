@@ -14,6 +14,9 @@ import "engine/entity_api";
 import "engine/game/gamestate";
 import "engine/resources/resources";
 
+// ::TODO remove::
+import "engine/game/dungeon";
+
 
 namespace engine_hooks {
 
@@ -89,28 +92,29 @@ inline func gamestate__continue_game__inline() {
     // ::HACK Hardcoded checkpoint (just before the boss)::
     // ::TODO create some kind of checkpoint system::
 
-    let LAST_HEALING_ROOM = 0x75;
+    let LAST_HEALING_ROOM_X = 5;
+    let LAST_HEALING_ROOM_Y = 7;
 
-    a = gamestate.data.currentRoom;
-    if a >= LAST_HEALING_ROOM + 1 {
+    x = gamestate.data.currentRoom_x;
+    y = gamestate.data.currentRoom_y;
+
+    if y >= LAST_HEALING_ROOM_Y + 1 || x >= LAST_HEALING_ROOM_X + 1 {
         // Game over before the boss
-        a = resources.rooms.STARTING_ROOM;
-        x = player.InitialPlayerState.xPos;
-        y = player.InitialPlayerState.yPos;
+        x = resources.STARTING_ROOM_X;
+        y = resources.STARTING_ROOM_Y;
     }
     else {
         // Game over after the final healing room (at the boss)
-        a = LAST_HEALING_ROOM;
-        x = 256 / 2;
-        y = 224 / 2;
+        x = LAST_HEALING_ROOM_X;
+        y = LAST_HEALING_ROOM_Y;
 
     }
 
-    gamestate.data.currentRoom = a;
-    gamestate.data.roomToLoad = a;
+    gamestate.data.currentRoom_x = x;
+    gamestate.data.currentRoom_y = y;
 
-    gamestate.data.playerState.xPos = x;
-    gamestate.data.playerState.yPos = y;
+    gamestate.data.playerState.xPos = a = player.InitialPlayerState.xPos;
+    gamestate.data.playerState.yPos = a = player.InitialPlayerState.yPos;
     gamestate.data.playerState.zPos = player.InitialPlayerState.zPos;
 }
 
@@ -156,7 +160,7 @@ let gamestate__key_count_changed = ui.draw_key_bar;
 //
 // DB = 0x80
 #[mem8, idx16]
-inline func room_transitions__setup_ppu__forceblank() {
+inline func load_dungeon__setup_ppu__forceblank() {
     ui.setup_ppu__forceblank();
 }
 
@@ -168,12 +172,15 @@ inline func room_transitions__setup_ppu__forceblank() {
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func room_transitions__init() {
+inline func load_dungeon__init() {
     // Reset and redraw the UI
     ui.init();
 
-    // ::TODO move into engine (and get songId from somewhere)::
-    audio.load_song_if_changed(resources.songs.DungeonTheme);
+    // ::TODO move into engine::
+    a = dungeon.dungeonData.song;
+    if a < resources.N_SONGS {
+        audio.load_song_if_changed(dungeon.dungeonData.song as resources.songs);
+    }
 }
 
 
@@ -194,7 +201,7 @@ inline func room_transitions__reset_player__inline() {
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func room_transitions__init_player_metasprites__inline() {
+inline func init_player_metasprites__inline() {
     player.init_metasprites();
 }
 
