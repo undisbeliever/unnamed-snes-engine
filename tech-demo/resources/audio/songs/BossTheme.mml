@@ -1,6 +1,6 @@
 ;Boss Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.10
+;Made for undisbeliever's Terrific Audio Driver v0.0.11
 
 #Title Boss Theme
 #Game unnamed-snes-game
@@ -39,15 +39,14 @@ A T132 E0
 A [!ARiff1a ]14
 A @Snare02 V192 o4a32a32 @Kick3 V255 o4f32 @HatClosed V64 o5c32
 A @Snare02 V192 o4a32 @HatClosed V64 o5c32 @Snare02 V192 o4a32a64a64 L
-A [[!ARiff1a !ARiff1b !ARiff2 !ARiff3 !ARiff4
-A !ARiff1a !ARiff1b !ARiff2 !ARiff3 !ARiff5
-A !ARiff1a !ARiff1b !ARiff2 !ARiff3 !ARiff4
+A [[[!ARiff1a !ARiff1b !ARiff2 !ARiff3 !ARiff4 :
+A !ARiff1a !ARiff1b !ARiff2 !ARiff3 !ARiff5 ]2
 A !ARiff1a !ARiff1b !ARiff2 !ARiff3 : !ARiff2 ]2 !ARiff6 ]3 [
 A [[!ARiff2 !ARiff2 @Snare02 V192 o4a32 @Kick3 V255 o4f32
 A !ARiff2 !ARiff2 : @Kick3 V255 o4f32 @Snare02 V192 o4a32]2
 A @Snare02 V192 o4a48a48a48]4 :
-A [[!ARiff1a !ARiff1b !ARiff1a !ARiff1b !ARiff1a !ARiff1b !ARiff2 !ARiff3 !ARiff5
-A !ARiff1a !ARiff1b !ARiff1a !ARiff1b !ARiff1a !ARiff1b !ARiff2 !ARiff3 : !ARiff4 ]2 !ARiff6 ]2]2
+A [[[!ARiff1a !ARiff1b ]3 !ARiff2 !ARiff3 !ARiff5
+A [!ARiff1a !ARiff1b ]3 !ARiff2 !ARiff3 : !ARiff4 ]2 !ARiff6 ]2]2
 A @Snare02 [[V192 o4a48 V48 a48a48 V96 a48]9 V192 o4a48 V0 [V+16 o4a48]11 ]2
 
 B E0 @TimpaniB V156 [o2b16b8b32b32 : b16b8.]4 V0 [V+13 o2b48]12 L
@@ -60,7 +59,7 @@ B @Crash2 V136 E0 o5c1^1
 B @Flute1 E1
 B V0 [V+3 !BRiff1 ]2 [V+3 !BRiff2 ]2 [V+3 !BRiff1 ]2 [V+3 !BRiff3 ]2
 B [!BRiff1 !BRiff1 !BRiff2 !BRiff2 !BRiff1 !BRiff1 : !BRiff3 !BRiff3 ]4
-B [!BRiff4 ]2 E0
+B !BRiff4 !BRiff4 E0
 B @Crash2 V136 [o5c4]8
 B A15,7,7,13 o3f+1. @TimpaniB V0 [V+6 o3f+48]24
 B @Crash2 V136 o5c4 @Flute1 E1 V6 !BRiff5 [V+3 !BRiff4 ]2 [V+3 !BRiff5 ]2 [V+3 !BRiff4 ]2
@@ -107,16 +106,15 @@ C o7b16
 
 D @PianoC2_16 V104 E0
 D o2b2b2b4b4 l8 bb>b<b L
-!DRiff1 l8 o2b>b<b>b
-!DRiff2 l8 o3d>d<d>d
-!DRiff3 l8 o3e>e<e>e
-D l8 [!DRiff1 o2a>a<a>a !DRiff1 : o3c>c<c>c]6
+!DRiff1 l8 [o2b>b]2
+!DRiff2 l8 [o3d>d]2
+D l8 [!DRiff1 [o2a>a]2 !DRiff1 : [o3c>c]2]6
 D !DRiff2
 D l16 [o2b.>b.<b]16
-D [!DRiff3 !DRiff2 ]5
-D !DRiff1 [!DRiff2 !DRiff3 ]2
-D l8 o3f>f<f>f
-D [l8 o3f+>f+<f+>f+ o3g>g<g>g o3g+>g+<g+>g+ o3a>a<a>a]2
+D [l8 [o3e>e]2 !DRiff2 ]5
+D !DRiff1 [!DRiff2 l8 [o3e>e]2]2
+D l8 [o3f>f]2
+D [l8 [o3f+>f+]2 [o3g>g]2 [o3g+>g+]2 [o3a>a]2]2
 D [o2b>b>b<b]4
 
 E @Strings8 V48 E0 p56 l2
