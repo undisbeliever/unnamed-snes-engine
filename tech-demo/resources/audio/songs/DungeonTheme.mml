@@ -1,6 +1,6 @@
 ;Dungeon Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.10
+;Made for undisbeliever's Terrific Audio Driver v0.0.11
 
 #Title Dungeon Theme
 #Game unnamed-snes-game
@@ -45,44 +45,41 @@ A @Strings8 E0 V24 p48 o4e1f+1g1f+1e1f+1f+1f+2g+4e4
 
 B l1 r^^^^^^^^^^^^^
 B E1 l8 @Strings8Detache V128 [o3[b]6[b16]3:b16b16]2
-!BRiff1 l8 o4[c]6c16c16c24c24<b24
-B !BRiff1 o4c16.c32c12c24c12c24c16.c32[c16]6c24c24<b24
-B l16 [o3bgf+e]8
-B !BRiff1 l24 [o3ab>cd:c<b]2 o4efgagfedc<bagfg
+B [l8 o4[c]6c16c16c24c24<b24 : o4c16.c32c12c24c12c24c16.c32[c16]6c24c24<b24
+B l16 [o3bgf+e]8]2
+B l24 [o3ab>cd:c<b]2 o4efgagfedc<bagfg
 B L E0 l4 V32 GF127 p80 [o2b]6 b2
-!BRiff2 V0 l64 [V+2o4a&b&]8 [V-2o4a&b&]7 V-2o4a&b
-!BRiff3 V0 l64 [V+2o4b&>c+&]8 [V-2o4b&>c+&]7 V-2o4c&>c+
-!BRiff4 V0 l64 [V+2o5c+&d&]8 [V-2o5c+&d&]7 V-2o5c+&d
-!BRiff5 E0 V8 l4 ro4b>bef+d
-B @Clarinet p64 E1 r2  !BRiff2 r2 !BRiff3 r2 !BRiff4 r2 !BRiff3
-B [!BRiff2 !BRiff3 !BRiff4 : !BRiff3 ]2 V0 l64 [V+2o5d&e&]8 [V-2o5d&e&]7 V-2o5d&e
-B !BRiff5 l4 o4b >c+8<a8
-B !BRiff5 l4 o5ef+
+!BRiff1 V0 l64 [V+2o4a&b&]8 [V-2o4a&b&]7 V-2o4a&b
+!BRiff2 V0 l64 [V+2o4b&>c+&]8 [V-2o4b&>c+&]7 V-2o4c&>c+
+!BRiff3 V0 l64 [V+2o5c+&d&]8 [V-2o5c+&d&]7 V-2o5c+&d
+B @Clarinet p64 E1 r2  !BRiff1 r2 !BRiff2 r2 !BRiff3 r2 !BRiff2
+B [!BRiff1 !BRiff2 !BRiff3 : !BRiff2 ]2 V0 l64 [V+2o5d&e&]8 [V-2o5d&e&]7 V-2o5d&e
+B [E0 V8 l4 ro4b>bef+d : l4 o4b >c+8<a8]2
+B l4 o5ef+
 B E1 @Flute1 V48 ~6,2 l8 o5d^c+dc+^<a^ g<b>g^^f+de
 B l8 o5ef+gf+edc<b16g16 ae16c16<e16a16>e f+g+f+16d16c+16d16
 B w16 ~0 A4,7,7,0 o4g2. GF127 {b f+}4,8& f+2& A15,7,7,14 f+4..
 B ~16,2 A4,7,7,0 o4d2. GF127 {f+ c+}4,8& c+2& A15,7,7,14 c+2
 B E0 ~0 @Strings8 V64 p80 l1 o1b^& A15,7,7,9 b^ p64
 B l1 r^^^
-!BRiff6 l16 ro3e>b<b o2b>b>d<d o4c+<c+a<a
-!BRiff7 l16 o3gf+df+
-!BRiff8 l16 o4dc+<a>e
+!BRiff4 l16 ro3e>b<b o2b>b>d<d o4c+<c+a<a
+!BRiff5 l16 o3gf+df+
+!BRiff6 l16 o4dc+<a>e
 B @PIANO_C5 V24 E1
-B [!BRiff6 !BRiff7
-B  !BRiff6 !BRiff8 ]8
+B [!BRiff4 !BRiff5 !BRiff4 !BRiff6 ]8
 B @Strings8 E0 V24 p80 o4c1d1e1d1c1d1d1d+2e4<b4
 
 C l1 r^^^^^^^^^^^^^^^^
 C @Strings8Detache E1 V128 l8 o3afaf16g16afa16f16e16d16
 C w4^32 o3a16a16g16f+16 w8.. l16wo4c<ba l24[wbbag:a]2f+ l32[eeegef+:ga]2ab
-C l8o3aaggaabb waggaabb
+C l8o3a[aggaabb: w]2
 C L E0 [@TimpaniB l8 o3 V128 e V48 e A15,7,7,0 V96 e^]3 e4 V16[e64V+6]16
 C l1 A15,7,7,9 o3e^^^^^^^
 !CRiff1 ~6,2 l8 o5g^f+gf+^d^
-!CRiff2 ~6,2 l8 o4beb^^>d& [c+64&d64&]4 c+16
-C E1 @Flute1 V48 !CRiff1 !CRiff2 ~6,2 o4a16
-C !CRiff1 ~6,2 l8 o5b^ag l24agf+ gf+e f+ed l48 c+def+ga
-C !CRiff1 ~6,2 !CRiff2 ~6,2 o5e16
+C E1 @Flute1 V48 
+C [!CRiff1 ~6,2 l8 o4beb^^>d& [c+64&d64&]4 c+16 :o4a16
+C !CRiff1 ~6,2 l8 o5b^ag l24agf+ gf+e f+ed l48 c+def+ga]2
+C o5e16
 C o4a8 l64 ^b>cde f+ga l16b^a^ gagf+gf+ed
 C l16 o5c<bae <a>ega b>c+dc+<bf+ef+
 C ~16,2 [A4,7,7,0 o4g2. GF127 {b f+}4,8& f+2& A15,7,7,14 f+2]2
@@ -107,10 +104,10 @@ E l1 o1e^^^^^^^^^^^^^
 E l1 o1a.b2
 E l1 o1e^^^e^& A15,7,7,9 e^
 E l1 r^^^^^^^
-E @Flute1 V8 GF96 E1
-!ERiff1 ~8,2 o6b16b32a32b16a16 o6e16e32d32e16d16 o5b16b32a32b16
-E [!ERiff1 ~8,2 o6d16 c+16d16c+16e64f+64g64a64
-E !ERiff1 ~8,2 o5a16 : g16f+16e16>e16]6 o5g16f+16e16b16
+E @Flute1 V8 GF96 E1~8,2
+E [[o6b16b32a32b16a16 o6e16e32d32e16d16 o5b16b32a32b16 :
+E o6d16 c+16d16c+16e64f+64g64a64]2
+E o5a16 : g16f+16e16>e16]6 o5g16f+16e16b16
 E @PianoC2_16 V64 E0 ~0 [o3a2]12 [o3b2]3 o3b4b4 [o3e4]6 o3e2
 
 F l1 r^^^^^^^^^^^^^
@@ -121,19 +118,18 @@ F l1 o3a.b2
 F l1 o3e^^^e^& A15,7,7,9 e^
 F l1 r^^^^^^^^^^^
 F @Clarinet E1 V8 GF96
-!FRiff1 ~8,2 o6e4b8>d8 c+8c+16d16
-F !FRiff1 ~8,2 o7c+16c48<b48a+48a8
-F l16 o6g<e>e<e>f+<e>g<e o6f+<e>d<e>l32edc+<bab>c+d
-F !FRiff1 ~8,2 o7c+8<a16>e48f+48g48
+F [~8,2 o6e4b8>d8 c+8c+16d16 : o7c+16c48<b48a+48a8
+F l16 o6g<e>e<e>f+<e>g<e o6f+<e>d<e>l32edc+<bab>c+d]2
+F o7c+8<a16>e48f+48g48
 F o7a8g16f+16g8f+16d16 e8d8c+8e8
 F o7b2& GD6 b2 GF96 o7a8&b8& [a32&b32&]2 [a64&b64&]4 GD6 a2
 F GF96 o7g2& GD6 g2 GF96 o7f+2 <b4>e4
-!FRiff2 ~8,2 o5a4>e4^16c32d32e16g16
-!FRiff2 o6f+16Q4d16Q8d16<a16>d16f+8g48f+48e48f+8d8
-F r4 @trumpet_2 V64 !FRiff2
-F ~8,2 o5a32b32>c32d32e32f+32g48a48b48
+F r4 @trumpet_2 V64 ~8,2 
+F [o5a4>e4^16c32d32e16g16
+F o6f+16Q4d16Q8d16<a16>d16f+8g48f+48e48f+8d8 :
+F o5a32b32>c32d32e32f+32g48a48b48
 F o7c4<b8>c16<b16 e8d8e8b8 a4g4f+4d4
-F o6e4 !FRiff2 ~8,2 o6f+8g16a16
+F o6e4]2 o6f+8g16a16
 F o6b4{f+>f+}4,8& f+4 {o6b>b}4,12& b4 a8g+8 a8g+16f+16 g+16e16<b16g+16
 F o6e8e12Q4e24Q8e4 o7e8e12Q4e24Q8e4 o6e8e12Q4e24Q8e4 o5e2 ~0
 
@@ -153,6 +149,5 @@ H l1 r^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ L E0
 H @Strings8 V80 l1 o0e^& A15,7,7,9 b^
 H l1 r^^^
 H @PIANO_C5 V9 E1 r16.
-H [!BRiff6 !BRiff7
-H  !BRiff6 !BRiff8 ]8
+H [!BRiff4 !BRiff5 !BRiff4 !BRiff6 ]8
 H l1 r^^^^^^^^^^^^^^^^^^^^^^^^^^^^^2..^32
