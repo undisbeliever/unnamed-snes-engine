@@ -29,24 +29,30 @@
 #ZenLen 192
 
 A T132 E0
-!ARiff1a @Kick3 V255 o4f32 @HatClosed V32 o5c32 V64 o5c32 V32 o5c32
-!ARiff1b @Snare02 V192 o4a32 @HatClosed V32 o5c32 V64 o5c32 V32 o5c32
-!ARiff2 @Kick3 V255 o4f32 @HatClosed V32 o5c32 V64 o5c32
-!ARiff3 @Snare02 V192 o4a32 @HatClosed V64 o5c32 
-!ARiff4 @Kick3 V255 o4f32 @Snare02 V192 o4a32 @Kick3 V255 o4f96f48
-!ARiff5 @Kick3 V255 o4f32 o4f32 @Snare02 V192 o4a32
-!ARiff6 @Kick3 V255 o4f32 @Snare02 V192 o4a32a32
+!Drum_Kick3_32 @Kick3 V255 o4f32
+!Drum_Snare02_32 @Snare02 V192 o4a32
+!Drum_HatClosed_32 @HatClosed V64 o5c32
+!ARiff1aa @HatClosed V32 o5c32 V64 o5c32
+!ARiff1a !Drum_Kick3_32 !ARiff1aa V32 o5c32
+!ARiff1b !Drum_Snare02_32 !ARiff1aa V32 o5c32
+!ARiff2 !Drum_Kick3_32 !ARiff1aa
+!ARiff3 !Drum_Snare02_32 !Drum_HatClosed_32 
+!ARiff1_2_3 !ARiff1a !ARiff1b !ARiff2 !ARiff3
+!ARiff1_3x_2_3 [!ARiff1a !ARiff1b ]3 !ARiff2 !ARiff3
+!ARiff4 !Drum_Kick3_32 !Drum_Snare02_32 @Kick3 V255 o4f96f48
+!ARiff5 !Drum_Kick3_32 o4f32 !Drum_Snare02_32
+!ARiff6 !Drum_Kick3_32 !Drum_Snare02_32 o4a32
 A [!ARiff1a ]14
-A @Snare02 V192 o4a32a32 @Kick3 V255 o4f32 @HatClosed V64 o5c32
-A @Snare02 V192 o4a32 @HatClosed V64 o5c32 @Snare02 V192 o4a32a64a64 L
-A [[[!ARiff1a !ARiff1b !ARiff2 !ARiff3 !ARiff4 :
-A !ARiff1a !ARiff1b !ARiff2 !ARiff3 !ARiff5 ]2
-A !ARiff1a !ARiff1b !ARiff2 !ARiff3 : !ARiff2 ]2 !ARiff6 ]3 [
-A [[!ARiff2 !ARiff2 @Snare02 V192 o4a32 @Kick3 V255 o4f32
-A !ARiff2 !ARiff2 : @Kick3 V255 o4f32 @Snare02 V192 o4a32]2
-A @Snare02 V192 o4a48a48a48]4 :
-A [[[!ARiff1a !ARiff1b ]3 !ARiff2 !ARiff3 !ARiff5
-A [!ARiff1a !ARiff1b ]3 !ARiff2 !ARiff3 : !ARiff4 ]2 !ARiff6 ]2]2
+A !Drum_Snare02_32 o4a32 !Drum_Kick3_32 !Drum_HatClosed_32
+A !Drum_Snare02_32 !Drum_HatClosed_32 !Drum_Snare02_32 o4a64a64 L
+A [[[!ARiff1_2_3 !ARiff4 :
+A !ARiff1_2_3 !ARiff5 ]2
+A !ARiff1_2_3 : !ARiff2 ]2 !ARiff6 ]3 [
+A [[!ARiff2 !ARiff2 !Drum_Snare02_32 !Drum_Kick3_32
+A !ARiff2 !ARiff2 : !Drum_Kick3_32 !Drum_Snare02_32 ]2
+A @Snare02 V192 [o4a48]3]4 :
+A [[!ARiff1_3x_2_3 !ARiff5
+A !ARiff1_3x_2_3 : !ARiff4 ]2 !ARiff6 ]2]2
 A @Snare02 [[V192 o4a48 V48 a48a48 V96 a48]9 V192 o4a48 V0 [V+16 o4a48]11 ]2
 
 B E0 @TimpaniB V156 [o2b16b8b32b32 : b16b8.]4 V0 [V+13 o2b48]12 L
@@ -79,7 +85,7 @@ C [r16 o5b32b32b16>c+16d16<b16>d16f+16 : o6e8d16e32d32c+16<a16e16a16]2
 C o6g8c8<g8>c16g16
 C [o6f+8.b8a16:g16f+16 o6e8.d8c+16d16e16]2
 C o6a16b16 o7c8<g8>c8g8
-C o7f+4<b8>f+8 o7e8d16d32d32d16d16d16e16
+C o7f+4<b8>f+8 o7e8d16d32d32[d16]3e16
 C o7f+4<b8f+8 o6g4>c8g8
 C o7f+4<b8>c+16d16 c+8<a8e8a16>e16
 C o7f+4<b8>c+8 d8.e16f+12g12a12
@@ -134,21 +140,22 @@ F o2f+gg+a L
 F V48 p56 [o2f+ef+:g]6 o2a
 F l4 o2f+af+ef+g+ab
 F V72 p64 o1b1^1
-F V48 p72 l2 o2bab>deded
-F o3edf+dedec
-F o3c+dd+e
+F V48 p72 l2 o2bab>d[ed]3
+F o3f+dedec
+!FRiff1 l2 o3c+dd+e
+F !FRiff1
 F V40 !ERiff1
 F V72 p64 o1b1^1
 
 G @Strings8 V48 E0
 G l1 r^^^^^^^^^^^^^^^^^^^2 L
-G l2 o2abab>f+
-G o3gf+d<ababr
+G l2 o2[ab]2>f+
+G o3gf+d<[ab]2r
 G r1^1
-G o3c+dd+e
+G !FRiff1
 G l1 r^^^^^^^^^^^^^^^^^^^2
 
 H @Strings8 V48 E0
 H l1 r^^^^^^^^^^^^^^^^^^^^^2 L
-H l2 o2abab
+H [l2 o2ab]2
 H l1 r^^^^^^^^^^^^^^^^^^^^^^^^^^^
