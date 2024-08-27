@@ -157,8 +157,8 @@ def combine_dungeon_and_room_data(dungeon: BaseResourceData, rooms: dict[tuple[i
 
     rd_offset: Final = len(room_table)
 
-    # ::TODO this is not reproducible::
-    for (x, y), r in rooms.items():
+    # Must sort the rooms to create a reproducible binary
+    for (x, y), r in sorted(rooms.items()):
         if x >= 0 and x < width and y >= 0 and y < height:
             i = (y * width + x) * 2
             o = rd_offset + len(room_data)
