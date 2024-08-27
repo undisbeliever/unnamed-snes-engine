@@ -187,8 +187,8 @@ class BaseResourceCompiler(metaclass=ABCMeta):
     EXPORT_ORDER_SI: Optional[SharedInputType]
     # The Shared inputs that are used by the compiler
     SHARED_INPUTS: Sequence[SharedInputType]
-    USES_PALETTES: bool
-    USES_MT_TILESETS: bool = False
+    # The resource-types that are used by the compiler
+    DEPENDENCIES: Sequence[ResourceType]
 
     def __init__(self, r_type: ResourceType, shared_input: SharedInput) -> None:
         # All fields in a BaseResourceCompiler MUST be final
@@ -274,9 +274,8 @@ class MsSpritesheetCompiler(BaseResourceCompiler):
         return None
 
     SHARED_INPUTS = (SharedInputType.MS_EXPORT_ORDER,)
-    USES_PALETTES = False
-
     EXPORT_ORDER_SI = SharedInputType.MAPPINGS
+    DEPENDENCIES = ()
 
     def _get_name_list(self) -> list[Name]:
         assert self._shared_input.mappings
@@ -314,8 +313,8 @@ class PaletteCompiler(OtherResourcesCompiler):
         return d
 
     SHARED_INPUTS = (SharedInputType.OTHER_RESOURCES,)
-    USES_PALETTES = False
     EXPORT_ORDER_SI = SharedInputType.MAPPINGS
+    DEPENDENCIES = ()
 
     def _get_name_list(self) -> list[Name]:
         assert self._shared_input.mappings
@@ -347,8 +346,8 @@ class MetaTileTilesetCompiler(SimpleResourceCompiler):
         return None
 
     SHARED_INPUTS = (SharedInputType.MAPPINGS,)
-    USES_PALETTES = True
     EXPORT_ORDER_SI = SharedInputType.MAPPINGS
+    DEPENDENCIES = (ResourceType.palettes,)
 
     def _get_name_list(self) -> list[Name]:
         assert self._shared_input.mappings
@@ -393,9 +392,8 @@ class SecondLayerCompiler(OtherResourcesCompiler):
         SharedInputType.MAPPINGS,
         SharedInputType.OTHER_RESOURCES,
     )
-    USES_PALETTES = True
-    USES_MT_TILESETS = True
     EXPORT_ORDER_SI = SharedInputType.MAPPINGS
+    DEPENDENCIES = (ResourceType.palettes, ResourceType.mt_tilesets)
 
     def _get_name_list(self) -> list[Name]:
         assert self._shared_input.mappings
@@ -424,8 +422,8 @@ class TileCompiler(OtherResourcesCompiler):
         return d
 
     SHARED_INPUTS = (SharedInputType.OTHER_RESOURCES,)
-    USES_PALETTES = False
     EXPORT_ORDER_SI = SharedInputType.MAPPINGS
+    DEPENDENCIES = ()
 
     def _get_name_list(self) -> list[Name]:
         assert self._shared_input.mappings
@@ -455,8 +453,8 @@ class BgImageCompiler(OtherResourcesCompiler):
         return d
 
     SHARED_INPUTS = (SharedInputType.OTHER_RESOURCES,)
-    USES_PALETTES = True
     EXPORT_ORDER_SI = SharedInputType.MAPPINGS
+    DEPENDENCIES = (ResourceType.palettes,)
 
     def _get_name_list(self) -> list[Name]:
         assert self._shared_input.mappings
@@ -509,8 +507,8 @@ class SongCompiler(SimpleResourceCompiler):
         return self._file_map.get(filename)
 
     SHARED_INPUTS = (SharedInputType.MAPPINGS, SharedInputType.AUDIO_PROJECT)
-    USES_PALETTES = False
     EXPORT_ORDER_SI = SharedInputType.AUDIO_PROJECT
+    DEPENDENCIES = ()
 
     def _get_name_list(self) -> list[Name]:
         assert self._shared_input.audio_project
@@ -540,8 +538,8 @@ class DungeonCompiler(SimpleResourceCompiler):
         SharedInputType.OTHER_RESOURCES,
         SharedInputType.AUDIO_PROJECT,
     )
-    USES_PALETTES = False
     EXPORT_ORDER_SI = SharedInputType.DUNGEONS
+    DEPENDENCIES = ()
 
     def _get_name_list(self) -> list[Name]:
         assert self._shared_input.dungeons
@@ -585,6 +583,7 @@ class RoomCompiler:
 
     SHARED_INPUTS = (SharedInputType.MAPPINGS, SharedInputType.OTHER_RESOURCES, SharedInputType.ENTITIES, SharedInputType.DUNGEONS)
     EXPORT_ORDER_SI = None
+    DEPENDENCIES = ()
 
     def shared_input_changed(self, s_type: SharedInputType) -> None:
         if s_type == SharedInputType.DUNGEONS or s_type == SharedInputType.MAPPINGS or s_type == SharedInputType.OTHER_RESOURCES:
@@ -672,6 +671,21 @@ def _build_st_rt_map(
     return out
 
 
+def _build_dependency_graph(
+    compilers: Sequence[Union[BaseResourceCompiler, RoomCompiler]]
+) -> dict[ResourceType, frozenset[Optional[ResourceType]]]:
+    out = dict()
+
+    for s_type in ResourceType:
+        d = list()
+        for c in compilers:
+            if s_type in c.DEPENDENCIES:
+                d.append(c.resource_type)
+        out[s_type] = frozenset(d)
+
+    return out
+
+
 # THREAD SAFETY: Must only exist on a single thread
 class ProjectCompiler:
     # A set containing all resource lists
@@ -707,14 +721,9 @@ class ProjectCompiler:
         )
         self.__room_compiler: Final = RoomCompiler(self.__shared_input)
         self.__dynamic_ms_compiler: Final = DynamicMetaspriteCompiler(self.__shared_input)
+        self.resource_dependencies: Final = _build_dependency_graph(self.__resource_compilers)
 
         assert len(self.__resource_compilers) == len(ResourceType)
-
-        self.resource_dependencies: Final[dict[Optional[ResourceType], frozenset[Optional[ResourceType]]]] = {
-            ResourceType.palettes: frozenset(c.resource_type for c in self.__resource_compilers if c.USES_PALETTES),
-            ResourceType.mt_tilesets: frozenset(c.resource_type for c in self.__resource_compilers if c.USES_MT_TILESETS),
-            ResourceType.dungeons: frozenset([None]),
-        }
 
         self.ST_RT_MAP: Final = _build_st_rt_map(*self.__resource_compilers, self.__room_compiler)
 
@@ -926,8 +935,8 @@ class ProjectCompiler:
             self._log_cannot_compile_si_error("resources")
             return
 
-        for rt, deps in self.resource_dependencies.items():
-            if rt in to_recompile:
+        for d_rt, deps in self.resource_dependencies.items():
+            if d_rt in to_recompile:
                 to_recompile |= deps
 
         if to_recompile == self.ALL_RESOURCE_LISTS:
