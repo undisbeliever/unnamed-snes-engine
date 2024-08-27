@@ -90,6 +90,13 @@ in zeropage {
 in code {
 
 
+#[mem8]
+inline func items_id_out_of_bounds(itemId : u8 in a, let rType: ResourceType): bool in carry {
+    cmp(a, ResourceTypeTable_nResources[rType as u16 * sizeof(ResourceTypeTableEntry)]);
+    return carry;
+}
+
+
 // Load a resource with fixed RAM data and no PPU data.
 //
 // REQUIRES: Force-Blank

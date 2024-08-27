@@ -559,13 +559,14 @@ class DungeonCompiler(SimpleResourceCompiler):
         r_name = self.name_list[resource_id]
         try:
             dungeon = self._shared_input.dungeons.dungeons[r_name]
-            header = compile_dungeon_header(
+            data, header = compile_dungeon_header(
                 dungeon, self._shared_input.mappings, self._shared_input.other_resources, self._shared_input.audio_project
             )
             return DungeonResourceData(
                 self.resource_type,
                 resource_id,
                 r_name,
+                data,
                 header,
                 includes_room_data=False,
             )
@@ -975,21 +976,20 @@ def append_room_data_to_dungeons(data_store: DataStore, err_handler: Callable[[U
     dungeons = data_store.get_resource_data_list(ResourceType.dungeons)
 
     for d_id, d in enumerate(dungeons):
-        if isinstance(d, DungeonResourceData):
-            assert d.includes_room_data is False
-            try:
-                rooms = data_store.get_dungeon_rooms(d_id)
-                data = combine_dungeon_and_room_data(d.resource_name, d.data, rooms)
+        assert d is not None
+        try:
+            rooms = data_store.get_dungeon_rooms(d_id)
+            data = combine_dungeon_and_room_data(d, rooms)
 
-                data_store.insert_data(
-                    ResourceData(
-                        resource_type=d.resource_type,
-                        resource_id=d.resource_id,
-                        resource_name=d.resource_name,
-                        data=data,
-                    )
+            data_store.insert_data(
+                ResourceData(
+                    resource_type=d.resource_type,
+                    resource_id=d.resource_id,
+                    resource_name=d.resource_name,
+                    data=data,
                 )
+            )
 
-            except Exception as e:
-                err_handler(e)
-                data_store.insert_data(create_resource_error(d.resource_type, d.resource_id, d.resource_name, e))
+        except Exception as e:
+            err_handler(e)
+            data_store.insert_data(create_resource_error(d.resource_type, d.resource_id, d.resource_name, e))

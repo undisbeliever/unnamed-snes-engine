@@ -106,7 +106,9 @@ in wram7e_roomstate {
 
 
 struct RoomToLoad {
+    // If `dungeon` is >= N_DUNGEONS, the default room of dungeon 0 will be loaded instead.
     dungeon : u8,
+
     roomPos_x : u8,
     roomPos_y : u8,
     playerPos_x : u8,

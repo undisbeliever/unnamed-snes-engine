@@ -92,30 +92,8 @@ inline func gamestate__continue_game__inline() {
     // ::HACK Hardcoded checkpoint (just before the boss)::
     // ::TODO create some kind of checkpoint system::
 
-    let LAST_HEALING_ROOM_X = 5;
-    let LAST_HEALING_ROOM_Y = 7;
-
-    x = gamestate.data.currentRoom_x;
-    y = gamestate.data.currentRoom_y;
-
-    if y >= LAST_HEALING_ROOM_Y + 1 || x >= LAST_HEALING_ROOM_X + 1 {
-        // Game over before the boss
-        x = resources.STARTING_ROOM_X;
-        y = resources.STARTING_ROOM_Y;
-    }
-    else {
-        // Game over after the final healing room (at the boss)
-        x = LAST_HEALING_ROOM_X;
-        y = LAST_HEALING_ROOM_Y;
-
-    }
-
-    gamestate.data.currentRoom_x = x;
-    gamestate.data.currentRoom_y = y;
-
-    gamestate.data.playerState.xPos = a = player.InitialPlayerState.xPos;
-    gamestate.data.playerState.yPos = a = player.InitialPlayerState.yPos;
-    gamestate.data.playerState.zPos = player.InitialPlayerState.zPos;
+    // Load the default room of dungeon 0
+    gamestate.data.currentDungeon = a = 0xff;
 }
 
 

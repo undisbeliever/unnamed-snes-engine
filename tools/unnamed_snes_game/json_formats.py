@@ -674,7 +674,6 @@ CallbackDict = Union[OrderedDict[Name, RoomEvent], OrderedDict[Name, SecondLayer
 
 class Mappings(NamedTuple):
     game_title: str
-    starting_room: RoomName
     mt_tilesets: list[Name]
     second_layers: list[Name]
     ms_spritesheets: list[Name]
@@ -776,7 +775,6 @@ def load_mappings_json(filename: Filename) -> Mappings:
 
     return Mappings(
         game_title=jh.get_string("game_title"),
-        starting_room=jh.get_room_name("starting_room"),
         mt_tilesets=jh.get_name_list("mt_tilesets"),
         second_layers=jh.get_name_list("second_layers"),
         ms_spritesheets=jh.get_name_list("ms_spritesheets"),
@@ -1247,6 +1245,7 @@ class DungeonInput(NamedTuple):
     infinite: bool
     width: int
     height: int
+    default_room: str
     tileset: Name
     second_layer: Optional[Name]
     ms_spritesheet: Name
@@ -1276,6 +1275,7 @@ def load_dungeons_json(filename: Filename) -> DungeonsJson:
             infinite=sj.get_bool("infinite"),
             width=sj.get_int("width"),
             height=sj.get_int("height"),
+            default_room=sj.get_string("default_room"),
             tileset=sj.get_name("tileset"),
             second_layer=sj.get_optional_name("second_layer"),
             ms_spritesheet=sj.get_name("ms_spritesheet"),

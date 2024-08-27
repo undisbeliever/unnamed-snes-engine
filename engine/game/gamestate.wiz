@@ -5,6 +5,8 @@
 
 import "src/memmap";
 
+import "dungeon";
+
 import "../resources/resources";
 
 import "src/engine-hooks";
@@ -47,8 +49,6 @@ struct GameStateData {
     // Updated whenever the gamestate backup is created.
     checksum : u16,
 
-
-    // ::TODO add dungron_id::
 
     // The current room within the dungeon
     currentDungeon : u8,
@@ -134,10 +134,11 @@ func new_game() {
     mem8_idx8();
 
 
-    // ::TODO improve how start position is determined::
-    data.currentDungeon = 0;
-    data.currentRoom_x = x = resources.STARTING_ROOM_X;
-    data.currentRoom_y = y = resources.STARTING_ROOM_Y;
+    // Force a dungeon load on the next room transition
+    dungeon.mark_dungeon_unloaded();
+
+    // Load the default room of dungeon 0.
+    data.currentDungeon = a = 0xff;
 }
 
 
@@ -155,6 +156,9 @@ func continue_game() {
     engine_hooks.gamestate__continue_game__inline();
 
     engine_hooks.gamestate__continue_player_gamestate__inline();
+
+    // Force a dungeon load on the next room transition
+    dungeon.mark_dungeon_unloaded();
 }
 
 

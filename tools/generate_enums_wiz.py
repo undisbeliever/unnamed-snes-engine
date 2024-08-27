@@ -107,10 +107,6 @@ def generate_wiz_code(mappings: Mappings, audio_project: AudioProject) -> str:
         )
         out.write(f"let N_RESOURCE_TYPES = { len(ResourceType) };\n\n")
 
-        starting_room = room_pos_for_name(mappings.starting_room)
-        out.write(f"let STARTING_ROOM_X = { starting_room[0] };\n")
-        out.write(f"let STARTING_ROOM_Y = { starting_room[1] };\n\n")
-
         out.write(f"let _USB2SNES_DATA_ADDR = 0x{resources_over_usb2snes_data_addr(mappings.memory_map):06x};\n")
         out.write(f"let _BANK_SIZE = { mappings.memory_map.mode.bank_size };\n\n")
 

@@ -44,7 +44,6 @@
    "heal",
    "poison"
  ],
- "starting_room": "00-00-top-left",
  "gamestate_flags": [
    "first_key_room__left_key",
    "first_key_room__right_key",
