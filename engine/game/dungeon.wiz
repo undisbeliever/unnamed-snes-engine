@@ -91,6 +91,14 @@ enum LoadDungeonRoomType : u8 {
     DUNGEON_ZERO_DEFAULT_ROOM,
 }
 
+// The maximum number of `__load_room()` calls per `load_dungeon_*()` or `load_room__inline()` call.
+//
+// If this limit is reached, the default room of dungeon 0 will be loaded.
+//
+// Used to prevent a stack overflow when loading rooms since `__load_room()` can call
+// `__load_dungeon()`, which then calls `__load_room()`
+let MAX_N_LOAD_ROOMS = 3;
+
 
 in lowram {
     // Used to determine if the dungeon is loaded into memory.
@@ -119,6 +127,9 @@ in lowram {
 in wram7e {
     var __load_dungeon__roomTypeToLoad : LoadDungeonRoomType;
 
+    // Counter to detect infinite warp loops
+    var __load_room_counter : u8;
+
     // Backup of the room state.
     // Created on __roomToLoad().
     // Restored in restore_room_state_from_backup().
@@ -130,9 +141,8 @@ in wram7e {
 
 in code {
 
-// Marks the dungeon is unloaded.
+// Marks the dungeon as unloaded
 //
-// DB = 0x7e
 #[mem8]
 inline func mark_dungeon_unloaded() {
     _dungeonLoaded = 0;
@@ -160,7 +170,7 @@ inline func invalidate_room_state_backup() {
 #[fallthrough, mem8, idx8]
 func load_dungeon_and_room(_roomToLoad : RoomToLoad in roomToLoad) {
     __backup_room_state();
-    return __load_dungeon(roomToLoad.dungeon, LoadDungeonRoomType.ROOM_TO_LOAD);
+    return __load_dungeon__reset_loadroom_counter(roomToLoad.dungeon, LoadDungeonRoomType.ROOM_TO_LOAD);
 }
 
 
@@ -174,7 +184,7 @@ func load_dungeon_and_room(_roomToLoad : RoomToLoad in roomToLoad) {
 #[fallthrough, mem8, idx8]
 func load_dungeon_and_default_room(dungeonId : u8 in a) {
     __backup_room_state();
-    return __load_dungeon(a, LoadDungeonRoomType.DEFAULT_ROOM);
+    return __load_dungeon__reset_loadroom_counter(a, LoadDungeonRoomType.DEFAULT_ROOM);
 }
 
 
@@ -191,7 +201,7 @@ func load_dungeon_and_default_room(dungeonId : u8 in a) {
 func load_dungeon_and_restore_roomstate() {
     var _roomStateBackup__dungeonId @ &__roomStateBackup_lowram[&_dungeonId as u16 - MEMMAP_ROOMSTATE_LOWRAM as u16] : typeof(_dungeonId);
 
-    return __load_dungeon(_roomStateBackup__dungeonId, LoadDungeonRoomType.ROOMSTATE_BACKUP);
+    return __load_dungeon__reset_loadroom_counter(_roomStateBackup__dungeonId, LoadDungeonRoomType.ROOMSTATE_BACKUP);
 }
 
 
@@ -207,6 +217,8 @@ func load_dungeon_and_restore_roomstate() {
 // DB = 0x7e
 #[mem8, idx8]
 inline func load_room__inline(_roomToLoad : RoomToLoad in roomToLoad) {
+    __load_room_counter = a = MAX_N_LOAD_ROOMS;
+
     __backup_room_state();
     __load_room(roomToLoad);
     __finish_loading_room();
@@ -215,6 +227,14 @@ inline func load_room__inline(_roomToLoad : RoomToLoad in roomToLoad) {
 
 // Private Functions
 // =================
+
+
+// DB = 0x7e
+#[fallthrough, mem8, idx8]
+func __load_dungeon__reset_loadroom_counter(dungeon : u8 in a, roomType : LoadDungeonRoomType in y) {
+    __load_room_counter = x = MAX_N_LOAD_ROOMS;
+}
+
 
 
 // Load dungeon into memory and initialise game subsystems
@@ -272,6 +292,8 @@ var _roomTypeToLoad : u8 in __load_dungeon__roomTypeToLoad;
     }
     else {
         if a != LoadDungeonRoomType.ROOM_TO_LOAD as u8 {
+            // Ensures `__load_room()` can load the room
+            __load_room_counter = a = 1;
 
             invalidate_room_state_backup();
 
@@ -433,6 +455,13 @@ func __load_room(_roomToLoad : RoomToLoad in roomToLoad) {
     x = _dungeonLoaded;
     if zero || a != _roomToLoad.dungeon {
         ^goto LoadDungeon;
+    }
+
+    __load_room_counter--;
+    if negative {
+        // `dungeon` parameter is ignored
+        // ASSUMES dungeon 0 default room is valid.
+        ^return __load_dungeon(a, LoadDungeonRoomType.DUNGEON_ZERO_DEFAULT_ROOM);
     }
 
     __load_room_into_memory__inline();
