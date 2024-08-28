@@ -125,6 +125,11 @@ class MtTilesetResourceData(ResourceData):
 
 
 @dataclass(frozen=True)
+class SecondLayerResourceData(ResourceData):
+    n_tiles: int
+
+
+@dataclass(frozen=True)
 class DungeonResourceData(ResourceData):
     header: "DungeonIntermediate"
     includes_room_data: bool
@@ -393,6 +398,14 @@ class DataStore:
         with self._lock:
             co = self._resource_name_map[ResourceType.mt_tilesets].get(name)
             if isinstance(co, MtTilesetResourceData):
+                return co
+            else:
+                return None
+
+    def get_second_layer(self, name: Name) -> Optional[SecondLayerResourceData]:
+        with self._lock:
+            co = self._resource_name_map[ResourceType.second_layers].get(name)
+            if isinstance(co, SecondLayerResourceData):
                 return co
             else:
                 return None

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
-from .data_store import EngineData, FixedSizedData, BaseResourceData, DungeonResourceData
+from .data_store import DataStore, EngineData, FixedSizedData, BaseResourceData, DungeonResourceData
 from .errors import SimpleMultilineError
 from .audio import BLANK_SONG_NAME
 from .json_formats import DungeonInput, Mappings, OtherResources, AudioProject, Name
@@ -12,6 +12,8 @@ from typing import Any, Final, NamedTuple, Optional
 
 MAX_WIDTH: Final = 16
 MAX_HEIGHT: Final = 16
+
+MAX_BG_TILES: Final = 1024
 
 INFINITE_FLAG: Final = 1 << 7
 
@@ -67,8 +69,27 @@ def extract_room_position(room_name: str) -> tuple[int, int]:
     return int(m.group(1), 10), int(m.group(2), 10)
 
 
+def get_n_tiles(dungeon: DungeonInput, data_store: DataStore, error_list: list[str]) -> int:
+    n_tiles = 0
+
+    mt_tileset = data_store.get_mt_tileset(dungeon.tileset)
+    if mt_tileset:
+        n_tiles += mt_tileset.tile_map.n_tiles()
+    else:
+        error_list.append(f"Dependency error: cannot load second_layer {dungeon.second_layer}")
+
+    if dungeon.second_layer:
+        sl = data_store.get_second_layer(dungeon.second_layer)
+        if sl:
+            n_tiles += sl.n_tiles
+        else:
+            error_list.append(f"Dependency error: cannot load second_layer {dungeon.second_layer}")
+
+    return n_tiles
+
+
 def compile_dungeon_header(
-    dungeon: DungeonInput, mappings: Mappings, other_resources: OtherResources, audio_project: AudioProject
+    dungeon: DungeonInput, mappings: Mappings, other_resources: OtherResources, audio_project: AudioProject, data_store: DataStore
 ) -> tuple[EngineData, DungeonIntermediate]:
     error_list = list()
 
@@ -93,8 +114,6 @@ def compile_dungeon_header(
 
     song_id = get_song_id(dungeon.song, audio_project, error_list)
 
-    # ::TODO verify tileset/second-layer will fit in VRAM::
-
     second_layer = None
     sl_callback = None
     if dungeon.second_layer is not None:
@@ -106,6 +125,10 @@ def compile_dungeon_header(
         sl_callback = mappings.sl_callbacks.get(second_layer.callback)
         if sl_callback is None:
             error_list.append(f"Unknown second-layer callback: {second_layer.callback}")
+
+    n_tiles = get_n_tiles(dungeon, data_store, error_list)
+    if n_tiles > MAX_BG_TILES:
+        error_list.append(f"mt_tileset and second_layer tiles cannot fit in VRAM ({n_tiles} tiles required, {MAX_BG_TILES} max)")
 
     if error_list:
         raise DungeonError("Error compiling dungeon", error_list)

@@ -27,6 +27,7 @@ from .data_store import (
     MetaSpriteResourceData,
     PaletteResourceData,
     MtTilesetResourceData,
+    SecondLayerResourceData,
     DungeonResourceData,
     RoomData,
     MsFsAndEntityOutput,
@@ -395,12 +396,20 @@ class SecondLayerCompiler(OtherResourcesCompiler):
         assert self._shared_input.mappings
         return self._shared_input.mappings.second_layers.copy()
 
-    def _compile(self, r_name: Name) -> EngineData:
+    def compile_resource(self, resource_id: int) -> BaseResourceData:
         assert self._shared_input.mappings
         assert self._shared_input.other_resources
 
-        sli = self._shared_input.other_resources.second_layers[r_name]
-        return convert_second_layer(sli, self._shared_input.mappings, self.__data_store)
+        r_name = self.name_list[resource_id]
+        try:
+            sli = self._shared_input.other_resources.second_layers[r_name]
+            data, n_tiles = convert_second_layer(sli, self._shared_input.mappings, self.__data_store)
+            return SecondLayerResourceData(self.resource_type, resource_id, r_name, data, n_tiles)
+        except Exception as e:
+            return create_resource_error(self.resource_type, resource_id, r_name, e)
+
+    def _compile(self, r_name: Name) -> EngineData:
+        raise NotImplementedError()
 
 
 class TileCompiler(OtherResourcesCompiler):
@@ -525,8 +534,9 @@ class SongCompiler(SimpleResourceCompiler):
 
 
 class DungeonCompiler(SimpleResourceCompiler):
-    def __init__(self, shared_input: SharedInput) -> None:
+    def __init__(self, shared_input: SharedInput, data_store: DataStore) -> None:
         super().__init__(ResourceType.dungeons, shared_input)
+        self.__data_store: Final = data_store
 
     SHARED_INPUTS = (
         SharedInputType.DUNGEONS,
@@ -535,7 +545,7 @@ class DungeonCompiler(SimpleResourceCompiler):
         SharedInputType.AUDIO_PROJECT,
     )
     EXPORT_ORDER_SI = SharedInputType.DUNGEONS
-    DEPENDENCIES = ()
+    DEPENDENCIES = (ResourceType.mt_tilesets, ResourceType.second_layers)
 
     def _get_name_list(self) -> list[Name]:
         assert self._shared_input.dungeons
@@ -554,7 +564,11 @@ class DungeonCompiler(SimpleResourceCompiler):
         try:
             dungeon = self._shared_input.dungeons.dungeons[r_name]
             data, header = compile_dungeon_header(
-                dungeon, self._shared_input.mappings, self._shared_input.other_resources, self._shared_input.audio_project
+                dungeon,
+                self._shared_input.mappings,
+                self._shared_input.other_resources,
+                self._shared_input.audio_project,
+                self.__data_store,
             )
             return DungeonResourceData(
                 self.resource_type,
@@ -711,7 +725,7 @@ class ProjectCompiler:
             TileCompiler(self.__shared_input),
             BgImageCompiler(self.__shared_input, self.data_store),
             SongCompiler(self.__shared_input),
-            DungeonCompiler(self.__shared_input),
+            DungeonCompiler(self.__shared_input, self.data_store),
         )
         self.__room_compiler: Final = RoomCompiler(self.__shared_input)
         self.__dynamic_ms_compiler: Final = DynamicMetaspriteCompiler(self.__shared_input)

@@ -68,12 +68,16 @@ class SecondLayerTilesetMap(AbstractTilesetMap):
     def tiles(self) -> Iterable[SmallTileData]:
         return reversed(self._tiles)
 
+    def n_tiles(self) -> int:
+        return len(self._tiles)
+
 
 class SecondLayerImage(NamedTuple):
     width: int
     height: int
     metatiles: bytes
     sl_map: Optional[bytes]
+    n_tiles: int
     tile_data: bytes
 
 
@@ -145,6 +149,7 @@ def convert_sl_image(
             + mt_padding
         ),
         sl_map=sl_map,
+        n_tiles=tileset.n_tiles(),
         tile_data=convert_snes_tileset(tileset.tiles(), SECOND_LAYER_BPP),
     )
 
@@ -180,11 +185,12 @@ def convert_sl_part_of_room(
         height=height,
         metatiles=create_tilemap_data(mt, tile_priority),
         sl_map=None,
+        n_tiles=tileset.n_tiles(),
         tile_data=convert_snes_tileset(tileset.tiles(), SECOND_LAYER_BPP),
     )
 
 
-def convert_second_layer(sli: SecondLayerInput, mapping: Mappings, data_store: DataStore) -> EngineData:
+def convert_second_layer(sli: SecondLayerInput, mapping: Mappings, data_store: DataStore) -> tuple[EngineData, int]:
     image_filename = sli.source
 
     pal_r = data_store.get_palette(sli.palette)
@@ -265,4 +271,4 @@ def convert_second_layer(sli: SecondLayerInput, mapping: Mappings, data_store: D
             raise RuntimeError("sl_map is too large")
         ram_data += sl.sl_map
 
-    return EngineData(ram_data=DynamicSizedData(ram_data), ppu_data=DynamicSizedData(sl.tile_data))
+    return (EngineData(ram_data=DynamicSizedData(ram_data), ppu_data=DynamicSizedData(sl.tile_data)), sl.n_tiles)
