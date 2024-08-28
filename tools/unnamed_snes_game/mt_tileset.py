@@ -7,7 +7,7 @@ import os.path
 import xml.etree.ElementTree
 from typing import Final, NamedTuple, Optional
 
-from .json_formats import Filename, Mappings, Name
+from .json_formats import Filename, Mappings
 from .palette import PaletteResource
 from .snes import (
     TileMap,
@@ -18,7 +18,7 @@ from .snes import (
     extract_tiles_and_build_tilemap,
     convert_snes_tileset,
 )
-from .data_store import FixedSizedData, DynamicSizedData, EngineData
+from .data_store import DataStore, FixedSizedData, DynamicSizedData, EngineData
 from .errors import SimpleMultilineError
 
 
@@ -301,7 +301,9 @@ def create_tileset_data(palette: PaletteResource, tile_data: bytes, metatile_map
 
 
 def convert_mt_tileset(
-    tsx_filename: Filename, mappings: Mappings, palettes: dict[Name, PaletteResource]
+    tsx_filename: Filename,
+    mappings: Mappings,
+    data_store: DataStore,
 ) -> tuple[EngineData, ConstSmallTileMap]:
     tsx_file = read_tsx_file(tsx_filename)
 
@@ -310,10 +312,10 @@ def convert_mt_tileset(
     if image.width_px != 256 or image.height_px != 256:
         raise ImageError(tsx_file.image_filename, "Tileset Image MUST BE 256x256 px in size")
 
-    pal = palettes.get(tsx_file.palette)
-    if pal is None:
+    pal_r = data_store.get_palette(tsx_file.palette)
+    if pal_r is None:
         raise RuntimeError(f"Cannot load palette: {tsx_file.palette}")
-    palette_map = pal.create_map(TILE_DATA_BPP)
+    palette_map = pal_r.palette.create_map(TILE_DATA_BPP)
 
     tileset = SmallTilesetMap()
     tilemap = extract_tiles_and_build_tilemap(image, tileset, palette_map)
@@ -329,6 +331,6 @@ def convert_mt_tileset(
         raise TsxFileError(f"Error compiling { tsx_filename }", error_list)
 
     return (
-        create_tileset_data(pal, tile_data, metatile_map, properties),
+        create_tileset_data(pal_r.palette, tile_data, metatile_map, properties),
         tileset.const_map(),
     )

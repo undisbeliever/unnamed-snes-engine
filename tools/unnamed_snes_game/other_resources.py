@@ -4,8 +4,7 @@
 
 from typing import Callable, Final, Iterable
 
-from .data_store import EngineData, FixedSizedData, DynamicSizedData
-from .palette import PaletteResource
+from .data_store import DataStore, EngineData, FixedSizedData, DynamicSizedData
 
 from .snes import (
     load_image_tile_extractor,
@@ -18,7 +17,7 @@ from .snes import (
     SmallTilesetMap,
 )
 
-from .json_formats import Name, TilesInput, BackgroundImageInput
+from .json_formats import TilesInput, BackgroundImageInput
 
 
 # ::TODO add palettes::
@@ -66,17 +65,17 @@ NAMETABLE_SIZE_BYTES: Final = 32 * 32 * 2
 VALID_BGI_HEADER_TM_SIZES: Final = (1, 2, 4)
 
 
-def convert_bg_image(bgi: BackgroundImageInput, palettes: dict[Name, PaletteResource]) -> EngineData:
+def convert_bg_image(bgi: BackgroundImageInput, data_store: DataStore) -> EngineData:
     bpp = BI_BPP_FORMATS[bgi.format]
 
     image = load_image_tile_extractor(bgi.source)
 
-    pal = palettes.get(bgi.palette)
-    if pal is None:
+    pal_r = data_store.get_palette(bgi.palette)
+    if pal_r is None:
         raise RuntimeError(f"Cannot load palette {bgi.palette}")
 
     tileset = SmallTilesetMap()
-    palette_map = pal.create_map(bpp)
+    palette_map = pal_r.palette.create_map(bpp)
 
     tilemap = extract_tiles_and_build_tilemap(image, tileset, palette_map)
 

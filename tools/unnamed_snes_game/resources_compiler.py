@@ -14,11 +14,10 @@ from .enums import ResourceType
 from .entity_data import create_entity_rom_data
 from .mt_tileset import convert_mt_tileset
 from .second_layers import convert_second_layer
-from .palette import convert_palette, PaletteResource
+from .palette import convert_palette
 from .metasprite import convert_static_spritesheet, convert_dynamic_spritesheet, build_ms_fs_data, MsFsEntry, DynamicMsSpritesheet
 from .dungeons import compile_dungeon_header, combine_dungeon_and_room_data
 from .rooms import extract_room_position, compile_room, build_room_dependencies__noexcept, RoomDependencies
-from .snes import ConstSmallTileMap
 from .other_resources import convert_tiles, convert_bg_image
 from .audio import AudioCompiler, COMMON_AUDIO_DATA_RESOURCE_NAME
 from .data_store import (
@@ -336,9 +335,9 @@ class PaletteCompiler(OtherResourcesCompiler):
 
 
 class MetaTileTilesetCompiler(SimpleResourceCompiler):
-    def __init__(self, shared_input: SharedInput, palettes: dict[Name, PaletteResource]) -> None:
+    def __init__(self, shared_input: SharedInput, data_store: DataStore) -> None:
         super().__init__(ResourceType.mt_tilesets, shared_input)
-        self.__palettes = palettes
+        self.__data_store: Final = data_store
 
     def test_filename_is_resource(self, filename: Filename) -> Optional[int]:
         if m := MT_TILESET_FILE_REGEX.match(filename):
@@ -359,7 +358,7 @@ class MetaTileTilesetCompiler(SimpleResourceCompiler):
         r_name = self.name_list[resource_id]
         try:
             filename = os.path.join("metatiles/", r_name + ".tsx")
-            data, tile_map = convert_mt_tileset(filename, self._shared_input.mappings, self.__palettes)
+            data, tile_map = convert_mt_tileset(filename, self._shared_input.mappings, self.__data_store)
 
             return MtTilesetResourceData(self.resource_type, resource_id, r_name, data, tile_map)
         except Exception as e:
@@ -370,12 +369,9 @@ class MetaTileTilesetCompiler(SimpleResourceCompiler):
 
 
 class SecondLayerCompiler(OtherResourcesCompiler):
-    def __init__(
-        self, shared_input: SharedInput, palettes: dict[Name, PaletteResource], mt_tileset_tiles: dict[Name, ConstSmallTileMap]
-    ) -> None:
+    def __init__(self, shared_input: SharedInput, data_store: DataStore) -> None:
         super().__init__(ResourceType.second_layers, shared_input)
-        self.__palettes: Final = palettes
-        self.__mt_tileset_tiles: Final = mt_tileset_tiles
+        self.__data_store: Final = data_store
 
     def build_filename_map(self, other_resources: OtherResources) -> dict[Filename, int]:
         second_layers: Final = other_resources.second_layers
@@ -404,7 +400,7 @@ class SecondLayerCompiler(OtherResourcesCompiler):
         assert self._shared_input.other_resources
 
         sli = self._shared_input.other_resources.second_layers[r_name]
-        return convert_second_layer(sli, self.__palettes, self.__mt_tileset_tiles, self._shared_input.mappings)
+        return convert_second_layer(sli, self._shared_input.mappings, self.__data_store)
 
 
 class TileCompiler(OtherResourcesCompiler):
@@ -437,9 +433,9 @@ class TileCompiler(OtherResourcesCompiler):
 
 
 class BgImageCompiler(OtherResourcesCompiler):
-    def __init__(self, shared_input: SharedInput, palettes: dict[Name, PaletteResource]) -> None:
+    def __init__(self, shared_input: SharedInput, data_store: DataStore) -> None:
         super().__init__(ResourceType.bg_images, shared_input)
-        self.__palettes = palettes
+        self.__data_store: Final = data_store
 
     def build_filename_map(self, other_resources: OtherResources) -> dict[Filename, int]:
         bg_images: Final = other_resources.bg_images
@@ -464,7 +460,7 @@ class BgImageCompiler(OtherResourcesCompiler):
         assert self._shared_input.other_resources
 
         bi = self._shared_input.other_resources.bg_images[r_name]
-        return convert_bg_image(bi, self.__palettes)
+        return convert_bg_image(bi, self.__data_store)
 
 
 class SongCompiler(SimpleResourceCompiler):
@@ -673,8 +669,9 @@ def _build_st_rt_map(
 
 def _build_dependency_graph(
     compilers: Sequence[Union[BaseResourceCompiler, RoomCompiler]]
-) -> dict[ResourceType, frozenset[Optional[ResourceType]]]:
-    out = dict()
+) -> dict[Optional[ResourceType], frozenset[Optional[ResourceType]]]:
+
+    out: dict[Optional[ResourceType], frozenset[Optional[ResourceType]]] = dict()
 
     for s_type in ResourceType:
         d = list()
@@ -706,16 +703,13 @@ class ProjectCompiler:
         self.log_message: Final = message_handler
         self.log_error: Final = err_handler
 
-        self.__palettes: Final[dict[Name, PaletteResource]] = dict()
-        self.__mt_tileset_tiles: Final[dict[Name, ConstSmallTileMap]] = dict()
-
         self.__resource_compilers: Final = (
             PaletteCompiler(self.__shared_input),
-            MetaTileTilesetCompiler(self.__shared_input, self.__palettes),
-            SecondLayerCompiler(self.__shared_input, self.__palettes, self.__mt_tileset_tiles),
+            MetaTileTilesetCompiler(self.__shared_input, self.data_store),
+            SecondLayerCompiler(self.__shared_input, self.data_store),
             MsSpritesheetCompiler(self.__shared_input),
             TileCompiler(self.__shared_input),
-            BgImageCompiler(self.__shared_input, self.__palettes),
+            BgImageCompiler(self.__shared_input, self.data_store),
             SongCompiler(self.__shared_input),
             DungeonCompiler(self.__shared_input),
         )
@@ -792,35 +786,9 @@ class ProjectCompiler:
                 self.data_store.insert_data(co)
                 if isinstance(co, ResourceError):
                     self.log_error(co)
-                if co.resource_type == ResourceType.palettes:
-                    self._palette_changed(co)
+                if deps := self.resource_dependencies[co.resource_type]:
+                    self.__compile_resource_lists(set(deps))
             return co
-
-    # MUST NOT be called by `self.__compile_resource_lists()`
-    def _palette_changed(self, co: BaseResourceData) -> None:
-        assert co.resource_type == ResourceType.palettes
-
-        if isinstance(co, PaletteResourceData):
-            self.__palettes[co.resource_name] = co.palette
-        else:
-            self.__palettes.pop(co.resource_name)
-
-        # Recompile the resource that uses palettes
-        # ::TODO only recompile the resources that use the changed palette::
-        self.__compile_resource_lists(set(self.resource_dependencies[ResourceType.palettes]))
-
-    # MUST NOT be called by `self.__compile_resource_lists()`
-    def _mt_tileset_changed(self, co: BaseResourceData) -> None:
-        assert co.resource_type == ResourceType.mt_tilesets
-
-        if isinstance(co, MtTilesetResourceData):
-            self.__mt_tileset_tiles[co.resource_name] = co.tile_map
-        else:
-            self.__mt_tileset_tiles.pop(co.resource_name)
-
-        # Recompile the resources that depend on mt_tilesets
-        # ::TODO only recompile the resources that use the changed mt_tileset::
-        self.__compile_resource_lists(set(self.resource_dependencies[ResourceType.mt_tilesets]))
 
     def _log_cannot_compile_si_error(self, res_name: str) -> None:
         si_list = [SHARED_INPUT_NAMES[s_type] for s_type in self.__shared_inputs_with_errors]
@@ -919,15 +887,6 @@ class ProjectCompiler:
 
         self.data_store.set_msfs_and_entity_data(data)
 
-    def __compile_list(self, rt: ResourceType) -> list[BaseResourceData]:
-        c = self.__resource_compilers[rt]
-        rt_data = [c.compile_resource(i) for i in range(len(c.name_list))]
-        for co in rt_data:
-            self.data_store.insert_data(co)
-            if isinstance(co, ResourceError):
-                self.log_error(co)
-        return rt_data
-
     def __compile_resource_lists(self, to_recompile: Set[Optional[ResourceType]]) -> None:
         # Uses multiprocessing to speed up the compilation
 
@@ -948,23 +907,16 @@ class ProjectCompiler:
                 else:
                     self.log_message("Compiling all rooms")
 
-        if ResourceType.palettes in to_recompile:
-            to_recompile.remove(ResourceType.palettes)
-            pal_l = self.__compile_list(ResourceType.palettes)
+        self.data_store.reset_resources(to_recompile)
 
-            self.__palettes.clear()
-            self.__palettes.update((co.resource_name, co.palette) for co in pal_l if isinstance(co, PaletteResourceData))
-
-        if ResourceType.mt_tilesets in to_recompile:
-            to_recompile.remove(ResourceType.mt_tilesets)
-            mt_l = self.__compile_list(ResourceType.mt_tilesets)
-
-            self.__mt_tileset_tiles.clear()
-            self.__mt_tileset_tiles.update((co.resource_name, co.tile_map) for co in mt_l if isinstance(co, MtTilesetResourceData))
-
-        for rt in to_recompile:
-            if rt is not None:
-                self.__compile_list(rt)
+        for rt in ResourceType:
+            if rt in to_recompile:
+                c = self.__resource_compilers[rt]
+                for i in range(len(c.name_list)):
+                    co = c.compile_resource(i)
+                    self.data_store.insert_data(co)
+                    if isinstance(co, ResourceError):
+                        self.log_error(co)
 
         if None in to_recompile:
             assert self.__shared_input.dungeons

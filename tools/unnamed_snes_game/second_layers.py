@@ -6,7 +6,7 @@
 from enum import IntFlag
 from typing import Final, Iterable, NamedTuple, Optional
 
-from .data_store import EngineData, DynamicSizedData
+from .data_store import DataStore, EngineData, DynamicSizedData
 from .errors import SimpleMultilineError
 from .palette import PaletteResource
 from .snes import (
@@ -22,7 +22,7 @@ from .snes import (
     create_tilemap_data,
 )
 from .callbacks import parse_callback_parameters, SL_CALLBACK_PARAMETERS
-from .json_formats import Name, SecondLayerInput, Mappings
+from .json_formats import SecondLayerInput, Mappings
 
 
 SECOND_LAYER_BPP: Final = 4
@@ -184,21 +184,21 @@ def convert_sl_part_of_room(
     )
 
 
-def convert_second_layer(
-    sli: SecondLayerInput, palettes: dict[Name, PaletteResource], mt_tileset_tiles: dict[Name, ConstSmallTileMap], mapping: Mappings
-) -> EngineData:
+def convert_second_layer(sli: SecondLayerInput, mapping: Mappings, data_store: DataStore) -> EngineData:
     image_filename = sli.source
 
-    pal = palettes.get(sli.palette)
-    if pal is None:
+    pal_r = data_store.get_palette(sli.palette)
+    if pal_r is None:
         raise RuntimeError(f"Cannot load palette {sli.palette}")
+    pal: Final = pal_r.palette
 
     mt_tiles = None
     if sli.mt_tileset:
         # ::TODO validate second-layer is loaded with the mt_tileset::
-        mt_tiles = mt_tileset_tiles.get(sli.mt_tileset)
-        if mt_tiles is None:
+        mt_tiles_r = data_store.get_mt_tileset(sli.mt_tileset)
+        if mt_tiles_r is None:
             raise RuntimeError(f"Cannot load MetaTile tileset {sli.mt_tileset}")
+        mt_tiles = mt_tiles_r.tile_map
 
     image = load_image_tile_extractor(image_filename)
 
