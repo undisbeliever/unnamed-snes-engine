@@ -36,7 +36,8 @@ A T144
 !ARiff2 [o4d16d32d32]4
 !ARiff3 [o4f+16f+32f+32]4
 !ARiff1_2_1_3 [!ARiff1 !ARiff2 !ARiff1 !ARiff3 ]4
-A E1 @Strings8Detache V160 p48
+!StringsDetache8_V160_E1 @Strings8Detache V160 E1
+A !StringsDetache8_V160_E1 p48
 A !ARiff1_2_1_3
 !ARiff4 @TimpaniB V128 [o3e12e12e24e24]3 [o3e24]6
 A L E0 p64 !ARiff4
@@ -68,13 +69,13 @@ A o4e4c8e8f+4d4
 !BRiff3_2_3_A2 !BRiff3
 !BRiff3_2_3_A2 !ARiff2
 !BRiff1S_3S !BRiff1_2_1_A2 !BRiff1_2_1_A2 !BRiff3_2_3_A2 !BRiff3_2_3_A2
-B E1 @Strings8Detache V160 p80
+B !StringsDetache8_V160_E1 p80
 B !BRiff1S_3S
 !BRiff5 @Crash2 V120 o5c2 r4 GI10 V160 o4c4
 B p64 !BRiff5
 !BRiff6 l8 [o4c>c]2
 !BRiff6 l8 [o4d>d]2
-B L @PianoC2_16 A15,7,7,12 V50 l8
+B L @PianoC2_16 V50 l8
 B [
 B [o3a>a]2
 B [o3g>g]2
@@ -94,7 +95,8 @@ B !BRiff6 !BRiff6
 B E1 @Strings8 V80 p72
 B [GI7 o4c4& GD7 r4 GI7 o3b4& GD7 r4 GI7 o3a4& GD7 r4 GI7 o3b4& GD7 r4]2
 B GI7 [o3a4 @Strings8 V52 o4c4<b4:g4]2 o4d4
-B @trumpet_2 V64 p64 ~8,4
+!trumpet2_V64_vib8_4 @trumpet_2 V64 ~8,4
+B !trumpet2_V64_vib8_4 p64
 B r16o5g+32g+32 o6d+8c8d+16g16
 B o6f8d8c8<a+8 >c4g4f+4d8a8
 B o6b4..Q4>e32e32 Q8e2 ~0
@@ -118,20 +120,20 @@ C !BRiff5
 C @Flute1 V12 !CRiff1_2_1_3_x4
 
 D E1
-D l1 r^ [@trumpet_2 V64 
-!DRiff1 ~8,4 o5a4>e16d16e16<a16 b16>c16d24c24<a24b8g8
+D l1 r^ [!trumpet2_V64_vib8_4
+!DRiff1 o5a4>e16d16e16<a16 b16>c16d24c24<a24b8g8
 !DRiff1 o5a4>e16<a16>c16e16 f+24e24d48e48 f+16g16a16d16e16f+16
 !DRiff1 [o6e8<g8>c8e8 : d24c24<b48>c48 d16c16<b16g16b16>d16]2
 !DRiff1 o6f+24e24f+48g48 a16.d16.f+16g16f+16
 !DRiff1 o6e24c24e24 g8>c8<b16a16 g8f+8e8d16<b16
 !DRiff1 o6c24<g24>c24 e8c8<g16>e16 f+8g8a8f+8
-D !DRiff1 : ~8,4
+D !DRiff1 :
 D o6g+4.. Q4o7e32e32 Q8o7e2 ~0
 D @Crash2 V120 o5c^
 D ]2 L
-!DRiff2 @Crash2 V120 o5c16
+!DRiff2 @Crash2 V120 ~0 o5c16
 D [!DRiff2
-D @trumpet_2 V64 ~8,4
+D !trumpet2_V64_vib8_4
 D o6e32e32b16e16g+16:e16g+16b16
 D o6a8g+16a32g+32 f+16d16f+16a16
 D o6g8f+16g32f+32 e16c16e16g16
@@ -139,18 +141,18 @@ D o6f+8d8f+8a8]2
 D o6b16>e16f+16 g+16a32g+32f+16e16d16e16f+16a16
 D o7g8e8c8g8 f+4a4
 D !DRiff2
-D @trumpet_2 V64 ~8,4 Q4o7g32g32e16c16e16c16e16Q8g16
+D !trumpet2_V64_vib8_4 Q4o7g32g32e16c16e16c16e16Q8g16
 D !DRiff2
-D @trumpet_2 V64 ~8,4 Q4o7a32a32f+16d16f+16d16f+16Q8a16
+D !trumpet2_V64_vib8_4 Q4o7a32a32f+16d16f+16d16f+16Q8a16
 D !DRiff2
-D @trumpet_2 V64 ~8,4 Q4o7b32b32g16e16c16e16g16Q8b16
+D !trumpet2_V64_vib8_4 Q4o7b32b32g16e16c16e16g16Q8b16
 D o7a8g8f+8d8
 D !DRiff2
 D @Clarinet V16 ~8,4 Q4o6c32d32e16c16e16g16e16>c16
 D r16 o5b32>c32d16g16d16c16<b16>b16
 D r16 o5a32b32>c16<a16>c16d16e16a16
 D Q8 o6g8d8<g8d8
-D ~0 @PIANO_C5 A15,7,7,15 V32 
+D ~0 @PIANO_C5 V32 
 D [Q8r16o4e32f32Q4g16:c16>c16<g16e16g16]2
 D Q4o3b16>b16g16d16g16Q8
 D r16o3f32g32a16b16>c16d16e16<a16
@@ -166,7 +168,7 @@ D l48 o4geg>c<g>cecegeg>c<g>c<gegecec<g>c
 D l48 o4af+a>d<a>df+df+af+a>d<a>d<af+af+df+d<a>d
 D [l48 o4bg+b>e<b>eg+eg+bg+b>e<b>e<bg+bg+eg+e<b>e]2
 D @Crash2 V120 o5c1^1
-D @trumpet_2 V64 !DRiff1
+D !trumpet2_V64_vib8_4 !DRiff1
 
 E E0 @Strings8 V32
 !ERiff1 l2 [o2agaa]2
@@ -194,7 +196,7 @@ F [l2 o2c<bab]2
 F l2 [o1ab]2>[cd]2e1
 F !FRiff1
 
-G E1 @Strings8Detache V160
+G !StringsDetache8_V160_E1
 G [
 G !BRiff3
 G [o3g16g32g32]4
