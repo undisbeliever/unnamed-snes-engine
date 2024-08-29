@@ -1,6 +1,6 @@
 ;Game Over Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.10
+;Made for undisbeliever's Terrific Audio Driver v0.0.11
 
 #Title Game Over Theme
 #Game unnamed-snes-game
@@ -26,7 +26,8 @@
 #ZenLen 192
 
 A T164
-A E1 @PIANO_C5 V64 p72
+!PIANO_C5_V64_E1 @PIANO_C5 V64 E1
+A !PIANO_C5_V64_E1 p72
 !ARiff1 o4g8b8a16g16f+16a16 g8b8
 !ARiff2 o5e8g8f+16d16<a16>d16 e8g8
 A !ARiff1 o4a8>d8
@@ -45,16 +46,16 @@ A l32 o5ge<bgr<bge o5f+d<af+r<af+d]2
 A !ARiff2 o5f+8d8
 A o4b8>d8c+16<a16f+16a16 o4g8r8f+8r16f+16
 
-B E1 @PIANO_C5 V64
+B !PIANO_C5_V64_E1
 !BRiff1 l16 [o4e<b]2 [o4d<a]2
 B [!BRiff1 ]4
 B l16 [o4c<geg]2 [o3bgeg]2 [o3bf+ef+]2 [o3bf+d+f+]2
 B E0 @PianoC2_16 V160 o3e1^1
 B E1 @PIANO_C5 V12 L
-B [!BRiff1 ]2 [o4e<bb>ed<aa>d]2
+B !BRiff1 !BRiff1 [o4e<bb>ed<aa>d]2
 B [!BRiff1 ]12
 
-C E1 @PIANO_C5 V64 p56
+C !PIANO_C5_V64_E1 p56
 C [o3b4a4]4
 C l16 [o3gece]2 [o3ge<b>e]2 [o3f+e<b>e]2 [o3f+d+<b>d+]2
 C E0 @PianoC2_16 V160 p64 o2e1^1
@@ -62,34 +63,34 @@ C E1 @PIANO_C5 V8 p56 L
 C [o3b4a4]2 [o3b8g16b16a8f+8]2
 C [o3b4a4]12
 
-D E0 @Strings8 V24 p48
-D [o4e4d4]4 o4c2<b2b2b2
+!Strings8_V24_E0 @Strings8 V24 E0
+D !Strings8_V24_E0 p48
+D [o4e4d4]4 o4c2<[b2]3
 D V64 p64 o2e2& A15,7,7,9 e2^1
 D l1 r^^^^^64
 D @PIANO_C5 V12 p80 E1 L
-!DRiff1 o5g8b8a16g16f+16a16 g8b8
-!DRiff2 o6e8g8f+16d16<a16>d16 e8g8f+8d8
-!DRiff3 l32 o6bge<bge<bg o6af+d<af+d<af+
-!DRiff3 l32 o6ge<bge<bge o6f+d<af+d<af+d
-D !DRiff3
+!DRiff1 o6e8g8f+16d16<a16>d16 e8g8f+8d8
+!DRiff2 l32 o6bge<bge<bg o6af+d<af+d<af+
+!DRiff2 l32 o6ge<bge<bge o6f+d<af+d<af+d
 D !DRiff2
+D !DRiff1
 D o5b8>d8c+16<a16f+16a16 o5g8e8f+8d16f+16
-D !DRiff1 o5a8f+8
-D o5g8e16g16f+16e16d16f+16 o5g8e16g16f+8d8
-D !DRiff1 o5a8>d8
+D [o5g8b8a16g16f+16a16 g8b8 : o5a8f+8
+D o5g8e16g16f+16e16d16f+16 o5g8e16g16f+8d8]2
+D o5a8>d8
+D !DRiff1
 D !DRiff2
-D !DRiff3
 
-E E0 @Strings8 V24 
+E !Strings8_V24_E0 
 E [o3b4a4]4 o3g2g2f+2f+2
 E V128 p64 o1e2& A15,7,7,9 e2^1
 
-F E0 @Strings8 V24 p80
-F [o3g4f+4]4 o3e2e2e2d+2
+F !Strings8_V24_E0 p80
+F [o3g4f+4]4 [o3e2]3d+2
 F @trumpet_2 V128 p64 o3e2& A15,7,7,9 e2^1
 
-G E0 @Strings8 V24 
-G [o3e4d4]4 o3c2<b2b2b2
+G !Strings8_V24_E0 
+G [o3e4d4]4 o3c2<[b2]3
 G V192 o0e2& A15,7,7,9 e2^1
 
 H E0 @Strings8 V48 l1 r^^^2 o1b2
