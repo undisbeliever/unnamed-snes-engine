@@ -16,6 +16,10 @@ import "gen/enums";
 import "gen/cosine-tables";
 import "gen/entities";
 
+// ::TODO remove these imports::
+import "engine/game/entityloop";
+import "engine/game/metasprites";
+
 
 namespace entities {
 namespace boss_bomb {
@@ -201,6 +205,18 @@ func set_state__disarmed(entityId : u8 in y) {
     SoA_timer_h[y] = a = >:DESPAWN_TIMER;
 
     set_ms_animation(y, ms_animations.stationary);
+
+    // Change metasprites to player bomb
+    mem16_idx16();
+    #[mem16, idx16] {
+        (&SoA.ms_draw_function[0] as *u16)[unaligned yy] = aa = &metasprites.drawing_functions.dynamic_pattern as u16;
+
+        xx = aa = (entity_rom_data.metasprite_framesets as far *u16)[EntityTypes.player_bomb as u8];
+
+        (&<:entities.SoA.metaSpriteFrameTable[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.frameTable[unaligned xx];
+        (&<:entities.SoA.msAnimationTable[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.animationTable[unaligned xx];
+    }
+    mem8_idx8();
 
     ^return queue_sound_effect(sound_effects.boss_bomb_disabled);
 }
