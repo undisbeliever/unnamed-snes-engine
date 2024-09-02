@@ -8,7 +8,6 @@ import "engine/entity_api";
 import "smoke-particles";
 import "player-bomb";
 
-import "engine/game/entityloop";
 import "engine/game/metasprites";
 import "engine/common/math";
 

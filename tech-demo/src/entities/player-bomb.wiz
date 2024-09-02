@@ -9,8 +9,6 @@ import "_base";
 import "smoke-particles";
 import "../player";
 
-import "engine/game/metasprites";
-
 import "gen/enums";
 import "gen/entities";
 import "gen/ms-drawing-functions";
