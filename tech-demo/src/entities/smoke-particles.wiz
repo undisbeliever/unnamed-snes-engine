@@ -9,10 +9,6 @@ import "_base";
 import "gen/enums";
 import "gen/entities";
 
-// ::TODO remove these imports::
-import "engine/game/entityloop";
-import "engine/game/metasprites";
-
 
 // ::TODO add a generic particle entity::
 
@@ -48,17 +44,13 @@ func change_to_smoke_entity(entityId : u8 in y, animation : u8 in x) {
     // Do not kill the entity on the next frame
     SoA.health[y] = a = 1;
 
-    mem16_idx16();
-    #[mem16, idx16] {
-        (&SoA.process_function[0] as *u16)[unaligned yy] = aa = &process as u16;
-        (&SoA.ms_draw_function[0] as *u16)[unaligned yy] = aa = &metasprites.drawing_functions.dynamic_pattern as u16;
-
-        xx = aa = (entity_rom_data.metasprite_framesets as far *u16)[EntityTypes.smoke_particles as u8];
-
-        (&<:entities.SoA.metaSpriteFrameTable[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.frameTable[unaligned xx];
-        (&<:entities.SoA.msAnimationTable[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.animationTable[unaligned xx];
+    mem16();
+    #[mem16] {
+        (&SoA.process_function[0] as *u16)[unaligned y] = aa = &process as u16;
     }
-    mem8_idx8();
+    mem8();
+
+    ^return change_ms_frameset(y, EntityTypes.smoke_particles);
 }
 
 

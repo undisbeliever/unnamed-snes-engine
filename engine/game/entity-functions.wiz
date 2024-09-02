@@ -1,0 +1,43 @@
+// Copyright (c) 2024, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+
+import "metasprites";
+import "entityloop";
+
+import "gen/entities";
+
+
+namespace entity_functions {
+
+in code {
+
+
+// Changes the MetaSprite frameset to match the one used by `entityType`.
+//
+// The ms animation MUST be changed before or after this function call.
+//
+// CAUTION: Does not check if the metasprite frameset is correct.
+//
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+func change_ms_frameset(entityId : u8 in y, entityType : entities.EntityTypes in x) {
+    // Change metasprites to player bomb
+    mem16_idx16();
+    #[mem16, idx16] {
+        xx = aa = xx << 1;
+        xx = aa = (entity_rom_data.metasprite_framesets as far *u16)[unaligned xx];
+
+        (&<:entities.SoA.ms_draw_function[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.drawFunction[unaligned xx];
+        (&<:entities.SoA.metaSpriteFrameTable[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.frameTable[unaligned xx];
+        (&<:entities.SoA.msAnimationTable[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.animationTable[unaligned xx];
+    }
+    mem8_idx8();
+}
+
+
+}
+}
+

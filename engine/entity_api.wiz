@@ -364,6 +364,10 @@ namespace entities {
     let get_enemy_count_a = entityloop.get_enemy_count_a;
 
     let spawn_entity__clobbers_y = entityloop.spawn_entity;
+
+    // Miscellaneous entity functions
+    import "game/entity-functions";
+    let change_ms_frameset = entity_functions.change_ms_frameset;
 }
 
 
