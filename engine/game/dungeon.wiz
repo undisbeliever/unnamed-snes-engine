@@ -16,6 +16,9 @@ import "second-layer";
 import "entityloop";
 import "room-transitions";
 
+import "../resources/resources";
+import "../resources/palette";
+
 import "../room-events-api";
 import "../entity_api";
 
@@ -24,9 +27,7 @@ import "../wait-frame";
 
 import "../common/reset";
 import "../gamemodes";
-import "../resources/resources";
 
-import "../resources/resources";
 import "../resources/resources-over-usb2snes.wiz";
 
 import "src/engine-hooks";
@@ -63,7 +64,7 @@ struct _RamDataFormat {
     defaultRoom_x: u8,
     defaultRoom_y: u8,
 
-    // ::TODO add palette (need to remove it from mt_tileset beforehand)::
+    palette: resources.palettes,
     tileset: u8,
     secondLayer: u8,
     msSpritesheet: u8,
@@ -334,6 +335,8 @@ var _roomTypeToLoad : u8 in __load_dungeon__roomTypeToLoad;
         textbox.setup_ppu__forceblank();
 
         engine_hooks.load_dungeon__setup_ppu__forceblank();
+
+        palette.load_palette__forceblank(dungeonData.palette);
 
         metatiles.load_tileset__forceblank(dungeonData.tileset);
         carry = second_layer.setup__forceblank(dungeonData.secondLayer);

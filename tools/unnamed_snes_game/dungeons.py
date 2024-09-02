@@ -96,6 +96,7 @@ def compile_dungeon_header(
     if dungeon.width < 0 or dungeon.width > MAX_WIDTH or dungeon.height < 0 or dungeon.height > MAX_HEIGHT:
         error_list.append(f"Invalid dungeon size ({dungeon.width}x{dungeon.height}, max {MAX_WIDTH}x{MAX_HEIGHT})")
 
+    palette_id = get_resource_id(dungeon.palette, mappings.palettes, "palette", error_list)
     tileset_id = get_resource_id(dungeon.tileset, mappings.mt_tilesets, "tileset", error_list)
     second_layer_id = get_optional_resource_id(dungeon.second_layer, mappings.second_layers, "second_layer", error_list)
     ms_spritesheet_id = get_resource_id(dungeon.ms_spritesheet, mappings.ms_spritesheets, "ms_spritesheet", error_list)
@@ -140,6 +141,7 @@ def compile_dungeon_header(
             dungeon.height,
             default_room_x,
             default_room_y,
+            palette_id,
             tileset_id,
             second_layer_id,
             ms_spritesheet_id,

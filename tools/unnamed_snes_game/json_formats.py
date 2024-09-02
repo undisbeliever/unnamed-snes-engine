@@ -1246,6 +1246,7 @@ class DungeonInput(NamedTuple):
     width: int
     height: int
     default_room: str
+    palette: Name
     tileset: Name
     second_layer: Optional[Name]
     ms_spritesheet: Name
@@ -1276,6 +1277,7 @@ def load_dungeons_json(filename: Filename) -> DungeonsJson:
             width=sj.get_int("width"),
             height=sj.get_int("height"),
             default_room=sj.get_string("default_room"),
+            palette=sj.get_name("palette"),
             tileset=sj.get_name("tileset"),
             second_layer=sj.get_optional_name("second_layer"),
             ms_spritesheet=sj.get_name("ms_spritesheet"),
