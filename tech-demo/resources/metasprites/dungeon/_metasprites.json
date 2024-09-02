@@ -526,5 +526,6 @@
       "yorigin": 6,
       "tilehitbox": "3 2"
     }
-  ]
+  ],
+  "palette_swaps": []
 }

@@ -5,6 +5,7 @@
 
 import os.path
 
+from collections import OrderedDict
 from typing import Callable, Final, Literal, NamedTuple, Optional, TextIO, TypeVar, Union
 
 from .data_store import EngineData, FixedSizedData, DynamicSizedData
@@ -38,6 +39,7 @@ from .json_formats import (
     MsAnimation,
     MsLayout,
     MsFrameset,
+    MsPaletteSwap,
     MsSpritesheet,
     MsLayoutOverride,
     AabbOverride,
@@ -92,7 +94,7 @@ class FramesetError(MultilineError):
         if not isinstance(errors, list):
             errors = [errors]
 
-        self.fs_name: Final = fs.name
+        self.name: Final = fs.name
         self.image_fn: Final = fs.source
         self.errors: Final = errors
 
@@ -103,7 +105,7 @@ class FramesetError(MultilineError):
                     self.tiles.update(e.tiles)
 
     def print_indented(self, fp: TextIO) -> None:
-        fp.write(f"  Frameset { self.fs_name }: { len(self.errors) } errors\n")
+        fp.write(f"  Frameset { self.name }: { len(self.errors) } errors\n")
         if self.tiles:
             fp.write(f"    { len(self.tiles) } tile errors in { self.image_fn }\n")
         for e in self.errors:
@@ -113,13 +115,22 @@ class FramesetError(MultilineError):
                 e.print_indented(fp)
 
 
+class PaletteSwapError(MultilineError):
+    def __init__(self, ps: MsPaletteSwap, message: str):
+        self.name: Final = ps.name
+        self.message: Final = message
+
+    def print_indented(self, fp: TextIO) -> None:
+        fp.write(f"  Palette Swap { self.name }: { self.message }\n")
+
+
 class SpritesheetError(MultilineError):
-    def __init__(self, errors: list[FramesetError], ms_dir: str):
+    def __init__(self, errors: list[FramesetError | PaletteSwapError], ms_dir: str):
         self.errors: Final = errors
         self.ms_dir: Final = ms_dir
 
     def print_indented(self, fp: TextIO) -> None:
-        fp.write(f"{ len(self.errors) } invalid framesets:\n")
+        fp.write(f"{ len(self.errors) } errors:\n")
         for e in self.errors:
             e.print_indented(fp)
 
@@ -173,6 +184,12 @@ class FramesetData(NamedTuple):
     frames: list[FrameData]
     # engine animation data
     animations: list[bytes]
+
+
+class PaletteSwapData(NamedTuple):
+    name: Name
+    fs_data: FramesetData
+    palette: int
 
 
 class TileIdAndFlip(NamedTuple):
@@ -371,7 +388,7 @@ class StaticTileset:
 
 
 def build_static_tileset(
-    framesets: list[FramesetData], ms_input: MsSpritesheet
+    framesets: OrderedDict[Name, FramesetData], ms_input: MsSpritesheet
 ) -> tuple[list[SmallTileData], dict[SmallOrLargeTileData, TileIdAndFlip]]:
     tileset = StaticTileset(ms_input.first_tile, ms_input.end_tile)
 
@@ -379,7 +396,7 @@ def build_static_tileset(
     # This will deduplicate the small tiles that exist in large tiles.
     small_tiles = list()
 
-    for fs in framesets:
+    for fs in framesets.values():
         for f in fs.frames:
             for t in f.objects:
                 if t.is_large_tile():
@@ -1194,7 +1211,31 @@ def build_engine_frame_data(
     return data, offset
 
 
-def build_msfs_entry(fs: FramesetData, frames: list[tuple[bytes, int]], spritesheet_name: Name) -> MsFsEntry:
+def build_palette_swapped_engine_frame_data(
+    frame: FrameData, tile_map: dict[SmallOrLargeTileData, TileIdAndFlip], palette_id: int
+) -> tuple[bytes, int]:
+    data = bytearray()
+
+    data.extend(frame.hitbox)
+    data.extend(frame.hurtbox)
+
+    data.append(frame.pattern.id)
+    data.append(frame.x_offset)
+    data.append(frame.y_offset)
+
+    for o in frame.objects:
+        t = tile_map[o.tile_data]
+        assert 0 <= t.tile_id <= 511
+
+        data.append(t.tile_id & 0xFF)
+        data.append(
+            (t.tile_id >> 8) | ((palette_id & 7) << 1) | ((frame.order & 3) << 4) | (bool(t.hflip) << 6) | (bool(t.vflip) << 7)
+        )
+
+    return data, 0
+
+
+def build_msfs_entry(name: Name, fs: FramesetData, frames: list[tuple[bytes, int]], spritesheet_name: Name) -> MsFsEntry:
     header = bytearray().zfill(3)
 
     header[0] = SHADOW_SIZES[fs.shadow_size]
@@ -1202,7 +1243,7 @@ def build_msfs_entry(fs: FramesetData, frames: list[tuple[bytes, int]], spritesh
     header[2] = fs.tile_hitbox[1]
 
     return MsFsEntry(
-        fullname=f"{ spritesheet_name }.{ fs.name }",
+        fullname=f"{ spritesheet_name }.{ name }",
         ms_export_order=fs.ms_export_order,
         header=header,
         pattern=fs.pattern,
@@ -1212,17 +1253,29 @@ def build_msfs_entry(fs: FramesetData, frames: list[tuple[bytes, int]], spritesh
 
 
 def build_static_msfs_entries(
-    framesets: list[FramesetData], ms_input: MsSpritesheet, tile_map: dict[SmallOrLargeTileData, TileIdAndFlip]
+    framesets: OrderedDict[Name, FramesetData],
+    palette_swaps: list[PaletteSwapData],
+    ms_input: MsSpritesheet,
+    tile_map: dict[SmallOrLargeTileData, TileIdAndFlip],
 ) -> list[MsFsEntry]:
     spritesheet_name: Final = ms_input.name
 
     return [
         build_msfs_entry(
+            fs.name,
             fs,
             [build_engine_frame_data(f, tile_map, None) for f in fs.frames],
             spritesheet_name,
         )
-        for fs in framesets
+        for fs in framesets.values()
+    ] + [
+        build_msfs_entry(
+            ps.name,
+            ps.fs_data,
+            [build_palette_swapped_engine_frame_data(f, tile_map, ps.palette) for f in ps.fs_data.frames],
+            spritesheet_name,
+        )
+        for ps in palette_swaps
     ]
 
 
@@ -1258,7 +1311,7 @@ def build_dynamic_msfs_entry(
     if errors:
         raise FramesetError(frameset.frameset, errors)
 
-    return build_msfs_entry(frameset, frames, ms_input.name)
+    return build_msfs_entry(frameset.name, frameset, frames, ms_input.name)
 
 
 def build_ms_fs_data(
@@ -1360,35 +1413,56 @@ def generate_ppu_data(ms_input: MsSpritesheet, tileset: list[SmallTileData], pal
 
 def _extract_frameset_data(
     ms_input: MsSpritesheet, ms_export_orders: MsExportOrder, ms_dir: Filename
-) -> tuple[list[FramesetData], bytes]:
+) -> tuple[OrderedDict[Name, FramesetData], list[PaletteSwapData], bytes]:
     palette_map, palette_data = load_palette(ms_dir, ms_input.palette)
     transparent_color = get_transparent_color(palette_data)
 
-    framesets = list()
-    errors: list[FramesetError] = list()
+    framesets = OrderedDict()
+
+    errors: list[FramesetError | PaletteSwapError] = list()
 
     for fs in ms_input.framesets.values():
         try:
-            framesets.append(build_frameset(fs, ms_export_orders, ms_dir, palette_map, transparent_color, ms_input.name))
+            framesets[fs.name] = build_frameset(fs, ms_export_orders, ms_dir, palette_map, transparent_color, ms_input.name)
         except FramesetError as e:
             errors.append(e)
         except Exception as e:
             errors.append(FramesetError(fs, f"{ type(e).__name__ }({ e })"))
 
+    palette_swaps = list()
+    for ps in ms_input.palette_swaps.values():
+        if ps.name in framesets:
+            errors.append(PaletteSwapError(ps, f"Palette swap name already exists: {ps.name}"))
+        fs_data = framesets.get(ps.copies)
+        if fs_data is None:
+            errors.append(PaletteSwapError(ps, f"Cannot find frameset: {ps.copies}"))
+
+        if ps.palette < 0 or ps.palette > 7:
+            errors.append(PaletteSwapError(ps, f"invalid palette: {ps.palette}"))
+
+        if fs_data:
+            palette_swaps.append(
+                PaletteSwapData(
+                    name=ps.name,
+                    fs_data=fs_data,
+                    palette=ps.palette,
+                )
+            )
+
     if errors:
         raise SpritesheetError(errors, ms_dir)
 
-    return framesets, palette_data
+    return framesets, palette_swaps, palette_data
 
 
 def convert_static_spritesheet(
     ms_input: MsSpritesheet, ms_export_orders: MsExportOrder, ms_dir: Filename
 ) -> tuple[EngineData, list[MsFsEntry]]:
-    framesets, palette_data = _extract_frameset_data(ms_input, ms_export_orders, ms_dir)
+    framesets, palette_swaps, palette_data = _extract_frameset_data(ms_input, ms_export_orders, ms_dir)
 
     tileset_data, tile_map = build_static_tileset(framesets, ms_input)
 
-    msfs_entries = build_static_msfs_entries(framesets, ms_input, tile_map)
+    msfs_entries = build_static_msfs_entries(framesets, palette_swaps, ms_input, tile_map)
 
     ppu_data = generate_ppu_data(ms_input, tileset_data, palette_data)
 
@@ -1398,14 +1472,19 @@ def convert_static_spritesheet(
 def convert_dynamic_spritesheet(
     ms_input: MsSpritesheet, ms_export_orders: MsExportOrder, ms_dir: Filename, map_mode: MemoryMapMode
 ) -> DynamicMsSpritesheet:
-    framesets, palette_data = _extract_frameset_data(ms_input, ms_export_orders, ms_dir)
+    if ms_input.palette_swaps:
+        raise RuntimeError("Dynamic metasprite spritesheet does not support palette swaps")
+
+    framesets, palette_swaps, palette_data = _extract_frameset_data(ms_input, ms_export_orders, ms_dir)
+
+    assert len(palette_swaps) == 0
 
     tile_store = DynamicTileStore(map_mode)
 
     msfs_entries = list()
-    errors: list[FramesetError] = list()
+    errors: list[FramesetError | PaletteSwapError] = list()
 
-    for fs in framesets:
+    for fs in framesets.values():
         try:
             msfs_entries.append(build_dynamic_msfs_entry(fs, tile_store, ms_input, ms_export_orders))
         except FramesetError as e:

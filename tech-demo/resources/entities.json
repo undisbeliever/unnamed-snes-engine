@@ -247,7 +247,7 @@
     {
       "name": "boss_bomb",
       "code": "boss_bomb",
-      "metasprites": "common.Bomb",
+      "metasprites": "common.EnemyBomb",
       "death_function": "none",
       "zpos": "24",
       "health": 255,

@@ -276,5 +276,12 @@
       "yorigin": 12,
       "tilehitbox": "5 5"
     }
+  ],
+  "palette_swaps": [
+    {
+      "name": "EnemyBomb",
+      "copies": "Bomb",
+      "palette": 2
+    }
   ]
 }

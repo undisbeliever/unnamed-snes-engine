@@ -922,12 +922,19 @@ class MsFrameset(NamedTuple):
     animations: dict[Name, MsAnimation]
 
 
+class MsPaletteSwap(NamedTuple):
+    name: Name
+    copies: Name
+    palette: int
+
+
 class MsSpritesheet(NamedTuple):
     name: Name
     palette: Filename
     first_tile: int
     end_tile: int
     framesets: OrderedDict[Name, MsFrameset]
+    palette_swaps: OrderedDict[Name, MsPaletteSwap]
 
 
 class _Ms_Helper(_Helper):
@@ -1100,12 +1107,24 @@ def __read_ms_frameset(jh: _Ms_Helper, name: Name, i: int, skip_animations: Opti
 
 
 def _load_metasprites(jh: _Ms_Helper) -> MsSpritesheet:
+    palette_swaps = jh.build_ordered_dict_from_list(
+        "palette_swaps",
+        MsPaletteSwap,
+        256,
+        lambda j, name, i: MsPaletteSwap(
+            name=name,
+            copies=j.get_name("copies"),
+            palette=j.get_int("palette"),
+        ),
+    )
+
     return MsSpritesheet(
         name=jh.get_name("name"),
         palette=jh.get_filename("palette"),
         first_tile=jh.get_int("firstTile"),
         end_tile=jh.get_int("endTile"),
         framesets=jh.build_ordered_dict_from_list("framesets", MsFrameset, 256, __read_ms_frameset),
+        palette_swaps=palette_swaps,
     )
 
 

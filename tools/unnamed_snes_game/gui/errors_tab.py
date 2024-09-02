@@ -11,6 +11,7 @@ import tkinter.messagebox
 
 from ..data_store import DataStore, ResourceError, NonResourceError
 from ..errors import MultilineError
+from ..metasprite import FramesetError
 from ..snes import InvalidTilesError
 from ..json_formats import Filename
 from .. import metasprite as ms
@@ -190,12 +191,13 @@ class ErrorsTab:
         self.draw_large_text(f"{ len(error.errors) } invalid spritesheets")
         self.cursor_ypos += 5
 
-        for fs_error in error.errors:
+        for e in error.errors:
             self.cursor_ypos += 5
-            self.draw_large_text(fs_error.fs_name)
+            self.draw_large_text(e.name)
 
-            if fs_error.tiles:
-                self.draw_text(f"{ len(fs_error.tiles) } tile errors in {fs_error.image_fn}")
-                self.draw_ms_tile_errors(os.path.join(error.ms_dir, fs_error.image_fn), fs_error.tiles)
+            if isinstance(e, FramesetError):
+                if e.tiles:
+                    self.draw_text(f"{ len(e.tiles) } tile errors in {e.image_fn}")
+                    self.draw_ms_tile_errors(os.path.join(error.ms_dir, e.image_fn), e.tiles)
 
-            self.draw_text(fs_error.string_indented())
+            self.draw_text(e.string_indented())
