@@ -10,6 +10,7 @@ import "../vram-map";
 import "gamestate";
 import "room";
 
+import "ms_palettes";
 import "metasprites";
 import "metatiles";
 import "second-layer";
@@ -67,6 +68,7 @@ struct _RamDataFormat {
     palette: resources.palettes,
     tileset: u8,
     secondLayer: u8,
+    msPalette: u8,
     msSpritesheet: u8,
 
     // The song to play for this dungeon.
@@ -330,6 +332,8 @@ var _roomTypeToLoad : u8 in __load_dungeon__roomTypeToLoad;
     // DB = 0x80
 
         // Load game subsystems
+        ms_palettes.load_ms_palette(dungeonData.msPalette);
+
         metasprites.setup__forceblank();
         metasprites.load_ms_spritesheet_ppu_data__forceblank(dungeonData.msSpritesheet);
         textbox.setup_ppu__forceblank();

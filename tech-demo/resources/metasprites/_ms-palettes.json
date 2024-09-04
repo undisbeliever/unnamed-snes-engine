@@ -1,0 +1,20 @@
+{
+  "ms_palettes": [
+    {
+      "name": "common",
+      "parent": null,
+      "spritesheet_uses_parent": false,
+      "source": "common-palette.png",
+      "starting_row": 0,
+      "n_rows": 3
+    },
+    {
+      "name": "dungeon",
+      "parent": "common",
+      "spritesheet_uses_parent": true,
+      "source": "dungeon-palette.png",
+      "starting_row": 3,
+      "n_rows": 5
+    }
+  ]
+}

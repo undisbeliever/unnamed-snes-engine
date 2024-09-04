@@ -1,6 +1,6 @@
 {
   "name": "dungeon",
-  "palette": "_palette.png",
+  "palette": "dungeon",
   "firstTile": 96,
   "endTile": 512,
   "framesets": [

@@ -7,6 +7,7 @@ import "registers";
 import "audio";
 import "textbox";
 import "interrupts";
+import "game/ms_palettes";
 import "game/metasprites";
 import "game/metatiles";
 import "game/gamestate";
@@ -98,6 +99,7 @@ func wait_frame() {
 
 
         metasprites.update_oam__vblank();
+        ms_palettes.update_cgram__vblank();
 
         metatiles.transitions.transfer_buffer__vblank();
         second_layer.transfer_buffers__vblank();

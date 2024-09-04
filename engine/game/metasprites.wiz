@@ -169,15 +169,10 @@ namespace AnimationDataFormat {
 
 
 // MetaSprite resource RAM data format
+//
+// PPU data contains dynamically-sized 4bpp tile data.
 struct _RamDataFormat {
     firstTile : u16,
-}
-
-
-// MetaSprie PPU data format in ROM.
-struct _PpuDataFormat {
-    palette_data : [u16 ; 128],
-    tile_data : u8,
 }
 
 
@@ -319,9 +314,6 @@ var _header : _RamDataFormat in zpTmp_word_0;
 var _secondRowVramWaddr : u16 in zpTmp_word_1;
 
     _ppuData = resources.load_resource__fixed_ram_and_ppu_data__forceblank_inline(resources.ResourceType.ms_spritesheet, a, &_header as *u8, sizeof(typeof(_header)));
-
-    CGADD = a = 128;
-    resources.dma_to_cgram__forceblank(_ppuData, 256);
 
     mem16();
     #[mem16] {

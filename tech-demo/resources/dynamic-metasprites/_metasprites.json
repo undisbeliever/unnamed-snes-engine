@@ -1,6 +1,6 @@
 {
   "name": "dynamic",
-  "palette": "_palette.png",
+  "palette": "common",
   "firstTile": 2,
   "endTile": 8,
   "framesets": [

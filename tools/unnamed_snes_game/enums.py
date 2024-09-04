@@ -10,10 +10,11 @@ from enum import IntEnum, unique
 @unique
 class ResourceType(IntEnum):
     palettes = 0
-    mt_tilesets = 1
-    second_layers = 2
-    ms_spritesheets = 3
-    tiles = 4
-    bg_images = 5
-    audio_data = 6
-    dungeons = 7
+    ms_palettes = 1
+    mt_tilesets = 2
+    second_layers = 3
+    ms_spritesheets = 4
+    tiles = 5
+    bg_images = 6
+    audio_data = 7
+    dungeons = 8

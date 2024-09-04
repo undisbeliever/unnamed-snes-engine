@@ -32,6 +32,28 @@ inline func dmap_and_bbad__xx(let dmap : u8, let bbad : u8) : u16 in xx {
 }
 
 
+// Fill a block of Work-RAM in bank 7e with zeros.
+//
+// CAUTION: Can clobber stack
+//
+// Uses DMA channel 0
+// REQUIRES: Force-Blank
+// DB = 0x80
+#[mem8, idx16]
+func clear_wram7e__forceblank(wram7eAddr : u16 in xx, byteCount : u16 in yy) {
+    WMADDML = xx;
+    WMADDH = 0;
+
+    A1T0 = xx = &empty_byte as u16;
+    A1B0 = a = #:far &empty_byte;
+
+    xx = dmap_and_bbad__xx(DMAP_TO_PPU | DMAP_FIXED | DMAP_TRANSFER_ONE, <:&WMDATA);
+    // yy unchanged
+    return __start_transfer(xx, yy);
+}
+
+
+
 // Fill a block of VRAM with zeros.
 //
 // Uses DMA channel 0

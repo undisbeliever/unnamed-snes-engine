@@ -10,6 +10,7 @@
     "palette": "dungeon",
     "tileset": "dungeon",
     "second_layer": "sl_floor",
+    "ms_palette": "dungeon",
     "ms_spritesheet": "dungeon",
     "song": "blank"
   },
@@ -23,6 +24,7 @@
     "palette": "dungeon",
     "tileset": "dungeon",
     "second_layer": null,
+    "ms_palette": "dungeon",
     "ms_spritesheet": "dungeon",
     "song": "DungeonTheme"
   }

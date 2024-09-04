@@ -15,6 +15,7 @@ namespace resources {
 // order MUST match `ResourceType` in `tools/_common.py`
 enum ResourceType : u8 {
   palette,
+  ms_palette,
   mt_tileset,
   second_layer,
   ms_spritesheet,
@@ -138,6 +139,24 @@ inline func load_resource__fixed_ram_and_ppu_data__forceblank_inline(let rType: 
     ppuData = __copy_fixed_size_data_and_prep_dynamic_sized_data(xx, a, wram_data_size);
 
     return ppuData;
+}
+
+
+// Load a resource with dynamically sized RAM data and no PPU data.
+//
+// REQUIRES: Force-Blank
+// USES: DMA Channel 0
+//
+// NOTE: This function will only load RAM data to wram bank $7e.
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func load_resource__dynamic_ram_no_ppu_data__forceblank_inline(let rType: ResourceType, resourceId : u8 in a, let wram_data_addr: *u8, let max_wram_data_size: u16) {
+    __load_resource(rType, a);
+
+    // a:xx = resource address
+    WMADDML = yy = wram_data_addr as u16;
+    __copy_dynamic_sized_data_and_prep_dynamic_sized_data(xx, a, max_wram_data_size);
 }
 
 

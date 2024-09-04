@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from .resources_compiler import SharedInputType
     from .palette import PaletteResource
     from .metasprite import MsFsEntry, DynamicMsSpritesheet
+    from .ms_palettes import MsPalette
     from .dungeons import DungeonIntermediate
 
 
@@ -107,6 +108,11 @@ class BaseResourceData:
 @dataclass(frozen=True)
 class ResourceData(BaseResourceData):
     data: EngineData
+
+
+@dataclass(frozen=True)
+class MsPaletteResourceData(ResourceData):
+    palette: "MsPalette"
 
 
 @dataclass(frozen=True)
@@ -390,6 +396,14 @@ class DataStore:
         with self._lock:
             co = self._resource_name_map[ResourceType.palettes].get(name)
             if isinstance(co, PaletteResourceData):
+                return co
+            else:
+                return None
+
+    def get_ms_palette(self, name: Name) -> Optional[MsPaletteResourceData]:
+        with self._lock:
+            co = self._resource_name_map[ResourceType.ms_palettes].get(name)
+            if isinstance(co, MsPaletteResourceData):
                 return co
             else:
                 return None

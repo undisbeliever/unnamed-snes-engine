@@ -8,13 +8,12 @@ import os.path
 from collections import OrderedDict
 from typing import Callable, Final, Literal, NamedTuple, Optional, TextIO, TypeVar, Union
 
-from .data_store import EngineData, FixedSizedData, DynamicSizedData
+from .data_store import EngineData, FixedSizedData, DynamicSizedData, DataStore
 from .memory_map import MemoryMapMode
 from .errors import MultilineError
 from .snes import (
     split_large_tile,
     load_image_tile_extractor,
-    load_palette_image,
     ImageTileExtractor,
     hflip_tile,
     vflip_tile,
@@ -1370,31 +1369,11 @@ def build_ms_fs_data(
 
 
 #
-# Image loaders
-# =============
-#
-
-
-def load_palette(ms_dir: Filename, palette_filename: Filename) -> tuple[PaletteMap, bytes]:
-    pal = load_palette_image(os.path.join(ms_dir, palette_filename), 128)
-
-    palette_map = pal.create_map(TILE_DATA_BPP)
-    palette_data = pal.snes_data()
-
-    return palette_map, palette_data
-
-
-def get_transparent_color(palette_data: bytes) -> SnesColor:
-    # Hack to reconstruct the first color from palette_data bytes
-    return palette_data[0] | (palette_data[1] << 8)
-
-
-#
 # =========================
 #
 
 
-def generate_ppu_data(ms_input: MsSpritesheet, tileset: list[SmallTileData], palette_data: bytes) -> EngineData:
+def generate_ppu_data(ms_input: MsSpritesheet, tileset: list[SmallTileData]) -> EngineData:
     tile_data = convert_snes_tileset(tileset, TILE_DATA_BPP)
 
     header = bytearray()
@@ -1403,7 +1382,7 @@ def generate_ppu_data(ms_input: MsSpritesheet, tileset: list[SmallTileData], pal
     header.append(ms_input.first_tile & 0xFF)
     header.append(ms_input.first_tile >> 8)
 
-    ppu_data = palette_data + tile_data
+    ppu_data = tile_data
 
     return EngineData(
         ram_data=FixedSizedData(header),
@@ -1412,10 +1391,14 @@ def generate_ppu_data(ms_input: MsSpritesheet, tileset: list[SmallTileData], pal
 
 
 def _extract_frameset_data(
-    ms_input: MsSpritesheet, ms_export_orders: MsExportOrder, ms_dir: Filename
-) -> tuple[OrderedDict[Name, FramesetData], list[PaletteSwapData], bytes]:
-    palette_map, palette_data = load_palette(ms_dir, ms_input.palette)
-    transparent_color = get_transparent_color(palette_data)
+    ms_input: MsSpritesheet, ms_export_orders: MsExportOrder, ms_dir: Filename, data_store: DataStore
+) -> tuple[OrderedDict[Name, FramesetData], list[PaletteSwapData]]:
+    pal_data = data_store.get_ms_palette(ms_input.palette)
+    if pal_data is None:
+        raise RuntimeError(f"Cannot load palette: {ms_input.palette}")
+
+    palette_map = pal_data.palette.palette_map
+    transparent_color = pal_data.palette.transparent_color
 
     framesets = OrderedDict()
 
@@ -1452,30 +1435,30 @@ def _extract_frameset_data(
     if errors:
         raise SpritesheetError(errors, ms_dir)
 
-    return framesets, palette_swaps, palette_data
+    return framesets, palette_swaps
 
 
 def convert_static_spritesheet(
-    ms_input: MsSpritesheet, ms_export_orders: MsExportOrder, ms_dir: Filename
+    ms_input: MsSpritesheet, ms_export_orders: MsExportOrder, ms_dir: Filename, data_store: DataStore
 ) -> tuple[EngineData, list[MsFsEntry]]:
-    framesets, palette_swaps, palette_data = _extract_frameset_data(ms_input, ms_export_orders, ms_dir)
+    framesets, palette_swaps = _extract_frameset_data(ms_input, ms_export_orders, ms_dir, data_store)
 
     tileset_data, tile_map = build_static_tileset(framesets, ms_input)
 
     msfs_entries = build_static_msfs_entries(framesets, palette_swaps, ms_input, tile_map)
 
-    ppu_data = generate_ppu_data(ms_input, tileset_data, palette_data)
+    ppu_data = generate_ppu_data(ms_input, tileset_data)
 
     return ppu_data, msfs_entries
 
 
 def convert_dynamic_spritesheet(
-    ms_input: MsSpritesheet, ms_export_orders: MsExportOrder, ms_dir: Filename, map_mode: MemoryMapMode
+    ms_input: MsSpritesheet, ms_export_orders: MsExportOrder, ms_dir: Filename, map_mode: MemoryMapMode, data_store: DataStore
 ) -> DynamicMsSpritesheet:
     if ms_input.palette_swaps:
         raise RuntimeError("Dynamic metasprite spritesheet does not support palette swaps")
 
-    framesets, palette_swaps, palette_data = _extract_frameset_data(ms_input, ms_export_orders, ms_dir)
+    framesets, palette_swaps = _extract_frameset_data(ms_input, ms_export_orders, ms_dir, data_store)
 
     assert len(palette_swaps) == 0
 

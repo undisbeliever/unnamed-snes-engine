@@ -18,6 +18,8 @@ RoomName = str
 
 Filename = str
 
+MAX_RESOURCE_ITEMS: Final = 254
+
 
 class JsonError(FileError):
     pass
@@ -851,6 +853,48 @@ def load_audio_project(filename: Filename) -> AudioProject:
     )
 
 
+#
+# ms-palettes.json
+#
+
+
+class MsPaletteInput(NamedTuple):
+    id: int
+    name: Name
+    parent: Optional[Name]
+    spritesheet_uses_parent: bool
+    source: Filename
+    starting_row: int
+    n_rows: int
+
+
+class MsPalettesJson(NamedTuple):
+    ms_palettes: OrderedDict[Name, MsPaletteInput]
+
+
+def load_ms_palettes_json(filename: Filename) -> MsPalettesJson:
+    jh = _load_json_file(filename, _Helper)
+
+    dirname = os.path.dirname(filename)
+
+    ms_palettes = jh.build_ordered_dict_from_list(
+        "ms_palettes",
+        MsPaletteInput,
+        MAX_RESOURCE_ITEMS,
+        lambda sj, name, i: MsPaletteInput(
+            name=name,
+            id=i,
+            parent=sj.get_optional_name("parent"),
+            spritesheet_uses_parent=sj.get_bool("spritesheet_uses_parent"),
+            source=os.path.join(dirname, sj.get_string("source")),
+            starting_row=sj.get_int("starting_row"),
+            n_rows=sj.get_int("n_rows"),
+        ),
+    )
+
+    return MsPalettesJson(ms_palettes)
+
+
 # metasprites.json
 # ================
 
@@ -930,7 +974,7 @@ class MsPaletteSwap(NamedTuple):
 
 class MsSpritesheet(NamedTuple):
     name: Name
-    palette: Filename
+    palette: Name
     first_tile: int
     end_tile: int
     framesets: OrderedDict[Name, MsFrameset]
@@ -1268,6 +1312,7 @@ class DungeonInput(NamedTuple):
     palette: Name
     tileset: Name
     second_layer: Optional[Name]
+    ms_palette: Name
     ms_spritesheet: Name
     song: Optional[Name]
 
@@ -1299,6 +1344,7 @@ def load_dungeons_json(filename: Filename) -> DungeonsJson:
             palette=sj.get_name("palette"),
             tileset=sj.get_name("tileset"),
             second_layer=sj.get_optional_name("second_layer"),
+            ms_palette=sj.get_name("ms_palette"),
             ms_spritesheet=sj.get_name("ms_spritesheet"),
             song=sj.get_optional_name("song"),
         ),

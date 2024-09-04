@@ -4,7 +4,7 @@
 from .data_store import DataStore, EngineData, FixedSizedData, BaseResourceData, DungeonResourceData
 from .errors import SimpleMultilineError
 from .audio import BLANK_SONG_NAME
-from .json_formats import DungeonInput, Mappings, OtherResources, AudioProject, Name
+from .json_formats import DungeonInput, Mappings, OtherResources, MsPalettesJson, AudioProject, Name
 
 import re
 from typing import Any, Final, NamedTuple, Optional
@@ -89,7 +89,12 @@ def get_n_tiles(dungeon: DungeonInput, data_store: DataStore, error_list: list[s
 
 
 def compile_dungeon_header(
-    dungeon: DungeonInput, mappings: Mappings, other_resources: OtherResources, audio_project: AudioProject, data_store: DataStore
+    dungeon: DungeonInput,
+    mappings: Mappings,
+    other_resources: OtherResources,
+    ms_palettes: MsPalettesJson,
+    audio_project: AudioProject,
+    data_store: DataStore,
 ) -> tuple[EngineData, DungeonIntermediate]:
     error_list = list()
 
@@ -100,6 +105,12 @@ def compile_dungeon_header(
     tileset_id = get_resource_id(dungeon.tileset, mappings.mt_tilesets, "tileset", error_list)
     second_layer_id = get_optional_resource_id(dungeon.second_layer, mappings.second_layers, "second_layer", error_list)
     ms_spritesheet_id = get_resource_id(dungeon.ms_spritesheet, mappings.ms_spritesheets, "ms_spritesheet", error_list)
+
+    ms_palette_id = 0
+    if ms_palette := ms_palettes.ms_palettes.get(dungeon.ms_palette):
+        ms_palette_id = ms_palette.id
+    else:
+        error_list.append(f"Cannot find ms_palette: {dungeon.ms_palette}")
 
     if room_m := ROOM_LOCATION_REGEX.match(dungeon.default_room):
         default_room_x = int(room_m.group(1))
@@ -144,6 +155,7 @@ def compile_dungeon_header(
             palette_id,
             tileset_id,
             second_layer_id,
+            ms_palette_id,
             ms_spritesheet_id,
             song_id,
         ]
