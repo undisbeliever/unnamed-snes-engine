@@ -335,7 +335,8 @@ def compile_data(resources_directory: Filename, symbols_file: Filename) -> Optio
 
     compiler.compile_everything()
 
-    append_room_data_to_dungeons(data_store, print_resource_error)
+    if valid:
+        append_room_data_to_dungeons(data_store, print_resource_error)
 
     os.chdir(cwd)
 
