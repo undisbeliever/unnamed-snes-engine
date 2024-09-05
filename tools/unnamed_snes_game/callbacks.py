@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
-from .json_formats import Name, Callback, CallbackDict, CallbackParameter, Mappings, RoomEvent, SecondLayerCallback
+from .json_formats import Name, Callback, CallbackDict, CallbackParameter, Mappings, RoomEvent, SecondLayerCallback, MsPaletteCallback
 
 from io import StringIO
 
@@ -20,6 +20,16 @@ PARAM_TYPES: Final = {
     "locked_door": "u8",
     "open_door": "u8",
     "optional_open_door": "u8",
+}
+
+# Mapping of parameter types to wiz types
+PARAM_TYPES_SOA: Final = {
+    "bool": "[u8 ; BA_SIZE]",
+    "u8": "[u8 ; BA_SIZE]",
+    "u16": "[u16 ; N_SLOTS]",
+    "sQ4_12": "[i16 ; N_SLOTS]",
+    "gamestate_flag": "[u8 ; BA_SIZE]",
+    "optional_gamestate_flag": "[u8 ; BA_SIZE]",
 }
 
 # Size of each parameter type in bytes
@@ -50,19 +60,28 @@ class CallbackType(NamedTuple):
     human_name: str
     parameter_array: str
     parameter_size: int
+    uses_soa: bool
     get_parameters: Callable[[Callback], Optional[list[CallbackParameter]]]
 
 
 ROOM_CALLBACK: Final = CallbackType(
-    "room event", "room.roomEventParameters", 4, lambda c: c.parameters if isinstance(c, RoomEvent) else None
+    "room event", "room.roomEventParameters", 4, False, lambda c: c.parameters if isinstance(c, RoomEvent) else None
 )
 
 SL_CALLBACK_PARAMETERS: Final = CallbackType(
-    "sl parameters", "second_layer.sl_parameters", 8, lambda c: c.sl_parameters if isinstance(c, SecondLayerCallback) else None
+    "sl parameters", "second_layer.sl_parameters", 8, False, lambda c: c.sl_parameters if isinstance(c, SecondLayerCallback) else None
 )
 
 SL_ROOM_PARAMETERS: Final = CallbackType(
-    "sl room parameters", "room.sl_parameters", 2, lambda c: c.room_parameters if isinstance(c, SecondLayerCallback) else None
+    "sl room parameters", "room.sl_parameters", 2, False, lambda c: c.room_parameters if isinstance(c, SecondLayerCallback) else None
+)
+
+MS_PALETTE_CALLBACK_PARAMETERS: Final = CallbackType(
+    "ms_palette parameters",
+    "ms_palette_callbacks.SoA.callbackParameters",
+    2,
+    True,
+    lambda c: c.parameters if isinstance(c, MsPaletteCallback) else None,
 )
 
 
@@ -277,6 +296,9 @@ def write_callback_parameters_wiz(out: StringIO, callbacks: CallbackDict, *callb
         out.write(f"namespace {e.name} {{\n")
 
         for callback_index, callback_type in enumerate(callback_types):
+            param_types = PARAM_TYPES if not callback_type.uses_soa else PARAM_TYPES_SOA
+            prefix = "parameter" if not callback_type.uses_soa else "SoA_parameter"
+
             e_parameters = callback_type.get_parameters(e)
             if e_parameters:
                 i = 0
@@ -287,7 +309,7 @@ def write_callback_parameters_wiz(out: StringIO, callbacks: CallbackDict, *callb
                     elif callback_index != 0:
                         out.write("\n\n")
 
-                    ptype = PARAM_TYPES.get(p.type)
+                    ptype = param_types.get(p.type)
                     if not ptype:
                         raise ValueError(f"Unknown { callback_type.human_name } parameter type: {p.type}")
 
@@ -295,7 +317,7 @@ def write_callback_parameters_wiz(out: StringIO, callbacks: CallbackDict, *callb
                         p_comment = p.comment.replace("\n", "\n  // ")
                         out.write(f"  // { p_comment }\n")
                     out.write(f"  // ({ p.type })\n")
-                    out.write(f"  const parameter__{ p.name } @ &{ callback_type.parameter_array }[{ i }] : { ptype };\n")
+                    out.write(f"  const {prefix}__{ p.name } @ &{ callback_type.parameter_array }[{ i }] : { ptype };\n")
 
                     i += PARAM_SIZE[p.type]
 

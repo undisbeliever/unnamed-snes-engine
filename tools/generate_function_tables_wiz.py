@@ -18,6 +18,7 @@ from unnamed_snes_game.json_formats import (
     CallbackDict,
     RoomEvent,
     SecondLayerCallback,
+    MsPaletteCallback,
     GameMode,
 )
 
@@ -153,6 +154,31 @@ def second_layers_table(out: StringIO, sl_callbacks: OrderedDict[Name, SecondLay
     out.write("}\n\n")
 
 
+def ms_palette_callback_table(out: StringIO, callbacks: OrderedDict[Name, MsPaletteCallback]) -> None:
+    n_functions: Final = len(callbacks) + 1
+
+    table_name: Final = "process_function_table"
+    fn_type: Final = "func(slot: u8 in y) : bool in carry"
+    fn_name: Final = "process"
+
+    out.write("namespace ms_palette_callbacks {\n\n")
+
+    out.write("// Called once per frame in the gameloop or room_transition mode.\n")
+    out.write("// If this callback return true, the ms_palette frame is loaded from A\n")
+    out.write("// OUT: A = ms_palette frame if carry set\n")
+    out.write("// Can clobber `Y`\n")
+    out.write("// DB = 0x7e\n")
+    out.write("#[mem8, idx8]\n")
+    out.write(f"const { table_name } : [ { fn_type } ; { n_functions } ] = [\n")
+    out.write("  ms_palette_callbacks.null.process,\n")
+    for i, e in enumerate(callbacks.values(), 1):
+        assert e.id == i
+        out.write(f"  ms_palette_callbacks.{ e.name }.{ fn_name },\n")
+    out.write("];\n\n")
+
+    out.write("}\n\n")
+
+
 def gamemodes_imports(out: StringIO, gamemodes: list[GameMode]) -> None:
     for gm in gamemodes:
         if '"' in gm.source:
@@ -199,12 +225,14 @@ import "src/memmap";
 
 import "src/entities/_death_functions";
 import "src/interactive-tiles";
-import "src/gamemodes/room-transition.wiz";
+import "src/gamemodes/room-transition";
+import "engine/ms-palette-api";
 import "engine/game/metatiles";
 """
         )
         callback_imports(out, mappings.room_events, "room-events")
         callback_imports(out, mappings.sl_callbacks, "sl-callbacks")
+        callback_imports(out, mappings.ms_palette_callbacks, "ms-palette-callbacks")
         gamemodes_imports(out, mappings.gamemodes)
 
         out.write("\n")
@@ -222,6 +250,7 @@ import "engine/game/metatiles";
         interactive_tiles_table(out, mappings.interactive_tile_functions)
         room_events_table(out, mappings.room_events)
         second_layers_table(out, mappings.sl_callbacks)
+        ms_palette_callback_table(out, mappings.ms_palette_callbacks)
         gamemodes_table(out, mappings.gamemodes)
 
         function_table(

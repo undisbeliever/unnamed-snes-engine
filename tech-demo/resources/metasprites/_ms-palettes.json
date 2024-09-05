@@ -6,7 +6,13 @@
       "spritesheet_uses_parent": false,
       "source": "common-palette.png",
       "starting_row": 0,
-      "n_rows": 3
+      "n_rows": 3,
+      "n_frames": 12,
+      "rows_per_frame": 1,
+      "callback": "palette_cycle",
+      "parameters": {
+        "frameDelay": 20
+      }
     },
     {
       "name": "dungeon",

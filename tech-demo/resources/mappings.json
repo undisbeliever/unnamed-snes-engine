@@ -264,5 +264,18 @@
        }
      ]
    }
+  ],
+  "ms_palette_callbacks": [
+    {
+      "name": "palette_cycle",
+      "source": "palette-cycle",
+      "parameters": [
+        {
+          "name": "frameDelay",
+          "comment": "Number of frames before cycling the palette",
+          "type": "u8"
+        }
+      ]
+    }
   ]
 }

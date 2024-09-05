@@ -203,6 +203,16 @@ class _Helper:
             except ValueError:
                 self._raise_error("Expected an integer", key)
 
+    def get_optional_int(self, key: str) -> Optional[int]:
+        v = self._optional_get2(key, str, int)
+        if v is None or isinstance(v, int):
+            return v
+        else:
+            try:
+                return int(v)
+            except ValueError:
+                self._raise_error("Expected an integer", key)
+
     def get_float(self, key: str) -> float:
         return self._get2(key, int, float)
 
@@ -631,6 +641,7 @@ MAX_N_CALLBACKS = 128
 MAX_ROOM_EVENT_PARAMETERS = 4
 MAX_SL_CALLBACK_PARAMETERS = 8
 MAX_SL_ROOM_PARAMETERS = 2
+MAX_MS_PALETTE_CALLBACK_PARAMETERS = 2
 
 # GAME_MODES > 128 mean the next game mode is unchanged.
 MAX_GAME_MODES = 128
@@ -670,8 +681,15 @@ class SecondLayerCallback(NamedTuple):
     # ::TODO add world parameters::
 
 
-Callback = Union[RoomEvent, SecondLayerCallback]
-CallbackDict = Union[OrderedDict[Name, RoomEvent], OrderedDict[Name, SecondLayerCallback]]
+class MsPaletteCallback(NamedTuple):
+    name: Name
+    id: int
+    source: str
+    parameters: list[CallbackParameter]
+
+
+Callback = Union[RoomEvent, SecondLayerCallback, MsPaletteCallback]
+CallbackDict = Union[OrderedDict[Name, RoomEvent], OrderedDict[Name, SecondLayerCallback], OrderedDict[Name, MsPaletteCallback]]
 
 
 class Mappings(NamedTuple):
@@ -688,6 +706,7 @@ class Mappings(NamedTuple):
     room_transitions: list[Name]
     room_events: OrderedDict[Name, RoomEvent]
     sl_callbacks: OrderedDict[Name, SecondLayerCallback]
+    ms_palette_callbacks: OrderedDict[Name, MsPaletteCallback]
     memory_map: MemoryMap
 
     # Location of the directory containing tad-compiler
@@ -771,6 +790,21 @@ class _Mappings_Helper(_Helper):
         # ::TODO detect duplicates in callback parameters::
         return callbacks
 
+    def get_ms_palette_callbacks(self, key: str) -> OrderedDict[Name, MsPaletteCallback]:
+        callbacks = self.build_ordered_dict_from_list(
+            key,
+            MsPaletteCallback,
+            MAX_N_CALLBACKS,
+            lambda rj, name, i: MsPaletteCallback(
+                name=name,
+                id=i + 1,  # 0 is null
+                source=rj.get_string("source"),
+                parameters=rj.get_callback_parameters("parameters", MAX_MS_PALETTE_CALLBACK_PARAMETERS),
+            ),
+        )
+        # ::TODO detect duplicates in callback parameters::
+        return callbacks
+
 
 def load_mappings_json(filename: Filename) -> Mappings:
     jh = _load_json_file(filename, _Mappings_Helper)
@@ -788,6 +822,7 @@ def load_mappings_json(filename: Filename) -> Mappings:
         room_transitions=jh.get_name_list("room_transitions"),
         room_events=jh.get_room_events("room_events"),
         sl_callbacks=jh.get_sl_callbacks("sl_callbacks"),
+        ms_palette_callbacks=jh.get_ms_palette_callbacks("ms_palette_callbacks"),
         memory_map=jh.get_memory_map("memory_map"),
         gamemodes=jh.get_gamemodes("gamemodes"),
         tad_binary_directory=jh.get_string("tad_binary_directory"),
@@ -866,6 +901,10 @@ class MsPaletteInput(NamedTuple):
     source: Filename
     starting_row: int
     n_rows: int
+    n_frames: Optional[int]
+    rows_per_frame: Optional[int]
+    callback: Optional[Name]
+    parameters: Optional[dict[Name, str]]
 
 
 class MsPalettesJson(NamedTuple):
@@ -889,6 +928,10 @@ def load_ms_palettes_json(filename: Filename) -> MsPalettesJson:
             source=os.path.join(dirname, sj.get_string("source")),
             starting_row=sj.get_int("starting_row"),
             n_rows=sj.get_int("n_rows"),
+            n_frames=sj.get_optional_int("n_frames"),
+            rows_per_frame=sj.get_optional_int("rows_per_frame"),
+            callback=sj.get_optional_name("callback"),
+            parameters=sj.get_optional_parameter_dict("parameters"),
         ),
     )
 

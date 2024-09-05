@@ -7,6 +7,7 @@ import "../registers";
 import "room";
 import "dungeon";
 import "gamestate";
+import "ms_palettes";
 import "metasprites";
 import "metatiles";
 import "second-layer";
@@ -285,6 +286,8 @@ func _scrolling_room_transition__loop() : bool in carry {
         move_camera_and_draw_sprite_list();
 
         second_layer.process_room_transition__inline();
+
+        ms_palettes.process();
 
         x = scrollDirection as u8;
         MetaTileTransition_Process_FunctionTable[unaligned x]();

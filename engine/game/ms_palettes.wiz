@@ -4,33 +4,51 @@
 import "src/memmap";
 import "../registers";
 
+import "../registers_math";
 import "../resources/resources";
 import "../resources/dma";
-
-import "gen/enums";
 
 
 namespace ms_palettes {
 
-let MAX_PALETTE_SIZE = 128 * 2;
+let MAX_PALETTE_SIZE = 320;
 
 // Number of MetaSprite Palettes that can be loaded at once
 let N_SLOTS = 3;
+
+let N_CALLBACKS = ms_palette_callbacks.process_function_table.len;
 
 
 // MetaSprite Palette data stored in RAM
 //
 // NOTE: data MUST NOT be modified after the data is loaded into RAM.
 struct _RamDataFormat {
-    // Number of color used by the MetaSprite Palette
-    colorsPerFrame: u8,
-
     // The CGRAM address (palette index) to store the data to
     cgramAddr: u8,
+
+    // Number of colors used by the MetaSprite Palette
+    colorsInPalette: u8,
 
     // Integer id of the parent `ms_palette` to load after this one
     // CAUTION: A maximum of `N_SLOTS` nested `ms_palette`s are allowed at once
     parent: u8,
+
+
+    // Frame size in bytes.
+    // A frame can be smaller then `colorsInPalette`.
+    // The frame's `cgramAddr` is the start of the MetaSprite palette.
+    // MUST be <= colorsInPalette * 2
+    frameSizeBytes: u8,
+
+    // Number of frames in the MetaSprite Palette.
+    nFrames: u8,
+
+    // ms_palette_callbacks callback to call every frame
+    callback : u8,
+
+    // ms_palette_callbacks callback parameters
+    callbackParameters : u16,
+
 
     // Palette data
     // NOTE: palette_data may be smaller then `MAX_PALETTE_SIZE`
@@ -46,21 +64,40 @@ in lowram {
     // MUST BE even
     // (using u16 so it can be read in Vblank routine)
     var lastSlotIndex: u16;
+        var lastSlotIndex_u8 @ &lastSlotIndex : u8;
 
 
     namespace PaletteSoA {
         let BA_SIZE = N_SLOTS * 2 - 1;
 
-        var _dirtyFlagAndBlank : [u16 ; N_SLOTS];
-            var dirtyFlag @ &<:_dirtyFlagAndBlank[0] : [u8 ; BA_SIZE];
+        var _cgramAddrAndColorsInPalette : [u16 ; N_SLOTS];
+            const cgramAddr         @ &<:_cgramAddrAndColorsInPalette[0] : [u8 ; BA_SIZE];
+            const colorsInPalette   @ &>:_cgramAddrAndColorsInPalette[0] : [u8 ; BA_SIZE];
 
-        var _colorsPerFrameAndCgramAddr : [u16 ; N_SLOTS];
-            var colorsPerFrame @ &<:_colorsPerFrameAndCgramAddr[0] : [u8 ; BA_SIZE];
-            var cgramAddr      @ &>:_colorsPerFrameAndCgramAddr[0] : [u8 ; BA_SIZE];
+        var frameSize : [u16 ; N_SLOTS];
+            const frameSize_u8      @ &<:frameSize[0] : [u8 ; BA_SIZE];
 
-        var colorData : [u16 ; N_SLOTS];
+        // Used to calculate `frameAddr` if `currentFrame` > 0.
+        var frameOffset : [u16 ; N_SLOTS];
 
-        var transferSize : [u16 ; N_SLOTS];
+        var _nFramesAndCallback : [u16 ; N_SLOTS];
+            const nFrames           @ &<:_nFramesAndCallback[0] : [u8 ; BA_SIZE];
+            const callback          @ &>:_nFramesAndCallback[0] : [u8 ; BA_SIZE];
+
+        var callbackParameters : [u16 ; N_SLOTS];
+
+
+        var callbackVar_0 : [u16 ; N_SLOTS];
+        var callbackVar_1 : [u16 ; N_SLOTS];
+        var callbackVar_2 : [u16 ; N_SLOTS];
+        var callbackVar_3 : [u16 ; N_SLOTS];
+
+        var _currentFrameAndDirtyFlag : [u16 ; N_SLOTS];
+            var currentFrame        @ &<:_currentFrameAndDirtyFlag[0] : [u8 ; BA_SIZE];
+            var dirtyFlag           @ &>:_currentFrameAndDirtyFlag[0] : [u8 ; BA_SIZE];
+
+        // Address of the frame to transfer to CGRAM
+        var frameAddr : [u16 ; N_SLOTS];
     }
 
     var padding : u8;
@@ -100,6 +137,8 @@ in code {
 // DB = 0x80
 #[mem8, idx16]
 inline func update_cgram__vblank() {
+    // ::SHOULDDO optimise::
+
     xx = lastSlotIndex;
 
     dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_ONE, <:&CGDATA);
@@ -108,12 +147,12 @@ inline func update_cgram__vblank() {
     do {
         a = PaletteSoA.dirtyFlag[unaligned xx];
         if !zero {
-            PaletteSoA.dirtyFlag[xx] = 0;
+            PaletteSoA.dirtyFlag[unaligned xx] = 0;
 
             CGADD = a = PaletteSoA.cgramAddr[unaligned xx];
 
-            A1T0 = yy = PaletteSoA.colorData[unaligned xx];
-            DAS0 = yy = PaletteSoA.transferSize[unaligned xx];
+            A1T0 = yy = PaletteSoA.frameAddr[unaligned xx];
+            DAS0 = yy = PaletteSoA.frameSize[unaligned xx];
 
             MDMAEN = a = MDMAEN_DMA0;
         }
@@ -123,50 +162,150 @@ inline func update_cgram__vblank() {
 }
 
 
+
 // REQUIRES: Force-Blank
 // Uses DMA Channel 0
 // DB = 0x80
 #[mem8, idx16]
-func load_ms_palette(palette_id: u8 in a) {
+func load_ms_palette__forceblank(palette_id: u8 in a) {
+var _size : u16 in zpTmp_word_0;
+
     dma.clear_wram7e__forceblank(__STATE_START_ADDR, __STATE_SIZE);
 
-    __load_ms_palette_data(a);
+    __load_ms_palette_data__inline(a);
 
-    push16(0x807e);
-    data_bank = pop8();
-// DB = 0x7e
+    xx = lastSlotIndex;
 
-    push8(p);
-    mem16();
-    #[mem16]
-    {
-        xx = aa = *(&lastSlotIndex as *u16) & 0xff;
+    do {
+        push8(p);
+        mem16();
+        #[mem16]
+        {
+            push16(0x807e);
+            data_bank = pop8();
+        // DB = 0x7e
 
-        do {
             yy = aa = PaletteSoA.PalDataIndex[unaligned xx];
 
-            aa = (&pal_data[0].colorsPerFrame as *u16)[unaligned yy];
-            push16(aa);
+            aa = (&pal_data[0].cgramAddr as *u16)[unaligned yy] & 0xf0f0 | 0x0080;
+            PaletteSoA._cgramAddrAndColorsInPalette[unaligned xx] = aa;
 
-            PaletteSoA._colorsPerFrameAndCgramAddr[unaligned xx] = aa = aa | 0x8000;
+            swap_bytes(aa);
+            _size = aa = (aa & 0xff) <<< 1;
 
-            aa = pop16();
-            PaletteSoA.transferSize[unaligned xx] = aa = (aa & 0xff) <<< 1;
+            aa = (&pal_data[0].frameSizeBytes as *u16)[unaligned yy] & 0xff;
+            if zero {
+                // Prevent zero from writing 65536 bytes to CGRAM
+                aa++;
+            }
+            PaletteSoA.frameSize[unaligned xx] = aa;
 
-            PaletteSoA.colorData[unaligned xx] = aa = PaletteSoA.ColorDataAddr[unaligned xx];
+            // Calculate `ColorDataAddr + size - frameSizeBytes`.
+            aa &= 0xff;
+            // Reverse subtract
+            aa ^= 0xffff;
+            carry = true;
+            aa +#= PaletteSoA.ColorDataAddr[unaligned xx];
+            aa += _size;
+            PaletteSoA.frameOffset[unaligned xx] = aa;
 
-            PaletteSoA._dirtyFlagAndBlank[unaligned xx] = aa = 0xffff;
+            aa = (&pal_data[0].nFrames as *u16)[unaligned yy];
+            aa &= 0xfe7f;   // ensure nFrames is not negative and callback is even
+            if aa >= N_CALLBACKS * 0x200 {
+                // null callback, 1 frame
+                aa = 1;
+            }
+            PaletteSoA._nFramesAndCallback[unaligned xx] = aa;
 
-            // CGRAM data is transferred during VBlank
+            PaletteSoA.callbackParameters[unaligned xx] = aa = (&pal_data[0].callbackParameters as *u16)[unaligned yy];
 
-            xx--;
-            xx--;
-        } while !negative;
-    }
-    p = pop8();
+            data_bank = pop8();
+        // DB = 0x80
 
-    data_bank = pop8();
-// DB = 0x80
+            // Transfer ms_palette to CGRAM
+            // (must do it here as the frame might be smaller than the palette)
+            dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_ONE, <:&CGDATA);
+
+            A1T0 = aa = PaletteSoA.ColorDataAddr[unaligned xx];
+            DAS0 = aa = _size;
+
+            mem8();
+            #[mem8] {
+                A1B0 = a = 0x7e;
+                CGADD = a = PaletteSoA.cgramAddr[unaligned xx];
+                MDMAEN = a = MDMAEN_DMA0;
+            }
+        }
+        p = pop8();
+
+        xx--;
+        xx--;
+    } while !negative;
+}
+
+
+
+// Process ms_palettes.
+//
+// REQUIRES: At least one ms_palette loaded into memory.
+//
+// MUST be called after `load_ms_palette__forceblank()` and before the screen is enabled
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process() {
+    y = lastSlotIndex_u8;
+
+    do {
+        push8(y);
+        {
+            x = PaletteSoA.callback[unaligned y];
+            carry = ms_palette_callbacks.process_function_table[unaligned x](y);
+        }
+        y = pop8();
+
+        if carry {
+            if a >= PaletteSoA.nFrames[y] {
+                x = a;
+                if !negative {
+                    a = 0;
+                }
+                else {
+                    a = PaletteSoA.nFrames[y];
+                    a--;
+                }
+            }
+
+            if a != PaletteSoA.currentFrame[y] {
+                PaletteSoA.currentFrame[y] = a;
+
+                *(far &WRMPYA) = a;
+                *(far &WRMPYB) = a = PaletteSoA.frameSize_u8[y];
+                // Must wait 8 cycles after WRMPYB write to read RDMPY
+
+                carry = false;
+                mem16();
+                #[mem16] {
+                    aa = *(far &RDMPY);
+                    if zero {
+                        x = y;
+                        aa = PaletteSoA.ColorDataAddr[unaligned x];
+                    }
+                    else {
+                        // Carry clear
+                        aa +#= PaletteSoA.frameOffset[unaligned y];
+                    }
+                    PaletteSoA.frameAddr[unaligned y] = aa;
+                }
+                mem8();
+
+                PaletteSoA.dirtyFlag[unaligned y] = a = 1;
+            }
+        }
+
+        y--;
+        y--;
+    } while !negative;
 }
 
 
@@ -176,7 +315,7 @@ func load_ms_palette(palette_id: u8 in a) {
 // Uses DMA Channel 0
 // DB = 0x80
 #[mem8, idx16]
-func __load_ms_palette_data(palette_id : u8 in a) {
+inline func __load_ms_palette_data__inline(palette_id : u8 in a) {
     *(&lastSlotIndex as *u8) = 0;
 
     resources.load_resource__dynamic_ram_no_ppu_data__forceblank_inline(
@@ -201,4 +340,6 @@ Return:
 }
 
 }
+
+import "gen/function-tables";
 

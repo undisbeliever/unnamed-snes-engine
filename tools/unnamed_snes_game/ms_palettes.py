@@ -3,8 +3,9 @@
 
 from .data_store import EngineData, DynamicSizedData
 from .errors import SimpleMultilineError
-from .json_formats import MsPaletteInput, MsPalettesJson
+from .json_formats import MsPaletteInput, MsPalettesJson, Mappings
 from .snes import load_palette_image, SnesColor, Palette, PaletteMap
+from .callbacks import parse_callback_parameters, MS_PALETTE_CALLBACK_PARAMETERS
 
 from typing import Final, NamedTuple, Optional
 
@@ -12,11 +13,18 @@ from typing import Final, NamedTuple, Optional
 N_METASPRITE_ROWS: Final = 8
 COLORS_PER_ROW: Final = 16
 
-MAX_SOURCE_PNG_COLORS: Final = N_METASPRITE_ROWS * COLORS_PER_ROW
+MAX_SOURCE_PNG_COLORS: Final = 320
+MAX_ROWS_IN_SOURCE_PNG: Final = MAX_SOURCE_PNG_COLORS // COLORS_PER_ROW
+
+MAX_FRAME_BYTE_SIZE: Final = 0x100 - COLORS_PER_ROW * 2
+
+BLANK_CALLBACK_PARAMETERS: Final = bytes(MS_PALETTE_CALLBACK_PARAMETERS.parameter_size)
+
+# snes code makes this assumption when wrapping frame ids
+assert MAX_SOURCE_PNG_COLORS < MAX_FRAME_BYTE_SIZE * 0x80
+
 
 MAX_PALETTES_LOADED_AT_ONCE: Final = 3
-
-MAX_RAM_DATA_PALETTE_SIZE: Final = 256
 
 
 class MsPaletteError(SimpleMultilineError):
@@ -86,7 +94,7 @@ def build_ms_palette_map(
     return PaletteMap(palette_maps)
 
 
-def compile_ms_palette(palette: MsPaletteInput, ms_palettes: MsPalettesJson) -> tuple[EngineData, MsPalette]:
+def compile_ms_palette(palette: MsPaletteInput, ms_palettes: MsPalettesJson, mapping: Mappings) -> tuple[EngineData, MsPalette]:
     error_list = list()
 
     if palette.starting_row < 0 or palette.starting_row > N_METASPRITE_ROWS:
@@ -105,6 +113,42 @@ def compile_ms_palette(palette: MsPaletteInput, ms_palettes: MsPalettesJson) -> 
         else:
             error_list.append(f"Cannot find parent ms_palette: {palette.parent}")
 
+    n_frames = 1
+    if palette.n_frames is not None:
+        if palette.n_frames > 0:
+            n_frames = palette.n_frames
+        else:
+            error_list.append(f"Invalid n_frames: {palette.n_frames}")
+
+    rows_per_frame = palette.n_rows
+    if palette.rows_per_frame is not None:
+        if palette.rows_per_frame >= 0 and palette.rows_per_frame <= palette.n_rows:
+            rows_per_frame = palette.rows_per_frame
+        else:
+            error_list.append(f"Invalid rows_per_frame (must be <= n_rows): {palette.rows_per_frame}")
+
+    frame_byte_size = rows_per_frame * COLORS_PER_ROW * 2
+    if frame_byte_size > MAX_FRAME_BYTE_SIZE:
+        error_list.append(f"Too many colours in a frame: {frame_byte_size / 2}, max is {MAX_FRAME_BYTE_SIZE / 2}")
+
+    expected_n_rows = abs(palette.n_rows) + (abs(rows_per_frame) * (n_frames - 1))
+    if expected_n_rows > MAX_ROWS_IN_SOURCE_PNG:
+        error_list.append(f"Too many rows: ms_palette requires {expected_n_rows} rows, max is {MAX_ROWS_IN_SOURCE_PNG}")
+
+    callback_id = 0
+    callback_parameters = BLANK_CALLBACK_PARAMETERS
+    if palette.callback:
+        if n_frames == 1:
+            error_list.append("Callback requires more than 1 ms_palette frame")
+        callback = mapping.ms_palette_callbacks.get(palette.callback)
+        if callback:
+            callback_id = callback.id
+            callback_parameters = parse_callback_parameters(
+                MS_PALETTE_CALLBACK_PARAMETERS, callback, palette.parameters or {}, mapping, None, error_list
+            )
+        else:
+            error_list.append(f"Unknown ms_palette_callback: {palette.callback}")
+
     try:
         pal = load_palette_image(palette.source, MAX_SOURCE_PNG_COLORS)
     except Exception as e:
@@ -112,10 +156,10 @@ def compile_ms_palette(palette: MsPaletteInput, ms_palettes: MsPalettesJson) -> 
         pal = None
 
     if pal:
-        n_rows: Final = len(pal.colors) // COLORS_PER_ROW
-        if n_rows != palette.n_rows:
+        n_rows_in_source: Final = len(pal.colors) // COLORS_PER_ROW
+        if n_rows_in_source != expected_n_rows:
             error_list.append(
-                f"Invalid number of rows in palette image: {palette.source} has {n_rows} rows, expected {palette.n_rows}"
+                f"Invalid number of rows in palette image: {palette.source} has {n_rows_in_source} rows, expected {expected_n_rows}"
             )
 
         palette_map = build_ms_palette_map(palette, pal, ms_palettes, error_list)
@@ -130,15 +174,19 @@ def compile_ms_palette(palette: MsPaletteInput, ms_palettes: MsPalettesJson) -> 
     ram_data = (
         bytes(
             [
+                palette.starting_row * COLORS_PER_ROW | 0x80,
                 palette.n_rows * COLORS_PER_ROW,
-                palette.starting_row * COLORS_PER_ROW,
                 parent_id,
+                frame_byte_size,
+                n_frames,
+                callback_id * 2,
             ]
         )
+        + callback_parameters
         + pal.snes_data()
     )
 
-    assert len(ram_data) < 3 + MAX_RAM_DATA_PALETTE_SIZE, "ram_data is too large"
+    assert len(ram_data) < 8 + MAX_SOURCE_PNG_COLORS * 2, "ram_data is too large"
 
     return (
         EngineData(

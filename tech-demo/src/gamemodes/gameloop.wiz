@@ -10,6 +10,7 @@ import "engine/game/room";
 import "engine/game/gamestate";
 import "engine/game/dungeon";
 import "engine/game/metatiles";
+import "engine/game/ms_palettes";
 import "engine/game/metasprites";
 import "engine/game/second-layer";
 import "engine/game/room-transitions";
@@ -64,6 +65,8 @@ func exec {
         entityloop.sort_active_entities();
         entityloop.draw_entities();
 
+
+        ms_palettes.process();
 
         second_layer.process__inline();
 

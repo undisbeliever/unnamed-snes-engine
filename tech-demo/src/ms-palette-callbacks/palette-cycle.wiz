@@ -1,0 +1,42 @@
+// Copyright (c) 2024, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "engine/ms-palette-api";
+import "gen/ms-palette-callbacks";
+
+namespace ms_palette_callbacks {
+namespace palette_cycle {
+
+in lowram {
+    var SoA_counter : [ u8 ; BA_SIZE] in SoA.var_0_l;
+}
+
+
+in code {
+
+// DB = 0x7e
+#[mem8, idx8]
+func process(slot: u8 in y) : bool in carry {
+    a = SoA_counter[y];
+    a++;
+    if a >= SoA_parameter__frameDelay[y] {
+        x = y;
+        SoA_counter[x] = 0;
+
+        a = SoA.currentFrame[x];
+        a++;
+
+        return true;
+    }
+
+    SoA_counter[y] = a;
+
+    return false;
+}
+
+}
+
+}
+}
+

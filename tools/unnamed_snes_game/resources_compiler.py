@@ -279,7 +279,7 @@ class MsPaletteCompiler(SimpleResourceCompiler):
         super().__init__(ResourceType.ms_palettes, shared_input)
         self.filename_map: dict[Filename, int] = dict()
 
-    SHARED_INPUTS = (SharedInputType.MS_PALETTES,)
+    SHARED_INPUTS = (SharedInputType.MS_PALETTES, SharedInputType.MAPPINGS)
     EXPORT_ORDER_SI = SharedInputType.MS_PALETTES
     DEPENDENCIES = ()
 
@@ -299,11 +299,12 @@ class MsPaletteCompiler(SimpleResourceCompiler):
 
     def compile_resource(self, resource_id: int) -> BaseResourceData:
         assert self._shared_input.ms_palettes
+        assert self._shared_input.mappings
 
         r_name = self.name_list[resource_id]
         try:
             ms_palettes_json = self._shared_input.ms_palettes
-            data, ms_palette = compile_ms_palette(ms_palettes_json.ms_palettes[r_name], ms_palettes_json)
+            data, ms_palette = compile_ms_palette(ms_palettes_json.ms_palettes[r_name], ms_palettes_json, self._shared_input.mappings)
 
             return MsPaletteResourceData(self.resource_type, resource_id, r_name, data, ms_palette)
         except Exception as e:
