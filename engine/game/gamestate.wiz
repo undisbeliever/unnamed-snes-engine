@@ -6,7 +6,7 @@
 import "src/memmap";
 
 import "dungeon";
-
+import "../entity_api";
 import "../resources/resources";
 
 import "src/engine-hooks";
@@ -41,6 +41,22 @@ let SIGNATURE_W0 = (__SIGNATURE[0] as u16) | (__SIGNATURE[1] as u16 << 8);
 let SIGNATURE_W1 = (__SIGNATURE[2] as u16) | (__SIGNATURE[3] as u16 << 8);
 
 
+struct RoomToLoad {
+    dungeon: u8,
+    room_x: u8,
+    room_y: u8,
+
+    player_x: u8,
+    player_y: u8,
+    player_z: u8,
+
+    // ::TODO add to mappings.json::
+    player_state: u8,
+    // ::TODO add to mappings.json::
+    player_direction: u8,
+}
+
+
 struct GameStateData {
     // Game state signature
     signature : [u16 ; 2],
@@ -49,14 +65,12 @@ struct GameStateData {
     // Updated whenever the gamestate backup is created.
     checksum : u16,
 
-
-    // The current room within the dungeon
-    currentDungeon : u8,
-    currentRoom_x : u8,
-    currentRoom_y : u8,
+    // The player position to load on new-game/continue/reload
+    playerPosition : RoomToLoad,
 
     // The player's state at the start of the room
     // (or when saving, loading or starting a new game)
+    // ::TODO move elsewhere::
     playerState : PlayerState,
 
 
@@ -69,6 +83,12 @@ struct GameStateData {
     // NOTE: This function should not be modified by game code
     _keyCount : u8,
 };
+
+
+in wram7e {
+    var __far_roomToLoad : RoomToLoad;
+        var roomToLoad @ &__far_roomToLoad : RoomToLoad;
+}
 
 
 in wram7e_roomstate {
@@ -138,7 +158,7 @@ func new_game() {
     dungeon.mark_dungeon_unloaded();
 
     // Load the default room of dungeon 0.
-    data.currentDungeon = a = 0xff;
+    data.playerPosition.dungeon = a = 0xff;
 }
 
 
@@ -216,6 +236,8 @@ var _oldChecksum : u16 in zpTmp_word_1;
 // DB = 0x7e
 #[mem8, idx8]
 func backup_gamestate() {
+    populate_room_to_load();
+    _copy_room_to_load_to_gamestate();
 
     engine_hooks.gamestate__save_player_state__inline();
 
@@ -269,6 +291,54 @@ inline func restore_gamestate_backup__inline() : bool in carry {
     return false;
 }
 
+
+
+// Populate `roomToLoad` with the player's current position.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func populate_room_to_load() {
+    gamestate.roomToLoad.room_x = a = gamestate.data.playerPosition.room_x;
+    gamestate.roomToLoad.room_y = a = gamestate.data.playerPosition.room_y;
+    gamestate.roomToLoad.dungeon = a = gamestate.data.playerPosition.dungeon;
+
+    gamestate.roomToLoad.player_x = a = player.xPos.px;
+    gamestate.roomToLoad.player_y = a = player.yPos.px;
+    gamestate.roomToLoad.player_z = a = player.zPos;
+
+    roomToLoad.player_state = a = engine_hooks.get_roomtoload_player_state__inline();
+    roomToLoad.player_direction = a = engine_hooks.get_roomtoload_player_direction__inline();
+}
+
+
+
+// Copy `gamestate.playerPosition` to `roomToLoad`
+//
+// DB = 0x7e
+#[mem8, idx8]
+func copy_gamestate_to_room_to_load() {
+    x = sizeof(RoomToLoad) - 1;
+    do {
+        (&roomToLoad as *u8)[x] = a = (&data.playerPosition as *u8)[x];
+        x--;
+    } while !negative;
+}
+
+
+
+// Copy `roomToLoad` to `data.playerPosition`.
+//
+// Caution: invalidates roomToLoad.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _copy_room_to_load_to_gamestate() {
+    x = sizeof(RoomToLoad) - 1;
+    do {
+        (&data.playerPosition as *u8)[x] = a = (&roomToLoad as *u8)[x];
+        x--;
+    } while !negative;
+}
 
 
 

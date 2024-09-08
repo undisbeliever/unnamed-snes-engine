@@ -167,13 +167,9 @@ func fadein_reset_player() {
     // Also causes the player's MetaSprite frame to be reset in a scrolling room transition.
     engine_hooks.room_transitions__reset_player__inline();
 
-    roomToLoad.dungeon = a = gamestate.data.currentDungeon;
-    roomToLoad.roomPos_x = a = gamestate.data.currentRoom_x;
-    roomToLoad.roomPos_y = a = gamestate.data.currentRoom_y;
-    roomToLoad.playerPos_x = a = gamestate.data.playerState.xPos;
-    roomToLoad.playerPos_y = a = gamestate.data.playerState.yPos;
+    gamestate.copy_gamestate_to_room_to_load();
 
-    ^return dungeon.load_dungeon_and_room(roomToLoad);
+    ^return dungeon.load_dungeon_and_room(gamestate.roomToLoad);
 }
 
 
@@ -196,25 +192,30 @@ func fadein_reset_player() {
 func _scrolling_room_transition(_scrollDirection : ScrollDirection in x,
                                 playerX : u8 in a, playerY : u8 in y) : bool in carry {
 
-    roomToLoad.playerPos_x = a;
-    roomToLoad.playerPos_y = y;
-
     scrollDirection = x as ScrollDirection;
-    roomToLoad.roomPos_x = a = gamestate.data.currentRoom_x + ScrollDirection_RoomOffset_x[x] as u8;
-    roomToLoad.roomPos_y = a = gamestate.data.currentRoom_y + ScrollDirection_RoomOffset_y[x] as u8;
-    roomToLoad.dungeon = a = gamestate.data.currentDungeon;
+
+    push8(a);
+    gamestate.populate_room_to_load();
+    a = pop8();
+
+    gamestate.roomToLoad.player_x = a;
+    gamestate.roomToLoad.player_y = y;
+
+    gamestate.roomToLoad.room_x = a = gamestate.roomToLoad.room_x + ScrollDirection_RoomOffset_x[x] as u8;
+    gamestate.roomToLoad.room_y = a = gamestate.roomToLoad.room_y + ScrollDirection_RoomOffset_y[x] as u8;
+
 
     // Check if a fadeout transition was requested
     a = roomstate.forceFadeoutRoomTransition;
     if !zero {
-        dungeon.load_dungeon_and_room(roomToLoad);
+        dungeon.load_dungeon_and_room(gamestate.roomToLoad);
     }
 
     _reset_camera();
     _clear_sprite_list();
     _add_entities_to_sprite_list();
 
-    dungeon.load_room__inline(roomToLoad);
+    dungeon.load_room__inline(gamestate.roomToLoad);
 
     _add_entities_to_sprite_list_with_offset(scrollDirection);
     _sprite_list_set_player_with_offset(scrollDirection);

@@ -40,30 +40,15 @@ let _is_ms_non_looping_animation_running = metasprites.is_player_non_looping_ani
 
 // The player state stored within the gamestate.
 struct GameState__PlayerState {
-    xPos                : u8,
-    yPos                : u8,
-    zPos                : u8,
-
     health              : u8,
     maxHealth           : u8,
     swordAttackPower    : u8,
-
-    state               : u8,
-    facingDirection     : u8,
 };
 
 let InitialPlayerState = GameState__PlayerState{
-
-    xPos                = DISPLAY_WIDTH / 2,
-    yPos                = DISPLAY_HEIGHT * 2 / 3,
-    zPos                = 0,
-
     swordAttackPower    = 2,
     health              = 16,
     maxHealth           = 16,
-
-    state               = State.WALKING as u8,
-    facingDirection     = FacingDirection.UP as u8,
 };
 
 
@@ -268,7 +253,7 @@ inline func init() {
 
 // Initialise the player's MetaSprites.
 //
-// Called on init or when MetaSprite resources have changed.
+// Called on dungeon load, just before fade-in.
 //
 // DB = 0x7e
 #[mem8, idx8]
@@ -297,23 +282,9 @@ func init_metasprites() {
 // ===================
 
 
-
-// Save the player state into the GameStateData
-//
-// Called on a successful room transition.
-//
 // DB = 0x7e
 #[mem8, idx8]
-inline func save_player_state__inline() {
-    gamestate.data.playerState.xPos = a = xPos.px;
-    gamestate.data.playerState.yPos = a = yPos.px;
-    gamestate.data.playerState.zPos = a = zPos;
-
-    gamestate.data.playerState.health = a = health;
-    gamestate.data.playerState.maxHealth = a = maxHealth;
-
-    gamestate.data.playerState.swordAttackPower = a = swordAttackPower;
-
+inline func get_roomtoload_player_state__inline() : u8 in a {
     a = state as u8;
     if a == State.HURT as u8 {
         // Ensure the previous state does not disappear when restoring a gamestate backup.
@@ -322,9 +293,46 @@ inline func save_player_state__inline() {
         //  bomb when restoring the gamestate backup)
         a = previousState as u8;
     }
-    gamestate.data.playerState.state = a;
+    return a;
+}
 
-    gamestate.data.playerState.facingDirection = a = facingDirection;
+
+// DB = 0x7e
+#[mem8, idx8]
+inline func get_roomtoload_player_direction__inline() : u8 in a {
+    return facingDirection as u8;
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+inline func dungeon_loaded__restore_player_state_and_direction__inline(state: u8 in x, direction: u8 in a) {
+    facingDirection = a = a & 3;
+
+    if x == State.WALK_THROUGH_DOORWAY as u8 || x == State.ATTACKING_IN_DOORWAY as u8 {
+        set_state__walk_through_doorway__restore_player_state();
+    }
+    else if x == State.HOLDING_BOMB as u8 {
+        set_state__holding_bomb__restore_player_state();
+    }
+    else {
+        set_state__walking();
+        _set_ms_animation(facingDirection);
+    }
+}
+
+
+// Save the player state into the GameStateData
+//
+// Called on a successful room transition.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func save_player_state__inline() {
+    gamestate.data.playerState.health = a = health;
+    gamestate.data.playerState.maxHealth = a = maxHealth;
+
+    gamestate.data.playerState.swordAttackPower = a = swordAttackPower;
 }
 
 
@@ -336,12 +344,7 @@ inline func save_player_state__inline() {
 // DB = 0x7e
 #[mem8, idx8]
 inline func continue_player_gamestate__inline() {
-
     gamestate.data.playerState.health = a = gamestate.data.playerState.maxHealth;
-
-    gamestate.data.playerState.state = State.WALKING as u8;
-
-    gamestate.data.playerState.facingDirection = a = InitialPlayerState.facingDirection;
 }
 
 
@@ -351,33 +354,10 @@ inline func continue_player_gamestate__inline() {
 // DB = 0x7e
 #[mem8, idx8]
 inline func restore_player_state__inline() {
-    xPos.sx = 0;
-    xPos.px = a = gamestate.data.playerState.xPos;
-
-    yPos.sx = 0;
-    yPos.px = a = gamestate.data.playerState.yPos;
-
-    zPos = a = gamestate.data.playerState.zPos;
-
     health = a = gamestate.data.playerState.health;
     maxHealth = a = gamestate.data.playerState.maxHealth;
 
     swordAttackPower = a = gamestate.data.playerState.swordAttackPower;
-
-    facingDirection = a = gamestate.data.playerState.facingDirection & 3;
-
-
-    a = gamestate.data.playerState.state;
-    if a == State.WALK_THROUGH_DOORWAY as u8 || a == State.ATTACKING_IN_DOORWAY as u8 {
-        set_state__walk_through_doorway__restore_player_state();
-    }
-    else if a == State.HOLDING_BOMB as u8 {
-        set_state__holding_bomb__restore_player_state();
-    }
-    else {
-        set_state__walking();
-        _set_ms_animation(facingDirection);
-    }
 }
 
 

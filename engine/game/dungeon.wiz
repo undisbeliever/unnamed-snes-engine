@@ -134,7 +134,7 @@ in wram7e {
     var __load_room_counter : u8;
 
     // Backup of the room state.
-    // Created on __roomToLoad().
+    // Created on when loading room/dungeon.
     // Restored in restore_room_state_from_backup().
     var __roomStateBackup_lowram : [ u8 ; MEMMAP_ROOMSTATE_LOWRAM_SIZE ];
     var __roomStateBackup_wram7e : [ u8 ; MEMMAP_ROOMSTATE_WRAM7E_SIZE ];
@@ -170,10 +170,10 @@ inline func invalidate_room_state_backup() {
 // CAUTION: Switches the game-mode to GAME_LOOP and drops the stack.
 //
 // DB = 0x7e
-#[fallthrough, mem8, idx8]
-func load_dungeon_and_room(_roomToLoad : RoomToLoad in roomToLoad) {
+#[mem8, idx8]
+func load_dungeon_and_room(_roomToLoad : gamestate.RoomToLoad in gamestate.roomToLoad) {
     __backup_room_state();
-    return __load_dungeon__reset_loadroom_counter(roomToLoad.dungeon, LoadDungeonRoomType.ROOM_TO_LOAD);
+    return __load_dungeon__reset_loadroom_counter(__roomToLoad.dungeon, LoadDungeonRoomType.ROOM_TO_LOAD);
 }
 
 
@@ -184,7 +184,7 @@ func load_dungeon_and_room(_roomToLoad : RoomToLoad in roomToLoad) {
 // CAUTION: Switches the game-mode to GAME_LOOP and drops the stack.
 //
 // DB = 0x7e
-#[fallthrough, mem8, idx8]
+#[mem8, idx8]
 func load_dungeon_and_default_room(dungeonId : u8 in a) {
     __backup_room_state();
     return __load_dungeon__reset_loadroom_counter(a, LoadDungeonRoomType.DEFAULT_ROOM);
@@ -219,17 +219,23 @@ func load_dungeon_and_restore_roomstate() {
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func load_room__inline(_roomToLoad : RoomToLoad in roomToLoad) {
+inline func load_room__inline(_roomToLoad : gamestate.RoomToLoad in gamestate.roomToLoad) {
     __load_room_counter = a = MAX_N_LOAD_ROOMS;
 
     __backup_room_state();
-    __load_room(roomToLoad);
+    __load_room();
     __finish_loading_room();
 }
 
 
 // Private Functions
 // =================
+
+
+in wram7e {
+    // Alias for the gamestate.roomToLoad variable.
+    var __roomToLoad : gamestate.RoomToLoad in gamestate.roomToLoad;
+}
 
 
 // DB = 0x7e
@@ -300,14 +306,19 @@ var _roomTypeToLoad : u8 in __load_dungeon__roomTypeToLoad;
 
             invalidate_room_state_backup();
 
-            roomToLoad.dungeon = a = _dungeonId;
-            roomToLoad.roomPos_x = a = dungeonData.defaultRoom_x;
-            roomToLoad.roomPos_y = a = dungeonData.defaultRoom_y;
+            __roomToLoad.dungeon = a = _dungeonId;
+            __roomToLoad.room_x = a = dungeonData.defaultRoom_x;
+            __roomToLoad.room_y = a = dungeonData.defaultRoom_y;
 
-            roomToLoad.playerPos_x = a = DISPLAY_WIDTH / 2;
-            roomToLoad.playerPos_y = a = DISPLAY_HEIGHT / 2;
+            __roomToLoad.player_x = a = DISPLAY_WIDTH / 2;
+            __roomToLoad.player_y = a = DISPLAY_HEIGHT / 2;
+            __roomToLoad.player_z = 0;
+
+            // ::TODO add to dungeonData::
+            __roomToLoad.player_state = 0;
+            __roomToLoad.player_direction = 0;
         }
-        __load_room(roomToLoad);
+        __load_room();
     }
 
 
@@ -384,23 +395,19 @@ var _roomTypeToLoad : u8 in __load_dungeon__roomTypeToLoad;
     mem8_idx8();
 
 
-    a = *far &resources.UseResourcesOverUsb2Snes;
-    if !zero {
-        // If resources-over-usb2snes is active, the MetaSprite data may have changed and the
-        // player's MetaSprite animations must be reset.
-        //
-        // This is only done if resources-over-usb2snes is active as resetting player animations
-        // could cause glitches (ie, resetting the player's sword animation mid-swing).
-        engine_hooks.init_player_metasprites__inline();
-    }
-
-
     engine_hooks.load_dungeon__init();
 
     a = _roomTypeToLoad as u8;
     if a != LoadDungeonRoomType.ROOMSTATE_BACKUP as u8 {
         __finish_loading_room();
+
+        // Only reset the player entity's state and direction on dungeon load.
+        engine_hooks.dungeon_loaded__restore_player_state_and_direction__inline(__roomToLoad.player_state, __roomToLoad.player_direction);
     }
+
+    // Fixes wrong animation frame on fade-in
+    engine_hooks.init_player_metasprites__inline();
+
 
     metatiles.draw_map__forceblank__mem8_idx8_db7e__inline();
 
@@ -455,14 +462,14 @@ var _roomTypeToLoad : u8 in __load_dungeon__roomTypeToLoad;
 //
 // DB = 0x7e
 #[mem8, idx8]
-func __load_room(_roomToLoad : RoomToLoad in roomToLoad) {
+func __load_room() {
     var _warpRoom @ &room : WarpRoom;
 
     room.dataType = RoomDataType.NO_ROOM;
 
     a = _dungeonId;
     x = _dungeonLoaded;
-    if zero || a != _roomToLoad.dungeon {
+    if zero || a != __roomToLoad.dungeon {
         ^goto LoadDungeon;
     }
 
@@ -480,13 +487,16 @@ func __load_room(_roomToLoad : RoomToLoad in roomToLoad) {
         return;
     }
     else if a == RoomDataType.WARP as u8 {
-        roomToLoad.dungeon = a = _warpRoom.dungeon;
-        roomToLoad.roomPos_x = a = _warpRoom.room_x;
-        roomToLoad.roomPos_y = a = _warpRoom.room_y;
+        __roomToLoad.dungeon = a = _warpRoom.dungeon;
+        __roomToLoad.room_x = a = _warpRoom.room_x;
+        __roomToLoad.room_y = a = _warpRoom.room_y;
 
         if _warpRoom.flags $ WarpRoomFlags.MOVE_PLAYER_BIT {
-            roomToLoad.playerPos_x = a = _warpRoom.player_x;
-            roomToLoad.playerPos_y = a = _warpRoom.player_y;
+            __roomToLoad.player_x = a = _warpRoom.player_x;
+            __roomToLoad.player_y = a = _warpRoom.player_y;
+            __roomToLoad.player_z = 0;
+
+            // ::TODO add player_state and player_direction to warpRoom::
 
             goto LoadDungeon;
         }
@@ -494,7 +504,7 @@ func __load_room(_roomToLoad : RoomToLoad in roomToLoad) {
             goto LoadDungeon;
         }
         else {
-            ^return __load_room(roomToLoad);
+            ^return __load_room();
         }
     }
     else {
@@ -508,7 +518,7 @@ func __load_room(_roomToLoad : RoomToLoad in roomToLoad) {
 LoadDungeon:
     // Must not call `load_dungeon_and_room`
     // I do not want to override the roomstate backup.
-    ^return __load_dungeon(roomToLoad.dungeon, LoadDungeonRoomType.ROOM_TO_LOAD);
+    ^return __load_dungeon(__roomToLoad.dungeon, LoadDungeonRoomType.ROOM_TO_LOAD);
 }
 
 
@@ -532,9 +542,7 @@ func __finish_loading_room() {
         // The room event may have modified the map, rebuild map tile properties
         metatiles.populate_map_tile_properties();
 
-        gamestate.data.currentDungeon = a = _dungeonId;
-        gamestate.data.currentRoom_x = x = roomToLoad.roomPos_x;
-        gamestate.data.currentRoom_y = y = roomToLoad.roomPos_y;
+        gamestate._copy_room_to_load_to_gamestate();
     }
     else {
         // Room does not exist.
@@ -546,10 +554,11 @@ func __finish_loading_room() {
         metatiles.populate_map_tile_properties__all_tiles_solid();
     }
 
-    player.xPos.px = a = roomToLoad.playerPos_x;
+    player.xPos.px = a = __roomToLoad.player_x;
     player.xPos.sx = 0;
-    player.yPos.px = a = roomToLoad.playerPos_y;
+    player.yPos.px = a = __roomToLoad.player_y;
     player.yPos.sx = 0;
+    player.zPos = a = __roomToLoad.player_z;
 
     entityloop.sort_active_entities();
 }
@@ -569,8 +578,8 @@ func __finish_loading_room() {
 inline func __load_room_into_memory__inline() {
 var _farPtr : far *u16 in zpTmp_farPtr;
 
-    x = roomToLoad.roomPos_x;
-    y = roomToLoad.roomPos_y;
+    x = __roomToLoad.room_x;
+    y = __roomToLoad.room_y;
 
     if x >= dungeonData.width || y >= dungeonData.height {
         if !(dungeonData.flags $ DungeonFlags.INFINITE_BIT) {
@@ -595,8 +604,8 @@ var _farPtr : far *u16 in zpTmp_farPtr;
             y = 0;
         }
 
-        roomToLoad.roomPos_x = x;
-        roomToLoad.roomPos_y = y;
+        __roomToLoad.room_x = x;
+        __roomToLoad.room_y = y;
     }
 
     a = *far &resources.UseResourcesOverUsb2Snes;
