@@ -70,7 +70,7 @@
       "is_enemy": true,
       "ms-export-order": "rook",
       "parameter": {
-        "type": "gamestateflag"
+        "type": "dungeon_flag"
       }
     },
     {
@@ -78,7 +78,7 @@
       "is_enemy": true,
       "ms-export-order": "boss",
       "parameter": {
-        "type": "gamestateflag"
+        "type": "dungeon_flag"
       }
     },
     {
@@ -114,7 +114,7 @@
       "is_enemy": false,
       "ms-export-order": "single_animation",
       "parameter": {
-        "type": "gamestateflag"
+        "type": "dungeon_flag"
       }
     },
     {

@@ -123,7 +123,6 @@ def write_gamestate(out: TextIO, gs: GameState) -> None:
     out.write(f"let N_U16_VARS = {gs.u16_array_len};\n")
 
     out.write("\n")
-    write_gamestate_enum(out, "flag", gs.flags, 1)
 
     write_gamestate_enum(out, "var8", gs.u8_vars, 1)
     write_gamestate_enum(out, "var16", gs.u16_vars, 2)

@@ -57,7 +57,7 @@ in code {
 func init() {
     x = parameter__flag;
     if !zero {
-        zero = is_gs_flag_clear(x);
+        zero = is_dungeon_flag_clear(x);
     }
 
     if !zero {
@@ -215,7 +215,7 @@ func process__wait_until_enemies_defeated() {
     if zero {
         x = parameter__flag;
         if !zero {
-            set_gs_flag(x);
+            set_dungeon_flag(x);
         }
 
         queue_sound_effect(sound_effects.door_open);

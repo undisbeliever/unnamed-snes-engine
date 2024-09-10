@@ -18,8 +18,8 @@ namespace key {
 
 in wram7e {
 
-// The gamestate flag id for the key
-var SoA_gameFlag : [ u8 ; SoA.BA_SIZE ] in SoA.var_0_l;
+// The dungeon flag id for the key
+var SoA_dungeonFlag : [ u8 ; SoA.BA_SIZE ] in SoA.var_0_l;
 
 }
 
@@ -31,15 +31,15 @@ in code {
 //
 // Called when the entity is spawned.
 //
-// Parameter: game flag for the key
+// Parameter: dungeon flag for the key
 //
 // DB = 0x7e
 #[mem8, idx8]
 func init(entityId : u8 in y, parameter : u8 in x) {
 
-    SoA_gameFlag[y] = a = x;
+    SoA_dungeonFlag[y] = a = x;
 
-    zero = is_gs_flag_clear(x);
+    zero = is_dungeon_flag_clear(x);
     if !zero {
         // Key has already been collected
         SoA.health[y] = a = 0;
@@ -94,7 +94,7 @@ func process(entityId : u8 in y) {
                             x = y;
                             SoA.health[x] = 0;
 
-                            set_gs_flag(SoA_gameFlag[y]);
+                            set_dungeon_flag(SoA_dungeonFlag[y]);
 
                             increment_key_count();
                             // Y is not entityId.

@@ -217,9 +217,9 @@ let get_enemy_count_a       = entityloop.get_enemy_count_a;
 
 
 // Gamestate functions
-import "game/gamestate";
-let is_gs_flag_clear             = gamestate.is_flag_clear;
-let set_gs_flag                  = gamestate.set_game_flag;
+import "gamestate_api";
+let is_dungeon_flag_clear = gs.is_dungeon_flag_clear__keep_y;
+let set_dungeon_flag      = gs.set_dungeon_flag__keep_y;
 
 }
 

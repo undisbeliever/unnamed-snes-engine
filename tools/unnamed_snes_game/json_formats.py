@@ -507,7 +507,7 @@ class _Entities_Helper(_Helper):
 
         if t == "enum":
             return EfParameter("enum", p.get_name_list("values"))
-        elif t == "gamestateflag":
+        elif t == "dungeon_flag":
             return EfParameter(t, None)
         elif t == "u8":
             return EfParameter(t, None)
@@ -675,7 +675,9 @@ class GameState(NamedTuple):
     # ::TODO add version::
     u8_array_len: int
     u16_array_len: int
-    flags: OrderedDict[Name, GameStateVar]
+    # Non-global flags.  Not named in `gen/enums.wiz`
+    # ::MAYDO multiple instances of dungeon_flags, swapped out when a dungeon is loaded::
+    dungeon_flags: OrderedDict[Name, GameStateVar]
     u8_vars: OrderedDict[Name, GameStateVar]
     u16_vars: OrderedDict[Name, GameStateVar]
 
@@ -805,7 +807,7 @@ class _Mappings_Helper(_Helper):
             identifier=identifier,
             u8_array_len=u8_array_len,
             u16_array_len=u16_array_len,
-            flags=gs.get_gamestate_vars("flags", MAX_GAMESTATE_FLAGS, 1),
+            dungeon_flags=gs.get_gamestate_vars("dungeon_flags", MAX_GAMESTATE_FLAGS, 1),
             u8_vars=gs.get_gamestate_vars("u8_vars", u8_array_len, 1),
             u16_vars=gs.get_gamestate_vars("u16_vars", u16_array_len, 2),
         )

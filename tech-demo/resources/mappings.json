@@ -12,7 +12,7 @@
    "version": 1,
    "u8_array_len": 64,
    "u16_array_len": 32,
-   "flags": [
+   "dungeon_flags": [
      "first_key_room__left_key",
      "first_key_room__right_key",
      "slime_key",
@@ -138,7 +138,7 @@
        {
          "name": "flag",
          "comment": "Gamestate flag for door locked/unlocked state",
-         "type": "gamestate_flag"
+         "type": "dungeon_flag"
        },
        {
          "name": "doorLocation",
@@ -154,7 +154,7 @@
        {
          "name": "flag",
          "comment": "Optional room defeated flag.  If non-zero, the room will only lock once",
-         "type": "optional_gamestate_flag"
+         "type": "optional_dungeon_flag"
        },
        {
          "name": "door0",
@@ -181,7 +181,7 @@
        {
          "name": "flag",
          "comment": "Boss defeated flag",
-         "type": "gamestate_flag"
+         "type": "dungeon_flag"
        },
        {
          "name": "door0",
@@ -207,7 +207,7 @@
        {
          "name": "flag",
          "comment": "Gamestate flag for key",
-         "type": "gamestate_flag"
+         "type": "dungeon_flag"
        },
        {
          "name": "keyPos",

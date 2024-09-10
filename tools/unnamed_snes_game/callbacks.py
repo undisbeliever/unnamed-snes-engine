@@ -15,21 +15,20 @@ PARAM_TYPES: Final = {
     "u8pos": "U8Position",
     "u16": "u16",
     "sQ4_12": "i16",
-    "gamestate_flag": "u8",
-    "optional_gamestate_flag": "u8",
+    "dungeon_flag": "u8",
+    "optional_dungeon_flag": "u8",
     "locked_door": "u8",
     "open_door": "u8",
     "optional_open_door": "u8",
 }
 
 # Mapping of parameter types to wiz types
+# NOTE: No room/dungeon types.  Dungeon and room might not be loaded for this type
 PARAM_TYPES_SOA: Final = {
     "bool": "[u8 ; BA_SIZE]",
     "u8": "[u8 ; BA_SIZE]",
     "u16": "[u16 ; N_SLOTS]",
     "sQ4_12": "[i16 ; N_SLOTS]",
-    "gamestate_flag": "[u8 ; BA_SIZE]",
-    "optional_gamestate_flag": "[u8 ; BA_SIZE]",
 }
 
 # Size of each parameter type in bytes
@@ -39,8 +38,8 @@ PARAM_SIZE: Final = {
     "u8pos": 2,
     "u16": 2,
     "sQ4_12": 2,
-    "gamestate_flag": 1,
-    "optional_gamestate_flag": 1,
+    "dungeon_flag": 1,
+    "optional_dungeon_flag": 1,
     "locked_door": 1,
     "open_door": 1,
     "optional_open_door": 1,
@@ -229,17 +228,17 @@ def parse_callback_parameters(
             else:
                 error_list.append(f"Unknown { callback_type.human_name } parameter type: {p.type}")
         else:
-            if p.type == "optional_gamestate_flag":
+            if p.type == "optional_dungeon_flag":
                 if value:
                     try:
-                        flag_index = mapping.gamestate.flags[value].var_index
+                        flag_index = mapping.gamestate.dungeon_flags[value].var_index
                         if flag_index == 0:
                             error_list.append(
-                                f"{ callback_type.human_name } parameter {p.name}: Optional gamestate flag cannot be 0: {value}"
+                                f"{ callback_type.human_name } parameter {p.name}: Optional dungeon flag cannot be 0: {value}"
                             )
                         out.append(flag_index)
                     except KeyError:
-                        error_list.append(f"{ callback_type.human_name } parameter {p.name}: Cannot find gamestate flag: {value}")
+                        error_list.append(f"{ callback_type.human_name } parameter {p.name}: Cannot find dungeon flag: {value}")
                 else:
                     out.append(0)
             elif not value:
@@ -258,12 +257,12 @@ def parse_callback_parameters(
                 v = parse_sq4_12(value, error_list)
                 out.append(v & 0xFF)
                 out.append(v >> 8)
-            elif p.type == "gamestate_flag":
+            elif p.type == "dungeon_flag":
                 try:
-                    flag_index = mapping.gamestate.flags[value].var_index
+                    flag_index = mapping.gamestate.dungeon_flags[value].var_index
                     out.append(flag_index)
                 except KeyError:
-                    error_list.append(f"{ callback_type.human_name } parameter {p.name}: Cannot find gamestate flag: {value}")
+                    error_list.append(f"{ callback_type.human_name } parameter {p.name}: Cannot find dungeon flag: {value}")
             else:
                 error_list.append(f"Unknown { callback_type.human_name } parameter type: {p.type}")
 

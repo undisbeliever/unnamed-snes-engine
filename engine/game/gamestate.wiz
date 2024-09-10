@@ -64,9 +64,9 @@ struct GameStateData {
     playerPosition : RoomToLoad,
 
 
-    // Game State flags
+    // Dungeon flags
     // (256 bit bitfield)
-    gameFlags : [ u8 ; 256 / 8 ],
+    dungeonFlags : [ u8 ; 256 / 8 ],
 
     u8_vars  : [ u8 ; gs.N_U8_VARS ],
     u16_vars : [ u16 ; gs.N_U16_VARS ],
@@ -322,82 +322,6 @@ func _copy_room_to_load_to_gamestate() {
         x--;
     } while !negative;
 }
-
-
-
-// Returns true if the game flag is clear
-//
-// DB = 0x7e
-#[mem8, idx8]
-func is_flag_clear(flag_id : u8 in x) : bool in zero {
-    y = a = x >>> 3;
-    x = a = x & 7;
-
-    a = data.gameFlags[y] & _BitTable[x];
-    return zero;
-}
-
-
-// Returns true if the game flag is clear (without clobbering the Y register)
-//
-// KEEP: y
-//
-// DB = 0x7e
-#[mem8, idx8]
-func is_flag_clear__keep_y(flag_id : u8 in x) : bool in zero {
-var _tmp : u8 in zpTmp_byte_0;
-
-    _tmp = y;
-
-    y = a = x >>> 3;
-    x = a = x & 7;
-
-    a = data.gameFlags[y];
-
-    y = _tmp;
-
-    a &= _BitTable[x];
-    return zero;
-}
-
-
-// DB = 0x7e
-#[mem8, idx8]
-func set_game_flag(flag_id : u8 in x) {
-    y = a = x >>> 3;
-    x = a = x & 7;
-
-    data.gameFlags[y] = a = data.gameFlags[y] | _BitTable[x];
-}
-
-
-
-// KEEP: Y
-//
-// DB = 0x7e
-#[mem8, idx8]
-func set_game_flag__keep_y(flag_id : u8 in x) {
-var _tmp : u8 in zpTmp_byte_0;
-
-    _tmp = y;
-
-    y = a = x >>> 3;
-    x = a = x & 7;
-
-    data.gameFlags[y] = a = data.gameFlags[y] | _BitTable[x];
-
-    y = _tmp;
-}
-
-}
-
-
-in rodata0 {
-
-const __BitTable : [ u8 ; 8 ] = [ 1 << i for let i in 0..7 ];
-
-let _BitTable = far &__BitTable as far *u8;
-
 }
 
 }
