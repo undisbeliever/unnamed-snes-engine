@@ -12,6 +12,9 @@
    "version": 1,
    "u8_array_len": 64,
    "u16_array_len": 32,
+   "global_flags": [
+     "boss_defeated"
+   ],
    "dungeon_flags": [
      "first_key_room__left_key",
      "first_key_room__right_key",
@@ -25,8 +28,7 @@
      "key_guarding_rook_1",
      "key_guarding_rook_2",
      "arena_one",
-     "arena_two",
-     "boss_defeated"
+     "arena_two"
    ],
    "u8_vars": [
      "player_health",
@@ -181,7 +183,7 @@
        {
          "name": "flag",
          "comment": "Boss defeated flag",
-         "type": "dungeon_flag"
+         "type": "global_flag"
        },
        {
          "name": "door0",

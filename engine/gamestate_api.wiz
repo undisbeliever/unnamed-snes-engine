@@ -191,6 +191,76 @@ func checked_dec_u16__mem8(gsVar16 : var16 in x) : bool in carry {
 }
 
 
+// Global flags
+// ============
+
+
+// Returns true if the game flag is clear
+//
+// DB = 0x7e
+#[mem8, idx8]
+func is_global_flag_clear(flag_id : gf in x) : bool in zero {
+    y = a = x >>> 3;
+    x = a = x & 7;
+
+    a = gamestate.data.globalFlags[y] & _BitTable[x];
+    return zero;
+}
+
+
+// Returns true if the game flag is clear (without clobbering the Y register)
+//
+// KEEP: y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func is_global_flag_clear__keep_y(flag_id : gf in x) : bool in zero {
+var _tmp : u8 in zpTmp_byte_0;
+
+    _tmp = y;
+
+    y = a = x >>> 3;
+    x = a = x & 7;
+
+    a = gamestate.data.globalFlags[y];
+
+    y = _tmp;
+
+    a &= _BitTable[x];
+    return zero;
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_global_flag(flag_id : gf in x) {
+    y = a = x >>> 3;
+    x = a = x & 7;
+
+    gamestate.data.globalFlags[y] = a = gamestate.data.globalFlags[y] | _BitTable[x];
+}
+
+
+
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_global_flag__keep_y(flag_id : gf in x) {
+var _tmp : u8 in zpTmp_byte_0;
+
+    _tmp = y;
+
+    y = a = x >>> 3;
+    x = a = x & 7;
+
+    gamestate.data.globalFlags[y] = a = gamestate.data.globalFlags[y] | _BitTable[x];
+
+    y = _tmp;
+}
+
+
+
 // Dungeon flags
 // =============
 

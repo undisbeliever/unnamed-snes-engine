@@ -19,6 +19,7 @@ def generate_wiz_code(sl_callbacks: OrderedDict[Name, SecondLayerCallback]) -> s
 import "src/memmap";
 import "engine/game/second-layer";
 import "engine/game/room";
+import "gen/enums";
 
 namespace sl_callbacks {
 

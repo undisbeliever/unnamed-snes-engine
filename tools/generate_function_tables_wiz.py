@@ -228,6 +228,8 @@ import "src/interactive-tiles";
 import "src/gamemodes/room-transition";
 import "engine/ms-palette-api";
 import "engine/game/metatiles";
+
+import "gen/enums";
 """
         )
         callback_imports(out, mappings.room_events, "room-events")

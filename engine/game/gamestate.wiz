@@ -63,8 +63,13 @@ struct GameStateData {
     // The player position to load on new-game/continue/reload
     playerPosition : RoomToLoad,
 
+    // Global flags
+    // (defined in gen/enums.wiz)
+    // (256 bit bitfield)
+    globalFlags : [ u8 ; 256 / 8 ],
 
     // Dungeon flags
+    // (not defined in gen/enums.wiz, only used by entity and callback parameters)
     // (256 bit bitfield)
     dungeonFlags : [ u8 ; 256 / 8 ],
 

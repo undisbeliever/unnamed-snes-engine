@@ -123,21 +123,22 @@ var SoA_zVelocity        : [ u16       ; N_ENTITIES ]  in SoA.var_2;
 var SoA_zVelocity_sx     : [ u8        ; SoA.BA_SIZE ] in SoA.var_2_l;
 var SoA_zVelocity_px     : [ u8        ; SoA.BA_SIZE ] in SoA.var_2_h;
 
-var SoA_dungeonFlag      : [ u8        ; SoA.BA_SIZE ] in SoA.var_3_l;
+var SoA_globalFlag       : [ gs.gf     ; SoA.BA_SIZE ] in SoA.var_3_l;
 
 }
 
 
 in code {
 
-// parameter = boss destroyed dungeon flag
+// parameter = boss destroyed global flag
 //
 // DB = 0x7e
 #[mem8, idx8]
-func init(entityId : u8 in y, parameter : u8 in x) {
+func init(entityId : u8 in y, parameter : gs.gf in x) {
 
-    SoA_dungeonFlag[y] = a = x;
-    zero = is_dungeon_flag_clear(x);
+    a = x;
+    SoA_globalFlag[y] = a as gs.gf;
+    zero = is_global_flag_clear(x as gs.gf);
     if !zero {
         // The boss has already been defeated, do not show it.
         x = y;
@@ -725,7 +726,7 @@ func set_state__dead(entityId: u8 in y) {
     SoA_state[y] = a as State;
 
     // Mark boss defeated
-    set_dungeon_flag(SoA_dungeonFlag[y]);
+    set_global_flag(SoA_globalFlag[y]);
 
     // Dead boss must still have health to be visible
     SoA.health[y] = a = 0xff;

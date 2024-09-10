@@ -15,6 +15,7 @@ PARAM_TYPES: Final = {
     "u8pos": "U8Position",
     "u16": "u16",
     "sQ4_12": "i16",
+    "global_flag": "gs.gf",
     "dungeon_flag": "u8",
     "optional_dungeon_flag": "u8",
     "locked_door": "u8",
@@ -29,6 +30,7 @@ PARAM_TYPES_SOA: Final = {
     "u8": "[u8 ; BA_SIZE]",
     "u16": "[u16 ; N_SLOTS]",
     "sQ4_12": "[i16 ; N_SLOTS]",
+    "global_flag": "[gs.gf ; N_SLOTS]",
 }
 
 # Size of each parameter type in bytes
@@ -38,6 +40,7 @@ PARAM_SIZE: Final = {
     "u8pos": 2,
     "u16": 2,
     "sQ4_12": 2,
+    "global_flag": 1,
     "dungeon_flag": 1,
     "optional_dungeon_flag": 1,
     "locked_door": 1,
@@ -257,6 +260,12 @@ def parse_callback_parameters(
                 v = parse_sq4_12(value, error_list)
                 out.append(v & 0xFF)
                 out.append(v >> 8)
+            elif p.type == "global_flag":
+                try:
+                    flag_index = mapping.gamestate.global_flags[value].var_index
+                    out.append(flag_index)
+                except KeyError:
+                    error_list.append(f"{ callback_type.human_name } parameter {p.name}: Cannot find global flag: {value}")
             elif p.type == "dungeon_flag":
                 try:
                     flag_index = mapping.gamestate.dungeon_flags[value].var_index

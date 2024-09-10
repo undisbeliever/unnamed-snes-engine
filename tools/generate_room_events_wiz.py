@@ -18,6 +18,7 @@ def generate_wiz_code(room_events: OrderedDict[Name, RoomEvent]) -> str:
             """
 import "src/memmap";
 import "engine/game/room";
+import "gen/enums";
 
 namespace room_events {
 

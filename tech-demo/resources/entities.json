@@ -78,7 +78,7 @@
       "is_enemy": true,
       "ms-export-order": "boss",
       "parameter": {
-        "type": "dungeon_flag"
+        "type": "global_flag"
       }
     },
     {
