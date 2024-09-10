@@ -7,6 +7,36 @@
  },
  "tad_binary_directory": "../../terrific-audio-driver/target/release/",
 
+ "gamestate": {
+   "identifier": "USG!",
+   "version": 1,
+   "u8_array_len": 64,
+   "u16_array_len": 32,
+   "flags": [
+     "first_key_room__left_key",
+     "first_key_room__right_key",
+     "slime_key",
+     "first_locked_door",
+     "second_locked_door",
+     "third_locked_door",
+     "rook_tutorial_complete",
+     "tutorial_rook_1",
+     "tutorial_rook_2",
+     "key_guarding_rook_1",
+     "key_guarding_rook_2",
+     "arena_one",
+     "arena_two",
+     "boss_defeated"
+   ],
+   "u8_vars": [
+     "player_health",
+     "player_maxHealth",
+     "player_swordAttackPower",
+     "_keyCount number of keys held by the player (should not be directly accessed)"
+   ],
+   "u16_vars": []
+ },
+
  "palettes": [
    "title_screen",
    "game_over",
@@ -43,22 +73,6 @@
    "locked_door",
    "heal",
    "poison"
- ],
- "gamestate_flags": [
-   "first_key_room__left_key",
-   "first_key_room__right_key",
-   "slime_key",
-   "first_locked_door",
-   "second_locked_door",
-   "third_locked_door",
-   "rook_tutorial_complete",
-   "tutorial_rook_1",
-   "tutorial_rook_2",
-   "key_guarding_rook_1",
-   "key_guarding_rook_2",
-   "arena_one",
-   "arena_two",
-   "boss_defeated"
  ],
  "room_transitions": [
    "fadein_reset_player",

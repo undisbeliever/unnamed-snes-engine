@@ -80,8 +80,13 @@ const joypad_pressed_h @ &>:joypad.pressed : u8;
 // GameState
 // =========
 
-typealias GameState__PlayerState : player.GameState__PlayerState;
-let GameState__InitialPlayerState = player.InitialPlayerState;
+// Called by `gamestate.new_game()`.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func gamestate__new_game__inline() {
+    player.new_player_gamestate__inline();
+}
 
 
 // Called by `gamestate.continue_game()`.
@@ -94,16 +99,7 @@ inline func gamestate__continue_game__inline() {
 
     // Load the default room of dungeon 0
     gamestate.data.playerPosition.dungeon = a = 0xff;
-}
 
-
-// Rest the player state from the gamestate.
-//
-// Called by `gamestate.continue_game()`.
-//
-// DB = 0x7e
-#[mem8, idx8]
-inline func gamestate__continue_player_gamestate__inline() {
     player.continue_player_gamestate__inline();
 }
 
@@ -117,15 +113,6 @@ inline func gamestate__continue_player_gamestate__inline() {
 inline func gamestate__save_player_state__inline() {
     player.save_player_state__inline();
 }
-
-
-// Called when the key count changes.
-//
-// INPUT: X = nKeys
-//
-// DB = 0x7e
-#[mem8, idx8]
-let gamestate__key_count_changed = ui.draw_key_bar;
 
 
 

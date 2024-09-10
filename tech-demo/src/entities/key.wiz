@@ -6,6 +6,8 @@ import "../memmap";
 import "engine/entity_api";
 import "_base";
 
+import "../gamestate";
+
 import "gen/enums";
 
 
@@ -94,7 +96,7 @@ func process(entityId : u8 in y) {
 
                             set_gs_flag(SoA_gameFlag[y]);
 
-                            gs_increment_key_count__clobbers_y();
+                            increment_key_count();
                             // Y is not entityId.
 
                             queue_sound_effect(sound_effects.collect_item);

@@ -14,6 +14,8 @@ import "engine/game/gamestate";
 import "engine/resources/resources";
 import "engine/resources/palette";
 
+import "engine/gamestate_api.wiz";
+
 import "../joypad";
 
 import "gen/enums";
@@ -96,9 +98,9 @@ func exec() {
             gamestate.init();
 
             // Increment health (if it is too low)
-            a = gamestate.data.playerState.health;
+            a = gs.get_u8(gs.var8.player_health);
             if a < MIN_HEALTH_ON_RESTART_ROOM {
-                gamestate.data.playerState.health = a = MIN_HEALTH_ON_RESTART_ROOM;
+                gs.set_u8(gs.var8.player_health, MIN_HEALTH_ON_RESTART_ROOM);
             }
         }
         else {

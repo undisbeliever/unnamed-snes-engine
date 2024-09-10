@@ -220,7 +220,6 @@ let get_enemy_count_a       = entityloop.get_enemy_count_a;
 import "game/gamestate";
 let is_gs_flag_clear             = gamestate.is_flag_clear;
 let set_gs_flag                  = gamestate.set_game_flag;
-let test_and_decrement_key_count = gamestate.test_and_decrement_key_count;
 
 }
 

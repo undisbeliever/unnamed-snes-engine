@@ -31,14 +31,9 @@ in lowram {
 
 namespace gamestate {
 
-typealias PlayerState : engine_hooks.GameState__PlayerState;
-
-
-// unnamed snes game!
-let __SIGNATURE = "USG!";
-
-let SIGNATURE_W0 = (__SIGNATURE[0] as u16) | (__SIGNATURE[1] as u16 << 8);
-let SIGNATURE_W1 = (__SIGNATURE[2] as u16) | (__SIGNATURE[3] as u16 << 8);
+// Game state signature
+let SIGNATURE_W0 = (gs.IDENTIFIER[0] as u16) | (gs.IDENTIFIER[1] as u16 << 8);
+let SIGNATURE_W1 = (gs.IDENTIFIER[2] as u16) | (gs.IDENTIFIER[3] as u16 << 8);
 
 
 struct RoomToLoad {
@@ -68,20 +63,13 @@ struct GameStateData {
     // The player position to load on new-game/continue/reload
     playerPosition : RoomToLoad,
 
-    // The player's state at the start of the room
-    // (or when saving, loading or starting a new game)
-    // ::TODO move elsewhere::
-    playerState : PlayerState,
-
 
     // Game State flags
     // (256 bit bitfield)
     gameFlags : [ u8 ; 256 / 8 ],
 
-    // Number of keys held by the player
-    //
-    // NOTE: This function should not be modified by game code
-    _keyCount : u8,
+    u8_vars  : [ u8 ; gs.N_U8_VARS ],
+    u16_vars : [ u16 ; gs.N_U16_VARS ],
 };
 
 
@@ -144,11 +132,6 @@ func new_game() {
         load_dec_repeat(#:far &__fardata, yy = &data as u16 + 1,
                         #:far &__fardata, xx = &data as u16,
                         aa = sizeof(typeof(data)) - 2);
-
-        // Load initial player state
-        load_dec_repeat(#:far &__fardata, yy = &data.playerState as u16,
-                        #:far &InitialPlayerState, xx = &InitialPlayerState as u16,
-                        aa = sizeof(typeof(data.playerState)) - 1);
         // DB = 0x7e
     }
     mem8_idx8();
@@ -159,6 +142,8 @@ func new_game() {
 
     // Load the default room of dungeon 0.
     data.playerPosition.dungeon = a = 0xff;
+
+    engine_hooks.gamestate__new_game__inline();
 }
 
 
@@ -174,8 +159,6 @@ func continue_game() {
     // ::TODO create some kind of checkpoint system::
 
     engine_hooks.gamestate__continue_game__inline();
-
-    engine_hooks.gamestate__continue_player_gamestate__inline();
 
     // Force a dungeon load on the next room transition
     dungeon.mark_dungeon_unloaded();
@@ -406,43 +389,6 @@ var _tmp : u8 in zpTmp_byte_0;
     y = _tmp;
 }
 
-
-
-// Increment the key counter
-// DB = 0x7e
-#[mem8, idx8]
-func increment_key_count() {
-    x = data._keyCount;
-    x++;
-    if negative {
-        x = 127;
-    }
-    data._keyCount = x;
-
-    ^return engine_hooks.gamestate__key_count_changed(x);
-}
-
-
-
-// Decrement the key counter.
-//
-// Return true if there was a key to decrement.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func test_and_decrement_key_count() : bool in carry{
-    x = data._keyCount;
-    if !zero {
-        x--;
-        data._keyCount = x;
-
-        engine_hooks.gamestate__key_count_changed(x);
-        return true;
-    }
-    return false;
-}
-
-
 }
 
 
@@ -451,9 +397,6 @@ in rodata0 {
 const __BitTable : [ u8 ; 8 ] = [ 1 << i for let i in 0..7 ];
 
 let _BitTable = far &__BitTable as far *u8;
-
-
-const InitialPlayerState : PlayerState = engine_hooks.GameState__InitialPlayerState;
 
 }
 

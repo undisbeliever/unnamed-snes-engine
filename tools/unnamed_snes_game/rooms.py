@@ -387,8 +387,8 @@ def process_room_entities(
                         add_error(f"Invalid parameter for { tmx_entity.type } enum: { tmx_entity.parameter }")
                 elif p.type == "gamestateflag":
                     try:
-                        parameter = mapping.gamestate_flags.index(tmx_entity.parameter)
-                    except ValueError:
+                        parameter = mapping.gamestate.flags[tmx_entity.parameter].var_index
+                    except KeyError:
                         add_error(f"Invalid parameter for { tmx_entity.type } enum: { tmx_entity.parameter }")
                 elif p.type == "u8":
                     try:

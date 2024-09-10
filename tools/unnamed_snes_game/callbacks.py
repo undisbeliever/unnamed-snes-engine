@@ -232,13 +232,13 @@ def parse_callback_parameters(
             if p.type == "optional_gamestate_flag":
                 if value:
                     try:
-                        flag_index = mapping.gamestate_flags.index(value)
+                        flag_index = mapping.gamestate.flags[value].var_index
                         if flag_index == 0:
                             error_list.append(
                                 f"{ callback_type.human_name } parameter {p.name}: Optional gamestate flag cannot be 0: {value}"
                             )
                         out.append(flag_index)
-                    except ValueError:
+                    except KeyError:
                         error_list.append(f"{ callback_type.human_name } parameter {p.name}: Cannot find gamestate flag: {value}")
                 else:
                     out.append(0)
@@ -260,9 +260,9 @@ def parse_callback_parameters(
                 out.append(v >> 8)
             elif p.type == "gamestate_flag":
                 try:
-                    flag_index = mapping.gamestate_flags.index(value)
+                    flag_index = mapping.gamestate.flags[value].var_index
                     out.append(flag_index)
-                except ValueError:
+                except KeyError:
                     error_list.append(f"{ callback_type.human_name } parameter {p.name}: Cannot find gamestate flag: {value}")
             else:
                 error_list.append(f"Unknown { callback_type.human_name } parameter type: {p.type}")

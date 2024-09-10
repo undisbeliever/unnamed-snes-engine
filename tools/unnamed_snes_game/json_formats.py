@@ -237,6 +237,12 @@ class _Helper:
             return True
         self._raise_error(f"Expected a 1 or a 0: { i }", key)
 
+    def get_int_range(self, key: str, min_: int, max_: int) -> int:
+        i = self.get_int(key)
+        if i < min_ or i > max_:
+            self._raise_error(f"Integer out of range: { i } (min: {min_}, max:{max_}", key)
+        return i
+
     def get_optional_u8_position(self, key: str) -> Optional[Position]:
         v = self._optional_get2(key, str, list)
         if v is None:
@@ -643,6 +649,10 @@ MAX_SL_CALLBACK_PARAMETERS = 8
 MAX_SL_ROOM_PARAMETERS = 2
 MAX_MS_PALETTE_CALLBACK_PARAMETERS = 2
 
+MAX_GAMESTATE_SIZE: Final = 4096
+MAX_GAMESTATE_ARRAY_BYTE_SIZE: Final = 256
+MAX_GAMESTATE_FLAGS: Final = 256
+
 # GAME_MODES > 128 mean the next game mode is unchanged.
 MAX_GAME_MODES = 128
 
@@ -651,6 +661,23 @@ class MemoryMap(NamedTuple):
     mode: MemoryMapMode
     first_resource_bank: int
     n_resource_banks: int
+
+
+class GameStateVar(NamedTuple):
+    var_index: int
+    comment: Optional[str]
+
+
+class GameState(NamedTuple):
+    identifier: str
+    # ::TODO add cart-ram size::
+    # ::TODO add names::
+    # ::TODO add version::
+    u8_array_len: int
+    u16_array_len: int
+    flags: OrderedDict[Name, GameStateVar]
+    u8_vars: OrderedDict[Name, GameStateVar]
+    u16_vars: OrderedDict[Name, GameStateVar]
 
 
 class GameMode(NamedTuple):
@@ -694,6 +721,7 @@ CallbackDict = Union[OrderedDict[Name, RoomEvent], OrderedDict[Name, SecondLayer
 
 class Mappings(NamedTuple):
     game_title: str
+    gamestate: GameState
     mt_tilesets: list[Name]
     second_layers: list[Name]
     ms_spritesheets: list[Name]
@@ -701,7 +729,6 @@ class Mappings(NamedTuple):
     tiles: list[Name]
     bg_images: list[Name]
     interactive_tile_functions: list[Name]
-    gamestate_flags: list[Name]
     gamemodes: list[GameMode]
     room_transitions: list[Name]
     room_events: OrderedDict[Name, RoomEvent]
@@ -727,6 +754,60 @@ class _Mappings_Helper(_Helper):
             mode=mode,
             first_resource_bank=mm.get_hex_or_int("first_resource_bank"),
             n_resource_banks=mm.get_int("n_resource_banks"),
+        )
+
+    def get_gamestate_identifier(self, key: str) -> str:
+        identifier = self.get_string("identifier")
+        try:
+            if len(identifier.encode("ASCII")) != 4:
+                self._raise_error("GameState identifier must be 4 ASCII characters", key)
+        except UnicodeEncodeError:
+            self._raise_error("GameState identifier must be ASCII", key)
+        return identifier
+
+    def get_gamestate_vars(self, key: str, array_len: int, element_size: int) -> OrderedDict[Name, GameStateVar]:
+        var_list = self._get(key, list)
+
+        if len(var_list) > array_len:
+            self._raise_error(f"Too many items in list ({len(var_list)}, max: {array_len})", key)
+
+        out: OrderedDict[Name, GameStateVar] = OrderedDict()
+
+        for i, s in enumerate(var_list):
+            if s is None:
+                # dummied out
+                pass
+            if not isinstance(s, str):
+                self._raise_error("Expected a string", key, str(i))
+            else:
+                sl = s.split(None, 1)
+                name = sl[0]
+                comment = None
+
+                if len(sl) == 2:
+                    comment = sl[1]
+
+                if not self.NAME_REGEX.match(name):
+                    self._raise_error(f"Invalid name: {name}", key, str(i))
+
+                out[name] = GameStateVar(i * element_size, comment)
+
+        return out
+
+    def get_gamestate(self, key: str) -> GameState:
+        gs = self.get_dict(key)
+
+        identifier = gs.get_gamestate_identifier("identifier")
+        u8_array_len = gs.get_int_range("u8_array_len", 32, MAX_GAMESTATE_ARRAY_BYTE_SIZE)
+        u16_array_len = gs.get_int_range("u16_array_len", 4, MAX_GAMESTATE_ARRAY_BYTE_SIZE // 2)
+
+        return GameState(
+            identifier=identifier,
+            u8_array_len=u8_array_len,
+            u16_array_len=u16_array_len,
+            flags=gs.get_gamestate_vars("flags", MAX_GAMESTATE_FLAGS, 1),
+            u8_vars=gs.get_gamestate_vars("u8_vars", u8_array_len, 1),
+            u16_vars=gs.get_gamestate_vars("u16_vars", u16_array_len, 2),
         )
 
     def get_gamemodes(self, key: str) -> list[GameMode]:
@@ -811,6 +892,7 @@ def load_mappings_json(filename: Filename) -> Mappings:
 
     return Mappings(
         game_title=jh.get_string("game_title"),
+        gamestate=jh.get_gamestate("gamestate"),
         mt_tilesets=jh.get_name_list("mt_tilesets"),
         second_layers=jh.get_name_list("second_layers"),
         ms_spritesheets=jh.get_name_list("ms_spritesheets"),
@@ -818,7 +900,6 @@ def load_mappings_json(filename: Filename) -> Mappings:
         tiles=jh.get_name_list("tiles"),
         bg_images=jh.get_name_list("bg_images"),
         interactive_tile_functions=jh.get_name_list("interactive_tile_functions"),
-        gamestate_flags=jh.get_name_list("gamestate_flags"),
         room_transitions=jh.get_name_list("room_transitions"),
         room_events=jh.get_room_events("room_events"),
         sl_callbacks=jh.get_sl_callbacks("sl_callbacks"),

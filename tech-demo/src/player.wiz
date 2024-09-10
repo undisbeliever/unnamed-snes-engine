@@ -4,6 +4,8 @@
 import "memmap";
 
 import "engine/entity_api";
+import "engine/gamestate_api";
+
 import "entities/_base";
 
 // ::TODO remove this import::
@@ -38,18 +40,8 @@ let _is_ms_non_looping_animation_running = metasprites.is_player_non_looping_ani
 
 
 
-// The player state stored within the gamestate.
-struct GameState__PlayerState {
-    health              : u8,
-    maxHealth           : u8,
-    swordAttackPower    : u8,
-};
-
-let InitialPlayerState = GameState__PlayerState{
-    swordAttackPower    = 2,
-    health              = 16,
-    maxHealth           = 16,
-};
+let STARTING_SWORD_ATTACK_POWER = 2;
+let STARTING_MAX_HEALTH = 16;
 
 
 // If the player health is below this value, sound a different 'player hurt' sound effect.
@@ -329,22 +321,38 @@ inline func dungeon_loaded__restore_player_state_and_direction__inline(state: u8
 // DB = 0x7e
 #[mem8, idx8]
 inline func save_player_state__inline() {
-    gamestate.data.playerState.health = a = health;
-    gamestate.data.playerState.maxHealth = a = maxHealth;
+    gs.set_u8(gs.var8.player_health, health);
+    gs.set_u8(gs.var8.player_maxHealth, maxHealth);
 
-    gamestate.data.playerState.swordAttackPower = a = swordAttackPower;
+    gs.set_u8(gs.var8.player_swordAttackPower, swordAttackPower);
 }
 
 
 
-// Reset the player state
+// Initialise player gamestate variables
+//
+// Called by `gamestate.continue_game()`
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func new_player_gamestate__inline() {
+    gs.set_u8(gs.var8.player_health, STARTING_MAX_HEALTH);
+    gs.set_u8(gs.var8.player_maxHealth, STARTING_MAX_HEALTH);
+
+    gs.set_u8(gs.var8.player_swordAttackPower, STARTING_SWORD_ATTACK_POWER);
+}
+
+
+
+// Reset the gamestate player variables
 //
 // Called by `gamestate.continue_game()`
 //
 // DB = 0x7e
 #[mem8, idx8]
 inline func continue_player_gamestate__inline() {
-    gamestate.data.playerState.health = a = gamestate.data.playerState.maxHealth;
+    a = gs.get_u8(gs.var8.player_maxHealth);
+    gs.set_u8(gs.var8.player_health, a);
 }
 
 
@@ -354,10 +362,10 @@ inline func continue_player_gamestate__inline() {
 // DB = 0x7e
 #[mem8, idx8]
 inline func restore_player_state__inline() {
-    health = a = gamestate.data.playerState.health;
-    maxHealth = a = gamestate.data.playerState.maxHealth;
+    health = a = gs.get_u8(gs.var8.player_health);
+    maxHealth = a = gs.get_u8(gs.var8.player_maxHealth);
 
-    swordAttackPower = a = gamestate.data.playerState.swordAttackPower;
+    swordAttackPower = a = gs.get_u8(gs.var8.player_swordAttackPower);
 }
 
 

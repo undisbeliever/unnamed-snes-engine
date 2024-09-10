@@ -6,7 +6,7 @@
 import re
 import argparse
 from io import StringIO
-from typing import TextIO, Sequence
+from typing import Final, OrderedDict, TextIO, Sequence
 
 from unnamed_snes_game.json_formats import (
     RoomName,
@@ -18,6 +18,8 @@ from unnamed_snes_game.json_formats import (
     SfxExportOrder,
     MemoryMap,
     GameMode,
+    GameState,
+    GameStateVar,
 )
 from unnamed_snes_game.memory_map import (
     MS_FS_DATA_BANK_OFFSET,
@@ -94,6 +96,41 @@ def write_gamemodes_enum(out: TextIO, gamemodes: list[GameMode]) -> None:
     out.write("};\n\n")
 
 
+def write_gamestate_enum(out: TextIO, name: Name, values: OrderedDict[Name, GameStateVar], element_size: int) -> None:
+    out.write(f"enum { name } : u8 {{\n")
+
+    assert element_size.bit_count() == 1, "element_size not a power of 2"
+    mask: Final = 0xFF & ~(element_size - 1)
+
+    for name, v in values.items():
+        if v.comment:
+            c = v.comment.replace("\n", "\n  // ")
+            out.write(f"  // { c }\n")
+
+        assert v.var_index & mask == v.var_index
+        out.write(f"  { name } = { v.var_index },\n")
+
+    out.write("};\n\n")
+
+
+def write_gamestate(out: TextIO, gs: GameState) -> None:
+    out.write("namespace gs {\n\n")
+
+    assert len(gs.identifier) == 4
+    out.write(f'let IDENTIFIER = "{gs.identifier}";\n')
+
+    out.write(f"let N_U8_VARS = {gs.u8_array_len};\n")
+    out.write(f"let N_U16_VARS = {gs.u16_array_len};\n")
+
+    out.write("\n")
+    write_gamestate_enum(out, "flag", gs.flags, 1)
+
+    write_gamestate_enum(out, "var8", gs.u8_vars, 1)
+    write_gamestate_enum(out, "var16", gs.u16_vars, 2)
+
+    out.write("}\n\n")
+
+
 def generate_wiz_code(mappings: Mappings, audio_project: AudioProject) -> str:
     with StringIO() as out:
         out.write("namespace resources {\n\n")
@@ -128,6 +165,8 @@ def generate_wiz_code(mappings: Mappings, audio_project: AudioProject) -> str:
         write_gamemodes_enum(out, mappings.gamemodes)
 
         write_enum_inc_by_2(out, "RoomTransitions", mappings.room_transitions)
+
+        write_gamestate(out, mappings.gamestate)
 
         return out.getvalue()
 
