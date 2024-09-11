@@ -31,9 +31,10 @@ in lowram {
 
 namespace gamestate {
 
-// Game state signature
-let SIGNATURE_W0 = (gs.IDENTIFIER[0] as u16) | (gs.IDENTIFIER[1] as u16 << 8);
-let SIGNATURE_W1 = (gs.IDENTIFIER[2] as u16) | (gs.IDENTIFIER[3] as u16 << 8);
+// Must increment whenever RoomToLoad or GameStateData changes
+let GAME_STATE_DATA_VERSION = 1;
+
+let N_FLAG_ARRAYS = 2;
 
 
 struct RoomToLoad {
@@ -54,7 +55,9 @@ struct RoomToLoad {
 
 struct GameStateData {
     // Game state signature
-    signature : [u16 ; 2],
+    // MUST be at the start of GameStateData
+    signature : [u8 ; 4],
+    version: [u8 ; 6],
 
     // The checksum of the data
     // Updated whenever the gamestate backup is created.
@@ -76,6 +79,14 @@ struct GameStateData {
     u8_vars  : [ u8 ; gs.N_U8_VARS ],
     u16_vars : [ u16 ; gs.N_U16_VARS ],
 };
+
+
+in rodata0 {
+    // Size MUST be even
+    // Size MUST match GameStateData
+    const SignatureAndVersion : [u8 ; 10] = gs.IDENTIFIER ~
+        [GAME_STATE_DATA_VERSION as u8, gs.VERSION, N_FLAG_ARRAYS, gs.N_U8_VARS, gs.N_U16_VARS, 0];
+}
 
 
 in wram7e {
@@ -108,7 +119,7 @@ in code {
 func init() : bool in carry {
     mem16_idx16();
     #[mem16, idx16] {
-        carry = restore_gamestate_backup__inline();
+        carry = __restore_gamestate_backup__inline();
     }
     mem8_idx8();
 
@@ -232,9 +243,14 @@ func backup_gamestate() {
 
     mem16_idx16();
     #[mem16, idx16] {
-        // set signature
-        data.signature[0] = aa = SIGNATURE_W0;
-        data.signature[1] = aa = SIGNATURE_W1;
+        // Copy signature and version fields
+        xx = sizeof(typeof(SignatureAndVersion)) - 2;
+        do {
+            (&data as *u16)[unaligned xx] = aa = (far &SignatureAndVersion as far *u16)[unaligned xx];
+
+            xx--;
+            xx--;
+        } while !negative;
 
         data.checksum = aa = calculate_checksum();
 
@@ -261,18 +277,28 @@ func backup_gamestate() {
 //
 // DB = 0x7e
 #[mem16, idx16]
-inline func restore_gamestate_backup__inline() : bool in carry {
+inline func __restore_gamestate_backup__inline() : bool in carry {
     // Parameter order is destination, source
     load_dec_repeat(#:far &__fardata, yy = &data as u16,
                     #:far &gamestateBackup, xx = &gamestateBackup as u16,
                     aa = sizeof(typeof(data)) - 1);
 // DB = 0x7e
 
+    xx = sizeof(typeof(SignatureAndVersion)) - 2;
+    do {
+        aa = (&data as *u16)[unaligned xx];
+        if aa != (far &SignatureAndVersion as far *u16)[unaligned xx] {
+            return false;
+        }
+
+        xx--;
+        xx--;
+    } while !negative;
+
+
     // Check checksum and signature is correct
     aa = calculate_checksum();
-    xx = SIGNATURE_W0;
-    yy = SIGNATURE_W1;
-    if aa == data.checksum && xx == data.signature[0] && yy == data.signature[1] {
+    if aa == data.checksum {
         return true;
     }
 

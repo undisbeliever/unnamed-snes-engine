@@ -674,7 +674,7 @@ class GameState(NamedTuple):
     identifier: str
     # ::TODO add cart-ram size::
     # ::TODO add names::
-    # ::TODO add version::
+    version: int
     u8_array_len: int
     u16_array_len: int
     # Global flags.  Named in `gen/enums.wiz`.
@@ -804,11 +804,13 @@ class _Mappings_Helper(_Helper):
         gs = self.get_dict(key)
 
         identifier = gs.get_gamestate_identifier("identifier")
+        version = gs.get_int_range("version", 0, 0xff)
         u8_array_len = gs.get_int_range("u8_array_len", 32, MAX_GAMESTATE_ARRAY_BYTE_SIZE)
         u16_array_len = gs.get_int_range("u16_array_len", 4, MAX_GAMESTATE_ARRAY_BYTE_SIZE // 2)
 
         return GameState(
             identifier=identifier,
+            version=version,
             u8_array_len=u8_array_len,
             u16_array_len=u16_array_len,
             global_flags=gs.get_gamestate_vars("global_flags", MAX_GAMESTATE_FLAGS, 1),

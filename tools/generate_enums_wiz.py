@@ -119,6 +119,7 @@ def write_gamestate(out: TextIO, gs: GameState) -> None:
     assert len(gs.identifier) == 4
     out.write(f'let IDENTIFIER = "{gs.identifier}";\n')
 
+    out.write(f"let VERSION = {gs.version};\n")
     out.write(f"let N_U8_VARS = {gs.u8_array_len};\n")
     out.write(f"let N_U16_VARS = {gs.u16_array_len};\n")
 
