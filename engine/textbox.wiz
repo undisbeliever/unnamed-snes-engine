@@ -447,6 +447,8 @@ func decode_string(bankbyte : u8 in a, addr : u16 in xx) : [u8; 256] in decodedS
                 continue;
             }
         }
+
+        decodedString[x] = 0;
     }
     idx16();
 
