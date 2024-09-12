@@ -64,16 +64,9 @@ func exec() {
 
 
     audio.queue_sound_effect(sound_effects.menu_select);
+    wait_frame();
 
-
-    gamestate.new_game();
-
-
-    set_next_game_mode_to_room_transition(RoomTransitions.fadein_reset_player);
-
-
-    // Ensures menu_select sound effect is finished before room transition loads a new song
-    wait_multiple_frames_and_fadeout__slow();
+    ^return switch_game_mode(GameModes.FILE_SELECT);
 }
 
 

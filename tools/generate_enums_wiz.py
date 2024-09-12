@@ -27,6 +27,7 @@ from unnamed_snes_game.memory_map import (
     RESOURCE_ADDR_TABLE_BANK_OFFSET,
     USB2SNES_DATA_BANK_OFFSET,
 )
+from unnamed_snes_game.gamestate import gamestate_data_size, validate_gamestate_cart_size
 from unnamed_snes_game.enums import ResourceType
 from unnamed_snes_game.audio import BLANK_SONG_NAME
 
@@ -114,16 +115,25 @@ def write_gamestate_enum(out: TextIO, name: Name, values: OrderedDict[Name, Game
 
 
 def write_gamestate(out: TextIO, gs: GameState) -> None:
+    validate_gamestate_cart_size(gs)
+
     out.write("namespace gs {\n\n")
 
     assert len(gs.identifier) == 4
     out.write(f'let IDENTIFIER = "{gs.identifier}";\n')
-
     out.write(f"let VERSION = {gs.version};\n")
+    out.write("\n")
+
+    out.write(f"// gamestate data size is { gamestate_data_size(gs) } bytes\n")
+    out.write(f"let CART_RAM_SIZE = {gs.cart_ram_size};\n")
+    out.write(f"let N_SAVE_SLOTS = {gs.n_save_slots};\n")
+    out.write(f"let N_SAVE_COPIES = {gs.n_save_copies};\n")
+    out.write("\n")
+
     out.write(f"let N_U8_VARS = {gs.u8_array_len};\n")
     out.write(f"let N_U16_VARS = {gs.u16_array_len};\n")
-
     out.write("\n")
+
     out.write("// Global Flags\n")
     write_gamestate_enum(out, "gf", gs.global_flags, 1)
 

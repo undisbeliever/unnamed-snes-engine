@@ -672,7 +672,9 @@ class GameStateVar(NamedTuple):
 
 class GameState(NamedTuple):
     identifier: str
-    # ::TODO add cart-ram size::
+    cart_ram_size: int
+    n_save_slots: int
+    n_save_copies: int
     # ::TODO add names::
     version: int
     u8_array_len: int
@@ -804,12 +806,20 @@ class _Mappings_Helper(_Helper):
         gs = self.get_dict(key)
 
         identifier = gs.get_gamestate_identifier("identifier")
-        version = gs.get_int_range("version", 0, 0xff)
+
+        cart_ram_size = gs.get_int_range("cart_ram_size", 1024, 8192)
+        n_save_slots = gs.get_int_range("n_save_slots", 1, 8)
+        n_save_copies = gs.get_int_range("n_save_copies", 2, 8)
+
+        version = gs.get_int_range("version", 0, 0xFF)
         u8_array_len = gs.get_int_range("u8_array_len", 32, MAX_GAMESTATE_ARRAY_BYTE_SIZE)
         u16_array_len = gs.get_int_range("u16_array_len", 4, MAX_GAMESTATE_ARRAY_BYTE_SIZE // 2)
 
         return GameState(
             identifier=identifier,
+            cart_ram_size=cart_ram_size,
+            n_save_slots=n_save_slots,
+            n_save_copies=n_save_copies,
             version=version,
             u8_array_len=u8_array_len,
             u16_array_len=u16_array_len,

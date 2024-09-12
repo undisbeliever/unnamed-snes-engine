@@ -36,6 +36,12 @@ let GAME_STATE_DATA_VERSION = 1;
 
 let N_FLAG_ARRAYS = 2;
 
+let N_SAVE_SLOTS = gs.N_SAVE_SLOTS;
+let N_SAVE_COPIES = gs.N_SAVE_COPIES;
+
+let BYTES_PER_SAVE_SLOT = gs.CART_RAM_SIZE / N_SAVE_SLOTS;
+let BYTES_PER_SAVE_COPY = BYTES_PER_SAVE_SLOT / N_SAVE_COPIES;
+
 
 struct RoomToLoad {
     dungeon: u8,
@@ -62,6 +68,11 @@ struct GameStateData {
     // The checksum of the data
     // Updated whenever the gamestate backup is created.
     checksum : u16,
+
+    // The cartridge RAM save slot the game is saved to.
+    // CAUTION: A valid gamestate has the MSB of `saveSlot` set.
+    //          (allows me to detect zeroed GameStateData vs slot 0)
+    saveSlot : u8,
 
     // The player position to load on new-game/continue/reload
     playerPosition : RoomToLoad,
@@ -110,6 +121,28 @@ in wram7f_gamestatebackup {
 }
 
 
+namespace __cart_saves {
+    let CART_RAM_BANK = MEMMAP_CART_RAM_ADDR >> 16;
+
+    // Used to confirm the data fits in cart-ram
+    bank _gamestate_cartram @ MEMMAP_CART_RAM_ADDR : [vardata; MEMMAP_CART_RAM_SIZE];
+    in _gamestate_cartram {
+        var __cartRamSaves : [u8 ; gs.CART_RAM_SIZE];
+    }
+
+    // Used to confirm gamestate fits in a save copy
+    bank _gamestate_save_copy @ MEMMAP_CART_RAM_ADDR : [vardata; BYTES_PER_SAVE_COPY];
+    in _gamestate_save_copy {
+        var __gamestateCopy : GameStateData;
+    }
+
+    in rodata0 {
+        const SaveSlotAddrs : [u16 ; N_SAVE_SLOTS] =
+            [ &__cartRamSaves as u16 + i * BYTES_PER_SAVE_SLOT for let i in 0..(N_SAVE_SLOTS - 1)];
+    }
+}
+
+
 in code {
 
 // Returns true if the gamestate backup is valid.
@@ -128,7 +161,7 @@ func init() : bool in carry {
     }
 
     // gamestate backup is missing or corrupt.  Start a new game.
-    new_game();
+    clear_gamestate();
     return false;
 }
 
@@ -138,7 +171,7 @@ func init() : bool in carry {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func new_game() {
+func clear_gamestate() {
     // Populate initial player state
     mem16_idx16();
     #[mem16, idx16] {
@@ -158,7 +191,19 @@ func new_game() {
 
     // Load the default room of dungeon 0.
     data.playerPosition.dungeon = a = 0xff;
+}
 
+
+
+// New game
+//
+// CAUTION: Does not initialise `saveSlot`.
+//          The game must be saved using `save_gamestate_to_cart_slot()` for saves to work.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func new_game() {
+    clear_gamestate();
     engine_hooks.gamestate__new_game__inline();
 }
 
@@ -188,7 +233,7 @@ func continue_game() {
 //
 // DB = 0x7e
 #[mem16, idx16]
-func calculate_checksum() : u16 in aa {
+func __calculate_checksum() : u16 in aa {
 var _tmp         : u16 in zpTmp_word_0;
 var _oldChecksum : u16 in zpTmp_word_1;
 
@@ -229,17 +274,15 @@ var _oldChecksum : u16 in zpTmp_word_1;
 
 
 
-
-// Create a backup of the gamestate
+// Prepare the gamestate for a save or a backup
 //
 // DB = 0x7e
 #[mem8, idx8]
-func backup_gamestate() {
+func __prepare_gamestate_for_save_or_backup() {
     populate_room_to_load();
     _copy_room_to_load_to_gamestate();
 
     engine_hooks.gamestate__save_player_state__inline();
-
 
     mem16_idx16();
     #[mem16, idx16] {
@@ -252,8 +295,22 @@ func backup_gamestate() {
             xx--;
         } while !negative;
 
-        data.checksum = aa = calculate_checksum();
+        data.checksum = aa = __calculate_checksum();
+    }
+    mem8_idx8();
+}
 
+
+
+// Create a backup of the gamestate
+//
+// DB = 0x7e
+#[mem8, idx8]
+func backup_gamestate() {
+    __prepare_gamestate_for_save_or_backup();
+
+    mem16_idx16();
+    #[mem16, idx16] {
         // Parameter order is destination, source
         load_dec_repeat(#:far &gamestateBackup, yy = &gamestateBackup as u16,
                         #:far &__fardata, xx = &data as u16,
@@ -297,7 +354,7 @@ inline func __restore_gamestate_backup__inline() : bool in carry {
 
 
     // Check checksum and signature is correct
-    aa = calculate_checksum();
+    aa = __calculate_checksum();
     if aa == data.checksum {
         return true;
     }
@@ -353,7 +410,195 @@ func _copy_room_to_load_to_gamestate() {
         x--;
     } while !negative;
 }
+
+
+
+// Select the save slot
+//
+// DB = 0x7e
+let save_gamestate_to_cart_slot = __save_gamestate_to_cart_slot as func(slot : u8 in a) : bool in carry;
+#[fallthrough, mem8, idx8]
+func __save_gamestate_to_cart_slot(slot : u8 in a) {
+    data.saveSlot = a = a | 0x80;
+
+// Fallthrough into save_gamestate_to_cart()
 }
 
+
+// Save gamestate to cartridge
+//
+// NOTE: Does not save the game if `saveSlot` is invalid.
+//
+// DB = 0x7e
+let save_gamestate_to_cart = __save_gamestate_to_cart as func() : bool in carry;
+#[fallthrough, mem8, idx8]
+func __save_gamestate_to_cart() {
+    __prepare_gamestate_for_save_or_backup();
+
+    a = data.saveSlot;
+    goto __return_false if !negative;
+
+// Fallthrough to __write_gamestate_to_cart_slot();
+}
+
+
+// CAUTION: Does not write the checksum
+//
+// DB = 0x7e
+#[mem8, idx8]
+func __write_gamestate_to_cart_slot(slot: u8 in a) : bool in carry {
+    x = a = a << 1;
+    goto __return_false if x >= sizeof(typeof(__cart_saves.SaveSlotAddrs));
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        yy = aa = (far &__cart_saves.SaveSlotAddrs as far *u16)[unaligned xx];
+
+        inline for let i in 0..(N_SAVE_COPIES - 1) {
+            yy = __save_gamestate_to_cart_addr__mem16_idx16(yy);
+        }
+    }
+    mem8_idx8();
+
+    return true;
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func __return_false() : bool in carry {
+    return false;
+}
+
+
+// OUT: yy = address of the next save copy
+// DB = 0x7e
+#[mem16, idx16]
+func __save_gamestate_to_cart_addr__mem16_idx16(cartAddr : u16 in yy) : u16 in yy {
+    push8(data_bank);
+
+    // Parameter order is destination, source
+    load_dec_repeat(__cart_saves.CART_RAM_BANK, yy,
+                    #:far &__fardata, xx = &data as u16,
+                    aa = sizeof(typeof(data)) - 1);
+// DB = CART_RAM_BANK
+    data_bank = pop8();
+// DB = 0x7e
+
+    yy = aa = yy + (BYTES_PER_SAVE_COPY - sizeof(typeof(data)));
+
+    return yy;
+}
+
+// Load gamestate from cartridge
+//
+// NOTE: Clobbers gamestate even if gamestate is invalid
+// NOTE: return false if `slot` is invalid.
+//
+// CAUTION: Writes to the save slot if one or more copies is corrupt (and the slot can be loaded).
+//
+// DB = 0x7e
+let load_gamestate_from_cart = __load_slot.__load_gamestate_from_cart;
+
+namespace __load_slot {
+    in zeropage {
+        var _slot : u8 in zpTmp_byte_0;
+
+        // tmp words 0 & 1 used by __calculate_checksum
+        var _lastGoodSave : u16 in zpTmp_word_2;
+        var _nGoodCopies : u16 in zpTmp_word_3;
+    }
+
+
+    // Load gamestate from cartridge
+    //
+    // NOTE: Clobbers gamestate even if gamestate is invalid
+    // NOTE: return false if `slot` is invalid.
+    //
+    // DB = 0x7e
+    #[mem8, idx8]
+    func __load_gamestate_from_cart(slot : u8 in a) : bool in carry {
+        _slot = a;
+
+        x = a = a << 1;
+        goto ReturnFalse if x >= sizeof(typeof(__cart_saves.SaveSlotAddrs));
+
+        mem16_idx16();
+        #[mem16, idx16] {
+            _lastGoodSave = 0;
+            _nGoodCopies = 0;
+
+            xx = aa = (far &__cart_saves.SaveSlotAddrs as far *u16)[unaligned xx];
+
+            inline for let i in 0..(N_SAVE_COPIES - 1) {
+                xx = __load_game_from_cart_addr__mem16_idx16(xx);
+            }
+
+            xx = _lastGoodSave;
+            goto ReturnFalse if zero;
+
+            aa = _nGoodCopies;
+            if aa != N_SAVE_COPIES {
+                // At least one save copy was corrupt.
+                // Load the last good copy and write it to the cartridge.
+                __load_game_from_cart_addr__mem16_idx16(xx);
+
+                mem8_idx8();
+                #[mem8, idx8] {
+                    // Returns true if _slot is valid.
+                    return __write_gamestate_to_cart_slot(_slot);
+                }
+            }
+        }
+        mem8_idx8();
+
+        // Make sure `saveSlot` is valid.
+        data.saveSlot = a = _slot | 0x80;
+        return true;
+
+
+    ReturnFalse:
+        mem8_idx8();
+        clear_gamestate();
+        // ::TODO return reason the game could not be loaded (empty, wrong version, wrong checksum)::
+        return false;
+    }
+
+
+    // OUT: xx = cart address of the next save copy.
+    // DB = 0x7e
+    #[mem16, idx16]
+    func __load_game_from_cart_addr__mem16_idx16(cartAddr : u16 in xx) : u16 in xx {
+        aa = xx + BYTES_PER_SAVE_COPY;
+        push16(xx);
+
+        // Parameter order is destination, source
+        load_dec_repeat(#:far &__fardata, yy = &data as u16,
+                        __cart_saves.CART_RAM_BANK, xx,
+                        aa = sizeof(typeof(data)) - 1);
+
+        xx = sizeof(typeof(SignatureAndVersion)) - 2;
+        do {
+            aa = (&data as *u16)[unaligned xx];
+            goto Invalid if aa != (far &SignatureAndVersion as far *u16)[unaligned xx];
+
+            xx--;
+            xx--;
+        } while !negative;
+
+        aa = __calculate_checksum();
+        goto Invalid if aa != data.checksum;
+
+        _lastGoodSave = aa = *((ss + 1) as *u16);
+        _nGoodCopies++;
+
+    Invalid:
+        aa = pop16();
+        xx = aa = aa + BYTES_PER_SAVE_COPY;
+        return xx;
+    }
+}
+
+}
 }
 

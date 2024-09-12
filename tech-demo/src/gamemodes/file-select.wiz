@@ -1,0 +1,254 @@
+// Copyright (c) 2024, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+import "engine/registers";
+import "engine/common/reset";
+
+import "engine/vram-map";
+import "engine/audio";
+import "engine/gamemodes";
+import "engine/textbox";
+import "engine/wait-frame";
+import "engine/common/reset";
+import "engine/game/gamestate";
+import "engine/resources/resources";
+import "engine/resources/palette";
+
+import "../joypad";
+
+import "gen/enums";
+
+
+namespace gamemodes {
+namespace file_select {
+
+
+let N_ITEMS = gamestate.N_SAVE_SLOTS;
+
+let SAVE_SLOT_HEIGHT = 2;
+let SAVE_SLOT_Y_OFFSET = 3;
+
+
+in wram7e {
+    var selectedItem : u8;
+}
+
+
+in rodata0 {
+    const NewGameText = "New Game\0";
+    const LoadGameText = "Game \xfd\n\0";
+}
+
+
+in code {
+
+// Game Over GameMode
+//
+// DB = 0x7e
+#[mem8, idx8]
+func exec() {
+    // Ensures menu_select sound effect is finished before room transition loads a new song
+    wait_multiple_frames_and_fadeout();
+
+    audio.load_song_if_changed(resources.songs.TitleScreenTheme);
+
+    idx16();
+    #[idx16] {
+        push16(0x7e80);
+        data_bank = pop8();
+    // DB = 0x80
+
+        setup_ppu__inline();
+
+        data_bank = pop8();
+    // DB = 0x7e
+    }
+    mem8_idx8();
+
+    a = gamestate.N_SAVE_SLOTS;
+    do {
+        a--;
+        load_and_display_slot(a);
+
+        // ::TODO replace with textbox.flush__forceblank()::
+        wait_frame();
+
+        a = selectedItem;
+    } while !zero;
+
+
+    wait_multiple_frames_and_fadein();
+
+
+    while true {
+        wait_frame();
+
+        // ::HACK in vblank time::
+        // ::TODO add 
+        {
+            x = a = selectedItem << 1;
+
+            mem16();
+            #[mem16] {
+                *(far& A1T7) = aa = (far &hdma_tables.HdmaTables as far *u16)[unaligned x];
+            }
+            mem8_idx8();
+        }
+
+        y = selectedItem;
+
+        a = joypad.pressed_h;
+
+        if a & joypad.JOYH.START != 0 {
+            carry = gamestate.load_gamestate_from_cart(selectedItem);
+            if !carry {
+                gamestate.new_game();
+                gamestate.save_gamestate_to_cart_slot(selectedItem);
+            }
+            set_next_game_mode_to_room_transition(RoomTransitions.fadein_reset_player);
+            return;
+        }
+        if a & (joypad.JOYH.UP | joypad.JOYH.DOWN) != 0 {
+            if a & joypad.JOYH.DOWN != 0 {
+                y++;
+                if y >= N_ITEMS {
+                    y = 0;
+                }
+            }
+            else {
+                y--;
+                if negative {
+                    y = N_ITEMS - 1;
+                }
+            }
+
+            if y < gamestate.N_SAVE_SLOTS {
+                load_and_display_slot(y);
+            }
+        }
+    }
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func load_and_display_slot(slot: u8 in a) {
+    selectedItem = a;
+
+    a++;
+    <:textbox.firstU16parameter = a;
+    >:textbox.firstU16parameter = 0;
+    a--;
+
+    y = a = (((a << 2) +# selectedItem)) +# SAVE_SLOT_Y_OFFSET;
+    textbox.setup_textbox(SAVE_SLOT_HEIGHT, y);
+
+    carry = gamestate.load_gamestate_from_cart(selectedItem);
+
+    idx16();
+    #[idx16] {
+        xx = &NewGameText as u16;
+        if carry {
+            xx = &LoadGameText as u16;
+        }
+        textbox.print_textbox(#:far &LoadGameText, xx);
+    }
+    mem8_idx8();
+}
+
+
+
+// Setup the PPU
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func setup_ppu__inline() {
+    // ::TODO create some kind of system for setting PPU registers::
+
+    reset_registers();
+    textbox.setup_ppu__forceblank();
+
+    // ::TODO add background image::
+    palette.load_palette__forceblank(resources.palettes.file_select);
+
+    BGMODE = a = BGMODE_MODE_1;
+    BG3SC = a = ((VRAM_BG3_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_32x32;
+    BG34NBA = a = ((VRAM_BG3_TILES_WADDR / BG34NBA_WALIGN) << BG34NBA_BG3_SHIFT);
+    TM = a = TM_BG3;
+
+    // Clip colors to black outside the color window
+    // Disable color math everywhere
+    CGWSEL = a = CGWSEL_ADD_SUBSCREEN |  CGWSEL_MSB_NOWHERE | CGWSEL_SST_OUTSIDE;
+
+    CGADSUB = a = CGADSUB_COLOR_ADD | CGADSUB_ENABLE_BACKDROP | CGADSUB_ENABLE_BG3;
+
+    // Enable colour math
+    WOBJSEL = a = WSEL_W1_ENABLE << WOBJSEL_COLOR_SHIFT;
+
+    // Gold
+    COLDATA = a = COLDATA_PLANE_R | 17;
+    COLDATA = a = COLDATA_PLANE_G | 14;
+    COLDATA = a = COLDATA_PLANE_B | 0;
+
+    DMAP7 = a = DMAP_TO_PPU | DMAP_TRANSFER_TWO;
+    BBAD7 = a = <:&WH0;
+    A1T7 = xx = &hdma_tables.SaveSlot0 as u16;
+    A1B7 = a = #:far &hdma_tables.HdmaTables;
+
+    HDMAEN = a = HDMAEN_DMA7;
+}
+
+}
+
+in rodata0 {
+
+namespace hdma_tables {
+    let _SH = SAVE_SLOT_HEIGHT * 16 + 8 - 2;
+
+    let _SY = (SAVE_SLOT_Y_OFFSET + 1) * 8 + 1;
+    let _SYS = 5 * 8;
+
+    let _SX1 = 3 * 8 + 1;
+    let _SX2 = 29 * 8 - 1;
+
+    const SaveSlot0 : [u8] = [
+        _SY + 0 * _SYS, 0xff, 0x00,
+        _SH,            _SX1, _SX2,
+        1,              0xff, 0x00,
+        0,
+    ];
+
+    const SaveSlot1 : [u8] = [
+        _SY + 1 * _SYS, 0xff, 0x00,
+        _SH,            _SX1, _SX2,
+        1,              0xff, 0x00,
+        0,
+    ];
+
+    const SaveSlot2 : [u8] = [
+        _SY + 2 * _SYS,         0xff, 0x00,
+        _SH,                    _SX1, _SX2,
+        1,                      0xff, 0x00,
+        0,
+    ];
+
+    const SaveSlot3 : [u8] = [
+        120,                    0xff, 0x00,
+        _SY + 3 * _SYS - 120,   0xff, 0x00,
+        _SH,                    _SX1, _SX2,
+        1,                      0xff, 0x00,
+        0,
+    ];
+
+
+    const HdmaTables : [u16 ; N_ITEMS] = [
+        &SaveSlot0 as u16, &SaveSlot1 as u16, &SaveSlot2 as u16, &SaveSlot3 as u16,
+    ];
+}
+
+}
+
+}
+}
+

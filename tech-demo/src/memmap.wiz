@@ -11,6 +11,8 @@ config {
     fastrom = false,
     region = "ntsc",
 
+    ram_size = MEMMAP_CART_RAM_SIZE,
+
     // ::TODO give this game a name::
     title = "UNNAMED TECH DEMO",
     version = 3,
@@ -44,6 +46,10 @@ let MEMMAP_ROOMSTATE_LOWRAM_SIZE =    0x100;
 
 let MEMMAP_ROOMSTATE_WRAM7E      = 0x7e2000;
 let MEMMAP_ROOMSTATE_WRAM7E_SIZE =    0x900;
+
+let MEMMAP_CART_RAM_ADDR = 0x206000;
+let MEMMAP_CART_RAM_SIZE = 4096;
+
 
 // Number of bytes to clear, within the second WRAM bank, on reset.
 // This will cause the gamestate backup to survive resets

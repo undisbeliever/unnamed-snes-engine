@@ -340,6 +340,10 @@ inline func new_player_gamestate__inline() {
     gs.set_u8(gs.var8.player_maxHealth, STARTING_MAX_HEALTH);
 
     gs.set_u8(gs.var8.player_swordAttackPower, STARTING_SWORD_ATTACK_POWER);
+
+    // ::HACK prevent an infinite death loop immediately after saving::
+    // ::TODO fix and remove hack::
+    restore_player_state__inline();
 }
 
 
@@ -353,6 +357,8 @@ inline func new_player_gamestate__inline() {
 inline func continue_player_gamestate__inline() {
     a = gs.get_u8(gs.var8.player_maxHealth);
     gs.set_u8(gs.var8.player_health, a);
+
+    restore_player_state__inline();
 }
 
 

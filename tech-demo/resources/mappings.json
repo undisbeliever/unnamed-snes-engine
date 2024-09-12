@@ -9,8 +9,11 @@
 
  "gamestate": {
    "identifier": "USG!",
-   "_comment": "Only increment version when reordering or resizing flags/variables.",
+   "_comment": "Only increment version when reordering or resizing flags/variables/cart sizes.",
    "version": 1,
+   "cart_ram_size": 4096,
+   "n_save_slots": 4,
+   "n_save_copies": 4,
    "u8_array_len": 32,
    "u16_array_len": 16,
    "global_flags": [
@@ -42,6 +45,7 @@
 
  "palettes": [
    "title_screen",
+   "file_select",
    "game_over",
    "credits",
    "dungeon"
@@ -97,6 +101,10 @@
    {
      "name": "title_screen",
      "source": "title-screen"
+   },
+   {
+     "name": "file_select",
+     "source": "file-select"
    },
    {
      "name": "game_over",
