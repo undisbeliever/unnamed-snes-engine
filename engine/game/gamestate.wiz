@@ -380,6 +380,19 @@ func populate_room_to_load() {
 }
 
 
+// Transfer gamestate playerPosition to player
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func __transfer_gs_playerposition_to_player__inline() {
+    player.xPos.px = a = gamestate.roomToLoad.player_x;
+    player.yPos.px = a = gamestate.roomToLoad.player_y;
+    player.zPos = a = gamestate.roomToLoad.player_z;
+
+    engine_hooks.dungeon_loaded__restore_player_state_and_direction__inline(
+        data.playerPosition.player_state, data.playerPosition.player_direction);
+}
+
 
 // Copy `gamestate.playerPosition` to `roomToLoad`
 //
@@ -510,6 +523,14 @@ namespace __load_slot {
     }
 
 
+    func __return_false() : bool in carry {
+        mem8_idx8();
+        clear_gamestate();
+        // ::TODO return reason the game could not be loaded (empty, wrong version, wrong checksum)::
+        return false;
+    }
+
+
     // Load gamestate from cartridge
     //
     // NOTE: Clobbers gamestate even if gamestate is invalid
@@ -521,7 +542,7 @@ namespace __load_slot {
         _slot = a;
 
         x = a = a << 1;
-        goto ReturnFalse if x >= sizeof(typeof(__cart_saves.SaveSlotAddrs));
+        goto __return_false if x >= sizeof(typeof(__cart_saves.SaveSlotAddrs));
 
         mem16_idx16();
         #[mem16, idx16] {
@@ -535,7 +556,7 @@ namespace __load_slot {
             }
 
             xx = _lastGoodSave;
-            goto ReturnFalse if zero;
+            goto __return_false if zero;
 
             aa = _nGoodCopies;
             if aa != N_SAVE_COPIES {
@@ -552,16 +573,14 @@ namespace __load_slot {
         }
         mem8_idx8();
 
+        // Prevent gamestate corruption when saving or creating a gamestate backup
+        // immediately after loading a save slot.
+        // (since `save_gamestate_to_cart()` calls `__prepare_gamestate_for_save_or_backup()`)
+        __transfer_gs_playerposition_to_player__inline();
+
         // Make sure `saveSlot` is valid.
         data.saveSlot = a = _slot | 0x80;
         return true;
-
-
-    ReturnFalse:
-        mem8_idx8();
-        clear_gamestate();
-        // ::TODO return reason the game could not be loaded (empty, wrong version, wrong checksum)::
-        return false;
     }
 
 
