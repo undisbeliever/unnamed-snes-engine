@@ -29,7 +29,7 @@ let JOYH_CANCEL = joypad.JOYH.Y;
 
 let N_SAVE_SLOTS = gamestate.N_SAVE_SLOTS;
 
-let N_ITEMS = N_SAVE_SLOTS + 1;
+let N_ITEMS = N_SAVE_SLOTS + 2;
 
 let SAVE_SLOT_HEIGHT = 2;
 let SAVE_SLOT_Y_OFFSET = 1;
@@ -38,17 +38,21 @@ let SMALL_TEXTBOX_HEIGHT = 1;
 let SMALL_TEXTBOX_Y_OFFSET = 22;
 
 
-let N_STATES = 2;
+let N_STATES = 4;
 
 enum State : u8 {
     NORMAL = 0,
     ERASE = 2,
+    COPY_SOURCE = 4,
+    COPY_DESTINATION = 6,
 };
 
 in code {
     const StateFunctionTable : [func ; N_STATES] = [
         process_normal,
         process_erase,
+        process_copy_source,
+        process_copy_destination,
     ];
 }
 
@@ -57,8 +61,10 @@ in rodata0 {
     const LoadGameText = "Game \xfd\n\0";
 
     const StateSmallTextbox : [*const u8 ; N_STATES] = [
-        @"                ERASE\0",
+        @"    COPY        ERASE\0",
         @"SELECT GAME TO ERASE\0",
+        @"SELECT GAME TO COPY\0",
+        @"SELECT COPY DESTINATION\0",
     ];
 
     const EraseConfirm = "ERASE GAME???\n"
@@ -69,8 +75,10 @@ in rodata0 {
     let NORMAL_COLDATA_B = COLDATA_PLANE_G | 14;
 
     const StateColData : [u8 ; N_STATES * 2] = [
-        NORMAL_COLDATA_A, NORMAL_COLDATA_B,             // Gold
-        COLDATA_PLANE_R | 17, 0,                        // Red
+        NORMAL_COLDATA_A,     NORMAL_COLDATA_B,     // Gold
+        COLDATA_PLANE_R | 17, 0,                    // Red
+        COLDATA_PLANE_B | 17, 0,                    // Blue
+        COLDATA_PLANE_B | 17, COLDATA_PLANE_R | 10, // Purple
     ];
 }
 
@@ -81,6 +89,9 @@ in lowram {
     // The currently selected item.
     // CAUTION: Might not be a save file.
     var selectedItem : u8;
+
+    // The save slot used when copying the save.
+    var copySourceSlot : u8;
 }
 
 in wram7e {
@@ -181,9 +192,38 @@ func set_erase_state() {
 
 
 // DB = 0x7e
+#[mem8, idx8]
+func set_copy_source_state() {
+    a = count_n_saves__inline();
+    if a >= 1 && a < N_SAVE_SLOTS {
+        carry = select_first_save_exists_matches(1);
+        if carry {
+            return _set_state_and_update_small_textbox(State.COPY_SOURCE);
+        }
+    }
+
+    return set_normal_state();
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_copy_destination_state() {
+    copySourceSlot = a = selectedItem;
+
+    carry = select_first_save_exists_matches(0);
+    goto set_normal_state if !carry;
+
+    return _set_state_and_update_small_textbox(State.COPY_DESTINATION);
+}
+
+
+// DB = 0x7e
 #[fallthrough, mem8, idx8]
 func set_normal_state() {
     x = State.NORMAL as u8;
+
+    copySourceSlot = a = 0xff;
 
 // Fallthrough into _set_state_and_update_small_textbox()
 }
@@ -235,7 +275,10 @@ func process_normal() {
             ^return execute_game_mode();
         }
 
-        set_erase_state();
+        if x == N_SAVE_SLOTS + 1 {
+            ^return set_erase_state();
+        }
+        ^return set_copy_source_state();
     }
     if a & (joypad.JOYH.UP | joypad.JOYH.DOWN) != 0 {
         if a & joypad.JOYH.DOWN != 0 {
@@ -273,6 +316,32 @@ func process_erase() {
             gamestate.clear_save_slot_from_cart(selectedItem);
         }
 
+        ^return set_normal_state();
+    }
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process_copy_source() {
+    carry = move_cursor_slot(1);
+    if carry {
+        ^return set_copy_destination_state();
+    }
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process_copy_destination() {
+    carry = move_cursor_slot(0);
+    if carry {
+        carry = gamestate.load_gamestate_from_cart(copySourceSlot);
+        if carry {
+            gamestate.save_gamestate_to_cart_slot(selectedItem);
+        }
         ^return set_normal_state();
     }
 }
@@ -346,6 +415,24 @@ func select_first_save_exists_matches(match : u8 in a) : bool in carry {
     } while x < N_SAVE_SLOTS;
 
     return false;
+}
+
+
+
+// Return the number of saves
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func count_n_saves__inline() : u8 in a {
+    a = 0;
+
+    x = N_SAVE_SLOTS - 1;
+    do {
+        a += saveExists[x];
+        x--;
+    } while !negative;
+
+    return a;
 }
 
 
@@ -470,10 +557,18 @@ namespace hdma_tables {
         0,
     ];
 
+    const Copy : [u8] = [
+        120,                    0xff, 0x00,
+        _EY - 120,              0xff, 0x00,
+        _EH,                    _SX1, _SXM - 1,
+        1,                      0xff, 0x00,
+        0,
+    ];
+
     const Erase : [u8] = [
         120,                    0xff, 0x00,
         _EY - 120,              0xff, 0x00,
-        _EH,                    _SXM, _SX2,
+        _EH,                _SXM + 1, _SX2,
         1,                      0xff, 0x00,
         0,
     ];
@@ -481,7 +576,7 @@ namespace hdma_tables {
 
     const HdmaTables : [u16 ; N_ITEMS] = [
         &SaveSlot0 as u16, &SaveSlot1 as u16, &SaveSlot2 as u16, &SaveSlot3 as u16,
-        &Erase as u16,
+        &Copy as u16, &Erase as u16,
     ];
 }
 
