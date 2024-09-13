@@ -160,6 +160,9 @@ func reset_registers() {
             x--;
         } while !negative;
 
+        // Set fixed color data to black
+        COLDATA = a = COLDATA_PLANE_ALL | 0;
+
 
         // Reset the DMA registers
         mem16();
