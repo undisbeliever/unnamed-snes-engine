@@ -97,6 +97,30 @@ func checked_dec_u8(gsVar8 : var8 in x) : bool in carry {
 }
 
 
+// CAUTION: gsVar8 is not bounds or alignment checked.
+// OUT: negative/zero/carry = cmp(a, gsVar8)
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+inline func cmp_a_u8(_a : u8 in a, let gsVar8 : var8) {
+    cmp(a, gamestate.data.u8_vars[unaligned gsVar8 as u8]);
+}
+
+
+// CAUTION: var and max are not bounds or alignment checked.
+// OUT: A = new gamestate value.
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+inline func add_with_limit_u8__inline(let v : var8, let max : var8, toAdd : u8 in a) {
+    a += gamestate.data.u8_vars[unaligned v as u8];
+    if carry || a >= gamestate.data.u8_vars[unaligned max as u8] {
+        a = gamestate.data.u8_vars[unaligned max as u8];
+    }
+    gamestate.data.u8_vars[unaligned v as u8] = a;
+}
+
+
 
 // u16 GameState Variables
 // =======================

@@ -41,7 +41,11 @@ let _is_ms_non_looping_animation_running = metasprites.is_player_non_looping_ani
 
 
 let STARTING_SWORD_ATTACK_POWER = 2;
+
 let STARTING_MAX_HEALTH = 16;
+let MIN_MAX_HEALTH = 8;
+
+let STARTING_MIN_PLAYER_HEALTH = 6;
 
 
 // If the player health is below this value, sound a different 'player hurt' sound effect.
@@ -166,12 +170,6 @@ in zeropage {
 
 
 in wram7e_roomstate {
-    // The amount of health on a full HP
-    //
-    // MUST be a multiple of 4
-    var maxHealth : u8;
-
-
 
 var state                   : u8 in entities.SoA.var_0_l[0];
 
@@ -235,10 +233,12 @@ inline func init() {
     mem8();
 
 
-    restore_player_state__inline();
-
     // Reset MetaSprite Animations
     init_metasprites();
+
+
+    // Make sure the player has health
+    validate_player_health();
 }
 
 
@@ -314,20 +314,6 @@ inline func dungeon_loaded__restore_player_state_and_direction__inline(state: u8
 }
 
 
-// Save the player state into the GameStateData
-//
-// Called on a successful room transition.
-//
-// DB = 0x7e
-#[mem8, idx8]
-inline func save_player_state__inline() {
-    gs.set_u8(gs.var8.player_health, health);
-    gs.set_u8(gs.var8.player_maxHealth, maxHealth);
-
-    gs.set_u8(gs.var8.player_swordAttackPower, swordAttackPower);
-}
-
-
 
 // Initialise player gamestate variables
 //
@@ -340,38 +326,45 @@ inline func new_player_gamestate__inline() {
     gs.set_u8(gs.var8.player_maxHealth, STARTING_MAX_HEALTH);
 
     gs.set_u8(gs.var8.player_swordAttackPower, STARTING_SWORD_ATTACK_POWER);
-
-    // ::HACK prevent an infinite death loop immediately after saving::
-    // ::TODO fix and remove hack::
-    restore_player_state__inline();
 }
 
 
 
-// Reset the gamestate player variables
+// Reset the player's health when on continue game.
 //
 // Called by `gamestate.continue_game()`
 //
 // DB = 0x7e
 #[mem8, idx8]
 inline func continue_player_gamestate__inline() {
+    validate_player_health();
+
     a = gs.get_u8(gs.var8.player_maxHealth);
     gs.set_u8(gs.var8.player_health, a);
-
-    restore_player_state__inline();
 }
 
 
 
-// restore player state from the GameStateData
+// Check player's health and maxHealth is valid.
+//
+// This function exists because I accidentally loaded a save with 0 maxHealth
+// and got stuck in a game-over loop.
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func restore_player_state__inline() {
-    health = a = gs.get_u8(gs.var8.player_health);
-    maxHealth = a = gs.get_u8(gs.var8.player_maxHealth);
+func validate_player_health() {
+    // Max health must be a multiple of 4
+    a = gs.get_u8(gs.var8.player_maxHealth);
+    a &= 0b111111_00;
+    if a < MIN_MAX_HEALTH {
+        a = STARTING_MAX_HEALTH;
+    }
+    gs.set_u8(gs.var8.player_maxHealth, STARTING_MAX_HEALTH);
 
-    swordAttackPower = a = gs.get_u8(gs.var8.player_swordAttackPower);
+    a = gs.get_u8(gs.var8.player_health);
+    if a < STARTING_MIN_PLAYER_HEALTH {
+        gs.set_u8(gs.var8.player_health, STARTING_MIN_PLAYER_HEALTH);
+    }
 }
 
 
@@ -1195,11 +1188,12 @@ var _damage : u8 in zpTmp_byte_0;
             }
 
             // Player takes damage
-            a = player.health - _damage;
+            a = gs.get_u8(gs.var8.player_health);
+            a = a - _damage;
             if !carry {
                 a = 0;
             }
-            player.health = a;
+            gs.set_u8(gs.var8.player_health, a);
 
             player_hurt_sound_effect();
 
@@ -1215,7 +1209,7 @@ var _damage : u8 in zpTmp_byte_0;
 #[mem8, idx8]
 func player_hurt_sound_effect() {
     // Hurt sound effect
-    a = health;
+    a = gs.get_u8(gs.var8.player_health);
     if !zero && a < player.LOW_HEALTH_ALARM + 1 {
         a = sound_effects.player_hurt_low_health as u8;
     }
@@ -1703,6 +1697,18 @@ func process__holding_bomb() {
 }
 
 
+// Miscellaneous
+// =============
+
+// Heal the player
+//
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+func heal_player(amount: u8 in a) {
+    gs.add_with_limit_u8__inline(gs.var8.player_health, gs.var8.player_maxHealth, a);
+}
+
 }
 
 
@@ -1718,4 +1724,6 @@ in rodata0 {
 
 
 }
+
+import "engine/game/gamestate";
 

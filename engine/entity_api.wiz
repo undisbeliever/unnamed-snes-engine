@@ -302,9 +302,6 @@ in wram7e_roomstate {
     var movementState           : u8 in entities.SoA.movementState[0];
     var iframeCounter           : u8 in entities.SoA.iframeCounter[0];
 
-    var health                  : u8 in entities.SoA.health[0];
-    var swordAttackPower        : u8 in entities.SoA.attackPower[0];
-
     var visionA                 : u8 in entities.SoA.visionA[0];
     var visionB                 : u8 in entities.SoA.visionB[0];
 

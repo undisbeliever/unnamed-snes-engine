@@ -32,9 +32,6 @@ let VRAM_BG1_TILES_WADDR = 0x2000;
 
 
 
-let MIN_HEALTH_ON_RESTART_ROOM = 6;
-
-
 let CURSOR_X_POS = 95;
 let CURSOR_Y_POS = 127;
 
@@ -97,11 +94,6 @@ func exec() {
             // Restart gamestate (which will load the gamestate backup if it exists)
             gamestate.init();
 
-            // Increment health (if it is too low)
-            a = gs.get_u8(gs.var8.player_health);
-            if a < MIN_HEALTH_ON_RESTART_ROOM {
-                gs.set_u8(gs.var8.player_health, MIN_HEALTH_ON_RESTART_ROOM);
-            }
             // Do not save the game
         }
         else {

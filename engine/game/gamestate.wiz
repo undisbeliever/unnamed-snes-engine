@@ -282,8 +282,6 @@ func __prepare_gamestate_for_save_or_backup() {
     populate_room_to_load();
     _copy_room_to_load_to_gamestate();
 
-    engine_hooks.gamestate__save_player_state__inline();
-
     mem16_idx16();
     #[mem16, idx16] {
         // Copy signature and version fields

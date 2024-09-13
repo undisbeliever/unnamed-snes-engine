@@ -104,17 +104,6 @@ inline func gamestate__continue_game__inline() {
 }
 
 
-// Save the player state to the gamestate.
-//
-// Called by `gamestate.backup_gamestate()`.
-//
-// DB = 0x7e
-#[mem8, idx8]
-inline func gamestate__save_player_state__inline() {
-    player.save_player_state__inline();
-}
-
-
 
 // Room Loading
 // ============
