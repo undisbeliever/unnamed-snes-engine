@@ -488,6 +488,8 @@ func __save_gamestate_to_cart_addr__mem16_idx16(cartAddr : u16 in yy) : u16 in y
     return yy;
 }
 
+
+
 // Load gamestate from cartridge
 //
 // NOTE: Clobbers gamestate even if gamestate is invalid
@@ -595,6 +597,35 @@ namespace __load_slot {
         xx = aa = aa + BYTES_PER_SAVE_COPY;
         return xx;
     }
+}
+
+
+
+// Clear save slot from cartridge
+//
+// DB = 0x7e
+#[mem8, idx8]
+func clear_save_slot_from_cart(slot : u8 in a) {
+    x = a = a << 1;
+    goto Return if x >= sizeof(typeof(__cart_saves.SaveSlotAddrs));
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        xx = aa = (far &__cart_saves.SaveSlotAddrs as far *u16)[unaligned xx];
+
+        aa = 0;
+        yy = BYTES_PER_SAVE_SLOT / 2;
+        do {
+            ((__cart_saves.CART_RAM_BANK << 16) as far *u16)[unaligned xx] = aa;
+            xx++;
+            xx++;
+            yy--;
+        } while !zero;
+    }
+    mem8_idx8();
+
+Return:
+    return;
 }
 
 }

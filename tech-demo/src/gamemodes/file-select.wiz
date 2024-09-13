@@ -23,25 +23,74 @@ import "gen/enums";
 namespace gamemodes {
 namespace file_select {
 
+let JOYH_CONFIRM = joypad.JOYH.START | joypad.JOYH.B;
+let JOYH_CANCEL = joypad.JOYH.Y;
 
-let N_ITEMS = gamestate.N_SAVE_SLOTS;
+
+let N_SAVE_SLOTS = gamestate.N_SAVE_SLOTS;
+
+let N_ITEMS = N_SAVE_SLOTS + 1;
 
 let SAVE_SLOT_HEIGHT = 2;
-let SAVE_SLOT_Y_OFFSET = 3;
+let SAVE_SLOT_Y_OFFSET = 1;
+
+let SMALL_TEXTBOX_HEIGHT = 1;
+let SMALL_TEXTBOX_Y_OFFSET = 22;
 
 
-in wram7e {
-    var selectedItem : u8;
+let N_STATES = 2;
+
+enum State : u8 {
+    NORMAL = 0,
+    ERASE = 2,
+};
+
+in code {
+    const StateFunctionTable : [func ; N_STATES] = [
+        process_normal,
+        process_erase,
+    ];
 }
-
 
 in rodata0 {
     const NewGameText = "New Game\0";
     const LoadGameText = "Game \xfd\n\0";
+
+    const StateSmallTextbox : [*const u8 ; N_STATES] = [
+        @"                ERASE\0",
+        @"SELECT GAME TO ERASE\0",
+    ];
+
+    const EraseConfirm = "ERASE GAME???\n"
+                       ~ " \x03 No          \x04 Yes\0";
+    let ERASE_CONFIRM_OPTION = 1;
+
+    let NORMAL_COLDATA_A = COLDATA_PLANE_R | 17;
+    let NORMAL_COLDATA_B = COLDATA_PLANE_G | 14;
+
+    const StateColData : [u8 ; N_STATES * 2] = [
+        NORMAL_COLDATA_A, NORMAL_COLDATA_B,             // Gold
+        COLDATA_PLANE_R | 17, 0,                        // Red
+    ];
+}
+
+
+in lowram {
+    var state : State;
+
+    // The currently selected item.
+    // CAUTION: Might not be a save file.
+    var selectedItem : u8;
+}
+
+in wram7e {
+    // Each element MUST be 0 or 1
+    var saveExists : [u8 ; N_SAVE_SLOTS];
 }
 
 
 in code {
+
 
 // Game Over GameMode
 //
@@ -66,95 +115,273 @@ func exec() {
     }
     mem8_idx8();
 
-    a = gamestate.N_SAVE_SLOTS;
+    set_normal_state();
+
+    x = N_SAVE_SLOTS;
     do {
-        a--;
-        load_and_display_slot(a);
+        x--;
+        set_selected_and_load_and_display_slot(x);
 
         // ::TODO replace with textbox.flush__forceblank()::
         wait_frame();
 
-        a = selectedItem;
+        x = selectedItem;
     } while !zero;
 
 
     wait_multiple_frames_and_fadein();
 
-
     while true {
         wait_frame();
 
         // ::HACK in vblank time::
-        // ::TODO add 
+        // ::TODO add a method of calling a function pointer in wait_frame()::
         {
+        push16(0x7e80);
+        data_bank = pop8();
+    // DB = 0x80
+
+            COLDATA = a = COLDATA_PLANE_ALL | 0;
+
             x = a = selectedItem << 1;
 
             mem16();
             #[mem16] {
-                *(far& A1T7) = aa = (far &hdma_tables.HdmaTables as far *u16)[unaligned x];
+                A1T7 = aa = (far &hdma_tables.HdmaTables as far *u16)[unaligned x];
+
+                x = state as u8;
+                aa = (far &StateColData as far *u16)[unaligned x];
             }
             mem8_idx8();
+
+            COLDATA = a;
+            swap_bytes(aa);
+            COLDATA = a;
+
+
+        data_bank = pop8();
+    // DB = 0x7e
         }
 
-        y = selectedItem;
+        x = state as u8;
+        StateFunctionTable[unaligned x]();
+    }
+}
 
-        a = joypad.pressed_h;
 
-        if a & joypad.JOYH.START != 0 {
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_erase_state() {
+    carry = select_first_save_exists_matches(1);
+    goto set_normal_state if !carry;
+
+    return _set_state_and_update_small_textbox(State.ERASE);
+}
+
+
+// DB = 0x7e
+#[fallthrough, mem8, idx8]
+func set_normal_state() {
+    x = State.NORMAL as u8;
+
+// Fallthrough into _set_state_and_update_small_textbox()
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func _set_state_and_update_small_textbox(_state : State in x) {
+    state = x as State;
+
+    textbox.setup_textbox(SMALL_TEXTBOX_HEIGHT, SMALL_TEXTBOX_Y_OFFSET);
+
+    x = state as u8;
+    mem16_idx16();
+    #[mem16, idx16] {
+        xx = aa = (far &StateSmallTextbox as far *u16)[unaligned xx];
+    }
+    mem8();
+    #[mem8, idx16] {
+        textbox.print_textbox(#:far &StateSmallTextbox, xx);
+    }
+    mem8_idx8();
+
+    wait_frame();
+
+
+    x = selectedItem;
+    if x < N_SAVE_SLOTS {
+        set_selected_and_load_and_display_slot(x);
+    }
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process_normal() {
+    x = selectedItem;
+
+    a = joypad.pressed_h;
+    if a & JOYH_CONFIRM != 0 {
+        if x < N_SAVE_SLOTS {
             carry = gamestate.load_gamestate_from_cart(selectedItem);
             if !carry {
                 gamestate.new_game();
                 gamestate.save_gamestate_to_cart_slot(selectedItem);
             }
             set_next_game_mode_to_room_transition(RoomTransitions.fadein_reset_player);
-            return;
+            ^return execute_game_mode();
         }
-        if a & (joypad.JOYH.UP | joypad.JOYH.DOWN) != 0 {
-            if a & joypad.JOYH.DOWN != 0 {
-                y++;
-                if y >= N_ITEMS {
-                    y = 0;
-                }
-            }
-            else {
-                y--;
-                if negative {
-                    y = N_ITEMS - 1;
-                }
-            }
 
-            if y < gamestate.N_SAVE_SLOTS {
-                load_and_display_slot(y);
+        set_erase_state();
+    }
+    if a & (joypad.JOYH.UP | joypad.JOYH.DOWN) != 0 {
+        if a & joypad.JOYH.DOWN != 0 {
+            x++;
+            if x >= N_ITEMS {
+                x = 0;
             }
         }
+        else {
+            x--;
+            if negative {
+                x = N_ITEMS - 1;
+            }
+        }
+
+        set_selected_and_load_and_display_slot(x);
     }
 }
 
 
+
 // DB = 0x7e
 #[mem8, idx8]
-func load_and_display_slot(slot: u8 in a) {
-    selectedItem = a;
-
-    a++;
-    <:textbox.firstU16parameter = a;
-    >:textbox.firstU16parameter = 0;
-    a--;
-
-    y = a = (((a << 2) +# selectedItem)) +# SAVE_SLOT_Y_OFFSET;
-    textbox.setup_textbox(SAVE_SLOT_HEIGHT, y);
-
-    carry = gamestate.load_gamestate_from_cart(selectedItem);
-
-    idx16();
-    #[idx16] {
-        xx = &NewGameText as u16;
-        if carry {
-            xx = &LoadGameText as u16;
+func process_erase() {
+    carry = move_cursor_slot(1);
+    if carry {
+        idx16();
+        #[idx16] {
+            a = textbox.print_textbox_and_wait(#:far &EraseConfirm, &EraseConfirm as u16,
+                                               JOYH_CONFIRM << 8);
         }
-        textbox.print_textbox(#:far &LoadGameText, xx);
+        mem8_idx8();
+
+        if a == ERASE_CONFIRM_OPTION {
+            gamestate.clear_save_slot_from_cart(selectedItem);
+        }
+
+        ^return set_normal_state();
     }
-    mem8_idx8();
+}
+
+
+
+// Move the selected item to a save slot where `saveExists == matches`.
+//
+//  * Returns true if `JOYH_CONFIRM` is pressed.
+//  * Changes state to normal and returns false if `JOYH_CANCEL` is pressed.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func move_cursor_slot(matches : u8 in a) : bool in carry {
+var _tmp : u8 in zpTmp_byte_0;
+    _tmp = a;
+
+    a = joypad.pressed_h;
+
+    if a & JOYH_CANCEL != 0 {
+        set_normal_state();
+        return false;
+    }
+    if a & JOYH_CONFIRM != 0 {
+        return true;
+    }
+    if a & (joypad.JOYH.UP | joypad.JOYH.DOWN) != 0 {
+        x = selectedItem;
+
+        if a & joypad.JOYH.DOWN != 0 {
+            do {
+                x++;
+                if x >= N_SAVE_SLOTS {
+                    x = 0;
+                }
+                a = saveExists[x];
+            } while a != _tmp && x != selectedItem;
+        }
+        else {
+            do {
+                x--;
+                if negative {
+                    x = N_SAVE_SLOTS - 1;
+                }
+                a = saveExists[x];
+            } while a != _tmp && x != selectedItem;
+        }
+
+        set_selected_and_load_and_display_slot(x);
+    }
+
+    return false;
+}
+
+
+
+// Sets `selectedItem` to the first slot where `saveExists` == `match`.
+//
+// CAUTION: Does not draw or update save slot textbox.
+// DB = 0x7e
+#[mem8, idx8]
+func select_first_save_exists_matches(match : u8 in a) : bool in carry {
+    x = 0;
+    do {
+        if a == saveExists[x] {
+            selectedItem = x;
+            return true;
+        }
+
+        x++;
+    } while x < N_SAVE_SLOTS;
+
+    return false;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_selected_and_load_and_display_slot(item: u8 in x) {
+    selectedItem = x;
+
+    if x < N_SAVE_SLOTS {
+        push8(x);
+        saveExists[x] = 0;
+
+        y = a = (((x << 2) +# selectedItem)) +# SAVE_SLOT_Y_OFFSET;
+        textbox.setup_textbox(SAVE_SLOT_HEIGHT, y);
+
+        carry = gamestate.load_gamestate_from_cart(selectedItem);
+        x = pop8();
+
+        idx16();
+        #[idx16] {
+            if carry {
+                saveExists[xx]++;
+
+                xx++;
+                textbox.firstU16parameter = xx;
+
+                xx = &LoadGameText as u16;
+            }
+            else {
+                xx = &NewGameText as u16;
+            }
+            textbox.print_textbox(#:far &LoadGameText, xx);
+        }
+        mem8_idx8();
+    }
 }
 
 
@@ -186,10 +413,8 @@ inline func setup_ppu__inline() {
     // Enable colour math
     WOBJSEL = a = WSEL_W1_ENABLE << WOBJSEL_COLOR_SHIFT;
 
-    // Gold
-    COLDATA = a = COLDATA_PLANE_R | 17;
-    COLDATA = a = COLDATA_PLANE_G | 14;
-    COLDATA = a = COLDATA_PLANE_B | 0;
+    COLDATA = a = NORMAL_COLDATA_A;
+    COLDATA = a = NORMAL_COLDATA_B;
 
     DMAP7 = a = DMAP_TO_PPU | DMAP_TRANSFER_TWO;
     BBAD7 = a = <:&WH0;
@@ -211,6 +436,10 @@ namespace hdma_tables {
 
     let _SX1 = 3 * 8 + 1;
     let _SX2 = 29 * 8 - 1;
+    let _SXM = (_SX1 + _SX2) / 2;
+
+    let _EY = (SMALL_TEXTBOX_Y_OFFSET + 1) * 8 + 1;
+    let _EH = SMALL_TEXTBOX_HEIGHT * 16 + 8 - 2;
 
     const SaveSlot0 : [u8] = [
         _SY + 0 * _SYS, 0xff, 0x00,
@@ -241,9 +470,18 @@ namespace hdma_tables {
         0,
     ];
 
+    const Erase : [u8] = [
+        120,                    0xff, 0x00,
+        _EY - 120,              0xff, 0x00,
+        _EH,                    _SXM, _SX2,
+        1,                      0xff, 0x00,
+        0,
+    ];
+
 
     const HdmaTables : [u16 ; N_ITEMS] = [
         &SaveSlot0 as u16, &SaveSlot1 as u16, &SaveSlot2 as u16, &SaveSlot3 as u16,
+        &Erase as u16,
     ];
 }
 
