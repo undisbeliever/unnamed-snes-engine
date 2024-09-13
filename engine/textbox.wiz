@@ -772,6 +772,8 @@ func print_textbox_and_wait(bankbyte : u8 in a, addr : u16 in xx, confirmButton 
     while true {
         print_decoded_textbox(decodedString);
 
+        wait_frame();
+
         a = engine_hooks.joypad_pressed_l;
         break if a & <:_confirmButton != 0;
 
@@ -802,8 +804,6 @@ func print_textbox_and_wait(bankbyte : u8 in a, addr : u16 in xx, confirmButton 
                 audio.queue_sound_effect(sound_effects.menu_cursor);
             }
         }
-
-        wait_frame();
     }
 
     return selectedMenuItem;
