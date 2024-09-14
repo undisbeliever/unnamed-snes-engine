@@ -64,7 +64,6 @@ func exec() {
 
 
     audio.queue_sound_effect(sound_effects.menu_select);
-    wait_frame();
 
     ^return switch_game_mode(GameModes.FILE_SELECT);
 }

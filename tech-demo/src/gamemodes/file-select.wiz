@@ -126,7 +126,8 @@ func exec() {
     }
     mem8_idx8();
 
-    set_normal_state();
+    // Play without a sound effect
+    set_normal_state(0xff as sound_effects);
 
     x = N_SAVE_SLOTS;
     do {
@@ -185,9 +186,9 @@ func exec() {
 #[mem8, idx8]
 func set_erase_state() {
     carry = select_first_save_exists_matches(1);
-    goto set_normal_state if !carry;
+    goto set_normal_state__error_sfx if !carry;
 
-    return _set_state_and_update_small_textbox(State.ERASE);
+    return _set_state_play_sfx_and_update_small_textbox(State.ERASE, sound_effects.menu_select_fast);
 }
 
 
@@ -198,11 +199,11 @@ func set_copy_source_state() {
     if a >= 1 && a < N_SAVE_SLOTS {
         carry = select_first_save_exists_matches(1);
         if carry {
-            return _set_state_and_update_small_textbox(State.COPY_SOURCE);
+            return _set_state_play_sfx_and_update_small_textbox(State.COPY_SOURCE, sound_effects.menu_select_fast);
         }
     }
 
-    return set_normal_state();
+    return set_normal_state__error_sfx();
 }
 
 
@@ -212,27 +213,39 @@ func set_copy_destination_state() {
     copySourceSlot = a = selectedItem;
 
     carry = select_first_save_exists_matches(0);
-    goto set_normal_state if !carry;
+    goto set_normal_state__error_sfx if !carry;
 
-    return _set_state_and_update_small_textbox(State.COPY_DESTINATION);
+    return _set_state_play_sfx_and_update_small_textbox(State.COPY_DESTINATION, sound_effects.menu_select_fast);
+}
+
+
+
+// DB = 0x7e
+#[fallthrough, mem8, idx8]
+func set_normal_state__error_sfx() {
+    a = sound_effects.menu_incorrect as u8;
+
+// Fallthrough into set_normal_state
 }
 
 
 // DB = 0x7e
 #[fallthrough, mem8, idx8]
-func set_normal_state() {
+func set_normal_state(sfxId : sound_effects in a) {
     x = State.NORMAL as u8;
 
-    copySourceSlot = a = 0xff;
+    copySourceSlot = y = 0xff;
 
-// Fallthrough into _set_state_and_update_small_textbox()
+// Fallthrough into _set_state_play_sfx_and_update_small_textbox
 }
 
 
 // DB = 0x7e
-#[mem8, idx8]
-func _set_state_and_update_small_textbox(_state : State in x) {
+#[fallthrough, mem8, idx8]
+func _set_state_play_sfx_and_update_small_textbox(_state : State in x, sfxId : sound_effects in a) {
     state = x as State;
+
+    audio.queue_sound_effect(sfxId);
 
     textbox.setup_textbox(SMALL_TEXTBOX_HEIGHT, SMALL_TEXTBOX_Y_OFFSET);
 
@@ -272,6 +285,13 @@ func process_normal() {
                 gamestate.save_gamestate_to_cart_slot(selectedItem);
             }
             set_next_game_mode_to_room_transition(RoomTransitions.fadein_reset_player);
+
+            audio.queue_sound_effect(sound_effects.menu_select);
+
+            // Ensures menu_select sound effect is finished before room transition loads a new song
+            // ::MAYDO shorter sound-effect and faster fadeout::
+            wait_multiple_frames_and_fadeout__slow();
+
             ^return execute_game_mode();
         }
 
@@ -295,6 +315,8 @@ func process_normal() {
         }
 
         set_selected_and_load_and_display_slot(x);
+
+        audio.queue_sound_effect(sound_effects.menu_cursor);
     }
 }
 
@@ -311,12 +333,15 @@ func process_erase() {
                                                JOYH_CONFIRM << 8);
         }
         mem8_idx8();
+        y = a;
 
-        if a == ERASE_CONFIRM_OPTION {
+        a = sound_effects.menu_back as u8;
+        if y == ERASE_CONFIRM_OPTION {
             gamestate.clear_save_slot_from_cart(selectedItem);
-        }
 
-        ^return set_normal_state();
+            a = sound_effects.menu_erase_save as u8;
+        }
+        ^return set_normal_state(a as sound_effects);
     }
 }
 
@@ -339,10 +364,14 @@ func process_copy_destination() {
     carry = move_cursor_slot(0);
     if carry {
         carry = gamestate.load_gamestate_from_cart(copySourceSlot);
+
+        a = sound_effects.menu_incorrect as u8;
         if carry {
             gamestate.save_gamestate_to_cart_slot(selectedItem);
+
+            a = sound_effects.menu_copy_save as u8;
         }
-        ^return set_normal_state();
+        ^return set_normal_state(a as sound_effects);
     }
 }
 
@@ -362,7 +391,7 @@ var _tmp : u8 in zpTmp_byte_0;
     a = joypad.pressed_h;
 
     if a & JOYH_CANCEL != 0 {
-        set_normal_state();
+        set_normal_state(sound_effects.menu_back);
         return false;
     }
     if a & JOYH_CONFIRM != 0 {
@@ -391,6 +420,8 @@ var _tmp : u8 in zpTmp_byte_0;
         }
 
         set_selected_and_load_and_display_slot(x);
+
+        audio.queue_sound_effect(sound_effects.menu_cursor);
     }
 
     return false;

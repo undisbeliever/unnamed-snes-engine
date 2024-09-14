@@ -210,6 +210,11 @@
   "high_priority_sound_effects": [
     "player_hurt_low_health",
     "menu_select",
+    "menu_incorrect",
+    "menu_copy_save",
+    "menu_erase_save",
+    "menu_back",
+    "menu_select_fast",
     "menu_cursor",
     "key_spawns",
     "door_slam",
