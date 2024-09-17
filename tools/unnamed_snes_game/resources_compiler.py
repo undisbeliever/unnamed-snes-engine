@@ -882,12 +882,6 @@ class ProjectCompiler:
 
             error = NonResourceError(ErrorKey(None, s_type), SHARED_INPUT_NAMES[s_type], e)
             self.data_store.add_non_resource_error(error)
-            return
-
-        for c in self.__resource_compilers:
-            if s_type == c.EXPORT_ORDER_SI:
-                c.update_name_list()
-                self.data_store.reset_data(c.resource_type, c.n_items())
 
         if s_type == SharedInputType.MAPPINGS:
             self.data_store.set_mappings(self.__shared_input.mappings)
@@ -897,6 +891,12 @@ class ProjectCompiler:
             if self.__shared_input.entities:
                 n_entities = len(self.__shared_input.entities.entities)
                 self.data_store.set_n_entities(n_entities)
+
+        if s_type not in self.__shared_inputs_with_errors:
+            for c in self.__resource_compilers:
+                if s_type == c.EXPORT_ORDER_SI:
+                    c.update_name_list()
+                    self.data_store.reset_data(c.resource_type, c.n_items())
 
         # Must be called after `c.update_name_list()`
         for c in self.__resource_compilers:
