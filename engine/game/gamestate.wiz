@@ -43,6 +43,7 @@ let BYTES_PER_SAVE_SLOT = gs.CART_RAM_SIZE / N_SAVE_SLOTS;
 let BYTES_PER_SAVE_COPY = BYTES_PER_SAVE_SLOT / N_SAVE_COPIES;
 
 
+// Order MUST match PLAYER_POSITION in `tools/unnamed_snes_game/gamestate.py`
 struct RoomToLoad {
     dungeon: u8,
     room_x: u8,

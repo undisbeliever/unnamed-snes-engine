@@ -50,6 +50,7 @@ from .entity_data import ENTITY_ROM_DATA_LABEL, ENTITY_ROM_DATA_BYTES_PER_ENTITY
 from .insert_resources import read_binary_file, validate_sfc_file, ROM_HEADER_V3_ADDR
 from .resources_compiler import ProjectCompiler, SharedInputType
 from .data_store import DataStore, ResourceError, ResourceData
+from .gamestate import gamestate_data_size
 from .json_formats import Name, Filename, Mappings, MemoryMap
 from .enums import ResourceType
 from .memory_map import (
@@ -171,6 +172,7 @@ MAX_COMMAND_DATA_SIZE: Final = MAX_COMMAND_SIZE - 4
 class Rou2sCommands(Enum):
     # Skipping `null`.  `auto()` starts at 1
     COMMON_AUDIO_DATA_CHANGED = auto()
+    SET_GAMESTATE_AND_RESTART = auto()
 
 
 class Command(NamedTuple):
@@ -220,6 +222,8 @@ class FsWatcherSignals(metaclass=ABCMeta):
 
         # MUST access _command via `_lock`
         self._command: Optional[Command] = None
+        self._gamestate_requested = False
+        self._gamestate_data: Optional[bytes] = None
 
     # Status methods
     def set_fs_watcher_status(self, s: str) -> None:
@@ -262,6 +266,29 @@ class FsWatcherSignals(metaclass=ABCMeta):
             c = self._command
             self._command = None
             return c
+
+    # Gamestate methods
+    def request_gamestate_data(self) -> None:
+        with self._lock:
+            self._gamestate_requested = True
+            self._interrupt_request_sleep_event.set()
+
+    def test_and_clear_gamestate_data_requested(self) -> bool:
+        with self._lock:
+            o = self._gamestate_requested
+            self._gamestate_requested = False
+            return o
+
+    def set_gamestate_data(self, gs: bytes) -> None:
+        with self._lock:
+            self._gamestate_data = gs
+        self.signal_read_gamestate_data()
+
+    def pop_gamestate_data(self) -> Optional[bytes]:
+        with self._lock:
+            o = self._gamestate_data
+            self._gamestate_data = None
+            return o
 
     # GUI methods
     def is_connected(self) -> bool:
@@ -352,6 +379,10 @@ class FsWatcherSignals(metaclass=ABCMeta):
     # GUI methods
 
     @abstractmethod
+    def signal_mappings_changed(self) -> None:
+        pass
+
+    @abstractmethod
     def signal_status_changed(self) -> None:
         pass
 
@@ -366,6 +397,10 @@ class FsWatcherSignals(metaclass=ABCMeta):
     # Called when a BgThread stops
     @abstractmethod
     def signal_bg_thread_stopped(self) -> None:
+        pass
+
+    @abstractmethod
+    def signal_read_gamestate_data(self) -> None:
         pass
 
 
@@ -411,6 +446,7 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
 
         signals.set_fs_watcher_status("Running")
 
+        signals.signal_mappings_changed()
         signals.resource_changed()
 
         self.rebuild_required: bool = False
@@ -448,6 +484,9 @@ class FsEventHandler(watchdog.events.FileSystemEventHandler):
                     self.rebuild_required = True
                     # Stop ResourcesOverUsb2Snes until the `.sfc` file has been rebuilt
                     self.signals.set_rebuild_required_flag()
+
+            if r == SharedInputType.MAPPINGS:
+                self.signals.signal_mappings_changed()
 
             if r == SharedInputType.SYMBOLS:
                 # Assumes the `.sfc` file changes when the symbol file changes
@@ -729,6 +768,9 @@ class ResourcesOverUsb2Snes:
         self.rom_update_required_offset: int = address_to_rom_offset(ROM_UPDATE_REQUIRED_ADDR)
 
         self.expected_entity_rom_data_size: int = n_entities * ENTITY_ROM_DATA_BYTES_PER_ENTITY
+
+        self.gamestate_data_addr: int = symbols["gamestate.__fardata"]
+        self.gamestate_data_size: int = gamestate_data_size(mappings.gamestate)
 
         # Steal `MAX_COMMAND_SIZE` bytes from the end of the self.response_data_offset and use it for commands.
         # ::TODO find a proper place to put the command block::
@@ -1060,6 +1102,22 @@ class ResourcesOverUsb2Snes:
             self.signals.set_usb2snes_status("Cannot send command: command too large")
             log_error("Cannot send command", "command too large")
 
+    def read_gamestate_data(self) -> None:
+        read_gs: Callable[[], bytes] = lambda: self.usb2snes.read_wram_addr(self.gamestate_data_addr, self.gamestate_data_size)
+
+        # gamestate contains u16 variables.
+        # Ensure gamestate is valid by checking it twice
+        log_notice("Read gamestate data")
+        gs1 = read_gs()
+        gs2 = read_gs()
+
+        while gs1 != gs2:
+            log_notice("  Read gamestate data")
+            gs1 = read_gs()
+            gs2 = read_gs()
+
+        self.signals.set_gamestate_data(gs1)
+
     def run(self) -> None:
         burst_read_counter: int = 0
         current_request_id: int = 0
@@ -1087,6 +1145,9 @@ class ResourcesOverUsb2Snes:
                         self.process_request(request)
                         current_request_id = request.request_id
                         burst_read_counter = BURST_COUNT
+
+                    if self.signals.test_and_clear_gamestate_data_requested():
+                        self.read_gamestate_data()
 
             if burst_read_counter > 0:
                 burst_read_counter -= 1

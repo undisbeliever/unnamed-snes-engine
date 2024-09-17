@@ -9,6 +9,7 @@ import tkinter.ttk as ttk
 import tkinter.messagebox
 
 from .errors_tab import ErrorsTab
+from .gamestate_tab import GameStateTab
 
 from ..resources_over_usb2snes import FsWatcherSignals, BgThread
 from ..data_store import DataStore
@@ -20,10 +21,12 @@ if tkinter.Tcl().eval("set tcl_platform(threaded)") != "1":
 
 
 class GuiSignals(FsWatcherSignals):
+    MAPPINGS_CHANGED_EVENT_NAME: Final = "<<MappingsChanged>>"
     RES_COMPILED_EVENT_NAME: Final = "<<ResCompiled>>"
     STATUS_CHANGED_EVENT_NAME: Final = "<<StatusChanged>>"
     WS_CONNECTION_CHANGED_EVENT_NAME: Final = "<<WsConnectionChanged>>"
     BG_THREAD_STOPPED_EVENT_NAME: Final = "<<BgThreadStopped>>"
+    READ_GAMESTATE_DATA_EVENT_NAME: Final = "<<ReadGamestateData>>"
 
     def __init__(self, root: tk.Tk):
         super().__init__()
@@ -34,6 +37,9 @@ class GuiSignals(FsWatcherSignals):
         # https://tkdocs.com/tutorial/eventloop.html#threads
         self.root.event_generate(self.STATUS_CHANGED_EVENT_NAME)
 
+    def signal_mappings_changed(self) -> None:
+        self.root.event_generate(self.MAPPINGS_CHANGED_EVENT_NAME)
+
     def signal_resource_compiled(self) -> None:
         self.root.event_generate(self.RES_COMPILED_EVENT_NAME)
 
@@ -42,6 +48,9 @@ class GuiSignals(FsWatcherSignals):
 
     def signal_bg_thread_stopped(self) -> None:
         self.root.event_generate(self.BG_THREAD_STOPPED_EVENT_NAME)
+
+    def signal_read_gamestate_data(self) -> None:
+        self.root.event_generate(self.READ_GAMESTATE_DATA_EVENT_NAME)
 
 
 class StatusBar:
@@ -120,10 +129,15 @@ class Rou2sWindow:
         self._errors_tab: Final = ErrorsTab(data_store, self._notebook)
         self._notebook.add(self._errors_tab.frame, text="Errors")
 
+        self._gamestate_tab: Final = GameStateTab(data_store, self.signals, self._notebook)
+        self._notebook.add(self._gamestate_tab.frame, text="GameState")
+
         # Signals
         self._window.bind(GuiSignals.STATUS_CHANGED_EVENT_NAME, self._statusbar.on_status_changed)
         self._window.bind(GuiSignals.WS_CONNECTION_CHANGED_EVENT_NAME, self._statusbar.on_ws_connected_status_changed)
         self._window.bind(GuiSignals.RES_COMPILED_EVENT_NAME, self._errors_tab.on_resource_compiled)
+        self._window.bind(GuiSignals.MAPPINGS_CHANGED_EVENT_NAME, self._gamestate_tab.on_mappings_changed)
+        self._window.bind(GuiSignals.READ_GAMESTATE_DATA_EVENT_NAME, self._gamestate_tab.on_gamestate_data_read)
         self._window.bind(GuiSignals.BG_THREAD_STOPPED_EVENT_NAME, self._on_bg_thread_stopped)
 
     def add_bg_thread(self, t: BgThread) -> None:

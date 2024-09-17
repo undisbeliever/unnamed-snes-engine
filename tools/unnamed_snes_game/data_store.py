@@ -326,6 +326,10 @@ class DataStore:
                 raise RuntimeError("No mappings")
             return self._mappings
 
+    def try_get_mappings(self) -> Optional[Mappings]:
+        with self._lock:
+            return self._mappings
+
     def get_mappings_symbols_and_n_entities(self) -> tuple[Mappings, dict[ScopedName, int], int]:
         with self._lock:
             if not self._mappings:

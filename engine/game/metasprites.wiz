@@ -5,8 +5,6 @@ import "src/memmap";
 import "../registers";
 
 import "../vram-map";
-import "../resources/dma";
-import "../resources/resources";
 import "../common/math";
 
 import "gen/enums";
@@ -270,7 +268,6 @@ inline func setup__forceblank() {
 // DB = 0x80
 #[mem8, idx16]
 inline func load_ms_spritesheet_ppu_data__forceblank(spritesheet_id : u8 in a) {
-var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
 
     push8(a);
 
@@ -307,13 +304,12 @@ var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
 // DB = 0x80
 #[mem8, idx16]
 func __load_and_transfer_resource_data__forceblank(spritesheet_id : u8 in a) {
-var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
 
 var _header : _RamDataFormat in zpTmp_word_0;
 
 var _secondRowVramWaddr : u16 in zpTmp_word_1;
 
-    _ppuData = resources.load_resource__fixed_ram_and_ppu_data__forceblank_inline(resources.ResourceType.ms_spritesheet, a, &_header as *u8, sizeof(typeof(_header)));
+    resources.ppuData = resources.load_resource__fixed_ram_and_ppu_data__forceblank_inline(resources.ResourceType.ms_spritesheet, a, &_header as *u8, sizeof(typeof(_header)));
 
     mem16();
     #[mem16] {
@@ -341,11 +337,11 @@ var _secondRowVramWaddr : u16 in zpTmp_word_1;
     mem8();
 
     // Transfer the first row of tiles to VRAM
-    resources.dma_to_vram__forceblank(_ppuData, yy);
+    resources.dma_to_vram__forceblank(resources.ppuData, yy);
 
     // Transfer the remaining tiles to VRAM
     VMADD = xx = _secondRowVramWaddr;
-    ^return resources.dma_remaining_to_vram__forceblank(_ppuData);
+    ^return resources.dma_remaining_to_vram__forceblank(resources.ppuData);
 }
 
 
@@ -1750,6 +1746,9 @@ func square_four_32(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos)
 // "encountered a reference to `var metasprites.xPos` before its type was known" error.
 import "room-transitions";
 import "../entity_api";
+
+import "../resources/dma";
+import "../resources/resources";
 
 import "gen/ms-drawing-functions";
 

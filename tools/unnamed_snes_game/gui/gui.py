@@ -50,10 +50,11 @@ def create_vertical_scrolling_frame(
     canvas = tk.Canvas(parent, borderwidth=0)
 
     frame = tk.Frame(canvas)
+
     v_scroll = tk.Scrollbar(parent, orient=tk.VERTICAL, command=canvas.yview)
 
-    canvas.grid(row=0, column=0, columnspan=columnspan, sticky=tk.NSEW)
-    v_scroll.grid(row=0, column=1 + columnspan, padx=2, sticky=tk.NS)
+    canvas.grid(row=row, column=column, columnspan=columnspan, sticky=tk.NSEW)
+    v_scroll.grid(row=row, column=column + columnspan, padx=2, sticky=tk.NS)
 
     canvas.create_window(0, 0, window=frame, anchor=tk.NW)
 
