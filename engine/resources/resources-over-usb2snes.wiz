@@ -56,9 +56,9 @@ struct Request {
     // Request ID.
     request_id   : u8,
 
-    // Type of request, either a `resources.ResourceType * 2` request or a `SpecialRequestType` request.
+    // Type of request, either a `resources.ResourceType * 3` request or a `SpecialRequestType` request.
     //
-    // (`resources.ResourceType * 2` or `SpecialRequestType`)
+    // (`resources.ResourceType * 3` or `SpecialRequestType`)
     request_type : u8,
 
     resource_id  : u8,
