@@ -622,6 +622,7 @@ class SpritesheetTab:
             gui.NameInput(self.frame, "palette", "Palette: "),
             gui.IntInput(self.frame, "firstTile", "First Tile ID:"),
             gui.IntInput(self.frame, "endTile", "End Tile ID:"),
+            gui.PaletteSwapInput(self.frame, "palette_swaps", "Palette Swaps:"),
         ]
 
         row = 0
