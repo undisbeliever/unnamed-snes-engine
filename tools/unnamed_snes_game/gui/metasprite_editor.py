@@ -832,7 +832,8 @@ class EditorWindow:
 
         # Change or reset the selected frameset_index
         self.spritesheet_tab.set_selected_fs_index(self._frameset_index)
-        self._fs_combo.current(self._frameset_index)
+        if self._frameset_index >= 0:
+            self._fs_combo.current(self._frameset_index)
 
     def add_frameset(self) -> None:
         if self._update_and_check_valid("creating a new frameset"):
