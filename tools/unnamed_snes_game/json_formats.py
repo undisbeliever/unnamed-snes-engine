@@ -812,7 +812,7 @@ class _Mappings_Helper(_Helper):
         n_save_copies = gs.get_int_range("n_save_copies", 2, 8)
 
         version = gs.get_int_range("version", 0, 0xFF)
-        u8_array_len = gs.get_int_range("u8_array_len", 32, MAX_GAMESTATE_ARRAY_BYTE_SIZE)
+        u8_array_len = gs.get_int_range("u8_array_len", 4, MAX_GAMESTATE_ARRAY_BYTE_SIZE)
         u16_array_len = gs.get_int_range("u16_array_len", 4, MAX_GAMESTATE_ARRAY_BYTE_SIZE // 2)
 
         return GameState(
