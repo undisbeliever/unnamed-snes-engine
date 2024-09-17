@@ -95,8 +95,9 @@ struct GameStateData {
 in rodata0 {
     // Size MUST be even
     // Size MUST match GameStateData
+    // Using inverted GAME_STATE_DATA_VERSION so the MSB is set in one of these variables.
     const SignatureAndVersion : [u8 ; 10] = gs.IDENTIFIER ~
-        [GAME_STATE_DATA_VERSION as u8, gs.VERSION, N_FLAG_ARRAYS, gs.N_U8_VARS, gs.N_U16_VARS, 0];
+        [~GAME_STATE_DATA_VERSION as u8, gs.VERSION, N_FLAG_ARRAYS, gs.N_U8_VARS, gs.N_U16_VARS, 0];
 }
 
 
