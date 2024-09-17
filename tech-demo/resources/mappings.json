@@ -32,7 +32,8 @@
      "key_guarding_rook_1",
      "key_guarding_rook_2",
      "arena_one",
-     "arena_two"
+     "arena_two",
+     null
    ],
    "u8_vars": [
      "player_health",

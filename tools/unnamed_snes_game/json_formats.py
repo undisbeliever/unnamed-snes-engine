@@ -785,7 +785,7 @@ class _Mappings_Helper(_Helper):
             if s is None:
                 # dummied out
                 pass
-            if not isinstance(s, str):
+            elif not isinstance(s, str):
                 self._raise_error("Expected a string", key, str(i))
             else:
                 sl = s.split(None, 1)
