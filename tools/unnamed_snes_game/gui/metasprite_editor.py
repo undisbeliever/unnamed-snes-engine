@@ -619,7 +619,7 @@ class SpritesheetTab:
 
         self._inputs: Final[list[gui.AbstractInput[Any]]] = [
             gui.NameInput(self.frame, "name", "Name:"),
-            gui.PngFilenameInput(self.frame, "palette", "Palette Image: "),
+            gui.NameInput(self.frame, "palette", "Palette: "),
             gui.IntInput(self.frame, "firstTile", "First Tile ID:"),
             gui.IntInput(self.frame, "endTile", "End Tile ID:"),
         ]
