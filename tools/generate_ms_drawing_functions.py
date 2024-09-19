@@ -14,13 +14,19 @@ def generate_pattern_code(out: StringIO, pattern: MsPattern) -> None:
         f"""
 // DB = 0x7e
 #[mem8, idx16]
+func __{pattern.name}_return() {{
+}}
+
+
+// DB = 0x7e
+#[mem8, idx16]
 func {pattern.name}(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {{
     xx = yy;
 
-    _subtract_ms_offset_from_position(xx, xPos, yPos);
-
     yy = bufferPos;
-    return if negative || yy < {(len(pattern.objects)-1) * 4};
+    goto __{pattern.name}_return if negative || yy < {(len(pattern.objects)-1) * 4};
+
+    _subtract_ms_offset_from_position(xx, xPos, yPos);
 
 """
     )

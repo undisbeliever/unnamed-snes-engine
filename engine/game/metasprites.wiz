@@ -1558,6 +1558,8 @@ namespace drawing_functions {
 #[mem8, idx16]
 inline func _subtract_ms_offset_from_position(msFrame : u16 in xx, xPos : u16 in metasprites.xPos, yPos : u16 in metasprites.yPos) {
 
+    // MUST not modify xx or yy
+
     <:xPos = a = <:xPos - MsDataFormat.xOffset[unaligned xx];
     if !carry {
         (>:xPos)--;
