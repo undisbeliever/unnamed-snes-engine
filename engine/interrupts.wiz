@@ -19,6 +19,12 @@ var nmiCounter : u8;
 in code {
 
 
+let invalid_handler = break_handler;
+
+// No IRQ interrupts in the engine
+let irq_handler = break_handler;
+
+
 #[nmi]
 func nmi_handler() {
     mem8();
@@ -35,12 +41,6 @@ func nmi_handler() {
     }
 
     nmireturn;
-}
-
-
-#[irq]
-func irq_handler() {
-    irqreturn;
 }
 
 
@@ -78,15 +78,6 @@ func break_handler() {
         }
     }
 }
-
-
-#[irq]
-func invalid_handler() {
-    // ::TODO show Red Screen of Death::
-    while true {
-    }
-}
-
 
 }
 
