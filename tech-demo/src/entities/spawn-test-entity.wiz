@@ -24,8 +24,6 @@ var SoA_counter : [ u8 ; SoA.BA_SIZE ] in SoA.var_0_l;
 
 in code {
 
-let ms_draw_function = ms.dungeon.Skull.pattern;
-
 
 // Entity process routine.
 //

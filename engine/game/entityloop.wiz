@@ -4,6 +4,7 @@
 import "src/memmap";
 
 import "metasprites";
+import "entity-functions";
 import "../entity_api";
 
 import "gen/entities";
@@ -77,8 +78,7 @@ func init() {
             aa = entities._blank_entity_function as u16;
             entities.SoA.process_function[unaligned x] = aa as func(u8 in x);
 
-            aa = entities._blank_ms_draw_function as u16;
-            entities.SoA.ms_draw_function[unaligned x] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
+            (&entities.SoA.__msDrawFunction[0] as *u16)[unaligned x] = MsDrawFunction.null as u16;
 
             // Clear entity shadow
             (&entities.SoA._shadowSizeAndIsEnemy as *u16)[unaligned x] = 0;
@@ -161,9 +161,15 @@ var _init_function_u16 : u16 in zpTmp_word_0;
                 (&entities.SoA._shadowSizeAndIsEnemy[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.shadowSize__u16[unaligned xx];
                 (&entities.SoA.tileHitbox[0].first as *u16)[unaligned yy] = aa = metasprites.MsFsData.tileHitbox[unaligned xx];
 
-                (&<:entities.SoA.ms_draw_function[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.drawFunction[unaligned xx];
                 (&<:entities.SoA.metaSpriteFrameTable[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.frameTable[unaligned xx];
                 (&<:entities.SoA.msAnimationTable[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.animationTable[unaligned xx];
+
+                mem8();
+                #[mem8] {
+                    a = metasprites.MsFsData.drawFunction[unaligned xx];
+                    entities.SoA.msDrawFunction[unaligned yy] = a as MsDrawFunction;
+                }
+                mem16();
             }
             idx8();
 
@@ -231,15 +237,13 @@ var _init_function_u16 : u16 in zpTmp_word_0;
                 #[mem16] {
                     aa = entities._blank_entity_function as u16;
                     entities.SoA.process_function[unaligned y] = aa as func(u8 in x);
-
-                    aa = entities._blank_ms_draw_function as u16;
-                    entities.SoA.ms_draw_function[unaligned y] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
                 }
                 mem8();
 
-                // Clear entity shadow
+                // Clear entity shadow and do not draw the entity.
                 x = y;
-                entities.SoA.shadowSize[x] = metasprites.ShadowSize.NONE;
+                entities.SoA.shadowSize[unaligned x] = metasprites.ShadowSize.NONE;
+                entities.SoA.msDrawFunction[unaligned x] = MsDrawFunction.null;
             }
         }
     }
@@ -364,11 +368,10 @@ inline func process_active_entities()
                             // Set process_function and ms_draw_function to a blank function (just in case they are accidentally called)
                             aa = entities._blank_entity_function as u16;
                             entities.SoA.process_function[unaligned y] = aa as func(u8 in x);
-
-                            aa = entities._blank_ms_draw_function as u16;
-                            entities.SoA.ms_draw_function[unaligned y] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
                         }
                         mem8();
+
+                        entity_functions.set_ms_draw_function(y, MsDrawFunction.null);
 
 
                         // Do not draw a shadow on unused entities.
@@ -529,13 +532,6 @@ func _blank_entity_function(entityId : u8 in y) {
 //
 // DB = 0x7e
 func _blank_player_function() {
-}
-
-
-// A special blank MS drawing function that does nothing.
-//
-// DB = 0x7e
-func _blank_ms_draw_function(msFrame : u16 in yy, xPos : u16 in metasprites.xPos, yPos : u16 in metasprites.yPos) {
 }
 
 }

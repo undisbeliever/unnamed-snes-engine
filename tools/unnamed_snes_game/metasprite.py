@@ -179,7 +179,7 @@ class FramesetData(NamedTuple):
     ms_export_order: Name
     shadow_size: Name
     tile_hitbox: TileHitbox
-    pattern: Name
+    pattern: Optional[Name]
     frames: list[FrameData]
     # engine animation data
     animations: list[bytes]
@@ -211,7 +211,7 @@ class MsFsEntry(NamedTuple):
     fullname: ScopedName
     ms_export_order: Name
     header: bytes
-    pattern: Name
+    pattern: Optional[Name]
 
     # `int` is an offset into `bytes` that points to the start of the MsDataFormat data
     #   0 for static tileset frames
@@ -1154,7 +1154,7 @@ def build_frameset(
     if len(patterns_used) == 1:
         pattern_name = next(iter(patterns_used))
     else:
-        pattern_name = "dynamic_pattern"
+        pattern_name = None
 
     unused_frames = frames.keys() - exported_frame_ids.keys()
     if unused_frames:
@@ -1316,14 +1316,14 @@ def build_dynamic_msfs_entry(
 def build_ms_fs_data(
     dynamic_spritesheet: DynamicMsSpritesheet,
     static_spritesheets: list[list[MsFsEntry]],
-    symbols: dict[str, int],
+    ms: MsExportOrder,
     mapmode: MemoryMapMode,
 ) -> tuple[RomData, dict[ScopedName, tuple[int, Name]]]:
     # Return: tuple(rom_data, dict fs_fullname -> tuple(addr, export_order))
 
     spritesheets: Final = [dynamic_spritesheet.msfs_entries] + static_spritesheets
 
-    MS_FRAMESET_FORMAT_SIZE = 9
+    MS_FRAMESET_FORMAT_SIZE = 8
 
     rom_data = RomData(mapmode.bank_start, mapmode.bank_size)
 
@@ -1342,18 +1342,20 @@ def build_ms_fs_data(
             frame_table_addr = rom_data.insert_ms_frame_addr_table(fs.frames)
             animation_table_addr = rom_data.insert_data_addr_table(fs.animations)
 
-            drawing_function = symbols[f"metasprites.drawing_functions.{ fs.pattern }"] & 0xFFFF
+            if fs.pattern:
+                drawing_function = ms.patterns[fs.pattern].id
+            else:
+                drawing_function = ms.dynamic_pattern_id
 
             fs_table[fs_pos : fs_pos + 3] = fs.header
 
-            fs_table[fs_pos + 3] = drawing_function & 0xFF
-            fs_table[fs_pos + 4] = drawing_function >> 8
+            fs_table[fs_pos + 3] = drawing_function
 
-            fs_table[fs_pos + 5] = frame_table_addr & 0xFF
-            fs_table[fs_pos + 6] = frame_table_addr >> 8
+            fs_table[fs_pos + 4] = frame_table_addr & 0xFF
+            fs_table[fs_pos + 5] = frame_table_addr >> 8
 
-            fs_table[fs_pos + 7] = animation_table_addr & 0xFF
-            fs_table[fs_pos + 8] = animation_table_addr >> 8
+            fs_table[fs_pos + 6] = animation_table_addr & 0xFF
+            fs_table[fs_pos + 7] = animation_table_addr >> 8
 
             fs_pos += MS_FRAMESET_FORMAT_SIZE
 

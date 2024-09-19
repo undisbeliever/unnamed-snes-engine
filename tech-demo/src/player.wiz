@@ -254,14 +254,14 @@ func init_metasprites() {
 
     mem16();
     #[mem16] {
-        // Set player's ms_draw function
-        aa = ms_draw_function as u16;
-        entities.SoA.ms_draw_function[0] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
-
         entities.SoA.metaSpriteFrameTable[0] = aa = metasprites.MsFsData.frameTable[unaligned MS_FS_DATA_ADDR];
         entities.SoA.msAnimationTable[0] = aa = metasprites.MsFsData.animationTable[unaligned MS_FS_DATA_ADDR];
     }
     mem8();
+
+    // Set player's ms_draw function
+    a = MsDrawFunction.draw_player as u8;
+    entities.SoA.msDrawFunction[0] = a as MsDrawFunction;
 
     metasprites.init_player_metasprite_animation__inline();
 
@@ -364,50 +364,6 @@ func validate_player_health() {
     a = gs.get_u8(gs.var8.player_health);
     if a < STARTING_MIN_PLAYER_HEALTH {
         gs.set_u8(gs.var8.player_health, STARTING_MIN_PLAYER_HEALTH);
-    }
-}
-
-
-
-// METASPRITES
-// ===========
-
-
-
-// Metasprite drawing function.
-//
-// Draws the player and the `itemAboveHead_msFrameAddr` MetaSprite (if non-zero)
-//
-// DB = 0x7e
-#[mem8, idx16]
-func ms_draw_function(msFrame : u16 in yy, ms_xPos : u16 in metasprites.xPos, ms_yPos : u16 in metasprites.yPos) {
-
-// Safe (for now) - MS drawing functions do not use zpTmp variables.
-var _tmpX : u16 in zpTmp_word_0;
-var _tmpY : u16 in zpTmp_word_1;
-
-    dynamicMsFrameAddr = yy;
-
-    // I need to save a copy of metasprite position
-    // Required when holding items during room transitions (cannot calculate metasprite position from player position).
-    _tmpX = xx = metasprites.xPos;
-    _tmpY = xx = metasprites.yPos;
-
-    metasprites.drawing_functions.dynamic_pattern(yy, metasprites.xPos, metasprites.yPos);
-
-    // The metasprite drawing function changes the metasprite xPos/yPos variables
-
-
-    yy = itemAboveHead_msFrameAddr;
-    if !zero {
-        mem16();
-        #[mem16] {
-            metasprites.xPos = aa = _tmpX;
-            metasprites.yPos = aa = _tmpY - ITEM_ABOVE_HEAD_Y_OFFSET;
-        }
-        mem8();
-
-        ^return metasprites.drawing_functions.dynamic_pattern(yy, metasprites.xPos, metasprites.yPos);
     }
 }
 

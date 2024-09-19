@@ -37,8 +37,7 @@ struct MsFramesetFormat {
     shadowSize : ShadowSize,
     tileHitbox : [u8; 2],
 
-    // func(msFrame : u16 in yy, xPos : u16 in metasprites.xPos, yPos : u16 in metasprites.yPos)
-    drawFunction : func,
+    drawFunction : u8,
 
     // List of pointers to `MsDataFormat` entries
     frameTable : *const *const u8,
@@ -55,9 +54,9 @@ namespace MsFsData {
             let shadowSize__u16 = (_base + 0) as far *u16;
 
     let tileHitbox      = (_base + 1) as far *u16;
-    let drawFunction    = (_base + 3) as far *u16;
-    let frameTable      = (_base + 5) as far *u16;
-    let animationTable  = (_base + 7) as far *u16;
+    let drawFunction    = (_base + 3) as far *u8;
+    let frameTable      = (_base + 4) as far *u16;
+    let animationTable  = (_base + 6) as far *u16;
 };
 
 
@@ -822,11 +821,15 @@ inline func _draw_entity__inline(entityId : u8 in y) {
     >:yPos = a = a -# 0;
 
 
-    idx16();
+    x = entities.SoA.msDrawFunction[unaligned y] as u8;
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        yy = aa = entities.SoA.msFrameAddr[unaligned yy];
+    }
+    mem8();
     #[mem8, idx16] {
-        xx = yy;
-        yy = entities.SoA.msFrameAddr[unaligned xx];
-        entities.SoA.ms_draw_function[unaligned xx](yy, xPos, yPos);
+        drawing_functions.ms_draw_function_table[unaligned xx](yy, xPos, yPos);
     }
     mem8_idx8();
 }
@@ -1651,7 +1654,7 @@ func dynamic_pattern(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos
         xx = aa;
     }
 
-    return ms_patterns_table[unaligned xx](yy, xPos, yPos);
+    return ms_draw_function_table[unaligned xx](yy, xPos, yPos);
 }
 
 

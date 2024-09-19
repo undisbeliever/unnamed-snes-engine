@@ -1,0 +1,55 @@
+// Copyright (c) 2024, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "memmap";
+
+import "player";
+import "engine/game/metasprites";
+
+namespace metasprites {
+namespace drawing_functions {
+
+in code {
+
+// Player metasprite drawing function.
+//
+// Draws the player and the `itemAboveHead_msFrameAddr` MetaSprite (if non-zero)
+//
+// DB = 0x7e
+#[mem8, idx16]
+func draw_player(msFrame : u16 in yy, ms_xPos : u16 in metasprites.xPos, ms_yPos : u16 in metasprites.yPos) {
+
+// Safe (for now) - MS drawing functions do not use zpTmp variables.
+var _tmpX : u16 in zpTmp_word_0;
+var _tmpY : u16 in zpTmp_word_1;
+
+    player.dynamicMsFrameAddr = yy;
+
+    // I need to save a copy of metasprite position
+    // Required when holding items during room transitions (cannot calculate metasprite position from player position).
+    _tmpX = xx = metasprites.xPos;
+    _tmpY = xx = metasprites.yPos;
+
+    metasprites.drawing_functions.dynamic_pattern(yy, metasprites.xPos, metasprites.yPos);
+
+    // The metasprite drawing function changes the metasprite xPos/yPos variables
+
+
+    yy = player.itemAboveHead_msFrameAddr;
+    if !zero {
+        mem16();
+        #[mem16] {
+            metasprites.xPos = aa = _tmpX;
+            metasprites.yPos = aa = _tmpY - player.ITEM_ABOVE_HEAD_Y_OFFSET;
+        }
+        mem8();
+
+        ^return metasprites.drawing_functions.dynamic_pattern(yy, metasprites.xPos, metasprites.yPos);
+    }
+}
+
+}
+
+}
+}
+

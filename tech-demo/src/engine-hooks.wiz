@@ -7,11 +7,11 @@ import "joypad";
 import "rng";
 
 import "gen/enums";
-import "gen/ms-drawing-functions";
 
 import "engine/audio";
 import "engine/entity_api";
 import "engine/game/gamestate";
+import "engine/game/metasprites";
 import "engine/resources/resources";
 
 // ::TODO remove::

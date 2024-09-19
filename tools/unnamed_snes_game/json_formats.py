@@ -314,7 +314,7 @@ class _Helper:
                 self._raise_error(f"Invalid name: {s}", key, str(i))
         return l
 
-    def get_name_list_mapping(self, key: str, max_items: Optional[int] = None) -> OrderedDict[Name, int]:
+    def get_name_list_mapping(self, key: str) -> OrderedDict[Name, int]:
         l = self.get_name_list(key)
 
         out: OrderedDict[Name, int] = OrderedDict()
@@ -323,6 +323,18 @@ class _Helper:
             if s in out:
                 self._raise_error(f"Duplicate name: { s }", key, str(i))
             out[s] = i
+
+        return out
+
+    def get_name_list_mapping_2(self, key: str, start: int, mul: int) -> OrderedDict[Name, int]:
+        l = self.get_name_list(key)
+
+        out: OrderedDict[Name, int] = OrderedDict()
+
+        for i, s in enumerate(l):
+            if s in out:
+                self._raise_error(f"Duplicate name: { s }", key, str(i))
+            out[s] = i * mul + start
 
         return out
 
@@ -582,6 +594,8 @@ class MseoDynamicMsFsSettings(NamedTuple):
 
 class MsExportOrder(NamedTuple):
     patterns: OrderedDict[Name, MsPattern]
+    custom_draw_functions: OrderedDict[Name, int]
+    dynamic_pattern_id: int
     shadow_sizes: OrderedDict[Name, int]
     animation_lists: OrderedDict[Name, MsAnimationExportOrder]
     dynamic_metasprites: OrderedDict[Name, MseoDynamicMsFsSettings]
@@ -631,11 +645,22 @@ def load_ms_export_order_json(filename: Filename) -> MsExportOrder:
     jh = _load_json_file(filename, _MSEO_Helper)
 
     patterns = jh.build_ordered_dict_from_list(
-        "patterns", MsPattern, 256, lambda p, name, i: MsPattern(name=name, id=i * 2, objects=p.get_pattern_objects("objects"))
+        "patterns", MsPattern, 256, lambda p, name, i: MsPattern(name=name, id=(i + 1) * 2, objects=p.get_pattern_objects("objects"))
     )
+
+    if len(patterns) > 1:
+        first_custom_id = 2 << (len(patterns)).bit_length()
+    else:
+        first_custom_id = 2
+
+    custom_draw_functions = jh.get_name_list_mapping_2("custom_draw_functions", first_custom_id, 2)
+
+    dynamic_pattern_id = first_custom_id + len(custom_draw_functions) * 2
 
     return MsExportOrder(
         patterns=patterns,
+        custom_draw_functions=custom_draw_functions,
+        dynamic_pattern_id=dynamic_pattern_id,
         shadow_sizes=jh.get_name_list_mapping("shadow_sizes"),
         animation_lists=jh.get_animation_eo_lists("animation_lists"),
         dynamic_metasprites=jh.get_dynamic_metasprites("dynamic_metasprites"),

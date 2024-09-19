@@ -926,7 +926,12 @@ class ProjectCompiler:
         self.data_store.set_dyanamic_ms_data(d)
 
     def __compile_msfs_and_entity_data(self) -> None:
-        if self.__shared_input.mappings is None or self.__shared_input.entities is None or self.__shared_input.symbols is None:
+        if (
+            self.__shared_input.mappings is None
+            or self.__shared_input.entities is None
+            or self.__shared_input.ms_export_order is None
+            or self.__shared_input.symbols is None
+        ):
             self._log_cannot_compile_si_error("MsFs and Entity Data")
             self.data_store.set_msfs_and_entity_data(None)
             return
@@ -942,7 +947,10 @@ class ProjectCompiler:
             try:
                 static_msfs_lists = cast(list[list[MsFsEntry]], optional_msfs_lists)
                 rom_data, ms_map = build_ms_fs_data(
-                    dynamic_ms_data, static_msfs_lists, self.__shared_input.symbols, self.__shared_input.mappings.memory_map.mode
+                    dynamic_ms_data,
+                    static_msfs_lists,
+                    self.__shared_input.ms_export_order,
+                    self.__shared_input.mappings.memory_map.mode,
                 )
                 ms_fs_data = bytes(rom_data.data())
                 entity_rom_data = create_entity_rom_data(self.__shared_input.entities, self.__shared_input.symbols, ms_map)

@@ -170,6 +170,9 @@
       ]
     }
   ],
+  "custom_draw_functions": [
+    "draw_player"
+  ],
   "shadow_sizes": [
     "NONE",
     "SMALL",

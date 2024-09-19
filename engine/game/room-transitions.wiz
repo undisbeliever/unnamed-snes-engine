@@ -22,6 +22,7 @@ import "../room-events-api";
 import "src/engine-hooks";
 
 import "gen/enums";
+import "gen/entities";
 
 
 namespace room_transitions {
@@ -65,22 +66,15 @@ enum ScrollDirection : u8 {
 //
 // (Structure of Word Arrays)
 namespace SpriteList {
-    in lowram {
-        // Metasprite draw function.
-        //
-        // DB = 0x7e
-        #[mem8, idx8]
-        var ms_draw_function : [func(msFrame : u16 in yy, xPos : u16 in metasprites.xPos, yPos : u16 in metasprites.yPos) ; N_SPRITE_LIST_ELEMENTS];
-    }
-
     in wram7e {
         var xPos : [u16 ; N_SPRITE_LIST_ELEMENTS];
         var yPos : [u16 ; N_SPRITE_LIST_ELEMENTS];
         var zPos : [u16 ; N_SPRITE_LIST_ELEMENTS];
         var msFrameAddr : [u16 ; N_SPRITE_LIST_ELEMENTS];
 
-        var _shadowSizeAndBlank : [ entities._u8pair ; N_SPRITE_LIST_ELEMENTS];
-            var shadowSize @ &_shadowSizeAndBlank[0].first : [ metasprites.ShadowSize ; N_SPRITE_LIST_ELEMENTS * 2 - 1];
+        var _shadowSizeAndMsDrawFunction : [ entities._u8pair ; N_SPRITE_LIST_ELEMENTS];
+            var shadowSize @ &_shadowSizeAndMsDrawFunction[0].first : [ metasprites.ShadowSize ; N_SPRITE_LIST_ELEMENTS * 2 - 1];
+            var msDrawFunction @ &_shadowSizeAndMsDrawFunction[0].second : [ MsDrawFunction ; N_SPRITE_LIST_ELEMENTS * 2 - 1];
     }
 }
 
@@ -510,11 +504,15 @@ var _activeEntitiesTablePos : u8 in zpTmp_byte_0;
                     SpriteList.xPos[unaligned x] = aa = ((&entities.SoA.xPos[0].px as *u16)[unaligned y] & 0xff) + CAMERA_ORIGIN;
                     SpriteList.yPos[unaligned x] = aa = ((&entities.SoA.yPos[0].px as *u16)[unaligned y] & 0xff) + CAMERA_ORIGIN;
                     SpriteList.zPos[unaligned x] = aa = ((&entities.SoA._zPosAndDeathFunction[0].first as *u16)[unaligned y] & 0xff);
-                    (&SpriteList.ms_draw_function[0] as *u16)[unaligned x] = aa = entities.SoA.ms_draw_function[unaligned y] as u16;
                     SpriteList.msFrameAddr[unaligned x] = aa = entities.SoA.msFrameAddr[unaligned y];
-                    (&SpriteList._shadowSizeAndBlank[0] as *u16)[unaligned x] = aa = (&entities.SoA._shadowSizeAndIsEnemy[0] as *u16)[unaligned y];
                 }
                 mem8();
+
+                a = entities.SoA.shadowSize[unaligned y] as u8;
+                SpriteList.shadowSize[unaligned x] = a as metasprites.ShadowSize;
+
+                a = entities.SoA.msDrawFunction[unaligned y] as u8;
+                SpriteList.msDrawFunction[unaligned x] = a as MsDrawFunction;
 
                 x++;
                 x++;
@@ -541,11 +539,15 @@ func _sprite_list_set_player_with_offset(sd : ScrollDirection in scrollDirection
         SpriteList.yPos[PLAYER_ID] = aa = ((&entities.SoA.yPos[0].px as *u16)[PLAYER_ID] & 0xff) + CAMERA_ORIGIN + ScrollDirectionTableY[unaligned x] as u16;
         SpriteList.zPos[PLAYER_ID] = aa = ((&entities.SoA._zPosAndDeathFunction[0].first as *u16)[PLAYER_ID] & 0xff);
 
-        (&SpriteList.ms_draw_function[0] as *u16)[PLAYER_ID] = aa = entities.SoA.ms_draw_function[PLAYER_ID] as u16;
         SpriteList.msFrameAddr[PLAYER_ID] = aa = entities.SoA.msFrameAddr[PLAYER_ID];
-        (&SpriteList._shadowSizeAndBlank[0] as *u16)[PLAYER_ID] = aa = (&entities.SoA._shadowSizeAndIsEnemy[0] as *u16)[PLAYER_ID];
     }
     mem8();
+
+    a = entities.SoA.shadowSize[unaligned PLAYER_ID] as u8;
+    SpriteList.shadowSize[unaligned PLAYER_ID] = a as metasprites.ShadowSize;
+
+    a = entities.SoA.msDrawFunction[unaligned PLAYER_ID] as u8;
+    SpriteList.msDrawFunction[unaligned PLAYER_ID] = a as MsDrawFunction;
 }
 
 
@@ -629,11 +631,13 @@ func draw_sprite_list() {
 
                 metasprites.xPos = aa = SpriteList.xPos[unaligned xx] - camera_x;
                 metasprites.yPos = aa = SpriteList.yPos[unaligned xx] - SpriteList.zPos[unaligned xx] - camera_y;
+
+                yy = SpriteList.msFrameAddr[unaligned xx];
+                xx = aa = (&SpriteList.msDrawFunction as *u16)[unaligned xx] & 0xff;
             }
             mem8();
             #[mem8, idx16] {
-                yy = SpriteList.msFrameAddr[unaligned xx];
-                SpriteList.ms_draw_function[unaligned xx](yy, metasprites.xPos, metasprites.yPos);
+                metasprites.drawing_functions.ms_draw_function_table[unaligned xx](yy, metasprites.xPos, metasprites.yPos);
             }
             mem8_idx8();
 

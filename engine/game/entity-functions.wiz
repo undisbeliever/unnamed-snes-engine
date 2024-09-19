@@ -30,11 +30,26 @@ func change_ms_frameset(entityId : u8 in y, entityType : entities.EntityTypes in
         xx = aa = xx << 1;
         xx = aa = (entity_rom_data.metasprite_framesets as far *u16)[unaligned xx];
 
-        (&<:entities.SoA.ms_draw_function[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.drawFunction[unaligned xx];
         (&<:entities.SoA.metaSpriteFrameTable[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.frameTable[unaligned xx];
         (&<:entities.SoA.msAnimationTable[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.animationTable[unaligned xx];
+
+        mem8();
+        #[mem8] {
+            a = metasprites.MsFsData.drawFunction[unaligned xx];
+            entities.SoA.msDrawFunction[unaligned yy] = a as MsDrawFunction;
+        }
     }
     mem8_idx8();
+}
+
+
+// Set the entity's msDrawFunction.
+//
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+inline func set_ms_draw_function(entityId : u8 in y, draw_function : MsDrawFunction in a) {
+    entities.SoA.msDrawFunction[unaligned y] = draw_function;
 }
 
 

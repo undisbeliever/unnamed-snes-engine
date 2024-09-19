@@ -4,6 +4,7 @@
 import "src/memmap";
 import "game/metasprites";
 
+import "gen/entities";
 
 let PLAYER_ENTITY_ID = 0;
 
@@ -97,18 +98,19 @@ namespace entities {
             // DB = 0x7e
             #[mem8, idx8]
             var process_function : [func(entityId : u8 in y) ; N_ENTITIES];
+        }
 
-
+        in wram7e_roomstate {
             // Metasprite draw function.
             //
             // INPUT: Y = entityId: index into `entities.SoA` Structure-of-Arrays.
             //
             // DB = 0x7e
             #[mem8, idx8]
-            var ms_draw_function : [func(msFrame : u16 in yy, xPos : u16 in metasprites.xPos, yPos : u16 in metasprites.yPos) ; N_ENTITIES];
-        }
+            var __msDrawFunction : [_u8pair ; N_ENTITIES];
+                var msDrawFunction @ &__msDrawFunction[0].first : [MsDrawFunction ; BA_SIZE];
 
-        in wram7e_roomstate {
+
             var xPos : [pos ; N_ENTITIES];
                 var xPos_u16 @ &xPos[0]    : [u16 ; N_ENTITIES];
                 var xPos_sx  @ &xPos[0].sx : [u8  ; BA_SIZE];
@@ -365,6 +367,6 @@ namespace entities {
     // Miscellaneous entity functions
     import "game/entity-functions";
     let change_ms_frameset = entity_functions.change_ms_frameset;
+    let set_ms_draw_function = entity_functions.set_ms_draw_function;
 }
-
 
