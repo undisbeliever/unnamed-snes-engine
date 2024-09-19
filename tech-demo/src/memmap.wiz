@@ -19,8 +19,10 @@ config {
 }
 
 
-bank rodata0    @ 0xc00000 : [constdata; 0x8000];
-bank code       @ 0x808000 : [constdata; 0x8000];
+bank rodata0         @ 0xc00000 : [constdata; 0x8000];
+bank code            @ 0x808000 : [constdata; 0x7f97];
+bank code_interrupts @ 0x80ff97 : [constdata;   0x19];
+bank rom_header      @ 0x80ffb0 : [constdata;   0x50];
 
 bank _resources @ 0xc10000 : [constdata; 0x10000 * 3];
 
@@ -60,7 +62,7 @@ let STACK_TOP = 0x1fff;
 let STACK_BOTTOM = 0x1f80;
 
 
-in code {
+in rom_header {
 
 // Define interrupt vectors
 

@@ -17,12 +17,12 @@ in lowram {
 }
 
 
-in code {
+in rom_header {
+    const @ 0x80ffb6 : u8 = 0;
+    extern const empty_byte @ 0x80ffb6 : u8;
+}
 
-
-const @ 0x80ffb6 : u8 = 0;
-extern const empty_byte @ 0x80ffb6 : u8;
-
+in code_interrupts {
 
 // Reset handler MUST NOT be called by this code
 // (The S-SMP cannot be reset by S-CPU code)
@@ -31,6 +31,10 @@ func __reset() {
     goto __reset_far;
 }
 
+}
+
+
+in code {
 
 // Reset handler MUST NOT be called by this code
 // (The S-SMP cannot be reset by S-CPU code)

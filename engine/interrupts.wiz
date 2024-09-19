@@ -16,7 +16,7 @@ var nmiCounter : u8;
 }
 
 
-in code {
+in code_interrupts {
 
 
 let invalid_handler = break_handler;
@@ -44,12 +44,27 @@ func nmi_handler() {
 }
 
 
+
+// noreturn
 #[irq]
 func break_handler() {
-    nointerrupt = true;
-    decimal = false;
     carry = false;
     swap_carry_emulation();
+
+    goto __break_handler;
+}
+
+}
+
+
+in code {
+
+// REQUIRES: native mode
+// noreturn
+#[fallthrough]
+far func __break_handler() {
+    nointerrupt = true;
+    decimal = false;
 
     push8(program_bank);
     data_bank = pop8();
@@ -80,5 +95,4 @@ func break_handler() {
 }
 
 }
-
 
