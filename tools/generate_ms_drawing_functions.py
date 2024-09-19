@@ -10,10 +10,6 @@ from unnamed_snes_game.json_formats import load_ms_export_order_json, MsPattern,
 
 
 def generate_pattern_code(out: StringIO, pattern: MsPattern) -> None:
-    # Kept `square_four_32` in `src/metasprites.wiz` as an example
-    if pattern.name == "square_four_32":
-        return
-
     out.write(
         f"""
 // DB = 0x7e
