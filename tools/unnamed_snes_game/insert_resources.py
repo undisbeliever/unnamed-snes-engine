@@ -261,7 +261,7 @@ def insert_resources(sfc_view: memoryview, data_store: DataStore) -> ResourceUsa
     validate_entity_rom_data_symbols(symbols, n_entities)
 
     ri = ResourceInserter(sfc_view, symbols, mappings, data_store.get_n_resources())
-    ri.confirm_initial_data_is_correct(ENTITY_ROM_DATA_LABEL, expected_blank_entity_rom_data(symbols, n_entities))
+    ri.confirm_initial_data_is_correct(ENTITY_ROM_DATA_LABEL, expected_blank_entity_rom_data(n_entities))
 
     ri.insert_blob_into_start_of_bank(MS_FS_DATA_BANK_OFFSET, msfs_entity_data.msfs_data)
     ri.insert_blob_into_start_of_bank(DYNAMIC_SPRITE_TILES_BANK_OFFSET, dynamic_ms_data.tile_data)

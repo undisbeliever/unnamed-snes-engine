@@ -44,13 +44,8 @@ func change_to_smoke_entity(entityId : u8 in y, animation : u8 in x) {
     // Do not kill the entity on the next frame
     SoA.health[y] = a = 1;
 
-    mem16();
-    #[mem16] {
-        (&SoA.process_function[0] as *u16)[unaligned y] = aa = &process as u16;
-    }
-    mem8();
-
-    ^return change_ms_frameset(y, EntityTypes.smoke_particles);
+    // Transform the entity
+    ^return set_entity_function_and_change_ms_frameset(y, EntityFunction.smoke_particles, EntityTypes.smoke_particles);
 }
 
 

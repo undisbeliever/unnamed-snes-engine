@@ -14,6 +14,20 @@ namespace entity_functions {
 in code {
 
 
+// Set the entity's entityFunction and change the entity's MetaSprite frameset.
+//
+// CAUTION: See change_ms_frameset()
+//
+// KEEP: Y
+// DB = 0x7e
+#[fallthrough, mem8, idx8]
+func set_entity_function_and_change_ms_frameset(entityId : u8 in y, entityFunction : entities.EntityFunction in a, entityType : entities.EntityTypes in x) {
+    entities.SoA.entityFunction[unaligned y] = entityFunction;
+
+// Fallthrough into change_ms_frameset
+}
+
+
 // Changes the MetaSprite frameset to match the one used by `entityType`.
 //
 // The ms animation MUST be changed before or after this function call.
@@ -40,6 +54,16 @@ func change_ms_frameset(entityId : u8 in y, entityType : entities.EntityTypes in
         }
     }
     mem8_idx8();
+}
+
+
+// Set the entity's entityFunction.
+//
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+inline func set_entity_function(entityId : u8 in y, entityFunction : entities.EntityFunction in a) {
+    entities.SoA.entityFunction[unaligned y] = entityFunction;
 }
 
 

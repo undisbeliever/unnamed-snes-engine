@@ -82,33 +82,30 @@ namespace entities {
         // Byte access size
         let BA_SIZE = N_ENTITIES * 2 - 1;
 
-
-        in lowram_roomstate {
-            // Process function for the entity.  Called once per frame by the entity loop.
-            //
-            // If the entity's health is 0 after this function is returned, the entity will be removed from the entity SoA.
-            //
-            // INPUT: entityId: index into `entities.SoA` Structure-of-Arrays.
-            //
-            // NOTE: `currentEntityId` will contain a copy of `entityId` to provide an easy
-            //       way to restore the X register if it gets overwritten.
-            //
-            // NOTE: The player entity (entityId 0) MUST NOT change this variable.
-            //
-            // DB = 0x7e
-            #[mem8, idx8]
-            var process_function : [func(entityId : u8 in y) ; N_ENTITIES];
-        }
-
         in wram7e_roomstate {
-            // Metasprite draw function.
-            //
-            // INPUT: Y = entityId: index into `entities.SoA` Structure-of-Arrays.
-            //
-            // DB = 0x7e
-            #[mem8, idx8]
-            var __msDrawFunction : [_u8pair ; N_ENTITIES];
-                var msDrawFunction @ &__msDrawFunction[0].first : [MsDrawFunction ; BA_SIZE];
+            var _entityAndMsDrawFunction : [_u8pair ; N_ENTITIES];
+                // Process function for the entity.  Called once per frame by the entity loop.
+                //
+                // If the entity's health is 0 after this function is returned, the entity will be removed from the entity SoA.
+                //
+                // INPUT: entityId: index into `entities.SoA` Structure-of-Arrays.
+                //
+                // NOTE: `currentEntityId` will contain a copy of `entityId` to provide an easy
+                //       way to restore the X register if it gets overwritten.
+                //
+                // NOTE: The player entity (entityId 0) MUST NOT change this variable.
+                //
+                // DB = 0x7e
+                #[mem8, idx8]
+                var entityFunction @ &_entityAndMsDrawFunction[0].first  : [EntityFunction ; BA_SIZE];
+
+                // Metasprite draw function.
+                //
+                // INPUT: Y = entityId: index into `entities.SoA` Structure-of-Arrays.
+                //
+                // DB = 0x7e
+                #[mem8, idx8]
+                var msDrawFunction  @ &_entityAndMsDrawFunction[0].second : [MsDrawFunction ; BA_SIZE];
 
 
             var xPos : [pos ; N_ENTITIES];
@@ -366,7 +363,9 @@ namespace entities {
 
     // Miscellaneous entity functions
     import "game/entity-functions";
+    let set_entity_function_and_change_ms_frameset = entity_functions.set_entity_function_and_change_ms_frameset;
     let change_ms_frameset = entity_functions.change_ms_frameset;
+    let set_entity_function = entity_functions.set_entity_function;
     let set_ms_draw_function = entity_functions.set_ms_draw_function;
 }
 

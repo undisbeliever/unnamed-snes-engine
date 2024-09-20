@@ -467,10 +467,10 @@ class EfParameter(NamedTuple):
 class EntityFunction(NamedTuple):
     name: Name
     id: int
+    source: str
     is_enemy: bool
     ms_export_order: Name
     parameter: Optional[EfParameter]
-    uses_process_function_from: Optional[Name]
 
 
 class EntityVision(NamedTuple):
@@ -535,14 +535,14 @@ def load_entities_json(filename: Filename) -> EntitiesJson:
     entity_functions = jh.build_ordered_dict_from_list(
         "entity_functions",
         EntityFunction,
-        256,
+        127,
         lambda ef, name, i: EntityFunction(
             name=name,
-            id=i,
+            id=(i + 1) * 2,
+            source=ef.get_string("source"),
             is_enemy=ef.get_bool("is_enemy"),
             ms_export_order=ef.get_name("ms-export-order"),
             parameter=ef.get_ef_parameter("parameter"),
-            uses_process_function_from=ef.get_optional_name("uses-process-function-from"),
         ),
     )
 

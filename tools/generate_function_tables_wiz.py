@@ -15,6 +15,7 @@ from unnamed_snes_game.json_formats import (
     Name,
     Mappings,
     EntitiesJson,
+    EntityFunction,
     CallbackDict,
     RoomEvent,
     SecondLayerCallback,
@@ -207,6 +208,39 @@ def gamemodes_table(out: StringIO, gamemodes: list[GameMode]) -> None:
     out.write("}\n\n")
 
 
+def entity_function_imports(out: StringIO, entity_functions: OrderedDict[Name, EntityFunction]) -> None:
+    for ef in entity_functions.values():
+        if '"' in ef.source:
+            raise ValueError(f"Invalid source value for entity_function: {ef.name}")
+        if "/" not in ef.source:
+            out.write(f'import "src/entities/{ef.source}";\n')
+        else:
+            out.write(f'import "../{ef.source}";\n')
+
+
+def entity_function_tables(out: StringIO, entity_functions: OrderedDict[Name, EntityFunction]) -> None:
+    n_functions: Final = len(entity_functions) + 1
+
+    def generate_table(table_name: str, fn_type: str, fn_name: str) -> None:
+        out.write(f"const { table_name } : [ { fn_type } ; { n_functions } ] = [\n")
+        out.write(f"  entities._null_{ fn_name }_function,\n")
+        for ef in entity_functions.values():
+            out.write(f"  entities.{ ef.name }.{ fn_name },\n")
+        out.write("];\n\n")
+
+    out.write("namespace entities {\n\n")
+
+    out.write(f"let N_ENTITY_FUNCTIONS = { n_functions };\n\n")
+
+    out.write("// DB = 0x7e\n")
+    generate_table("init_function_table", "func(entityId : u8 in y, parameter : u8 in x)", "init")
+
+    out.write("// DB = 0x7e\n")
+    generate_table("process_function_table", "func(entityId : u8 in y)", "process")
+
+    out.write("}\n\n")
+
+
 def generate_wiz_code(mappings: Mappings, entities_json: EntitiesJson) -> str:
     death_functions = entities_json.death_functions
     if not death_functions:
@@ -228,6 +262,7 @@ import "src/interactive-tiles";
 import "src/gamemodes/room-transition";
 import "engine/ms-palette-api";
 import "engine/game/metatiles";
+import "engine/game/entityloop";
 
 import "gen/enums";
 """
@@ -236,6 +271,7 @@ import "gen/enums";
         callback_imports(out, mappings.sl_callbacks, "sl-callbacks")
         callback_imports(out, mappings.ms_palette_callbacks, "ms-palette-callbacks")
         gamemodes_imports(out, mappings.gamemodes)
+        entity_function_imports(out, entities_json.entity_functions)
 
         out.write("\n")
         out.write("in code {\n\n")
@@ -264,6 +300,8 @@ import "gen/enums";
             "gamemodes.room_transition",
             mappings.room_transitions,
         )
+
+        entity_function_tables(out, entities_json.entity_functions)
 
         out.write("}\n")
 

@@ -38,6 +38,12 @@ def generate_wiz_code(entities_input: EntitiesJson, ms_export_orders: MsExportOr
             out.write(f"  { e.name },\n")
         out.write("};\n\n")
 
+        out.write("enum EntityFunction : u8 {\n")
+        out.write("  null = 0,\n")
+        for ef in entity_functions:
+            out.write(f"  {ef.name} = {ef.id},\n")
+        out.write("};\n\n")
+
         for ef in entity_functions:
             out.write(f"namespace { ef.name } {{\n")
 
