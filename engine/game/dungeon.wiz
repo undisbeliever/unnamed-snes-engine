@@ -532,7 +532,7 @@ LoadDungeon:
 #[mem8, idx8]
 func __finish_loading_room() {
     // Reset entity subsystem
-    entityloop.init();
+    entityloop.init__inline();
 
     a = room.dataType as u8;
     if a == RoomDataType.ROOM as u8 {
