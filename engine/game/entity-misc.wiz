@@ -9,7 +9,7 @@ import "entityloop";
 import "gen/entities";
 
 
-namespace entity_functions {
+namespace entity_misc {
 
 in code {
 

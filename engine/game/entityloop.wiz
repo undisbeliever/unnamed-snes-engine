@@ -4,7 +4,8 @@
 import "src/memmap";
 
 import "metasprites";
-import "entity-functions";
+import "entity-misc";
+
 import "../entity_api";
 
 import "gen/entities";
@@ -372,7 +373,7 @@ inline func process_active_entities()
                         }
                         mem8();
 
-                        entity_functions.set_ms_draw_function(y, MsDrawFunction.null);
+                        entity_misc.set_ms_draw_function(y, MsDrawFunction.null);
 
 
                         // Do not draw a shadow on unused entities.
