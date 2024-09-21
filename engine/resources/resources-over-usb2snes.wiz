@@ -197,9 +197,10 @@ func __send_request(rTypeTimes3 : u8 in x, resourceId : u8 in y) : u8 in a {
 
     push8(data_bank);
 
-    push8(program_bank);
+    a = 0x80;
+    push8(a);
     data_bank = pop8();
-// DB access registers
+// DB = 0x80
 
     // Flush any pending audio transfers
     // ::TODO create a separate buffer for audio data::
