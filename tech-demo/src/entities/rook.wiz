@@ -69,9 +69,10 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func init(entityId : u8 in y, parameter : u8 in x) {
-    SoA_dungeonFlag[y] = a = x;
+func init(entityId : u8 in y, parameter : u8 in a) {
+    SoA_dungeonFlag[y] = a;
 
+    x = a;
     zero = is_dungeon_flag_clear(x);
     if !zero {
         // The rook was destroyed up by a bomb on a previous visit.

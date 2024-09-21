@@ -72,9 +72,9 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func init(entityId : u8 in y, parameter : u8 in x) {
+func init(entityId : u8 in y, parameter : u8 in a) {
 
-    x = a = x << 1;
+    x = a = a << 1;
     mem16();
     #[mem16] {
         SoA.xVelocity[unaligned y] = aa = CosineTables.BossBombVelocity[unaligned x] as u16;

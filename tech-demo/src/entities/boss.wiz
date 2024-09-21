@@ -134,9 +134,8 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func init(entityId : u8 in y, parameter : gs.gf in x) {
+func init(entityId : u8 in y, parameter : gs.gf in a) {
 
-    a = x;
     SoA_globalFlag[y] = a as gs.gf;
     zero = is_global_flag_clear(x as gs.gf);
     if !zero {

@@ -27,7 +27,7 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func init(entityId : u8 in y, parameter : u8 in x) {
+func init(entityId : u8 in y, parameter : u8 in a) {
 
     SoA.yPos_px[y] = a = SoA.yPos_px[y] + SoA.zPos[y];
 }

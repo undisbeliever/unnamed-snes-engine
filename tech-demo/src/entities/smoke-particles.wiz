@@ -56,12 +56,12 @@ func change_to_smoke_entity(entityId : u8 in y, animation : u8 in x) {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func init(entityId : u8 in y, parameter : u8 in x) {
-    if x >= init_parameter.none as u8 {
+func init(entityId : u8 in y, parameter : u8 in a) {
+    if a >= init_parameter.none as u8 {
         entities.stop_ms_animation(y);
     }
     else {
-        entities.set_ms_animation_x(y, x);
+        entities.set_ms_animation(y, a);
     }
 }
 

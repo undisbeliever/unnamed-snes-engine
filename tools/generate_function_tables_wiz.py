@@ -233,7 +233,7 @@ def entity_function_tables(out: StringIO, entity_functions: OrderedDict[Name, En
     out.write(f"let N_ENTITY_FUNCTIONS = { n_functions };\n\n")
 
     out.write("// DB = 0x7e\n")
-    generate_table("init_function_table", "func(entityId : u8 in y, parameter : u8 in x)", "init")
+    generate_table("init_function_table", "func(entityId : u8 in y, parameter : u8 in a)", "init")
 
     out.write("// DB = 0x7e\n")
     generate_table("process_function_table", "func(entityId : u8 in y)", "process")

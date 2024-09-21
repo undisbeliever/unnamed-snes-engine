@@ -119,7 +119,6 @@ inline func init__inline() {
 // DB = 0x7e
 #[mem8, idx8]
 func spawn_entity(xPos : u8 in zpTmp_byte_0, yPos : u8 in zpTmp_byte_1, entityType : u8 in a, initParameter : u8 in y) {
-var _init_function_u16 : u16 in zpTmp_word_0;
 
     ^if a < entities.N_ENTITY_TYPES {
 
@@ -175,9 +174,6 @@ var _init_function_u16 : u16 in zpTmp_word_0;
             #[mem16, idx8] {
                 metasprites.init_entity_metasprite_animation__inline(y);
 
-                x = entities.SoA.entityFunction[unaligned y] as u8;
-                _init_function_u16 = aa = (far &entities.init_function_table as far *u16)[unaligned x];
-
                 // Clear unused data
                 // Required: No `stz.w addr,y` instruction.
                 x = y;
@@ -216,13 +212,14 @@ var _init_function_u16 : u16 in zpTmp_word_0;
             entities.SoA.yPos_px[x] = a;
             entities.SoA.yPos_sx[x] = 0;
 
-            // Call spawn function
-            x = pop8();
+            a = pop8();  // initParameter
 
             // Push entityId onto stack.
             // Y is NOT preserved by init function and the init function may call `spawn_entity`
             push8(y);
-            __spawn_entity__call_init_function_ptr(y, x, _init_function_u16);
+
+            x = entities.SoA.entityFunction[unaligned y] as u8;
+            entities.init_function_table[unaligned x](y, a);
 
             y = pop8();
 
@@ -270,20 +267,6 @@ inline func get_enemy_count_a() : u8 in a {
 inline func is_all_enemies_defeated() : bool in zero {
     a = _enemyCount as u8;
     return zero;
-}
-
-
-
-// Call the entity's init function (which is located in the temporary variable `zpTmp_word_0`)
-//
-// MUST ONLY BE CALLED BY `spawn_entity()`
-//
-// DB = 0x7e
-#[mem8, idx8]
-func __spawn_entity__call_init_function_ptr(entityId : u8 in y, parameter : u8 in x, init_function_u16 : u16 in zpTmp_word_0) {
-var _init_function_ptr : func(u8 in y, u8 in x) in init_function_u16;
-
-    return (*&_init_function_ptr)(y, x);
 }
 
 
@@ -513,7 +496,7 @@ in code {
 // A blank init process function that does nothing
 //
 // DB = 0x7e
-func _null_init_function(entityId : u8 in y, parameter : u8 in x) {
+func _null_init_function(entityId : u8 in y, parameter : u8 in a) {
 }
 
 

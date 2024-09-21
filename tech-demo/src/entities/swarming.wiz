@@ -167,7 +167,7 @@ func change_to_swarming_entity__player_sword_collision(entityId : u8 in y) {
 
 
 // (`init` function does not use a parameter)
-let init = _reset as func(entityId : u8 in y, parameter : u8 in x);
+let init = _reset as func(entityId : u8 in y, parameter : u8 in a);
 
 
 

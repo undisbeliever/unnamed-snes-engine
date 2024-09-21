@@ -85,11 +85,11 @@ in code {
 
 // DB = 0x7e
 #[mem8, idx8]
-func init(entityId : u8 in y, parameter : u8 in x) {
+func init(entityId : u8 in y, parameter : u8 in a) {
     // Do not spawn a bomb on the ground if the player is holding a bomb.
-    a = player.state as u8;
-    if a == player.State.HOLDING_BOMB as u8 {
-        if x == DROP_ACTIVE_BOMB_PARAMETER {
+    x = player.state as u8;
+    if x == player.State.HOLDING_BOMB as u8 {
+        if a == DROP_ACTIVE_BOMB_PARAMETER {
             // This bomb was spawned by the player.  It is an active bomb.
             set_state__active__inline(y);
         }
