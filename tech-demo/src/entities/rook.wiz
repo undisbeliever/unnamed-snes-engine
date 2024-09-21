@@ -72,8 +72,7 @@ in code {
 func init(entityId : u8 in y, parameter : u8 in a) {
     SoA_dungeonFlag[y] = a;
 
-    x = a;
-    zero = is_dungeon_flag_clear(x);
+    zero = is_dungeon_flag_clear_a(a);
     if !zero {
         // The rook was destroyed up by a bomb on a previous visit.
         // Do not show the 'entity dead' smoke particle.

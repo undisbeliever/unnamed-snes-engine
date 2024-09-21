@@ -222,6 +222,18 @@ func checked_dec_u16__mem8(gsVar16 : var16 in x) : bool in carry {
 // Returns true if the game flag is clear
 //
 // DB = 0x7e
+let is_global_flag_clear_a = __is_global_flag_clear_a as func(flag_id : gf in a) : bool in zero;
+#[fallthrough, mem8, idx8]
+func __is_global_flag_clear_a(flag_id : gf in a) {
+    x = a;
+
+// Fallthrough into is_global_flag_clear()
+}
+
+
+// Returns true if the game flag is clear
+//
+// DB = 0x7e
 #[mem8, idx8]
 func is_global_flag_clear(flag_id : gf in x) : bool in zero {
     y = a = x >>> 3;
@@ -229,6 +241,18 @@ func is_global_flag_clear(flag_id : gf in x) : bool in zero {
 
     a = gamestate.data.globalFlags[y] & _BitTable[x];
     return zero;
+}
+
+
+// Returns true if the game flag is clear (without clobbering the Y register)
+//
+// DB = 0x7e
+let is_global_flag_clear_a__keep_y = __is_global_flag_clear_a__keep_y as func(flag_id : gf in a) : bool in zero;
+#[fallthrough, mem8, idx8]
+func __is_global_flag_clear_a__keep_y(flag_id : gf in a) {
+    x = a;
+
+// Fallthrough into is_global_flag_clear__keep_y()
 }
 
 
@@ -255,6 +279,17 @@ var _tmp : u8 in zpTmp_byte_0;
 }
 
 
+
+// DB = 0x7e
+let set_global_flag_a = __set_global_flag_a as func(flag_id : u8 in a) : bool in zero;
+#[fallthrough, mem8, idx8]
+func __set_global_flag_a(flag_id : u8 in a) {
+    x = a;
+
+// Fallthrough into set_global_flag()
+}
+
+
 // DB = 0x7e
 #[mem8, idx8]
 func set_global_flag(flag_id : gf in x) {
@@ -266,8 +301,19 @@ func set_global_flag(flag_id : gf in x) {
 
 
 
+
 // KEEP: Y
-//
+// DB = 0x7e
+let set_global_flag_a__keep_y = __set_global_flag_a__keep_y as func(flag_id : u8 in a) : bool in zero;
+#[fallthrough, mem8, idx8]
+func __set_global_flag_a__keep_y(flag_id : u8 in a) {
+    x = a;
+
+// Fallthrough into set_global_flag__keep_y()
+}
+
+
+// KEEP: Y
 // DB = 0x7e
 #[mem8, idx8]
 func set_global_flag__keep_y(flag_id : gf in x) {
@@ -292,6 +338,18 @@ var _tmp : u8 in zpTmp_byte_0;
 // Returns true if the dungeon flag is clear
 //
 // DB = 0x7e
+let is_dungeon_flag_clear_a = __is_dungeon_flag_clear_a as func(flag_id : u8 in a) : bool in zero;
+#[fallthrough, mem8, idx8]
+func __is_dungeon_flag_clear_a(flag_id : u8 in a) {
+    x = a;
+
+// Fallthrough into is_dungeon_flag_clear()
+}
+
+
+// Returns true if the dungeon flag is clear
+//
+// DB = 0x7e
 #[mem8, idx8]
 func is_dungeon_flag_clear(flag_id : u8 in x) : bool in zero {
     y = a = x >>> 3;
@@ -302,10 +360,23 @@ func is_dungeon_flag_clear(flag_id : u8 in x) : bool in zero {
 }
 
 
+
 // Returns true if the dungeon flag is clear (without clobbering the Y register)
 //
-// KEEP: y
+// KEEP: Y
+// DB = 0x7e
+let is_dungeon_flag_clear_a__keep_y = __is_dungeon_flag_clear_a__keep_y as func(flag_id : u8 in a) : bool in zero;
+#[fallthrough, mem8, idx8]
+func __is_dungeon_flag_clear_a__keep_y(flag_id : u8 in a) {
+    x = a;
+
+// Fallthrough into is_dungeon_flag_clear__keep_y()
+}
+
+
+// Returns true if the dungeon flag is clear (without clobbering the Y register)
 //
+// KEEP: Y
 // DB = 0x7e
 #[mem8, idx8]
 func is_dungeon_flag_clear__keep_y(flag_id : u8 in x) : bool in zero {
@@ -325,6 +396,17 @@ var _tmp : u8 in zpTmp_byte_0;
 }
 
 
+// KEEP: Y
+// DB = 0x7e
+let set_dungeon_flag_a = __set_dungeon_flag_a as func(flag_id : u8 in a) : bool in zero;
+#[fallthrough, mem8, idx8]
+func __set_dungeon_flag_a(flag_id : u8 in a) {
+    x = a;
+
+// Fallthrough into set_dungeon_flag()
+}
+
+
 // DB = 0x7e
 #[mem8, idx8]
 func set_dungeon_flag(flag_id : u8 in x) {
@@ -334,6 +416,17 @@ func set_dungeon_flag(flag_id : u8 in x) {
     gamestate.data.dungeonFlags[y] = a = gamestate.data.dungeonFlags[y] | _BitTable[x];
 }
 
+
+
+// KEEP: Y
+// DB = 0x7e
+let set_dungeon_flag_a__keep_y = __set_dungeon_flag_a__keep_y as func(flag_id : u8 in a) : bool in zero;
+#[fallthrough, mem8, idx8]
+func __set_dungeon_flag_a__keep_y(flag_id : u8 in a) {
+    x = a;
+
+// Fallthrough into set_dungeon_flag__keep_y()
+}
 
 
 // KEEP: Y

@@ -137,7 +137,7 @@ in code {
 func init(entityId : u8 in y, parameter : gs.gf in a) {
 
     SoA_globalFlag[y] = a as gs.gf;
-    zero = is_global_flag_clear(x as gs.gf);
+    zero = is_global_flag_clear_a(a as gs.gf);
     if !zero {
         // The boss has already been defeated, do not show it.
         x = y;
