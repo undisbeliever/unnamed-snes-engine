@@ -399,10 +399,12 @@ var _roomTypeToLoad : u8 in __load_dungeon__roomTypeToLoad;
 
     a = _roomTypeToLoad as u8;
     if a != LoadDungeonRoomType.ROOMSTATE_BACKUP as u8 {
-        __finish_loading_room();
+        _set_player_pos();
 
         // Only reset the player entity's state and direction on dungeon load.
         engine_hooks.dungeon_loaded__restore_player_state_and_direction__inline(__roomToLoad.player_state, __roomToLoad.player_direction);
+
+        __finish_loading_room();
     }
 
     // Fixes wrong animation frame on fade-in
@@ -554,13 +556,20 @@ func __finish_loading_room() {
         metatiles.populate_map_tile_properties__all_tiles_solid();
     }
 
+    _set_player_pos();
+
+    entityloop.sort_active_entities();
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func _set_player_pos() {
     player.xPos.px = a = __roomToLoad.player_x;
     player.xPos.sx = 0;
     player.yPos.px = a = __roomToLoad.player_y;
     player.yPos.sx = 0;
     player.zPos = a = __roomToLoad.player_z;
-
-    entityloop.sort_active_entities();
 }
 
 
