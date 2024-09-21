@@ -19,8 +19,8 @@ config {
 }
 
 
-bank rodata0         @ 0xc00000 : [constdata; 0x8000];
-bank code            @ 0x808000 : [constdata; 0x7f97];
+bank code            @ 0xc00000 : [constdata; 0xe000];
+bank rodata0         @ 0xc0e000 : [constdata; 0x1f97];
 bank code_interrupts @ 0x80ff97 : [constdata;   0x19];
 bank rom_header      @ 0x80ffb0 : [constdata;   0x50];
 
