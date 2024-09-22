@@ -104,13 +104,7 @@ func player_touches_tile(tileIndex : u8 in y) {
     // Heal 1HP every 8 frames
     a = frameCounter_lobyte;
     if a & 0x7 == 0 {
-
-        a = player.health;
-        a++;
-        if a >= player.maxHealth {
-            a = player.maxHealth;
-        }
-        player.health = a;
+        ^return player.heal_player(1);
     }
 }
 

@@ -6,7 +6,7 @@
 import re
 import argparse
 from io import StringIO
-from typing import TextIO, Sequence
+from typing import Final, OrderedDict, TextIO, Sequence
 
 from unnamed_snes_game.json_formats import (
     RoomName,
@@ -18,6 +18,8 @@ from unnamed_snes_game.json_formats import (
     SfxExportOrder,
     MemoryMap,
     GameMode,
+    GameState,
+    GameStateVar,
 )
 from unnamed_snes_game.memory_map import (
     MS_FS_DATA_BANK_OFFSET,
@@ -25,6 +27,7 @@ from unnamed_snes_game.memory_map import (
     RESOURCE_ADDR_TABLE_BANK_OFFSET,
     USB2SNES_DATA_BANK_OFFSET,
 )
+from unnamed_snes_game.gamestate import gamestate_data_size, validate_gamestate_cart_size
 from unnamed_snes_game.enums import ResourceType
 from unnamed_snes_game.audio import BLANK_SONG_NAME
 
@@ -94,6 +97,52 @@ def write_gamemodes_enum(out: TextIO, gamemodes: list[GameMode]) -> None:
     out.write("};\n\n")
 
 
+def write_gamestate_enum(out: TextIO, name: Name, values: OrderedDict[Name, GameStateVar], element_size: int) -> None:
+    out.write(f"enum { name } : u8 {{\n")
+
+    assert element_size.bit_count() == 1, "element_size not a power of 2"
+    mask: Final = 0xFF & ~(element_size - 1)
+
+    for name, v in values.items():
+        if v.comment:
+            c = v.comment.replace("\n", "\n  // ")
+            out.write(f"  // { c }\n")
+
+        assert v.var_index & mask == v.var_index
+        out.write(f"  { name } = { v.var_index },\n")
+
+    out.write("};\n\n")
+
+
+def write_gamestate(out: TextIO, gs: GameState) -> None:
+    validate_gamestate_cart_size(gs)
+
+    out.write("namespace gs {\n\n")
+
+    assert len(gs.identifier) == 4
+    out.write(f'let IDENTIFIER = "{gs.identifier}";\n')
+    out.write(f"let VERSION = {gs.version};\n")
+    out.write("\n")
+
+    out.write(f"// gamestate data size is { gamestate_data_size(gs) } bytes\n")
+    out.write(f"let CART_RAM_SIZE = {gs.cart_ram_size};\n")
+    out.write(f"let N_SAVE_SLOTS = {gs.n_save_slots};\n")
+    out.write(f"let N_SAVE_COPIES = {gs.n_save_copies};\n")
+    out.write("\n")
+
+    out.write(f"let N_U8_VARS = {gs.u8_array_len};\n")
+    out.write(f"let N_U16_VARS = {gs.u16_array_len};\n")
+    out.write("\n")
+
+    out.write("// Global Flags\n")
+    write_gamestate_enum(out, "gf", gs.global_flags, 1)
+
+    write_gamestate_enum(out, "var8", gs.u8_vars, 1)
+    write_gamestate_enum(out, "var16", gs.u16_vars, 2)
+
+    out.write("}\n\n")
+
+
 def generate_wiz_code(mappings: Mappings, audio_project: AudioProject) -> str:
     with StringIO() as out:
         out.write("namespace resources {\n\n")
@@ -106,10 +155,6 @@ def generate_wiz_code(mappings: Mappings, audio_project: AudioProject) -> str:
             f"let RESOURCE_ADDR_TABLE_BANK = 0x{mappings.memory_map.first_resource_bank + RESOURCE_ADDR_TABLE_BANK_OFFSET:02x};\n\n"
         )
         out.write(f"let N_RESOURCE_TYPES = { len(ResourceType) };\n\n")
-
-        starting_room = room_pos_for_name(mappings.starting_room)
-        out.write(f"let STARTING_ROOM_X = { starting_room[0] };\n")
-        out.write(f"let STARTING_ROOM_Y = { starting_room[1] };\n\n")
 
         out.write(f"let _USB2SNES_DATA_ADDR = 0x{resources_over_usb2snes_data_addr(mappings.memory_map):06x};\n")
         out.write(f"let _BANK_SIZE = { mappings.memory_map.mode.bank_size };\n\n")
@@ -132,6 +177,8 @@ def generate_wiz_code(mappings: Mappings, audio_project: AudioProject) -> str:
         write_gamemodes_enum(out, mappings.gamemodes)
 
         write_enum_inc_by_2(out, "RoomTransitions", mappings.room_transitions)
+
+        write_gamestate(out, mappings.gamestate)
 
         return out.getvalue()
 

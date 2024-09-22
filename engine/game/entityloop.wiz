@@ -4,6 +4,8 @@
 import "src/memmap";
 
 import "metasprites";
+import "entity-misc";
+
 import "../entity_api";
 
 import "gen/entities";
@@ -62,23 +64,20 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func init() {
+inline func init__inline() {
+    // MUST NOT modify player entity variables.
+    // (player is active before a room-transition and must be unchanged).
+
+    // Set player's process and draw function to a blank function.
+    // Required as the player is processed before `process_active_entities()` is called.
+    entities.SoA.entityFunction[0] = entities.EntityFunction.null;
+
     mem16();
     #[mem16] {
-        // Set player's process function to a blank function.
-        // Required as the player is processed before `process_active_entities()` is called.
-        aa = entities._blank_player_function as u16;
-        entities.SoA.process_function[0] = aa as func(u8 in x);
-
-
         x = entities.SoA.LAST_INDEX;
         do {
             // Reset entity functions
-            aa = entities._blank_entity_function as u16;
-            entities.SoA.process_function[unaligned x] = aa as func(u8 in x);
-
-            aa = entities._blank_ms_draw_function as u16;
-            entities.SoA.ms_draw_function[unaligned x] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
+            (&entities.SoA._entityAndMsDrawFunction as *u16)[unaligned x] = (entities.EntityFunction.null as u16) | (MsDrawFunction.null as u16 << 8);
 
             // Clear entity shadow
             (&entities.SoA._shadowSizeAndIsEnemy as *u16)[unaligned x] = 0;
@@ -120,7 +119,6 @@ func init() {
 // DB = 0x7e
 #[mem8, idx8]
 func spawn_entity(xPos : u8 in zpTmp_byte_0, yPos : u8 in zpTmp_byte_1, entityType : u8 in a, initParameter : u8 in y) {
-var _init_function_u16 : u16 in zpTmp_word_0;
 
     ^if a < entities.N_ENTITY_TYPES {
 
@@ -140,9 +138,9 @@ var _init_function_u16 : u16 in zpTmp_word_0;
 
             mem16();
             #[mem16] {
-                _init_function_u16 = aa = (entity_rom_data.init_functions as far *u16)[unaligned x];
+                // msDrawFunction is set below in the MetaSprite section
+                (&entities.SoA._entityAndMsDrawFunction[0] as *u16)[unaligned y] = aa = (far &entity_rom_data.__entity_function_index as far *u16)[unaligned x];
 
-                (&entities.SoA.process_function[0] as *u16)[unaligned y] = aa = (entity_rom_data.process_functions as far *u16)[unaligned x];
                 (&entities.SoA._visionAB[0] as *u16)[unaligned y] = aa = entity_rom_data.vision_ab[unaligned x];
 
                 (&entities.SoA._zPosAndDeathFunction[0] as *u16)[unaligned y] = aa = entity_rom_data.initial_zpos_and_death_function_and_is_enemy[unaligned x];
@@ -161,9 +159,15 @@ var _init_function_u16 : u16 in zpTmp_word_0;
                 (&entities.SoA._shadowSizeAndIsEnemy[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.shadowSize__u16[unaligned xx];
                 (&entities.SoA.tileHitbox[0].first as *u16)[unaligned yy] = aa = metasprites.MsFsData.tileHitbox[unaligned xx];
 
-                (&<:entities.SoA.ms_draw_function[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.drawFunction[unaligned xx];
                 (&<:entities.SoA.metaSpriteFrameTable[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.frameTable[unaligned xx];
                 (&<:entities.SoA.msAnimationTable[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.animationTable[unaligned xx];
+
+                mem8();
+                #[mem8] {
+                    a = metasprites.MsFsData.drawFunction[unaligned xx];
+                    entities.SoA.msDrawFunction[unaligned yy] = a as MsDrawFunction;
+                }
+                mem16();
             }
             idx8();
 
@@ -208,13 +212,14 @@ var _init_function_u16 : u16 in zpTmp_word_0;
             entities.SoA.yPos_px[x] = a;
             entities.SoA.yPos_sx[x] = 0;
 
-            // Call spawn function
-            x = pop8();
+            a = pop8();  // initParameter
 
             // Push entityId onto stack.
             // Y is NOT preserved by init function and the init function may call `spawn_entity`
             push8(y);
-            __spawn_entity__call_init_function_ptr(y, x, _init_function_u16);
+
+            x = entities.SoA.entityFunction[unaligned y] as u8;
+            entities.init_function_table[unaligned x](y, a);
 
             y = pop8();
 
@@ -223,23 +228,19 @@ var _init_function_u16 : u16 in zpTmp_word_0;
                 ^return metasprites.init_entity_metasprite_animation__after_init(y);
             }
             else {
+                x = y;
+
                 // Entity's heath is 0.
                 // We cannot remove the entity from the list by decrementing `numberOfActiveEntities`, the entity's init function might spawn more entities.
                 // Instead, the entity functions are changed to blank functions so the entity is not drawn during room transitions.
                 // We may also need to decrement the `_enemyCount` (if the entity is an enemy), which is done in `process_active_entities()`.
                 mem16();
                 #[mem16] {
-                    aa = entities._blank_entity_function as u16;
-                    entities.SoA.process_function[unaligned y] = aa as func(u8 in x);
-
-                    aa = entities._blank_ms_draw_function as u16;
-                    entities.SoA.ms_draw_function[unaligned y] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
+                    // Set entityFunction and msDrawFunction to null
+                    (&entities.SoA._entityAndMsDrawFunction as *u16)[unaligned x] = (entities.EntityFunction.null as u16) | (MsDrawFunction.null as u16 << 8);
                 }
                 mem8();
-
-                // Clear entity shadow
-                x = y;
-                entities.SoA.shadowSize[x] = metasprites.ShadowSize.NONE;
+                entities.SoA.shadowSize[unaligned x] = metasprites.ShadowSize.NONE;
             }
         }
     }
@@ -270,20 +271,6 @@ inline func is_all_enemies_defeated() : bool in zero {
 
 
 
-// Call the entity's init function (which is located in the temporary variable `zpTmp_word_0`)
-//
-// MUST ONLY BE CALLED BY `spawn_entity()`
-//
-// DB = 0x7e
-#[mem8, idx8]
-func __spawn_entity__call_init_function_ptr(entityId : u8 in y, parameter : u8 in x, init_function_u16 : u16 in zpTmp_word_0) {
-var _init_function_ptr : func(u8 in y, u8 in x) in init_function_u16;
-
-    return (*&_init_function_ptr)(y, x);
-}
-
-
-
 // Execute the process routine in all active entities
 //
 // DB = 0x7e
@@ -302,8 +289,10 @@ inline func process_active_entities()
             y = activeEntitiesTable[x];
             if !zero {
                 currentEntityId = y;
-                x = y;
-                entities.SoA.process_function[unaligned x](y);
+
+                x = entities.SoA.entityFunction[unaligned y] as u8;
+                entities.process_function_table[unaligned x](y);
+
 
                 y = currentEntityId;
                 a = entities.SoA.health[y];
@@ -362,13 +351,12 @@ inline func process_active_entities()
                             }
 
                             // Set process_function and ms_draw_function to a blank function (just in case they are accidentally called)
-                            aa = entities._blank_entity_function as u16;
-                            entities.SoA.process_function[unaligned y] = aa as func(u8 in x);
-
-                            aa = entities._blank_ms_draw_function as u16;
-                            entities.SoA.ms_draw_function[unaligned y] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
+                            x = y;
+                            (&entities.SoA._entityAndMsDrawFunction as *u16)[unaligned x] = (entities.EntityFunction.null as u16) | (MsDrawFunction.null as u16 << 8);
                         }
                         mem8();
+
+                        entity_misc.set_ms_draw_function(y, MsDrawFunction.null);
 
 
                         // Do not draw a shadow on unused entities.
@@ -507,35 +495,16 @@ in code {
 
 // A blank init process function that does nothing
 //
-// Used to determine if `entity_rom_data` is blank
-//
 // DB = 0x7e
-func _blank_init_function(entityId : u8 in y, parameter : u8 in x) {
+func _null_init_function(entityId : u8 in y, parameter : u8 in a) {
 }
 
 
-// A blank entity process function that sets the entity's health to 0.
+// A blank entity process function that does nothing
 //
 // DB = 0x7e
 #[mem8, idx8]
-func _blank_entity_function(entityId : u8 in y) {
-    entities.SoA.health[unaligned y] = a = 0;
-}
-
-
-// A special blank entity process function that does nothing.
-//
-// Used by entities that are processed outside of `process_active_entities()`.
-//
-// DB = 0x7e
-func _blank_player_function() {
-}
-
-
-// A special blank MS drawing function that does nothing.
-//
-// DB = 0x7e
-func _blank_ms_draw_function(msFrame : u16 in yy, xPos : u16 in metasprites.xPos, yPos : u16 in metasprites.yPos) {
+func _null_process_function(entityId : u8 in y) {
 }
 
 }
@@ -548,14 +517,12 @@ namespace entity_rom_data {
 
 let N_ENTRIES = entities.N_ENTITY_TYPES;
 
-// Filling the data with blank functions and `0xaa` bytes.
+// Filling the data with `0x00` and `0xaa` bytes.
 // This is used by the *insert_resources* script, to ensure the entity_rom_data is inserted into the correct location.
 in rodata0 {
-    const __init_funtions : [ func(u8 in y, u8 in x) ; N_ENTRIES ] = [ entities._blank_init_function ; N_ENTRIES ];
-    let init_functions = far &__init_funtions;
-
-    const __process_funtions : [ func(u8 in y) ; N_ENTRIES ] = [ entities._blank_entity_function ; N_ENTRIES ];
-    let process_functions = far &__process_funtions;
+    const __entity_function_index : [ u16 ; N_ENTRIES ] = [ 0x00 ; N_ENTRIES ];
+        let entity_function_index = far &__entity_function_index as far *u8;
+        // ::TODO do something with the second byte::
 
     const __metasprite_framesets : [ *const metasprites.MsFramesetFormat ; N_ENTRIES ] = [ 0xaaaa as *metasprites.MsFramesetFormat ; N_ENTRIES ];
     let metasprite_framesets = far &__metasprite_framesets;

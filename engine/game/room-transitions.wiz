@@ -7,6 +7,7 @@ import "../registers";
 import "room";
 import "dungeon";
 import "gamestate";
+import "ms_palettes";
 import "metasprites";
 import "metatiles";
 import "second-layer";
@@ -21,6 +22,7 @@ import "../room-events-api";
 import "src/engine-hooks";
 
 import "gen/enums";
+import "gen/entities";
 
 
 namespace room_transitions {
@@ -64,22 +66,15 @@ enum ScrollDirection : u8 {
 //
 // (Structure of Word Arrays)
 namespace SpriteList {
-    in lowram {
-        // Metasprite draw function.
-        //
-        // DB = 0x7e
-        #[mem8, idx8]
-        var ms_draw_function : [func(msFrame : u16 in yy, xPos : u16 in metasprites.xPos, yPos : u16 in metasprites.yPos) ; N_SPRITE_LIST_ELEMENTS];
-    }
-
     in wram7e {
         var xPos : [u16 ; N_SPRITE_LIST_ELEMENTS];
         var yPos : [u16 ; N_SPRITE_LIST_ELEMENTS];
         var zPos : [u16 ; N_SPRITE_LIST_ELEMENTS];
         var msFrameAddr : [u16 ; N_SPRITE_LIST_ELEMENTS];
 
-        var _shadowSizeAndBlank : [ entities._u8pair ; N_SPRITE_LIST_ELEMENTS];
-            var shadowSize @ &_shadowSizeAndBlank[0].first : [ metasprites.ShadowSize ; N_SPRITE_LIST_ELEMENTS * 2 - 1];
+        var _shadowSizeAndMsDrawFunction : [ entities._u8pair ; N_SPRITE_LIST_ELEMENTS];
+            var shadowSize @ &_shadowSizeAndMsDrawFunction[0].first : [ metasprites.ShadowSize ; N_SPRITE_LIST_ELEMENTS * 2 - 1];
+            var msDrawFunction @ &_shadowSizeAndMsDrawFunction[0].second : [ MsDrawFunction ; N_SPRITE_LIST_ELEMENTS * 2 - 1];
     }
 }
 
@@ -141,7 +136,7 @@ in wram7e {
 
 in code {
 
-let load_room__fadein = _fadein_load_dungeon_and_room as func();
+let load_room__fadein = dungeon.load_dungeon_and_room as func;
 
 
 // Room Transitions
@@ -166,51 +161,9 @@ func fadein_reset_player() {
     // Also causes the player's MetaSprite frame to be reset in a scrolling room transition.
     engine_hooks.room_transitions__reset_player__inline();
 
-    roomToLoad.dungeon = a = gamestate.data.currentDungeon;
-    roomToLoad.roomPos_x = a = gamestate.data.currentRoom_x;
-    roomToLoad.roomPos_y = a = gamestate.data.currentRoom_y;
-    roomToLoad.playerPos_x = a = gamestate.data.playerState.xPos;
-    roomToLoad.playerPos_y = a = gamestate.data.playerState.yPos;
+    gamestate.copy_gamestate_to_room_to_load();
 
-
-// Fallthrough
-}
-
-
-// Fadeout the screen, load resources, load roomToLoad, fadein the screen.
-//
-// DB = 0x7e
-#[fallthrough, mem8, idx8]
-func _fadein_load_dungeon_and_room(roomToLoad : RoomToLoad in roomToLoad) {
-    dungeon.load_dungeon_and_room(roomToLoad);
-
-// Fallthrough
-}
-
-
-// Assumes dungeon is loaded
-//
-// DB = 0x7e
-#[mem8, idx8]
-func _fadein_after_dungeon_load() {
-    wait_multiple_frames_and_fadein();
-
-    carry = _test_player_position_is_valid();
-    if !carry {
-        // Player is in an invalid position.
-        wait_one_second();
-
-        // ::TODO do something if the position is invalid a second time::
-        // ::TODO do something if backup is invalid::
-        dungeon.load_dungeon_and_restore_roomstate();
-        wait_multiple_frames_and_fadein();
-    }
-
-
-    // The player is in a valid position.  Make a backup of the game state.
-    gamestate.backup_gamestate();
-
-    set_next_game_mode(GameModes.GAME_LOOP);
+    ^return dungeon.load_dungeon_and_room(gamestate.roomToLoad);
 }
 
 
@@ -233,32 +186,30 @@ func _fadein_after_dungeon_load() {
 func _scrolling_room_transition(_scrollDirection : ScrollDirection in x,
                                 playerX : u8 in a, playerY : u8 in y) : bool in carry {
 
-    roomToLoad.playerPos_x = a;
-    roomToLoad.playerPos_y = y;
-
     scrollDirection = x as ScrollDirection;
-    roomToLoad.roomPos_x = a = gamestate.data.currentRoom_x + ScrollDirection_RoomOffset_x[x] as u8;
-    roomToLoad.roomPos_y = a = gamestate.data.currentRoom_y + ScrollDirection_RoomOffset_y[x] as u8;
-    roomToLoad.dungeon = a = gamestate.data.currentDungeon;
+
+    push8(a);
+    gamestate.populate_room_to_load();
+    a = pop8();
+
+    gamestate.roomToLoad.player_x = a;
+    gamestate.roomToLoad.player_y = y;
+
+    gamestate.roomToLoad.room_x = a = gamestate.roomToLoad.room_x + ScrollDirection_RoomOffset_x[x] as u8;
+    gamestate.roomToLoad.room_y = a = gamestate.roomToLoad.room_y + ScrollDirection_RoomOffset_y[x] as u8;
+
 
     // Check if a fadeout transition was requested
     a = roomstate.forceFadeoutRoomTransition;
     if !zero {
-        _fadein_load_dungeon_and_room(roomToLoad);
-        return true;
+        dungeon.load_dungeon_and_room(gamestate.roomToLoad);
     }
 
     _reset_camera();
     _clear_sprite_list();
     _add_entities_to_sprite_list();
 
-    carry = dungeon.load_room__inline(roomToLoad);
-    if !carry {
-        // ::TODO improve this::
-        dungeon.load_dungeon_and_room__no_roomstate_backup__inline(roomToLoad);
-        _fadein_after_dungeon_load();
-        return true;
-    }
+    dungeon.load_room__inline(gamestate.roomToLoad);
 
     _add_entities_to_sprite_list_with_offset(scrollDirection);
     _sprite_list_set_player_with_offset(scrollDirection);
@@ -330,6 +281,8 @@ func _scrolling_room_transition__loop() : bool in carry {
         move_camera_and_draw_sprite_list();
 
         second_layer.process_room_transition__inline();
+
+        ms_palettes.process();
 
         x = scrollDirection as u8;
         MetaTileTransition_Process_FunctionTable[unaligned x]();
@@ -551,11 +504,15 @@ var _activeEntitiesTablePos : u8 in zpTmp_byte_0;
                     SpriteList.xPos[unaligned x] = aa = ((&entities.SoA.xPos[0].px as *u16)[unaligned y] & 0xff) + CAMERA_ORIGIN;
                     SpriteList.yPos[unaligned x] = aa = ((&entities.SoA.yPos[0].px as *u16)[unaligned y] & 0xff) + CAMERA_ORIGIN;
                     SpriteList.zPos[unaligned x] = aa = ((&entities.SoA._zPosAndDeathFunction[0].first as *u16)[unaligned y] & 0xff);
-                    (&SpriteList.ms_draw_function[0] as *u16)[unaligned x] = aa = entities.SoA.ms_draw_function[unaligned y] as u16;
                     SpriteList.msFrameAddr[unaligned x] = aa = entities.SoA.msFrameAddr[unaligned y];
-                    (&SpriteList._shadowSizeAndBlank[0] as *u16)[unaligned x] = aa = (&entities.SoA._shadowSizeAndIsEnemy[0] as *u16)[unaligned y];
                 }
                 mem8();
+
+                a = entities.SoA.shadowSize[unaligned y] as u8;
+                SpriteList.shadowSize[unaligned x] = a as metasprites.ShadowSize;
+
+                a = entities.SoA.msDrawFunction[unaligned y] as u8;
+                SpriteList.msDrawFunction[unaligned x] = a as MsDrawFunction;
 
                 x++;
                 x++;
@@ -582,11 +539,15 @@ func _sprite_list_set_player_with_offset(sd : ScrollDirection in scrollDirection
         SpriteList.yPos[PLAYER_ID] = aa = ((&entities.SoA.yPos[0].px as *u16)[PLAYER_ID] & 0xff) + CAMERA_ORIGIN + ScrollDirectionTableY[unaligned x] as u16;
         SpriteList.zPos[PLAYER_ID] = aa = ((&entities.SoA._zPosAndDeathFunction[0].first as *u16)[PLAYER_ID] & 0xff);
 
-        (&SpriteList.ms_draw_function[0] as *u16)[PLAYER_ID] = aa = entities.SoA.ms_draw_function[PLAYER_ID] as u16;
         SpriteList.msFrameAddr[PLAYER_ID] = aa = entities.SoA.msFrameAddr[PLAYER_ID];
-        (&SpriteList._shadowSizeAndBlank[0] as *u16)[PLAYER_ID] = aa = (&entities.SoA._shadowSizeAndIsEnemy[0] as *u16)[PLAYER_ID];
     }
     mem8();
+
+    a = entities.SoA.shadowSize[unaligned PLAYER_ID] as u8;
+    SpriteList.shadowSize[unaligned PLAYER_ID] = a as metasprites.ShadowSize;
+
+    a = entities.SoA.msDrawFunction[unaligned PLAYER_ID] as u8;
+    SpriteList.msDrawFunction[unaligned PLAYER_ID] = a as MsDrawFunction;
 }
 
 
@@ -670,11 +631,13 @@ func draw_sprite_list() {
 
                 metasprites.xPos = aa = SpriteList.xPos[unaligned xx] - camera_x;
                 metasprites.yPos = aa = SpriteList.yPos[unaligned xx] - SpriteList.zPos[unaligned xx] - camera_y;
+
+                yy = SpriteList.msFrameAddr[unaligned xx];
+                xx = aa = (&SpriteList.msDrawFunction as *u16)[unaligned xx] & 0xff;
             }
             mem8();
             #[mem8, idx16] {
-                yy = SpriteList.msFrameAddr[unaligned xx];
-                SpriteList.ms_draw_function[unaligned xx](yy, metasprites.xPos, metasprites.yPos);
+                metasprites.drawing_functions.ms_draw_function_table[unaligned xx](yy, metasprites.xPos, metasprites.yPos);
             }
             mem8_idx8();
 

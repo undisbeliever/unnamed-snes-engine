@@ -56,8 +56,8 @@ var SoA_zVelocity        : [ u16       ; N_ENTITIES ]  in SoA.var_2;
 var SoA_zVelocity_sx     : [ u8        ; SoA.BA_SIZE ] in SoA.var_2_l;
 var SoA_zVelocity_px     : [ u8        ; SoA.BA_SIZE ] in SoA.var_2_h;
 
-// The gamestate flag for the rook enemy
-var SoA_gameStateFlag    : [ u8        ; SoA.BA_SIZE ] in SoA.var_3_l;
+// The dungeon flag for the rook enemy
+var SoA_dungeonFlag      : [ u8        ; SoA.BA_SIZE ] in SoA.var_3_l;
 
 }
 
@@ -65,14 +65,14 @@ var SoA_gameStateFlag    : [ u8        ; SoA.BA_SIZE ] in SoA.var_3_l;
 in code {
 
 
-// parameter = rook destroyed gamestate flag
+// parameter = rook destroyed dungeon flag
 //
 // DB = 0x7e
 #[mem8, idx8]
-func init(entityId : u8 in y, parameter : u8 in x) {
-    SoA_gameStateFlag[y] = a = x;
+func init(entityId : u8 in y, parameter : u8 in a) {
+    SoA_dungeonFlag[y] = a;
 
-    zero = is_gs_flag_clear(x);
+    zero = is_dungeon_flag_clear_a(a);
     if !zero {
         // The rook was destroyed up by a bomb on a previous visit.
         // Do not show the 'entity dead' smoke particle.
@@ -257,7 +257,7 @@ func set_state__dead__inline__clobbers_y(entityId : u8 in y) {
 
     set_ms_animation(y, ms_animations.dead);
 
-    set_gs_flag(SoA_gameStateFlag[y]);
+    set_dungeon_flag(SoA_dungeonFlag[y]);
 
     // Remove tile solid flag
     ^return reset_tile_properties__clobbers_y(SoA_tileIndex[y]);

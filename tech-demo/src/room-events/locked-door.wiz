@@ -6,6 +6,7 @@ import "../memmap";
 import "engine/room-events-api";
 import "_common";
 
+import "../gamestate";
 import "../interactive-tiles";
 
 import "gen/enums";
@@ -34,7 +35,7 @@ in code {
 func init() {
     metatiles.interactive_tiles.locked_door.playerTouchedLockedDoor = 0;
 
-    zero = is_gs_flag_clear(parameter__flag);
+    zero = is_dungeon_flag_clear(parameter__flag);
     if !zero {
         // The door has already been unlocked.
         // Change the map tiles to an unlocked door before the room transition starts.
@@ -65,7 +66,7 @@ func process() {
             carry = test_and_decrement_key_count();
             if carry {
                 // key was consumed, set flag and unlocked door
-                set_gs_flag(parameter__flag);
+                set_dungeon_flag(parameter__flag);
                 return _process__unlock_door();
             }
         }

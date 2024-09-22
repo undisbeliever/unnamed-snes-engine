@@ -8,6 +8,7 @@
   "entity_functions": [
     {
       "name": "smoke_particles",
+      "source": "smoke-particles",
       "is_enemy": false,
       "ms-export-order": "smoke",
       "parameter": {
@@ -17,6 +18,7 @@
     },
     {
       "name": "sword_particles",
+      "source": "sword-particles",
       "is_enemy": false,
       "ms-export-order": "sword_particles",
       "parameter": {
@@ -26,6 +28,7 @@
     },
     {
       "name": "bouncing_off_walls",
+      "source": "bouncing-off-walls",
       "is_enemy": true,
       "ms-export-order": "eight_direction_spinner",
       "parameter": {
@@ -35,6 +38,7 @@
     },
     {
       "name": "crossbow_man",
+      "source": "crossbow-man",
       "is_enemy": true,
       "ms-export-order": "crossbow_man",
       "parameter": {
@@ -44,6 +48,7 @@
     },
     {
       "name": "skeleton",
+      "source": "skeleton",
       "is_enemy": true,
       "ms-export-order": "skeleton",
       "parameter": {
@@ -53,6 +58,7 @@
     },
     {
       "name": "slime",
+      "source": "slime",
       "is_enemy": true,
       "ms-export-order": "slime",
       "parameter": {
@@ -62,27 +68,31 @@
     },
     {
       "name": "swarming",
+      "source": "swarming",
       "is_enemy": true,
       "ms-export-order": "skeleton"
     },
     {
       "name": "rook",
+      "source": "rook",
       "is_enemy": true,
       "ms-export-order": "rook",
       "parameter": {
-        "type": "gamestateflag"
+        "type": "dungeon_flag"
       }
     },
     {
       "name": "boss",
+      "source": "boss",
       "is_enemy": true,
       "ms-export-order": "boss",
       "parameter": {
-        "type": "gamestateflag"
+        "type": "global_flag"
       }
     },
     {
       "name": "boss_bomb",
+      "source": "boss-bomb",
       "is_enemy": false,
       "ms-export-order": "bomb",
       "parameter": {
@@ -92,6 +102,7 @@
     },
     {
       "name": "projectile",
+      "source": "projectile",
       "is_enemy": false,
       "ms-export-order": "projectile",
       "parameter": {
@@ -101,8 +112,8 @@
     },
     {
       "name": "projectile_angled",
+      "source": "projectile-angled",
       "is_enemy": false,
-      "uses-process-function-from": "projectile",
       "ms-export-order": "projectile",
       "parameter": {
         "type": "enum",
@@ -111,24 +122,28 @@
     },
     {
       "name": "key",
+      "source": "key",
       "is_enemy": false,
       "ms-export-order": "single_animation",
       "parameter": {
-        "type": "gamestateflag"
+        "type": "dungeon_flag"
       }
     },
     {
       "name": "player_bomb",
+      "source": "player-bomb",
       "is_enemy": false,
       "ms-export-order": "bomb"
     },
     {
       "name": "credits_orb",
+      "source": "credits-orb",
       "is_enemy": false,
       "ms-export-order": "particle"
     },
     {
       "name": "test__calc_angle",
+      "source": "test--calc-angle",
       "is_enemy": false,
       "ms-export-order": "eight_direction_spinner"
     }
@@ -247,7 +262,7 @@
     {
       "name": "boss_bomb",
       "code": "boss_bomb",
-      "metasprites": "common.Bomb",
+      "metasprites": "common.EnemyBomb",
       "death_function": "none",
       "zpos": "24",
       "health": 255,

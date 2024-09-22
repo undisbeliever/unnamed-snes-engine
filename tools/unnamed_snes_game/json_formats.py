@@ -18,6 +18,8 @@ RoomName = str
 
 Filename = str
 
+MAX_RESOURCE_ITEMS: Final = 254
+
 
 class JsonError(FileError):
     pass
@@ -201,6 +203,16 @@ class _Helper:
             except ValueError:
                 self._raise_error("Expected an integer", key)
 
+    def get_optional_int(self, key: str) -> Optional[int]:
+        v = self._optional_get2(key, str, int)
+        if v is None or isinstance(v, int):
+            return v
+        else:
+            try:
+                return int(v)
+            except ValueError:
+                self._raise_error("Expected an integer", key)
+
     def get_float(self, key: str) -> float:
         return self._get2(key, int, float)
 
@@ -224,6 +236,12 @@ class _Helper:
         elif i == 1:
             return True
         self._raise_error(f"Expected a 1 or a 0: { i }", key)
+
+    def get_int_range(self, key: str, min_: int, max_: int) -> int:
+        i = self.get_int(key)
+        if i < min_ or i > max_:
+            self._raise_error(f"Integer out of range: { i } (min: {min_}, max:{max_}", key)
+        return i
 
     def get_optional_u8_position(self, key: str) -> Optional[Position]:
         v = self._optional_get2(key, str, list)
@@ -296,7 +314,7 @@ class _Helper:
                 self._raise_error(f"Invalid name: {s}", key, str(i))
         return l
 
-    def get_name_list_mapping(self, key: str, max_items: Optional[int] = None) -> OrderedDict[Name, int]:
+    def get_name_list_mapping(self, key: str) -> OrderedDict[Name, int]:
         l = self.get_name_list(key)
 
         out: OrderedDict[Name, int] = OrderedDict()
@@ -305,6 +323,18 @@ class _Helper:
             if s in out:
                 self._raise_error(f"Duplicate name: { s }", key, str(i))
             out[s] = i
+
+        return out
+
+    def get_name_list_mapping_2(self, key: str, start: int, mul: int) -> OrderedDict[Name, int]:
+        l = self.get_name_list(key)
+
+        out: OrderedDict[Name, int] = OrderedDict()
+
+        for i, s in enumerate(l):
+            if s in out:
+                self._raise_error(f"Duplicate name: { s }", key, str(i))
+            out[s] = i * mul + start
 
         return out
 
@@ -437,10 +467,10 @@ class EfParameter(NamedTuple):
 class EntityFunction(NamedTuple):
     name: Name
     id: int
+    source: str
     is_enemy: bool
     ms_export_order: Name
     parameter: Optional[EfParameter]
-    uses_process_function_from: Optional[Name]
 
 
 class EntityVision(NamedTuple):
@@ -489,7 +519,9 @@ class _Entities_Helper(_Helper):
 
         if t == "enum":
             return EfParameter("enum", p.get_name_list("values"))
-        elif t == "gamestateflag":
+        elif t == "global_flag":
+            return EfParameter(t, None)
+        elif t == "dungeon_flag":
             return EfParameter(t, None)
         elif t == "u8":
             return EfParameter(t, None)
@@ -503,14 +535,14 @@ def load_entities_json(filename: Filename) -> EntitiesJson:
     entity_functions = jh.build_ordered_dict_from_list(
         "entity_functions",
         EntityFunction,
-        256,
+        127,
         lambda ef, name, i: EntityFunction(
             name=name,
-            id=i,
+            id=(i + 1) * 2,
+            source=ef.get_string("source"),
             is_enemy=ef.get_bool("is_enemy"),
             ms_export_order=ef.get_name("ms-export-order"),
             parameter=ef.get_ef_parameter("parameter"),
-            uses_process_function_from=ef.get_optional_name("uses-process-function-from"),
         ),
     )
 
@@ -562,6 +594,8 @@ class MseoDynamicMsFsSettings(NamedTuple):
 
 class MsExportOrder(NamedTuple):
     patterns: OrderedDict[Name, MsPattern]
+    custom_draw_functions: OrderedDict[Name, int]
+    dynamic_pattern_id: int
     shadow_sizes: OrderedDict[Name, int]
     animation_lists: OrderedDict[Name, MsAnimationExportOrder]
     dynamic_metasprites: OrderedDict[Name, MseoDynamicMsFsSettings]
@@ -611,11 +645,22 @@ def load_ms_export_order_json(filename: Filename) -> MsExportOrder:
     jh = _load_json_file(filename, _MSEO_Helper)
 
     patterns = jh.build_ordered_dict_from_list(
-        "patterns", MsPattern, 256, lambda p, name, i: MsPattern(name=name, id=i * 2, objects=p.get_pattern_objects("objects"))
+        "patterns", MsPattern, 256, lambda p, name, i: MsPattern(name=name, id=(i + 1) * 2, objects=p.get_pattern_objects("objects"))
     )
+
+    if len(patterns) > 1:
+        first_custom_id = 2 << (len(patterns)).bit_length()
+    else:
+        first_custom_id = 2
+
+    custom_draw_functions = jh.get_name_list_mapping_2("custom_draw_functions", first_custom_id, 2)
+
+    dynamic_pattern_id = first_custom_id + len(custom_draw_functions) * 2
 
     return MsExportOrder(
         patterns=patterns,
+        custom_draw_functions=custom_draw_functions,
+        dynamic_pattern_id=dynamic_pattern_id,
         shadow_sizes=jh.get_name_list_mapping("shadow_sizes"),
         animation_lists=jh.get_animation_eo_lists("animation_lists"),
         dynamic_metasprites=jh.get_dynamic_metasprites("dynamic_metasprites"),
@@ -629,6 +674,11 @@ MAX_N_CALLBACKS = 128
 MAX_ROOM_EVENT_PARAMETERS = 4
 MAX_SL_CALLBACK_PARAMETERS = 8
 MAX_SL_ROOM_PARAMETERS = 2
+MAX_MS_PALETTE_CALLBACK_PARAMETERS = 2
+
+MAX_GAMESTATE_SIZE: Final = 4096
+MAX_GAMESTATE_ARRAY_BYTE_SIZE: Final = 256
+MAX_GAMESTATE_FLAGS: Final = 256
 
 # GAME_MODES > 128 mean the next game mode is unchanged.
 MAX_GAME_MODES = 128
@@ -638,6 +688,29 @@ class MemoryMap(NamedTuple):
     mode: MemoryMapMode
     first_resource_bank: int
     n_resource_banks: int
+
+
+class GameStateVar(NamedTuple):
+    var_index: int
+    comment: Optional[str]
+
+
+class GameState(NamedTuple):
+    identifier: str
+    cart_ram_size: int
+    n_save_slots: int
+    n_save_copies: int
+    # ::TODO add names::
+    version: int
+    u8_array_len: int
+    u16_array_len: int
+    # Global flags.  Named in `gen/enums.wiz`.
+    global_flags: OrderedDict[Name, GameStateVar]
+    # Non-global flags.  Not named in `gen/enums.wiz`
+    # ::MAYDO multiple instances of dungeon_flags, swapped out when a dungeon is loaded::
+    dungeon_flags: OrderedDict[Name, GameStateVar]
+    u8_vars: OrderedDict[Name, GameStateVar]
+    u16_vars: OrderedDict[Name, GameStateVar]
 
 
 class GameMode(NamedTuple):
@@ -668,13 +741,20 @@ class SecondLayerCallback(NamedTuple):
     # ::TODO add world parameters::
 
 
-Callback = Union[RoomEvent, SecondLayerCallback]
-CallbackDict = Union[OrderedDict[Name, RoomEvent], OrderedDict[Name, SecondLayerCallback]]
+class MsPaletteCallback(NamedTuple):
+    name: Name
+    id: int
+    source: str
+    parameters: list[CallbackParameter]
+
+
+Callback = Union[RoomEvent, SecondLayerCallback, MsPaletteCallback]
+CallbackDict = Union[OrderedDict[Name, RoomEvent], OrderedDict[Name, SecondLayerCallback], OrderedDict[Name, MsPaletteCallback]]
 
 
 class Mappings(NamedTuple):
     game_title: str
-    starting_room: RoomName
+    gamestate: GameState
     mt_tilesets: list[Name]
     second_layers: list[Name]
     ms_spritesheets: list[Name]
@@ -682,11 +762,11 @@ class Mappings(NamedTuple):
     tiles: list[Name]
     bg_images: list[Name]
     interactive_tile_functions: list[Name]
-    gamestate_flags: list[Name]
     gamemodes: list[GameMode]
     room_transitions: list[Name]
     room_events: OrderedDict[Name, RoomEvent]
     sl_callbacks: OrderedDict[Name, SecondLayerCallback]
+    ms_palette_callbacks: OrderedDict[Name, MsPaletteCallback]
     memory_map: MemoryMap
 
     # Location of the directory containing tad-compiler
@@ -707,6 +787,71 @@ class _Mappings_Helper(_Helper):
             mode=mode,
             first_resource_bank=mm.get_hex_or_int("first_resource_bank"),
             n_resource_banks=mm.get_int("n_resource_banks"),
+        )
+
+    def get_gamestate_identifier(self, key: str) -> str:
+        identifier = self.get_string("identifier")
+        try:
+            if len(identifier.encode("ASCII")) != 4:
+                self._raise_error("GameState identifier must be 4 ASCII characters", key)
+        except UnicodeEncodeError:
+            self._raise_error("GameState identifier must be ASCII", key)
+        return identifier
+
+    def get_gamestate_vars(self, key: str, array_len: int, element_size: int) -> OrderedDict[Name, GameStateVar]:
+        var_list = self._get(key, list)
+
+        if len(var_list) > array_len:
+            self._raise_error(f"Too many items in list ({len(var_list)}, max: {array_len})", key)
+
+        out: OrderedDict[Name, GameStateVar] = OrderedDict()
+
+        for i, s in enumerate(var_list):
+            if s is None:
+                # dummied out
+                pass
+            elif not isinstance(s, str):
+                self._raise_error("Expected a string", key, str(i))
+            else:
+                sl = s.split(None, 1)
+                name = sl[0]
+                comment = None
+
+                if len(sl) == 2:
+                    comment = sl[1]
+
+                if not self.NAME_REGEX.match(name):
+                    self._raise_error(f"Invalid name: {name}", key, str(i))
+
+                out[name] = GameStateVar(i * element_size, comment)
+
+        return out
+
+    def get_gamestate(self, key: str) -> GameState:
+        gs = self.get_dict(key)
+
+        identifier = gs.get_gamestate_identifier("identifier")
+
+        cart_ram_size = gs.get_int_range("cart_ram_size", 1024, 8192)
+        n_save_slots = gs.get_int_range("n_save_slots", 1, 8)
+        n_save_copies = gs.get_int_range("n_save_copies", 2, 8)
+
+        version = gs.get_int_range("version", 0, 0xFF)
+        u8_array_len = gs.get_int_range("u8_array_len", 4, MAX_GAMESTATE_ARRAY_BYTE_SIZE)
+        u16_array_len = gs.get_int_range("u16_array_len", 4, MAX_GAMESTATE_ARRAY_BYTE_SIZE // 2)
+
+        return GameState(
+            identifier=identifier,
+            cart_ram_size=cart_ram_size,
+            n_save_slots=n_save_slots,
+            n_save_copies=n_save_copies,
+            version=version,
+            u8_array_len=u8_array_len,
+            u16_array_len=u16_array_len,
+            global_flags=gs.get_gamestate_vars("global_flags", MAX_GAMESTATE_FLAGS, 1),
+            dungeon_flags=gs.get_gamestate_vars("dungeon_flags", MAX_GAMESTATE_FLAGS, 1),
+            u8_vars=gs.get_gamestate_vars("u8_vars", u8_array_len, 1),
+            u16_vars=gs.get_gamestate_vars("u16_vars", u16_array_len, 2),
         )
 
     def get_gamemodes(self, key: str) -> list[GameMode]:
@@ -770,13 +915,28 @@ class _Mappings_Helper(_Helper):
         # ::TODO detect duplicates in callback parameters::
         return callbacks
 
+    def get_ms_palette_callbacks(self, key: str) -> OrderedDict[Name, MsPaletteCallback]:
+        callbacks = self.build_ordered_dict_from_list(
+            key,
+            MsPaletteCallback,
+            MAX_N_CALLBACKS,
+            lambda rj, name, i: MsPaletteCallback(
+                name=name,
+                id=i + 1,  # 0 is null
+                source=rj.get_string("source"),
+                parameters=rj.get_callback_parameters("parameters", MAX_MS_PALETTE_CALLBACK_PARAMETERS),
+            ),
+        )
+        # ::TODO detect duplicates in callback parameters::
+        return callbacks
+
 
 def load_mappings_json(filename: Filename) -> Mappings:
     jh = _load_json_file(filename, _Mappings_Helper)
 
     return Mappings(
         game_title=jh.get_string("game_title"),
-        starting_room=jh.get_room_name("starting_room"),
+        gamestate=jh.get_gamestate("gamestate"),
         mt_tilesets=jh.get_name_list("mt_tilesets"),
         second_layers=jh.get_name_list("second_layers"),
         ms_spritesheets=jh.get_name_list("ms_spritesheets"),
@@ -784,10 +944,10 @@ def load_mappings_json(filename: Filename) -> Mappings:
         tiles=jh.get_name_list("tiles"),
         bg_images=jh.get_name_list("bg_images"),
         interactive_tile_functions=jh.get_name_list("interactive_tile_functions"),
-        gamestate_flags=jh.get_name_list("gamestate_flags"),
         room_transitions=jh.get_name_list("room_transitions"),
         room_events=jh.get_room_events("room_events"),
         sl_callbacks=jh.get_sl_callbacks("sl_callbacks"),
+        ms_palette_callbacks=jh.get_ms_palette_callbacks("ms_palette_callbacks"),
         memory_map=jh.get_memory_map("memory_map"),
         gamemodes=jh.get_gamemodes("gamemodes"),
         tad_binary_directory=jh.get_string("tad_binary_directory"),
@@ -851,6 +1011,56 @@ def load_audio_project(filename: Filename) -> AudioProject:
         ),
         sound_effect_file=os.path.join(dirname, jh.get_string("sound_effect_file")),
     )
+
+
+#
+# ms-palettes.json
+#
+
+
+class MsPaletteInput(NamedTuple):
+    id: int
+    name: Name
+    parent: Optional[Name]
+    spritesheet_uses_parent: bool
+    source: Filename
+    starting_row: int
+    n_rows: int
+    n_frames: Optional[int]
+    rows_per_frame: Optional[int]
+    callback: Optional[Name]
+    parameters: Optional[dict[Name, str]]
+
+
+class MsPalettesJson(NamedTuple):
+    ms_palettes: OrderedDict[Name, MsPaletteInput]
+
+
+def load_ms_palettes_json(filename: Filename) -> MsPalettesJson:
+    jh = _load_json_file(filename, _Helper)
+
+    dirname = os.path.dirname(filename)
+
+    ms_palettes = jh.build_ordered_dict_from_list(
+        "ms_palettes",
+        MsPaletteInput,
+        MAX_RESOURCE_ITEMS,
+        lambda sj, name, i: MsPaletteInput(
+            name=name,
+            id=i,
+            parent=sj.get_optional_name("parent"),
+            spritesheet_uses_parent=sj.get_bool("spritesheet_uses_parent"),
+            source=os.path.join(dirname, sj.get_string("source")),
+            starting_row=sj.get_int("starting_row"),
+            n_rows=sj.get_int("n_rows"),
+            n_frames=sj.get_optional_int("n_frames"),
+            rows_per_frame=sj.get_optional_int("rows_per_frame"),
+            callback=sj.get_optional_name("callback"),
+            parameters=sj.get_optional_parameter_dict("parameters"),
+        ),
+    )
+
+    return MsPalettesJson(ms_palettes)
 
 
 # metasprites.json
@@ -924,12 +1134,19 @@ class MsFrameset(NamedTuple):
     animations: dict[Name, MsAnimation]
 
 
+class MsPaletteSwap(NamedTuple):
+    name: Name
+    copies: Name
+    palette: int
+
+
 class MsSpritesheet(NamedTuple):
     name: Name
-    palette: Filename
+    palette: Name
     first_tile: int
     end_tile: int
     framesets: OrderedDict[Name, MsFrameset]
+    palette_swaps: OrderedDict[Name, MsPaletteSwap]
 
 
 class _Ms_Helper(_Helper):
@@ -1102,12 +1319,24 @@ def __read_ms_frameset(jh: _Ms_Helper, name: Name, i: int, skip_animations: Opti
 
 
 def _load_metasprites(jh: _Ms_Helper) -> MsSpritesheet:
+    palette_swaps = jh.build_ordered_dict_from_list(
+        "palette_swaps",
+        MsPaletteSwap,
+        256,
+        lambda j, name, i: MsPaletteSwap(
+            name=name,
+            copies=j.get_name("copies"),
+            palette=j.get_int("palette"),
+        ),
+    )
+
     return MsSpritesheet(
         name=jh.get_name("name"),
         palette=jh.get_filename("palette"),
         first_tile=jh.get_int("firstTile"),
         end_tile=jh.get_int("endTile"),
         framesets=jh.build_ordered_dict_from_list("framesets", MsFrameset, 256, __read_ms_frameset),
+        palette_swaps=palette_swaps,
     )
 
 
@@ -1247,8 +1476,11 @@ class DungeonInput(NamedTuple):
     infinite: bool
     width: int
     height: int
+    default_room: str
+    palette: Name
     tileset: Name
     second_layer: Optional[Name]
+    ms_palette: Name
     ms_spritesheet: Name
     song: Optional[Name]
 
@@ -1276,8 +1508,11 @@ def load_dungeons_json(filename: Filename) -> DungeonsJson:
             infinite=sj.get_bool("infinite"),
             width=sj.get_int("width"),
             height=sj.get_int("height"),
+            default_room=sj.get_string("default_room"),
+            palette=sj.get_name("palette"),
             tileset=sj.get_name("tileset"),
             second_layer=sj.get_optional_name("second_layer"),
+            ms_palette=sj.get_name("ms_palette"),
             ms_spritesheet=sj.get_name("ms_spritesheet"),
             song=sj.get_optional_name("song"),
         ),

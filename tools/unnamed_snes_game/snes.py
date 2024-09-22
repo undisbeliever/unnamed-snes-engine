@@ -42,11 +42,15 @@ class TileMap(NamedTuple):
 
 
 class ConstSmallTileMap:
-    def __init__(self, tile_map: dict[SmallTileData, tuple[int, bool, bool]]) -> None:
+    def __init__(self, tile_map: dict[SmallTileData, tuple[int, bool, bool]], n_tiles: int) -> None:
         self.__tile_map: Final = tile_map
+        self.__n_tiles: Final = n_tiles
 
     def get(self, tile_data: SmallTileData) -> Optional[tuple[int, bool, bool]]:
         return self.__tile_map.get(tile_data)
+
+    def n_tiles(self) -> int:
+        return self.__n_tiles
 
 
 class AbstractTilesetMap(ABC):
@@ -54,7 +58,7 @@ class AbstractTilesetMap(ABC):
         self._map: Final[dict[SmallTileData, tuple[int, bool, bool]]] = {}
 
     def const_map(self) -> ConstSmallTileMap:
-        return ConstSmallTileMap(self._map)
+        return ConstSmallTileMap(self._map, self.n_tiles())
 
     def _add_to_map(self, tile_data: SmallTileData, tile_id: int) -> tuple[int, bool, bool]:
         tile_match = tile_id, False, False
@@ -76,6 +80,9 @@ class AbstractTilesetMap(ABC):
     @abstractmethod
     def tiles(self) -> Iterable[SmallTileData]: ...
 
+    @abstractmethod
+    def n_tiles(self) -> int: ...
+
 
 class SmallTilesetMap(AbstractTilesetMap):
     def __init__(self) -> None:
@@ -92,6 +99,9 @@ class SmallTilesetMap(AbstractTilesetMap):
 
     def tiles(self) -> Iterable[SmallTileData]:
         return self._tiles
+
+    def n_tiles(self) -> int:
+        return len(self._tiles)
 
 
 class ImageError(FileError):

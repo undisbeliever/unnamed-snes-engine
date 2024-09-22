@@ -11,14 +11,18 @@ config {
     fastrom = false,
     region = "ntsc",
 
+    ram_size = MEMMAP_CART_RAM_SIZE,
+
     // ::TODO give this game a name::
     title = "UNNAMED TECH DEMO",
     version = 3,
 }
 
 
-bank rodata0    @ 0xc00000 : [constdata; 0x8000];
-bank code       @ 0x808000 : [constdata; 0x8000];
+bank code            @ 0xc00000 : [constdata; 0xe000];
+bank rodata0         @ 0xc0e000 : [constdata; 0x1f97];
+bank code_interrupts @ 0x80ff97 : [constdata;   0x19];
+bank rom_header      @ 0x80ffb0 : [constdata;   0x50];
 
 bank _resources @ 0xc10000 : [constdata; 0x10000 * 3];
 
@@ -45,6 +49,10 @@ let MEMMAP_ROOMSTATE_LOWRAM_SIZE =    0x100;
 let MEMMAP_ROOMSTATE_WRAM7E      = 0x7e2000;
 let MEMMAP_ROOMSTATE_WRAM7E_SIZE =    0x900;
 
+let MEMMAP_CART_RAM_ADDR = 0x206000;
+let MEMMAP_CART_RAM_SIZE = 4096;
+
+
 // Number of bytes to clear, within the second WRAM bank, on reset.
 // This will cause the gamestate backup to survive resets
 let MEMMAP_WRAM7F_BYTES_TO_RESET =   0xff00;
@@ -54,7 +62,7 @@ let STACK_TOP = 0x1fff;
 let STACK_BOTTOM = 0x1f80;
 
 
-in code {
+in rom_header {
 
 // Define interrupt vectors
 

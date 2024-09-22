@@ -7,6 +7,10 @@ import "resources-over-usb2snes";
 import "resources";
 
 import "../audio";
+import "../gamemodes";
+import "../game/gamestate";
+
+import "gen/enums";
 
 
 namespace rou2s_commands {
@@ -16,12 +20,14 @@ namespace rou2s_commands {
 enum Rou2sCommand : u8 {
     null,
     common_audio_data_changed,
+    set_gamestate_and_restart,
 };
 
 in code {
     const function_table = [
         commands.null,
         commands.common_audio_data_changed,
+        commands.set_gamestate_and_restart,
     ];
 }
 
@@ -52,7 +58,7 @@ namespace Command {
     extern const data       @ _COMMAND_BLOCK_ADDR + 4 : [u8 ; MAX_COMMAND_SIZE - 4];
 }
 
-let command_data = far& data as far * const u8;
+let command_data = far& Command.data as far * const u8;
 
 
 in wram7e {
@@ -132,6 +138,23 @@ func null() {
 // DB = 0x7e
 #[mem8, idx16]
 let common_audio_data_changed = audio.reload_common_audio_data;
+
+
+// Copies the data to gamestate and restarts the gameloop
+//
+// DB = 0x7e
+#[mem8, idx16]
+func set_gamestate_and_restart() {
+    xx = sizeof(typeof(gamestate.data)) - 1;
+    do {
+        (&gamestate.data as *u8)[xx] = a = command_data[xx];
+
+        xx--;
+    } while !negative;
+
+    // must not call `execute_game_mode()` (`last_command_id` would not be updated)
+    ^return set_next_game_mode_to_room_transition(RoomTransitions.fadein_reset_player);
+}
 
 }
 }

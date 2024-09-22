@@ -139,12 +139,7 @@ in code {
 // DB = 0x7e
 #[mem8, idx8]
 func change_to_swarming_entity(entityId : u8 in y) {
-
-    mem16();
-    #[mem16] {
-        (&SoA.process_function[0] as *u16)[unaligned y] = aa = &process as u16;
-    }
-    mem8();
+    set_entity_function(y, EntityFunction.swarming);
 
     return _reset(y);
 }
@@ -162,11 +157,8 @@ func change_to_swarming_entity(entityId : u8 in y) {
 #[mem8, idx8]
 func change_to_swarming_entity__player_sword_collision(entityId : u8 in y) {
 
-    mem16();
-    #[mem16] {
-        (&SoA.process_function[0] as *u16)[unaligned y] = aa = &process as u16;
-    }
-    mem8();
+    a = EntityFunction.swarming as u8;
+    SoA.entityFunction[unaligned y] = a as EntityFunction;
 
     // `process__hurt` will call `_reset` when the countdown timer ends.
     set_state__hurt(y);
@@ -175,7 +167,7 @@ func change_to_swarming_entity__player_sword_collision(entityId : u8 in y) {
 
 
 // (`init` function does not use a parameter)
-let init = _reset as func(entityId : u8 in y, parameter : u8 in x);
+let init = _reset as func(entityId : u8 in y, parameter : u8 in a);
 
 
 

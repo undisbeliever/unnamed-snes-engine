@@ -5,6 +5,8 @@
 
 import "src/memmap";
 
+import "dungeon";
+import "../entity_api";
 import "../resources/resources";
 
 import "src/engine-hooks";
@@ -29,46 +31,81 @@ in lowram {
 
 namespace gamestate {
 
-typealias PlayerState : engine_hooks.GameState__PlayerState;
+// Must increment whenever RoomToLoad or GameStateData changes
+let GAME_STATE_DATA_VERSION = 1;
+
+let N_FLAG_ARRAYS = 2;
+
+let N_SAVE_SLOTS = gs.N_SAVE_SLOTS;
+let N_SAVE_COPIES = gs.N_SAVE_COPIES;
+
+let BYTES_PER_SAVE_SLOT = gs.CART_RAM_SIZE / N_SAVE_SLOTS;
+let BYTES_PER_SAVE_COPY = BYTES_PER_SAVE_SLOT / N_SAVE_COPIES;
 
 
-// unnamed snes game!
-let __SIGNATURE = "USG!";
+// Order MUST match PLAYER_POSITION in `tools/unnamed_snes_game/gamestate.py`
+struct RoomToLoad {
+    dungeon: u8,
+    room_x: u8,
+    room_y: u8,
 
-let SIGNATURE_W0 = (__SIGNATURE[0] as u16) | (__SIGNATURE[1] as u16 << 8);
-let SIGNATURE_W1 = (__SIGNATURE[2] as u16) | (__SIGNATURE[3] as u16 << 8);
+    player_x: u8,
+    player_y: u8,
+    player_z: u8,
+
+    // ::TODO add to mappings.json::
+    player_state: u8,
+    // ::TODO add to mappings.json::
+    player_direction: u8,
+}
 
 
 struct GameStateData {
     // Game state signature
-    signature : [u16 ; 2],
+    // MUST be at the start of GameStateData
+    signature : [u8 ; 4],
+    version: [u8 ; 6],
 
     // The checksum of the data
     // Updated whenever the gamestate backup is created.
     checksum : u16,
 
+    // The cartridge RAM save slot the game is saved to.
+    // CAUTION: A valid gamestate has the MSB of `saveSlot` set.
+    //          (allows me to detect zeroed GameStateData vs slot 0)
+    saveSlot : u8,
 
-    // ::TODO add dungron_id::
+    // The player position to load on new-game/continue/reload
+    playerPosition : RoomToLoad,
 
-    // The current room within the dungeon
-    currentDungeon : u8,
-    currentRoom_x : u8,
-    currentRoom_y : u8,
-
-    // The player's state at the start of the room
-    // (or when saving, loading or starting a new game)
-    playerState : PlayerState,
-
-
-    // Game State flags
+    // Global flags
+    // (defined in gen/enums.wiz)
     // (256 bit bitfield)
-    gameFlags : [ u8 ; 256 / 8 ],
+    globalFlags : [ u8 ; 256 / 8 ],
 
-    // Number of keys held by the player
-    //
-    // NOTE: This function should not be modified by game code
-    _keyCount : u8,
+    // Dungeon flags
+    // (not defined in gen/enums.wiz, only used by entity and callback parameters)
+    // (256 bit bitfield)
+    dungeonFlags : [ u8 ; 256 / 8 ],
+
+    u8_vars  : [ u8 ; gs.N_U8_VARS ],
+    u16_vars : [ u16 ; gs.N_U16_VARS ],
 };
+
+
+in rodata0 {
+    // Size MUST be even
+    // Size MUST match GameStateData
+    // Using inverted GAME_STATE_DATA_VERSION so the MSB is set in one of these variables.
+    const SignatureAndVersion : [u8 ; 10] = gs.IDENTIFIER ~
+        [~GAME_STATE_DATA_VERSION as u8, gs.VERSION, N_FLAG_ARRAYS, gs.N_U8_VARS, gs.N_U16_VARS, 0];
+}
+
+
+in wram7e {
+    var __far_roomToLoad : RoomToLoad;
+        var roomToLoad @ &__far_roomToLoad : RoomToLoad;
+}
 
 
 in wram7e_roomstate {
@@ -86,6 +123,28 @@ in wram7f_gamestatebackup {
 }
 
 
+namespace __cart_saves {
+    let CART_RAM_BANK = MEMMAP_CART_RAM_ADDR >> 16;
+
+    // Used to confirm the data fits in cart-ram
+    bank _gamestate_cartram @ MEMMAP_CART_RAM_ADDR : [vardata; MEMMAP_CART_RAM_SIZE];
+    in _gamestate_cartram {
+        var __cartRamSaves : [u8 ; gs.CART_RAM_SIZE];
+    }
+
+    // Used to confirm gamestate fits in a save copy
+    bank _gamestate_save_copy @ MEMMAP_CART_RAM_ADDR : [vardata; BYTES_PER_SAVE_COPY];
+    in _gamestate_save_copy {
+        var __gamestateCopy : GameStateData;
+    }
+
+    in rodata0 {
+        const SaveSlotAddrs : [u16 ; N_SAVE_SLOTS] =
+            [ &__cartRamSaves as u16 + i * BYTES_PER_SAVE_SLOT for let i in 0..(N_SAVE_SLOTS - 1)];
+    }
+}
+
+
 in code {
 
 // Returns true if the gamestate backup is valid.
@@ -95,7 +154,7 @@ in code {
 func init() : bool in carry {
     mem16_idx16();
     #[mem16, idx16] {
-        carry = restore_gamestate_backup__inline();
+        carry = __restore_gamestate_backup__inline();
     }
     mem8_idx8();
 
@@ -104,7 +163,7 @@ func init() : bool in carry {
     }
 
     // gamestate backup is missing or corrupt.  Start a new game.
-    new_game();
+    clear_gamestate();
     return false;
 }
 
@@ -114,7 +173,7 @@ func init() : bool in carry {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func new_game() {
+func clear_gamestate() {
     // Populate initial player state
     mem16_idx16();
     #[mem16, idx16] {
@@ -124,20 +183,30 @@ func new_game() {
         load_dec_repeat(#:far &__fardata, yy = &data as u16 + 1,
                         #:far &__fardata, xx = &data as u16,
                         aa = sizeof(typeof(data)) - 2);
-
-        // Load initial player state
-        load_dec_repeat(#:far &__fardata, yy = &data.playerState as u16,
-                        #:far &InitialPlayerState, xx = &InitialPlayerState as u16,
-                        aa = sizeof(typeof(data.playerState)) - 1);
         // DB = 0x7e
     }
     mem8_idx8();
 
 
-    // ::TODO improve how start position is determined::
-    data.currentDungeon = 0;
-    data.currentRoom_x = x = resources.STARTING_ROOM_X;
-    data.currentRoom_y = y = resources.STARTING_ROOM_Y;
+    // Force a dungeon load on the next room transition
+    dungeon.mark_dungeon_unloaded();
+
+    // Load the default room of dungeon 0.
+    data.playerPosition.dungeon = a = 0xff;
+}
+
+
+
+// New game
+//
+// CAUTION: Does not initialise `saveSlot`.
+//          The game must be saved using `save_gamestate_to_cart_slot()` for saves to work.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func new_game() {
+    clear_gamestate();
+    engine_hooks.gamestate__new_game__inline();
 }
 
 
@@ -154,7 +223,8 @@ func continue_game() {
 
     engine_hooks.gamestate__continue_game__inline();
 
-    engine_hooks.gamestate__continue_player_gamestate__inline();
+    // Force a dungeon load on the next room transition
+    dungeon.mark_dungeon_unloaded();
 }
 
 
@@ -165,7 +235,7 @@ func continue_game() {
 //
 // DB = 0x7e
 #[mem16, idx16]
-func calculate_checksum() : u16 in aa {
+func __calculate_checksum() : u16 in aa {
 var _tmp         : u16 in zpTmp_word_0;
 var _oldChecksum : u16 in zpTmp_word_1;
 
@@ -206,24 +276,41 @@ var _oldChecksum : u16 in zpTmp_word_1;
 
 
 
+// Prepare the gamestate for a save or a backup
+//
+// DB = 0x7e
+#[mem8, idx8]
+func __prepare_gamestate_for_save_or_backup() {
+    populate_room_to_load();
+    _copy_room_to_load_to_gamestate();
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        // Copy signature and version fields
+        xx = sizeof(typeof(SignatureAndVersion)) - 2;
+        do {
+            (&data as *u16)[unaligned xx] = aa = (far &SignatureAndVersion as far *u16)[unaligned xx];
+
+            xx--;
+            xx--;
+        } while !negative;
+
+        data.checksum = aa = __calculate_checksum();
+    }
+    mem8_idx8();
+}
+
+
 
 // Create a backup of the gamestate
 //
 // DB = 0x7e
 #[mem8, idx8]
 func backup_gamestate() {
-
-    engine_hooks.gamestate__save_player_state__inline();
-
+    __prepare_gamestate_for_save_or_backup();
 
     mem16_idx16();
     #[mem16, idx16] {
-        // set signature
-        data.signature[0] = aa = SIGNATURE_W0;
-        data.signature[1] = aa = SIGNATURE_W1;
-
-        data.checksum = aa = calculate_checksum();
-
         // Parameter order is destination, source
         load_dec_repeat(#:far &gamestateBackup, yy = &gamestateBackup as u16,
                         #:far &__fardata, xx = &data as u16,
@@ -247,18 +334,28 @@ func backup_gamestate() {
 //
 // DB = 0x7e
 #[mem16, idx16]
-inline func restore_gamestate_backup__inline() : bool in carry {
+inline func __restore_gamestate_backup__inline() : bool in carry {
     // Parameter order is destination, source
     load_dec_repeat(#:far &__fardata, yy = &data as u16,
                     #:far &gamestateBackup, xx = &gamestateBackup as u16,
                     aa = sizeof(typeof(data)) - 1);
 // DB = 0x7e
 
+    xx = sizeof(typeof(SignatureAndVersion)) - 2;
+    do {
+        aa = (&data as *u16)[unaligned xx];
+        if aa != (far &SignatureAndVersion as far *u16)[unaligned xx] {
+            return false;
+        }
+
+        xx--;
+        xx--;
+    } while !negative;
+
+
     // Check checksum and signature is correct
-    aa = calculate_checksum();
-    xx = SIGNATURE_W0;
-    yy = SIGNATURE_W1;
-    if aa == data.checksum && xx == data.signature[0] && yy == data.signature[1] {
+    aa = __calculate_checksum();
+    if aa == data.checksum {
         return true;
     }
 
@@ -267,121 +364,291 @@ inline func restore_gamestate_backup__inline() : bool in carry {
 
 
 
-
-// Returns true if the game flag is clear
+// Populate `roomToLoad` with the player's current position.
 //
 // DB = 0x7e
 #[mem8, idx8]
-func is_flag_clear(flag_id : u8 in x) : bool in zero {
-    y = a = x >>> 3;
-    x = a = x & 7;
+func populate_room_to_load() {
+    gamestate.roomToLoad.room_x = a = gamestate.data.playerPosition.room_x;
+    gamestate.roomToLoad.room_y = a = gamestate.data.playerPosition.room_y;
+    gamestate.roomToLoad.dungeon = a = gamestate.data.playerPosition.dungeon;
 
-    a = data.gameFlags[y] & _BitTable[x];
-    return zero;
+    gamestate.roomToLoad.player_x = a = player.xPos.px;
+    gamestate.roomToLoad.player_y = a = player.yPos.px;
+    gamestate.roomToLoad.player_z = a = player.zPos;
+
+    roomToLoad.player_state = a = engine_hooks.get_roomtoload_player_state__inline();
+    roomToLoad.player_direction = a = engine_hooks.get_roomtoload_player_direction__inline();
 }
 
 
-// Returns true if the game flag is clear (without clobbering the Y register)
-//
-// KEEP: y
+// Transfer gamestate playerPosition to player
 //
 // DB = 0x7e
 #[mem8, idx8]
-func is_flag_clear__keep_y(flag_id : u8 in x) : bool in zero {
-var _tmp : u8 in zpTmp_byte_0;
+inline func __transfer_gs_playerposition_to_player__inline() {
+    player.xPos.px = a = gamestate.roomToLoad.player_x;
+    player.yPos.px = a = gamestate.roomToLoad.player_y;
+    player.zPos = a = gamestate.roomToLoad.player_z;
 
-    _tmp = y;
-
-    y = a = x >>> 3;
-    x = a = x & 7;
-
-    a = data.gameFlags[y];
-
-    y = _tmp;
-
-    a &= _BitTable[x];
-    return zero;
+    engine_hooks.dungeon_loaded__restore_player_state_and_direction__inline(
+        data.playerPosition.player_state, data.playerPosition.player_direction);
 }
 
 
-// DB = 0x7e
-#[mem8, idx8]
-func set_game_flag(flag_id : u8 in x) {
-    y = a = x >>> 3;
-    x = a = x & 7;
-
-    data.gameFlags[y] = a = data.gameFlags[y] | _BitTable[x];
-}
-
-
-
-// KEEP: Y
+// Copy `gamestate.playerPosition` to `roomToLoad`
 //
 // DB = 0x7e
 #[mem8, idx8]
-func set_game_flag__keep_y(flag_id : u8 in x) {
-var _tmp : u8 in zpTmp_byte_0;
-
-    _tmp = y;
-
-    y = a = x >>> 3;
-    x = a = x & 7;
-
-    data.gameFlags[y] = a = data.gameFlags[y] | _BitTable[x];
-
-    y = _tmp;
-}
-
-
-
-// Increment the key counter
-// DB = 0x7e
-#[mem8, idx8]
-func increment_key_count() {
-    x = data._keyCount;
-    x++;
-    if negative {
-        x = 127;
-    }
-    data._keyCount = x;
-
-    ^return engine_hooks.gamestate__key_count_changed(x);
-}
-
-
-
-// Decrement the key counter.
-//
-// Return true if there was a key to decrement.
-//
-// DB = 0x7e
-#[mem8, idx8]
-func test_and_decrement_key_count() : bool in carry{
-    x = data._keyCount;
-    if !zero {
+func copy_gamestate_to_room_to_load() {
+    x = sizeof(RoomToLoad) - 1;
+    do {
+        (&roomToLoad as *u8)[x] = a = (&data.playerPosition as *u8)[x];
         x--;
-        data._keyCount = x;
+    } while !negative;
+}
 
-        engine_hooks.gamestate__key_count_changed(x);
-        return true;
+
+
+// Copy `roomToLoad` to `data.playerPosition`.
+//
+// Caution: invalidates roomToLoad.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _copy_room_to_load_to_gamestate() {
+    x = sizeof(RoomToLoad) - 1;
+    do {
+        (&data.playerPosition as *u8)[x] = a = (&roomToLoad as *u8)[x];
+        x--;
+    } while !negative;
+}
+
+
+
+// Select the save slot
+//
+// DB = 0x7e
+let save_gamestate_to_cart_slot = __save_gamestate_to_cart_slot as func(slot : u8 in a) : bool in carry;
+#[fallthrough, mem8, idx8]
+func __save_gamestate_to_cart_slot(slot : u8 in a) {
+    data.saveSlot = a = a | 0x80;
+
+// Fallthrough into save_gamestate_to_cart()
+}
+
+
+// Save gamestate to cartridge
+//
+// NOTE: Does not save the game if `saveSlot` is invalid.
+//
+// DB = 0x7e
+let save_gamestate_to_cart = __save_gamestate_to_cart as func() : bool in carry;
+#[fallthrough, mem8, idx8]
+func __save_gamestate_to_cart() {
+    __prepare_gamestate_for_save_or_backup();
+
+    a = data.saveSlot;
+    goto __return_false if !negative;
+
+// Fallthrough to __write_gamestate_to_cart_slot();
+}
+
+
+// CAUTION: Does not write the checksum
+//
+// DB = 0x7e
+#[mem8, idx8]
+func __write_gamestate_to_cart_slot(slot: u8 in a) : bool in carry {
+    x = a = a << 1;
+    goto __return_false if x >= sizeof(typeof(__cart_saves.SaveSlotAddrs));
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        yy = aa = (far &__cart_saves.SaveSlotAddrs as far *u16)[unaligned xx];
+
+        inline for let i in 0..(N_SAVE_COPIES - 1) {
+            yy = __save_gamestate_to_cart_addr__mem16_idx16(yy);
+        }
     }
+    mem8_idx8();
+
+    return true;
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func __return_false() : bool in carry {
     return false;
 }
 
 
+// OUT: yy = address of the next save copy
+// DB = 0x7e
+#[mem16, idx16]
+func __save_gamestate_to_cart_addr__mem16_idx16(cartAddr : u16 in yy) : u16 in yy {
+    push8(data_bank);
+
+    // Parameter order is destination, source
+    load_dec_repeat(__cart_saves.CART_RAM_BANK, yy,
+                    #:far &__fardata, xx = &data as u16,
+                    aa = sizeof(typeof(data)) - 1);
+// DB = CART_RAM_BANK
+    data_bank = pop8();
+// DB = 0x7e
+
+    yy = aa = yy + (BYTES_PER_SAVE_COPY - sizeof(typeof(data)));
+
+    return yy;
 }
 
 
-in rodata0 {
 
-const __BitTable : [ u8 ; 8 ] = [ 1 << i for let i in 0..7 ];
+// Load gamestate from cartridge
+//
+// NOTE: Clobbers gamestate even if gamestate is invalid
+// NOTE: return false if `slot` is invalid.
+//
+// CAUTION: Writes to the save slot if one or more copies is corrupt (and the slot can be loaded).
+//
+// DB = 0x7e
+let load_gamestate_from_cart = __load_slot.__load_gamestate_from_cart;
 
-let _BitTable = far &__BitTable as far *u8;
+namespace __load_slot {
+    in zeropage {
+        var _slot : u8 in zpTmp_byte_0;
+
+        // tmp words 0 & 1 used by __calculate_checksum
+        var _lastGoodSave : u16 in zpTmp_word_2;
+        var _nGoodCopies : u16 in zpTmp_word_3;
+    }
 
 
-const InitialPlayerState : PlayerState = engine_hooks.GameState__InitialPlayerState;
+    func __return_false() : bool in carry {
+        mem8_idx8();
+        clear_gamestate();
+        // ::TODO return reason the game could not be loaded (empty, wrong version, wrong checksum)::
+        return false;
+    }
 
+
+    // Load gamestate from cartridge
+    //
+    // NOTE: Clobbers gamestate even if gamestate is invalid
+    // NOTE: return false if `slot` is invalid.
+    //
+    // DB = 0x7e
+    #[mem8, idx8]
+    func __load_gamestate_from_cart(slot : u8 in a) : bool in carry {
+        _slot = a;
+
+        x = a = a << 1;
+        goto __return_false if x >= sizeof(typeof(__cart_saves.SaveSlotAddrs));
+
+        mem16_idx16();
+        #[mem16, idx16] {
+            _lastGoodSave = 0;
+            _nGoodCopies = 0;
+
+            xx = aa = (far &__cart_saves.SaveSlotAddrs as far *u16)[unaligned xx];
+
+            inline for let i in 0..(N_SAVE_COPIES - 1) {
+                xx = __load_game_from_cart_addr__mem16_idx16(xx);
+            }
+
+            xx = _lastGoodSave;
+            goto __return_false if zero;
+
+            aa = _nGoodCopies;
+            if aa != N_SAVE_COPIES {
+                // At least one save copy was corrupt.
+                // Load the last good copy and write it to the cartridge.
+                __load_game_from_cart_addr__mem16_idx16(xx);
+
+                mem8_idx8();
+                #[mem8, idx8] {
+                    // Returns true if _slot is valid.
+                    return __write_gamestate_to_cart_slot(_slot);
+                }
+            }
+        }
+        mem8_idx8();
+
+        // Prevent gamestate corruption when saving or creating a gamestate backup
+        // immediately after loading a save slot.
+        // (since `save_gamestate_to_cart()` calls `__prepare_gamestate_for_save_or_backup()`)
+        __transfer_gs_playerposition_to_player__inline();
+
+        // Make sure `saveSlot` is valid.
+        data.saveSlot = a = _slot | 0x80;
+        return true;
+    }
+
+
+    // OUT: xx = cart address of the next save copy.
+    // DB = 0x7e
+    #[mem16, idx16]
+    func __load_game_from_cart_addr__mem16_idx16(cartAddr : u16 in xx) : u16 in xx {
+        aa = xx + BYTES_PER_SAVE_COPY;
+        push16(xx);
+
+        // Parameter order is destination, source
+        load_dec_repeat(#:far &__fardata, yy = &data as u16,
+                        __cart_saves.CART_RAM_BANK, xx,
+                        aa = sizeof(typeof(data)) - 1);
+
+        xx = sizeof(typeof(SignatureAndVersion)) - 2;
+        do {
+            aa = (&data as *u16)[unaligned xx];
+            goto Invalid if aa != (far &SignatureAndVersion as far *u16)[unaligned xx];
+
+            xx--;
+            xx--;
+        } while !negative;
+
+        aa = __calculate_checksum();
+        goto Invalid if aa != data.checksum;
+
+        _lastGoodSave = aa = *((ss + 1) as *u16);
+        _nGoodCopies++;
+
+    Invalid:
+        aa = pop16();
+        xx = aa = aa + BYTES_PER_SAVE_COPY;
+        return xx;
+    }
 }
 
+
+
+// Clear save slot from cartridge
+//
+// DB = 0x7e
+#[mem8, idx8]
+func clear_save_slot_from_cart(slot : u8 in a) {
+    x = a = a << 1;
+    goto Return if x >= sizeof(typeof(__cart_saves.SaveSlotAddrs));
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        xx = aa = (far &__cart_saves.SaveSlotAddrs as far *u16)[unaligned xx];
+
+        aa = 0;
+        yy = BYTES_PER_SAVE_SLOT / 2;
+        do {
+            ((__cart_saves.CART_RAM_BANK << 16) as far *u16)[unaligned xx] = aa;
+            xx++;
+            xx++;
+            yy--;
+        } while !zero;
+    }
+    mem8_idx8();
+
+Return:
+    return;
+}
+
+}
 }
 

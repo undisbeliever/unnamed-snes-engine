@@ -619,9 +619,10 @@ class SpritesheetTab:
 
         self._inputs: Final[list[gui.AbstractInput[Any]]] = [
             gui.NameInput(self.frame, "name", "Name:"),
-            gui.PngFilenameInput(self.frame, "palette", "Palette Image: "),
+            gui.NameInput(self.frame, "palette", "Palette: "),
             gui.IntInput(self.frame, "firstTile", "First Tile ID:"),
             gui.IntInput(self.frame, "endTile", "End Tile ID:"),
+            gui.PaletteSwapInput(self.frame, "palette_swaps", "Palette Swaps:"),
         ]
 
         row = 0
@@ -832,7 +833,8 @@ class EditorWindow:
 
         # Change or reset the selected frameset_index
         self.spritesheet_tab.set_selected_fs_index(self._frameset_index)
-        self._fs_combo.current(self._frameset_index)
+        if self._frameset_index >= 0:
+            self._fs_combo.current(self._frameset_index)
 
     def add_frameset(self) -> None:
         if self._update_and_check_valid("creating a new frameset"):

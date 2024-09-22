@@ -1,6 +1,6 @@
 {
   "name": "dungeon",
-  "palette": "_palette.png",
+  "palette": "dungeon",
   "firstTile": 96,
   "endTile": 512,
   "framesets": [
@@ -526,5 +526,6 @@
       "yorigin": 6,
       "tilehitbox": "3 2"
     }
-  ]
+  ],
+  "palette_swaps": []
 }

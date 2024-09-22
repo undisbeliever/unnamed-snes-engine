@@ -7,11 +7,11 @@ import "joypad";
 import "rng";
 
 import "gen/enums";
-import "gen/ms-drawing-functions";
 
 import "engine/audio";
 import "engine/entity_api";
 import "engine/game/gamestate";
+import "engine/game/metasprites";
 import "engine/resources/resources";
 
 // ::TODO remove::
@@ -80,8 +80,13 @@ const joypad_pressed_h @ &>:joypad.pressed : u8;
 // GameState
 // =========
 
-typealias GameState__PlayerState : player.GameState__PlayerState;
-let GameState__InitialPlayerState = player.InitialPlayerState;
+// Called by `gamestate.new_game()`.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func gamestate__new_game__inline() {
+    player.new_player_gamestate__inline();
+}
 
 
 // Called by `gamestate.continue_game()`.
@@ -92,63 +97,52 @@ inline func gamestate__continue_game__inline() {
     // ::HACK Hardcoded checkpoint (just before the boss)::
     // ::TODO create some kind of checkpoint system::
 
-    let LAST_HEALING_ROOM_X = 5;
-    let LAST_HEALING_ROOM_Y = 7;
+    // Load the default room of dungeon 0
+    gamestate.data.playerPosition.dungeon = a = 0xff;
 
-    x = gamestate.data.currentRoom_x;
-    y = gamestate.data.currentRoom_y;
-
-    if y >= LAST_HEALING_ROOM_Y + 1 || x >= LAST_HEALING_ROOM_X + 1 {
-        // Game over before the boss
-        x = resources.STARTING_ROOM_X;
-        y = resources.STARTING_ROOM_Y;
-    }
-    else {
-        // Game over after the final healing room (at the boss)
-        x = LAST_HEALING_ROOM_X;
-        y = LAST_HEALING_ROOM_Y;
-
-    }
-
-    gamestate.data.currentRoom_x = x;
-    gamestate.data.currentRoom_y = y;
-
-    gamestate.data.playerState.xPos = a = player.InitialPlayerState.xPos;
-    gamestate.data.playerState.yPos = a = player.InitialPlayerState.yPos;
-    gamestate.data.playerState.zPos = player.InitialPlayerState.zPos;
-}
-
-
-
-// Rest the player state from the gamestate.
-//
-// Called by `gamestate.continue_game()`.
-//
-// DB = 0x7e
-#[mem8, idx8]
-inline func gamestate__continue_player_gamestate__inline() {
     player.continue_player_gamestate__inline();
 }
 
 
-// Save the player state to the gamestate.
-//
-// Called by `gamestate.backup_gamestate()`.
+
+// Room Loading
+// ============
+
+// Return the player state byte to store in gamestate data and RoomToLoad.
 //
 // DB = 0x7e
 #[mem8, idx8]
-inline func gamestate__save_player_state__inline() {
-    player.save_player_state__inline();
+let get_roomtoload_player_state__inline = player.get_roomtoload_player_state__inline;
+
+
+// Return the direction byte to store in gamestate data and RoomToLoad.
+//
+// DB = 0x7e
+#[mem8, idx8]
+let get_roomtoload_player_direction__inline = player.get_roomtoload_player_direction__inline;
+
+
+// Initialise the player entity's state and direction.
+//
+// Called on dungeon load, after the room has been loaded into memory.
+//
+// Arguments are the values returned by `get_roomtoload_player_state__inline()`
+// and `get_roomtoload_player_direction__inline()`.
+//
+// DB = 0x7e
+#[mem8, idx8]
+let dungeon_loaded__restore_player_state_and_direction__inline = player.dungeon_loaded__restore_player_state_and_direction__inline;
+
+
+// Reset player MetaSprites.
+//
+// Called on dungeon load, just before fade-in.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func init_player_metasprites__inline() {
+    player.init_metasprites();
 }
-
-
-// Called when the key count changes.
-//
-// INPUT: X = nKeys
-//
-// DB = 0x7e
-#[mem8, idx8]
-let gamestate__key_count_changed = ui.draw_key_bar;
 
 
 
@@ -191,18 +185,6 @@ inline func load_dungeon__init() {
 #[mem8, idx8]
 inline func room_transitions__reset_player__inline() {
     player.init();
-}
-
-
-
-// Reset player MetaSprites.
-//
-// Called when resources-over-usb2snes is active and the metasprite subsystem is reset.
-//
-// DB = 0x7e
-#[mem8, idx8]
-inline func init_player_metasprites__inline() {
-    player.init_metasprites();
 }
 
 

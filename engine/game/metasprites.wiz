@@ -5,8 +5,6 @@ import "src/memmap";
 import "../registers";
 
 import "../vram-map";
-import "../resources/dma";
-import "../resources/resources";
 import "../common/math";
 
 import "gen/enums";
@@ -39,8 +37,7 @@ struct MsFramesetFormat {
     shadowSize : ShadowSize,
     tileHitbox : [u8; 2],
 
-    // func(msFrame : u16 in yy, xPos : u16 in metasprites.xPos, yPos : u16 in metasprites.yPos)
-    drawFunction : func,
+    drawFunction : u8,
 
     // List of pointers to `MsDataFormat` entries
     frameTable : *const *const u8,
@@ -57,9 +54,9 @@ namespace MsFsData {
             let shadowSize__u16 = (_base + 0) as far *u16;
 
     let tileHitbox      = (_base + 1) as far *u16;
-    let drawFunction    = (_base + 3) as far *u16;
-    let frameTable      = (_base + 5) as far *u16;
-    let animationTable  = (_base + 7) as far *u16;
+    let drawFunction    = (_base + 3) as far *u8;
+    let frameTable      = (_base + 4) as far *u16;
+    let animationTable  = (_base + 6) as far *u16;
 };
 
 
@@ -169,15 +166,10 @@ namespace AnimationDataFormat {
 
 
 // MetaSprite resource RAM data format
+//
+// PPU data contains dynamically-sized 4bpp tile data.
 struct _RamDataFormat {
     firstTile : u16,
-}
-
-
-// MetaSprie PPU data format in ROM.
-struct _PpuDataFormat {
-    palette_data : [u16 ; 128],
-    tile_data : u8,
 }
 
 
@@ -275,7 +267,6 @@ inline func setup__forceblank() {
 // DB = 0x80
 #[mem8, idx16]
 inline func load_ms_spritesheet_ppu_data__forceblank(spritesheet_id : u8 in a) {
-var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
 
     push8(a);
 
@@ -312,16 +303,12 @@ var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
 // DB = 0x80
 #[mem8, idx16]
 func __load_and_transfer_resource_data__forceblank(spritesheet_id : u8 in a) {
-var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
 
 var _header : _RamDataFormat in zpTmp_word_0;
 
 var _secondRowVramWaddr : u16 in zpTmp_word_1;
 
-    _ppuData = resources.load_resource__fixed_ram_and_ppu_data__forceblank_inline(resources.ResourceType.ms_spritesheet, a, &_header as *u8, sizeof(typeof(_header)));
-
-    CGADD = a = 128;
-    resources.dma_to_cgram__forceblank(_ppuData, 256);
+    resources.ppuData = resources.load_resource__fixed_ram_and_ppu_data__forceblank_inline(resources.ResourceType.ms_spritesheet, a, &_header as *u8, sizeof(typeof(_header)));
 
     mem16();
     #[mem16] {
@@ -349,11 +336,11 @@ var _secondRowVramWaddr : u16 in zpTmp_word_1;
     mem8();
 
     // Transfer the first row of tiles to VRAM
-    resources.dma_to_vram__forceblank(_ppuData, yy);
+    resources.dma_to_vram__forceblank(resources.ppuData, yy);
 
     // Transfer the remaining tiles to VRAM
     VMADD = xx = _secondRowVramWaddr;
-    ^return resources.dma_remaining_to_vram__forceblank(_ppuData);
+    ^return resources.dma_remaining_to_vram__forceblank(resources.ppuData);
 }
 
 
@@ -834,11 +821,15 @@ inline func _draw_entity__inline(entityId : u8 in y) {
     >:yPos = a = a -# 0;
 
 
-    idx16();
+    x = entities.SoA.msDrawFunction[unaligned y] as u8;
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        yy = aa = entities.SoA.msFrameAddr[unaligned yy];
+    }
+    mem8();
     #[mem8, idx16] {
-        xx = yy;
-        yy = entities.SoA.msFrameAddr[unaligned xx];
-        entities.SoA.ms_draw_function[unaligned xx](yy, xPos, yPos);
+        drawing_functions.ms_draw_function_table[unaligned xx](yy, xPos, yPos);
     }
     mem8_idx8();
 }
@@ -1567,6 +1558,8 @@ namespace drawing_functions {
 #[mem8, idx16]
 inline func _subtract_ms_offset_from_position(msFrame : u16 in xx, xPos : u16 in metasprites.xPos, yPos : u16 in metasprites.yPos) {
 
+    // MUST not modify xx or yy
+
     <:xPos = a = <:xPos - MsDataFormat.xOffset[unaligned xx];
     if !carry {
         (>:xPos)--;
@@ -1663,7 +1656,7 @@ func dynamic_pattern(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos
         xx = aa;
     }
 
-    return ms_patterns_table[unaligned xx](yy, xPos, yPos);
+    return ms_draw_function_table[unaligned xx](yy, xPos, yPos);
 }
 
 
@@ -1672,79 +1665,6 @@ func dynamic_pattern(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos
 //
 #[mem8, idx16]
 func null_function(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
-}
-
-
-
-// Four sprites, 32x32 square (all large)
-//
-// ┌─┬─┐
-// │1│2│
-// ├─┼─┤
-// │3│4│
-// └─┴─┘
-//
-// This pattern is not auto-generated, it is provided as an example.
-//
-// DB = 0x7e
-#[mem8, idx16]
-func square_four_32(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
-    xx = yy;
-
-    _subtract_ms_offset_from_position(xx, xPos, yPos);
-
-    yy = bufferPos;
-    return if negative || yy < (4 - 1) * sizeof(OamEntry);
-
-
-    a = <:xPos;
-    (&buffer[ 0].xPos)[unaligned yy] = a;
-    (&buffer[-2].xPos)[unaligned yy] = a;
-
-    _update_hi_table_size_large();
-    _update_hi_table_x8_xPos();
-
-    _update_hi_table_size_large();
-
-    (&buffer[-1].xPos)[unaligned yy] = a = <:xPos + 16;
-    a = (>:xPos +# 0) >>> 1;
-    _update_hi_table_x8(carry);
-
-    _update_hi_table_size_large();
-    _update_hi_table_x8_xPos();
-
-    _update_hi_table_size_large();
-
-    (&buffer[-3].xPos)[unaligned yy] = a = <:xPos + 16;
-    a = (>:xPos +# 0) >>> 1;
-    _update_hi_table_x8(carry);
-
-
-    mem16();
-    #[mem16] {
-        aa = yPos;
-        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
-            aa = -16 as u16;
-        }
-        (&buffer[ 0].yPos as *u16)[unaligned yy] = aa;
-        (&buffer[-1].yPos as *u16)[unaligned yy] = aa;
-
-        aa = yPos + 16;
-        if aa >= DISPLAY_HEIGHT && aa < -16 as u16 {
-            aa = -16 as u16;
-        }
-        (&buffer[-2].yPos as *u16)[unaligned yy] = aa;
-        (&buffer[-3].yPos as *u16)[unaligned yy] = aa;
-
-
-        (&buffer[ 0].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr0[unaligned xx];
-        (&buffer[-1].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr1[unaligned xx];
-        (&buffer[-2].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr2[unaligned xx];
-        (&buffer[-3].char as *u16)[unaligned yy] = aa = MsDataFormat.charAttr3[unaligned xx];
-
-        bufferPos = aa = yy - 4 * sizeof(OamEntry);
-    }
-    mem8();
 }
 
 }
@@ -1758,6 +1678,9 @@ func square_four_32(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos)
 // "encountered a reference to `var metasprites.xPos` before its type was known" error.
 import "room-transitions";
 import "../entity_api";
+
+import "../resources/dma";
+import "../resources/resources";
 
 import "gen/ms-drawing-functions";
 

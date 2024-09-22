@@ -6,8 +6,11 @@
     "infinite": true,
     "width": 2,
     "height": 3,
+    "default_room": "00-01-test",
+    "palette": "dungeon",
     "tileset": "dungeon",
     "second_layer": "sl_floor",
+    "ms_palette": "dungeon",
     "ms_spritesheet": "dungeon",
     "song": "blank"
   },
@@ -17,8 +20,11 @@
     "infinite": false,
     "width": 15,
     "height": 16,
+    "default_room": "08-15-entrance",
+    "palette": "dungeon",
     "tileset": "dungeon",
     "second_layer": null,
+    "ms_palette": "dungeon",
     "ms_spritesheet": "dungeon",
     "song": "DungeonTheme"
   }

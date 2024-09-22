@@ -7,8 +7,46 @@
  },
  "tad_binary_directory": "../../terrific-audio-driver/target/release/",
 
+ "gamestate": {
+   "identifier": "USG!",
+   "_comment": "Only increment version when reordering or resizing flags/variables/cart sizes.",
+   "version": 1,
+   "cart_ram_size": 4096,
+   "n_save_slots": 4,
+   "n_save_copies": 4,
+   "u8_array_len": 32,
+   "u16_array_len": 16,
+   "global_flags": [
+     "boss_defeated"
+   ],
+   "dungeon_flags": [
+     "first_key_room__left_key",
+     "first_key_room__right_key",
+     "slime_key",
+     "first_locked_door",
+     "second_locked_door",
+     "third_locked_door",
+     "rook_tutorial_complete",
+     "tutorial_rook_1",
+     "tutorial_rook_2",
+     "key_guarding_rook_1",
+     "key_guarding_rook_2",
+     "arena_one",
+     "arena_two",
+     null
+   ],
+   "u8_vars": [
+     "player_health",
+     "player_maxHealth",
+     "player_swordAttackPower",
+     "_keyCount number of keys held by the player (should not be directly accessed)"
+   ],
+   "u16_vars": []
+ },
+
  "palettes": [
    "title_screen",
+   "file_select",
    "game_over",
    "credits",
    "dungeon"
@@ -44,23 +82,6 @@
    "heal",
    "poison"
  ],
- "starting_room": "00-00-top-left",
- "gamestate_flags": [
-   "first_key_room__left_key",
-   "first_key_room__right_key",
-   "slime_key",
-   "first_locked_door",
-   "second_locked_door",
-   "third_locked_door",
-   "rook_tutorial_complete",
-   "tutorial_rook_1",
-   "tutorial_rook_2",
-   "key_guarding_rook_1",
-   "key_guarding_rook_2",
-   "arena_one",
-   "arena_two",
-   "boss_defeated"
- ],
  "room_transitions": [
    "fadein_reset_player",
    "fadein",
@@ -81,6 +102,10 @@
    {
      "name": "title_screen",
      "source": "title-screen"
+   },
+   {
+     "name": "file_select",
+     "source": "file-select"
    },
    {
      "name": "game_over",
@@ -125,7 +150,7 @@
        {
          "name": "flag",
          "comment": "Gamestate flag for door locked/unlocked state",
-         "type": "gamestate_flag"
+         "type": "dungeon_flag"
        },
        {
          "name": "doorLocation",
@@ -141,7 +166,7 @@
        {
          "name": "flag",
          "comment": "Optional room defeated flag.  If non-zero, the room will only lock once",
-         "type": "optional_gamestate_flag"
+         "type": "optional_dungeon_flag"
        },
        {
          "name": "door0",
@@ -168,7 +193,7 @@
        {
          "name": "flag",
          "comment": "Boss defeated flag",
-         "type": "gamestate_flag"
+         "type": "global_flag"
        },
        {
          "name": "door0",
@@ -194,7 +219,7 @@
        {
          "name": "flag",
          "comment": "Gamestate flag for key",
-         "type": "gamestate_flag"
+         "type": "dungeon_flag"
        },
        {
          "name": "keyPos",
@@ -265,5 +290,18 @@
        }
      ]
    }
+  ],
+  "ms_palette_callbacks": [
+    {
+      "name": "palette_cycle",
+      "source": "palette-cycle",
+      "parameters": [
+        {
+          "name": "frameDelay",
+          "comment": "Number of frames before cycling the palette",
+          "type": "u8"
+        }
+      ]
+    }
   ]
 }

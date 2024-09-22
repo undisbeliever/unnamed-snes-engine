@@ -86,7 +86,6 @@ namespace Font {
         let BORDER_TOP_RIGHT = Font.BORDER_CORNER | __ATTR_HFLIP;
 
         let BORDER_LEFT = Font.BORDER_VERTICAL | __ATTR;
-        let BORDER_RIGHT = Font.BORDER_VERTICAL | __ATTR_HFLIP;
 
         let PADDING = Font.SPACE_TILE | __ATTR;
 
@@ -153,6 +152,20 @@ namespace DecodeTokens {
 }
 
 
+
+// Flag to control if the border is drawn or not.
+namespace Flags {
+    let _NO_TOP_BORDER_BIT = 7;
+    let NO_TOP_BORDER = 1 << _NO_TOP_BORDER_BIT;
+
+    let _NO_BOTTOM_BORDER_BIT = 6;
+    let NO_BOTTOM_BORDER = 1 << _NO_BOTTOM_BORDER_BIT;
+
+    let _NO_LEFT_RIGHT_BORDER_BIT = 0;
+    let NO_LEFT_RIGHT_BORDER = 1 << _NO_LEFT_RIGHT_BORDER_BIT;
+}
+
+
 // The action to preform on the next VBlank.
 enum VBlankAction : u8 {
     NOTHING = 0,
@@ -194,6 +207,14 @@ in wram7e {
     // Buffer for converting a u16 to a string.
     // MUST BE > `MAX_UINT16_CHARS + 2`
     var u16Buffer : [u8 ; 8];
+
+    // Border flags
+    // (see Flags namespace)
+    var _flags : u8;
+
+    // The tile to use for the left/right border.
+    // (tilemap cell)
+    var leftRightBorderTile : u16;
 
 
     // The values to print when the string decoder encounters a `PRINT_FIRST_U16`, `PRINT_SECOND_U16` or `PRINT_THIRD_U16` token
@@ -331,14 +352,29 @@ func setup_default_textbox() {
     a = DEFAULT_HEIGHT;
     y = DEFAULT_YPOS;
 
-// Fallthrough
+// Fallthrough into `setup_textbox()`
 }
+
+
+#[mem8, idx8]
+#[fallthrough]
+func setup_textbox(height : u8 in a, yPos : u8 in y) {
+    x = 0;
+
+// Fallthrough into `setup_textbox_flags()`
+}
+
 
 // Setup the textbox height and location, draw the top and bottom borders of the textbox.
 //
 // DB = 0x7e
 #[mem8, idx8]
-func setup_textbox(height : u8 in a, yPos : u8 in y) {
+func setup_textbox_flags(height : u8 in a, yPos : u8 in y, flags : u8 in x) {
+// ::HACK to bit-test _flags with mem16::
+var __flags_u16 @ &_flags as u16 - 1 : u16;
+
+    _flags = x;
+
     if a < MIN_TEXTBOX_HEIGHT {
         a = MIN_TEXTBOX_HEIGHT;
     }
@@ -354,28 +390,54 @@ func setup_textbox(height : u8 in a, yPos : u8 in y) {
 
         // aa = height * BUFFER_WIDTH
         bufferIndexAtEndOfText = aa;
-        bufferSizeInBytes = aa = aa + BUFFER_WIDTH_BYTES * 2; // + top and bottom border rows
 
-        aa = yy & 31;
+        push16(yy);
+
+        if !(__flags_u16 $ Flags._NO_TOP_BORDER_BIT) {
+            aa += BUFFER_WIDTH_BYTES;
+            push16(aa);
+            // Copy the top row to `buffer`
+            // Parameter order is destination, source.
+            load_dec_repeat(#: far &buffer, yy = &buffer as u16,
+                            #: far &TopRow, xx = &TopRow as u16,
+                            aa = sizeof(typeof(TopRow)) - 1);
+            // DB = 0x7e
+            aa = pop16();
+        }
+        if !(__flags_u16 $ Flags._NO_BOTTOM_BORDER_BIT) {
+            aa += BUFFER_WIDTH_BYTES;
+            push16(aa);
+
+            // Copy the bottom row to `buffer`.
+            // carry clear
+            yy = aa = aa +# (&buffer as u16 - BUFFER_WIDTH_BYTES);
+
+            // Parameter order is destination, source.
+            load_dec_repeat(#: far &buffer, yy,
+                            #: far &BottomRow, xx = &BottomRow as u16,
+                            aa = sizeof(typeof(BottomRow)) - 1);
+            // DB = 0x7e
+            aa = pop16();
+        }
+        bufferSizeInBytes = aa;
+
+        // yPos
+        aa = pop16();
+
+        aa &= 31;
         swap_bytes(aa); // << 8
         aa >>>= 3;      // << 8 >> 2 == << 5
         bufferVramWaddr = aa = aa | (VRAM_BG3_MAP_WADDR + TEXTBOX_BORDER_X);
 
 
-        // Copy the top row to `buffer`
-        // Parameter order is destination, source.
-        load_dec_repeat(#: far &buffer, yy = &buffer as u16,
-                        #: far &TopRow, xx = &TopRow as u16,
-                        aa = sizeof(typeof(TopRow)) - 1);
-        // DB = 0x7e
-
-        // Copy the bottom row to `buffer`.
-        // Parameter order is destination, source.
-        yy = aa = bufferSizeInBytes + (&buffer as u16 - BUFFER_WIDTH_BYTES);
-        load_dec_repeat(#: far &buffer, yy,
-                        #: far &BottomRow, xx = &BottomRow as u16,
-                        aa = sizeof(typeof(BottomRow)) - 1);
-        // DB = 0x7e
+        yy = Font.CharAttr.BORDER_LEFT;
+        // Assumes Flags._NO_LEFT_RIGHT_BORDER_BIT == 0
+        aa = *(&_flags as *u16);
+        aa >>>= 1;
+        if carry {
+            yy = Font.CharAttr.PADDING;
+        }
+        leftRightBorderTile = yy;
     }
     mem8_idx8();
 
@@ -447,6 +509,8 @@ func decode_string(bankbyte : u8 in a, addr : u16 in xx) : [u8; 256] in decodedS
                 continue;
             }
         }
+
+        decodedString[x] = 0;
     }
     idx16();
 
@@ -550,7 +614,7 @@ inline func __decode_string__u16__inline(decodedStringPos : u8 in x, char_token 
 func print_textbox(bankbyte : u8 in a, addr : u16 in xx) {
     decodedString = decode_string(a, xx);
 
-// Fallthrough
+// Fallthrough into print_decoded_textbox()
 }
 
 
@@ -567,6 +631,7 @@ func print_textbox(bankbyte : u8 in a, addr : u16 in xx) {
 // DB = 0x7e
 #[mem8, idx16]
 func print_decoded_textbox(_decodedString : [u8 ; 256] in decodedString) {
+
 
     // -----------------------
     // WARNING: Spaghetti code
@@ -590,19 +655,34 @@ func print_decoded_textbox(_decodedString : [u8 ; 256] in decodedString) {
         }
     }
 
+    a = _flags;
+
     mem16_idx16();
     #[mem16, idx16] {
-        _endOfLineIndex = xx = BUFFER_WIDTH_BYTES + 2 + TEXTBOX_WIDTH_BYTES; // +2 for the border tiles
-        xx = BUFFER_WIDTH_BYTES;
+        // Assumes Flags._NO_TOP_BORDER_BIT == 7
+        if negative {
+            xx = 0;
+            yy = TEXTBOX_WIDTH_BYTES + 2; // +2 for the left border tile
+        }
+        else {
+            xx = BUFFER_WIDTH_BYTES;
+            yy = BUFFER_WIDTH_BYTES + TEXTBOX_WIDTH_BYTES + 2; // +2 for the left border tile
+        }
+        _endOfLineIndex = yy;
 
         yy = 0;
         // Loop until all textbox lines are completed
         // (even if the string has ended)
         ^while true {
-            // Draw the left border character
-            aa = Font.CharAttr.BORDER_LEFT;
+            // Draw the left and right border tiles
+            aa = leftRightBorderTile;
             buffer[unaligned xx] = aa;
             (&buffer[BUFFER_WIDTH])[unaligned xx] = aa;
+
+            aa ^= 0x4000;   // hflip
+            (&buffer[TEXTBOX_WIDTH + 1])[unaligned xx] = aa;
+            (&buffer[TEXTBOX_WIDTH + 1 + BUFFER_WIDTH])[unaligned xx] = aa;
+
             xx++;
             xx++;
 
@@ -674,7 +754,7 @@ func print_decoded_textbox(_decodedString : [u8 ; 256] in decodedString) {
             }
             mem16();
             // The line is over, do not draw padding.
-            goto DrawRightBorder;
+            goto EndOfLine;
 
 
         // .A8
@@ -691,12 +771,7 @@ func print_decoded_textbox(_decodedString : [u8 ; 256] in decodedString) {
             } while xx < _endOfLineIndex;
 
 
-        DrawRightBorder:
-            xx = _endOfLineIndex;
-            aa = Font.CharAttr.BORDER_RIGHT;
-            buffer[unaligned xx] = aa;
-            (&buffer[BUFFER_WIDTH])[unaligned xx] = aa;
-
+        EndOfLine:
             aa = xx + BUFFER_WIDTH_BYTES * 2;
             break if aa >= bufferIndexAtEndOfText;
 
@@ -770,6 +845,8 @@ func print_textbox_and_wait(bankbyte : u8 in a, addr : u16 in xx, confirmButton 
     while true {
         print_decoded_textbox(decodedString);
 
+        wait_frame();
+
         a = engine_hooks.joypad_pressed_l;
         break if a & <:_confirmButton != 0;
 
@@ -800,8 +877,6 @@ func print_textbox_and_wait(bankbyte : u8 in a, addr : u16 in xx, confirmButton 
                 audio.queue_sound_effect(sound_effects.menu_cursor);
             }
         }
-
-        wait_frame();
     }
 
     return selectedMenuItem;

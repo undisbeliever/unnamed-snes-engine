@@ -17,12 +17,12 @@ in lowram {
 }
 
 
-in code {
+in rom_header {
+    const @ 0x80ffb6 : u8 = 0;
+    extern const empty_byte @ 0x80ffb6 : u8;
+}
 
-
-const @ 0x80ffb6 : u8 = 0;
-extern const empty_byte @ 0x80ffb6 : u8;
-
+in code_interrupts {
 
 // Reset handler MUST NOT be called by this code
 // (The S-SMP cannot be reset by S-CPU code)
@@ -31,6 +31,10 @@ func __reset() {
     goto __reset_far;
 }
 
+}
+
+
+in code {
 
 // Reset handler MUST NOT be called by this code
 // (The S-SMP cannot be reset by S-CPU code)
@@ -51,7 +55,8 @@ far func __reset_far() {
 
     mem8();
     #[mem8, idx16] {
-        push8(program_bank);
+        a = 0x80;
+        push8(a);
         data_bank = pop8();
     // DB = 0x00 (access registers)
 
@@ -100,7 +105,8 @@ func reset_registers() {
 
     mem8_idx8();
     #[mem8, idx8] {
-        push8(program_bank);
+        a = 0x80;
+        push8(a);
         data_bank = pop8();
     // DB = 0x80 (access registers)
 
@@ -159,6 +165,9 @@ func reset_registers() {
             (0x2123 as *u8)[x] = 0;
             x--;
         } while !negative;
+
+        // Set fixed color data to black
+        COLDATA = a = COLDATA_PLANE_ALL | 0;
 
 
         // Reset the DMA registers

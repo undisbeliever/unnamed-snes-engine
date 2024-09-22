@@ -56,9 +56,9 @@ struct Request {
     // Request ID.
     request_id   : u8,
 
-    // Type of request, either a `resources.ResourceType * 2` request or a `SpecialRequestType` request.
+    // Type of request, either a `resources.ResourceType * 3` request or a `SpecialRequestType` request.
     //
-    // (`resources.ResourceType * 2` or `SpecialRequestType`)
+    // (`resources.ResourceType * 3` or `SpecialRequestType`)
     request_type : u8,
 
     resource_id  : u8,
@@ -115,7 +115,7 @@ struct Response {
 extern const response_data @ resources._USB2SNES_DATA_ADDR : [ u8 ; resources._BANK_SIZE ];
 
 
-in wram7e {
+in lowram {
     var request : Request;
 }
 
@@ -160,7 +160,7 @@ let __send_room_request = __send_room_request__ as func(u8 in a, u8 in x, u8 in 
 func __send_room_request__(dungeonId : u8 in a, room_x: u8 in x, room_y: u8 in y) {
 
     // Annoying hack to access var struct elements with far addressing
-    in wram7e {
+    in lowram {
         extern var __room_x  @ &request.room_x : u8;
         extern var __room_y  @ &request.room_y : u8;
     }
@@ -188,18 +188,17 @@ func __send_room_request__(dungeonId : u8 in a, room_x: u8 in x, room_y: u8 in y
 #[mem8, idx8]
 func __send_request(rTypeTimes3 : u8 in x, resourceId : u8 in y) : u8 in a {
 
-    // Annoying hack to access var struct elements with far addressing
-    in wram7e {
-        extern var __request_id   @ &request.request_id   : u8;
-        extern var __request_type @ &request.request_type : u8;
-        extern var __resource_id  @ &request.resource_id  : u8;
+    // Annoying hack to access var struct elements with addr addressing
+    in lowram {
+        extern var __request @ &request : Request;
     }
 
     push8(data_bank);
 
-    push8(program_bank);
+    a = 0x80;
+    push8(a);
     data_bank = pop8();
-// DB access registers
+// DB = 0x80
 
     // Flush any pending audio transfers
     // ::TODO create a separate buffer for audio data::
@@ -215,21 +214,18 @@ func __send_request(rTypeTimes3 : u8 in x, resourceId : u8 in y) : u8 in a {
     y = pop8();
     x = pop8();
 
-    data_bank = pop8();
-// DB = unknown
-
-    // This function MUST ONLY use long addressing
-
-    *(far& __request_type) = a = x;
-    *(far& __resource_id)  = a = y;
-
-    // `request_id` must be written last
+    __request.request_type = x;
+    __request.resource_id = y;
 
     // Increment request_id
-    a = *(far& __request_id);
+    a = __request.request_id;
     a++;
     if zero { a++; }
-    *(far& __request_id) = a;
+    __request.request_id = a;
+
+
+    data_bank = pop8();
+// DB = unknown
 
     return a;
 }
@@ -246,7 +242,7 @@ func __send_request(rTypeTimes3 : u8 in x, resourceId : u8 in y) : u8 in a {
 func __send_init_request_and_wait_for_response() {
 
     // Annoying hack to access var struct elements with far addressing
-    in wram7e {
+    in lowram {
         extern var __request_type @ &request.request_type : u8;
     }
 
@@ -366,7 +362,7 @@ inline func set_last_command_id__inline(cId : u8 in a) {
     // This function MUST ONLY use long addressing
 
     // Annoying hack to access var struct elements with far addressing
-    in wram7e {
+    in lowram {
         extern var __request_last_command_id @ &request.last_command_id : u8;
     }
 

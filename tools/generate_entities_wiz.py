@@ -9,6 +9,21 @@ from io import StringIO
 from unnamed_snes_game.json_formats import load_entities_json, load_ms_export_order_json, EntitiesJson, MsExportOrder
 
 
+def generate_ms_draw_function_enum(out: StringIO, ms: MsExportOrder) -> None:
+    out.write("enum MsDrawFunction : u8 {\n")
+    out.write("  null = 0,\n")
+
+    for p in ms.patterns.values():
+        out.write(f"  {p.name} = {p.id},\n")
+
+    for f, i in ms.custom_draw_functions.items():
+        out.write(f"  {f} = {i},\n")
+
+    out.write(f"  dynamic_pattern = {ms.dynamic_pattern_id},\n")
+
+    out.write("};\n\n")
+
+
 def generate_wiz_code(entities_input: EntitiesJson, ms_export_orders: MsExportOrder) -> str:
     entity_functions = entities_input.entity_functions.values()
     entities = entities_input.entities.values()
@@ -21,6 +36,12 @@ def generate_wiz_code(entities_input: EntitiesJson, ms_export_orders: MsExportOr
         out.write("enum EntityTypes : u8 {\n")
         for e in entities:
             out.write(f"  { e.name },\n")
+        out.write("};\n\n")
+
+        out.write("enum EntityFunction : u8 {\n")
+        out.write("  null = 0,\n")
+        for ef in entity_functions:
+            out.write(f"  {ef.name} = {ef.id},\n")
         out.write("};\n\n")
 
         for ef in entity_functions:
@@ -51,6 +72,8 @@ def generate_wiz_code(entities_input: EntitiesJson, ms_export_orders: MsExportOr
             out.write("}\n\n")
 
         out.write("}\n\n")
+
+        generate_ms_draw_function_enum(out, ms_export_orders)
 
         return out.getvalue()
 

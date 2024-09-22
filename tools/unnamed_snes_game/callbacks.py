@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # vim: set fenc=utf-8 ai ts=4 sw=4 sts=4 et:
 
-from .json_formats import Name, Callback, CallbackDict, CallbackParameter, Mappings, RoomEvent, SecondLayerCallback
+from .json_formats import Name, Callback, CallbackDict, CallbackParameter, Mappings, RoomEvent, SecondLayerCallback, MsPaletteCallback
 
 from io import StringIO
 
@@ -15,11 +15,22 @@ PARAM_TYPES: Final = {
     "u8pos": "U8Position",
     "u16": "u16",
     "sQ4_12": "i16",
-    "gamestate_flag": "u8",
-    "optional_gamestate_flag": "u8",
+    "global_flag": "gs.gf",
+    "dungeon_flag": "u8",
+    "optional_dungeon_flag": "u8",
     "locked_door": "u8",
     "open_door": "u8",
     "optional_open_door": "u8",
+}
+
+# Mapping of parameter types to wiz types
+# NOTE: No room/dungeon types.  Dungeon and room might not be loaded for this type
+PARAM_TYPES_SOA: Final = {
+    "bool": "[u8 ; BA_SIZE]",
+    "u8": "[u8 ; BA_SIZE]",
+    "u16": "[u16 ; N_SLOTS]",
+    "sQ4_12": "[i16 ; N_SLOTS]",
+    "global_flag": "[gs.gf ; N_SLOTS]",
 }
 
 # Size of each parameter type in bytes
@@ -29,8 +40,9 @@ PARAM_SIZE: Final = {
     "u8pos": 2,
     "u16": 2,
     "sQ4_12": 2,
-    "gamestate_flag": 1,
-    "optional_gamestate_flag": 1,
+    "global_flag": 1,
+    "dungeon_flag": 1,
+    "optional_dungeon_flag": 1,
     "locked_door": 1,
     "open_door": 1,
     "optional_open_door": 1,
@@ -50,19 +62,28 @@ class CallbackType(NamedTuple):
     human_name: str
     parameter_array: str
     parameter_size: int
+    uses_soa: bool
     get_parameters: Callable[[Callback], Optional[list[CallbackParameter]]]
 
 
 ROOM_CALLBACK: Final = CallbackType(
-    "room event", "room.roomEventParameters", 4, lambda c: c.parameters if isinstance(c, RoomEvent) else None
+    "room event", "room.roomEventParameters", 4, False, lambda c: c.parameters if isinstance(c, RoomEvent) else None
 )
 
 SL_CALLBACK_PARAMETERS: Final = CallbackType(
-    "sl parameters", "second_layer.sl_parameters", 8, lambda c: c.sl_parameters if isinstance(c, SecondLayerCallback) else None
+    "sl parameters", "second_layer.sl_parameters", 8, False, lambda c: c.sl_parameters if isinstance(c, SecondLayerCallback) else None
 )
 
 SL_ROOM_PARAMETERS: Final = CallbackType(
-    "sl room parameters", "room.sl_parameters", 2, lambda c: c.room_parameters if isinstance(c, SecondLayerCallback) else None
+    "sl room parameters", "room.sl_parameters", 2, False, lambda c: c.room_parameters if isinstance(c, SecondLayerCallback) else None
+)
+
+MS_PALETTE_CALLBACK_PARAMETERS: Final = CallbackType(
+    "ms_palette parameters",
+    "ms_palette_callbacks.SoA.callbackParameters",
+    2,
+    True,
+    lambda c: c.parameters if isinstance(c, MsPaletteCallback) else None,
 )
 
 
@@ -210,17 +231,17 @@ def parse_callback_parameters(
             else:
                 error_list.append(f"Unknown { callback_type.human_name } parameter type: {p.type}")
         else:
-            if p.type == "optional_gamestate_flag":
+            if p.type == "optional_dungeon_flag":
                 if value:
                     try:
-                        flag_index = mapping.gamestate_flags.index(value)
+                        flag_index = mapping.gamestate.dungeon_flags[value].var_index
                         if flag_index == 0:
                             error_list.append(
-                                f"{ callback_type.human_name } parameter {p.name}: Optional gamestate flag cannot be 0: {value}"
+                                f"{ callback_type.human_name } parameter {p.name}: Optional dungeon flag cannot be 0: {value}"
                             )
                         out.append(flag_index)
-                    except ValueError:
-                        error_list.append(f"{ callback_type.human_name } parameter {p.name}: Cannot find gamestate flag: {value}")
+                    except KeyError:
+                        error_list.append(f"{ callback_type.human_name } parameter {p.name}: Cannot find dungeon flag: {value}")
                 else:
                     out.append(0)
             elif not value:
@@ -239,12 +260,18 @@ def parse_callback_parameters(
                 v = parse_sq4_12(value, error_list)
                 out.append(v & 0xFF)
                 out.append(v >> 8)
-            elif p.type == "gamestate_flag":
+            elif p.type == "global_flag":
                 try:
-                    flag_index = mapping.gamestate_flags.index(value)
+                    flag_index = mapping.gamestate.global_flags[value].var_index
                     out.append(flag_index)
-                except ValueError:
-                    error_list.append(f"{ callback_type.human_name } parameter {p.name}: Cannot find gamestate flag: {value}")
+                except KeyError:
+                    error_list.append(f"{ callback_type.human_name } parameter {p.name}: Cannot find global flag: {value}")
+            elif p.type == "dungeon_flag":
+                try:
+                    flag_index = mapping.gamestate.dungeon_flags[value].var_index
+                    out.append(flag_index)
+                except KeyError:
+                    error_list.append(f"{ callback_type.human_name } parameter {p.name}: Cannot find dungeon flag: {value}")
             else:
                 error_list.append(f"Unknown { callback_type.human_name } parameter type: {p.type}")
 
@@ -277,6 +304,9 @@ def write_callback_parameters_wiz(out: StringIO, callbacks: CallbackDict, *callb
         out.write(f"namespace {e.name} {{\n")
 
         for callback_index, callback_type in enumerate(callback_types):
+            param_types = PARAM_TYPES if not callback_type.uses_soa else PARAM_TYPES_SOA
+            prefix = "parameter" if not callback_type.uses_soa else "SoA_parameter"
+
             e_parameters = callback_type.get_parameters(e)
             if e_parameters:
                 i = 0
@@ -287,7 +317,7 @@ def write_callback_parameters_wiz(out: StringIO, callbacks: CallbackDict, *callb
                     elif callback_index != 0:
                         out.write("\n\n")
 
-                    ptype = PARAM_TYPES.get(p.type)
+                    ptype = param_types.get(p.type)
                     if not ptype:
                         raise ValueError(f"Unknown { callback_type.human_name } parameter type: {p.type}")
 
@@ -295,7 +325,7 @@ def write_callback_parameters_wiz(out: StringIO, callbacks: CallbackDict, *callb
                         p_comment = p.comment.replace("\n", "\n  // ")
                         out.write(f"  // { p_comment }\n")
                     out.write(f"  // ({ p.type })\n")
-                    out.write(f"  const parameter__{ p.name } @ &{ callback_type.parameter_array }[{ i }] : { ptype };\n")
+                    out.write(f"  const {prefix}__{ p.name } @ &{ callback_type.parameter_array }[{ i }] : { ptype };\n")
 
                     i += PARAM_SIZE[p.type]
 

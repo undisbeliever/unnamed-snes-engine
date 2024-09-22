@@ -14,6 +14,8 @@ import "engine/game/gamestate";
 import "engine/resources/resources";
 import "engine/resources/palette";
 
+import "engine/gamestate_api.wiz";
+
 import "../joypad";
 
 import "gen/enums";
@@ -30,27 +32,24 @@ let VRAM_BG1_TILES_WADDR = 0x2000;
 
 
 
-let MIN_HEALTH_ON_RESTART_ROOM = 6;
-
-
 let CURSOR_X_POS = 95;
 let CURSOR_Y_POS = 127;
 
 
 enum MenuItem : u8 {
-    CONTINUE,
+    SAVE_AND_CONTINUE,
     RESTART_ROOM,
-    TITLE_SCREEN,
-    SHOW_CREDITS,
+    SAVE_AND_QUIT,
+    SAVE_AND_SHOW_CREDITS,
 };
 
 let N_MENU_ITEMS = 4;
 
 in rodata0 {
-    const Text = "\x03 Continue\n"
+    const Text = "\x03 Save and Continue\n"
                ~ "\x04 Restart Room\n"
-               ~ "\x05 Quit\n"
-               ~ "\x06 Quit and show credits\0";
+               ~ "\x05 Save and Quit\n"
+               ~ "\x06 Save and show credits\0";
 }
 
 
@@ -88,28 +87,27 @@ func exec() {
     }
     mem8_idx8();
 
-    if a < MenuItem.TITLE_SCREEN as u8 {
+    if a < MenuItem.SAVE_AND_QUIT as u8 {
         // restarts the gameloop
 
         if a == MenuItem.RESTART_ROOM as u8 {
             // Restart gamestate (which will load the gamestate backup if it exists)
             gamestate.init();
 
-            // Increment health (if it is too low)
-            a = gamestate.data.playerState.health;
-            if a < MIN_HEALTH_ON_RESTART_ROOM {
-                gamestate.data.playerState.health = a = MIN_HEALTH_ON_RESTART_ROOM;
-            }
+            // Do not save the game
         }
         else {
+            // Save and continue
             gamestate.continue_game();
+            // ::TODO check return value and ask for file on error::
+            gamestate.save_gamestate_to_cart();
         }
 
         set_next_game_mode_to_room_transition(RoomTransitions.fadein_reset_player);
     }
     else {
         // Switch game mode
-        if a == MenuItem.SHOW_CREDITS as u8 {
+        if a == MenuItem.SAVE_AND_SHOW_CREDITS as u8 {
             a = GameModes.CREDITS as u8;
         }
         else {
@@ -117,6 +115,10 @@ func exec() {
         }
         // A = GameModes
         set_next_game_mode(a as GameModes);
+
+        gamestate.continue_game();
+        // ::TODO check return value and ask for file on error::
+        gamestate.save_gamestate_to_cart();
     }
 
     audio.queue_sound_effect(sound_effects.menu_select);

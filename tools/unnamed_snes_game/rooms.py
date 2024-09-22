@@ -385,10 +385,15 @@ def process_room_entities(
                         parameter = p.values.index(tmx_entity.parameter)
                     except ValueError:
                         add_error(f"Invalid parameter for { tmx_entity.type } enum: { tmx_entity.parameter }")
-                elif p.type == "gamestateflag":
+                elif p.type == "global_flag":
                     try:
-                        parameter = mapping.gamestate_flags.index(tmx_entity.parameter)
-                    except ValueError:
+                        parameter = mapping.gamestate.global_flags[tmx_entity.parameter].var_index
+                    except KeyError:
+                        add_error(f"Invalid parameter for { tmx_entity.type } global_flag: { tmx_entity.parameter }")
+                elif p.type == "dungeon_flag":
+                    try:
+                        parameter = mapping.gamestate.dungeon_flags[tmx_entity.parameter].var_index
+                    except KeyError:
                         add_error(f"Invalid parameter for { tmx_entity.type } enum: { tmx_entity.parameter }")
                 elif p.type == "u8":
                     try:

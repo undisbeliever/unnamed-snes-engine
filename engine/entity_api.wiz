@@ -4,6 +4,7 @@
 import "src/memmap";
 import "game/metasprites";
 
+import "gen/entities";
 
 let PLAYER_ENTITY_ID = 0;
 
@@ -81,34 +82,32 @@ namespace entities {
         // Byte access size
         let BA_SIZE = N_ENTITIES * 2 - 1;
 
-
-        in lowram_roomstate {
-            // Process function for the entity.  Called once per frame by the entity loop.
-            //
-            // If the entity's health is 0 after this function is returned, the entity will be removed from the entity SoA.
-            //
-            // INPUT: entityId: index into `entities.SoA` Structure-of-Arrays.
-            //
-            // NOTE: `currentEntityId` will contain a copy of `entityId` to provide an easy
-            //       way to restore the X register if it gets overwritten.
-            //
-            // NOTE: The player entity (entityId 0) MUST NOT change this variable.
-            //
-            // DB = 0x7e
-            #[mem8, idx8]
-            var process_function : [func(entityId : u8 in y) ; N_ENTITIES];
-
-
-            // Metasprite draw function.
-            //
-            // INPUT: Y = entityId: index into `entities.SoA` Structure-of-Arrays.
-            //
-            // DB = 0x7e
-            #[mem8, idx8]
-            var ms_draw_function : [func(msFrame : u16 in yy, xPos : u16 in metasprites.xPos, yPos : u16 in metasprites.yPos) ; N_ENTITIES];
-        }
-
         in wram7e_roomstate {
+            var _entityAndMsDrawFunction : [_u8pair ; N_ENTITIES];
+                // Process function for the entity.  Called once per frame by the entity loop.
+                //
+                // If the entity's health is 0 after this function is returned, the entity will be removed from the entity SoA.
+                //
+                // INPUT: entityId: index into `entities.SoA` Structure-of-Arrays.
+                //
+                // NOTE: `currentEntityId` will contain a copy of `entityId` to provide an easy
+                //       way to restore the X register if it gets overwritten.
+                //
+                // NOTE: The player entity (entityId 0) MUST NOT change this variable.
+                //
+                // DB = 0x7e
+                #[mem8, idx8]
+                var entityFunction @ &_entityAndMsDrawFunction[0].first  : [EntityFunction ; BA_SIZE];
+
+                // Metasprite draw function.
+                //
+                // INPUT: Y = entityId: index into `entities.SoA` Structure-of-Arrays.
+                //
+                // DB = 0x7e
+                #[mem8, idx8]
+                var msDrawFunction  @ &_entityAndMsDrawFunction[0].second : [MsDrawFunction ; BA_SIZE];
+
+
             var xPos : [pos ; N_ENTITIES];
                 var xPos_u16 @ &xPos[0]    : [u16 ; N_ENTITIES];
                 var xPos_sx  @ &xPos[0].sx : [u8  ; BA_SIZE];
@@ -302,9 +301,6 @@ in wram7e_roomstate {
     var movementState           : u8 in entities.SoA.movementState[0];
     var iframeCounter           : u8 in entities.SoA.iframeCounter[0];
 
-    var health                  : u8 in entities.SoA.health[0];
-    var swordAttackPower        : u8 in entities.SoA.attackPower[0];
-
     var visionA                 : u8 in entities.SoA.visionA[0];
     var visionB                 : u8 in entities.SoA.visionB[0];
 
@@ -326,13 +322,17 @@ namespace entities {
 
 
     // Gamestate functions
-    import "game/gamestate";
+    import "gamestate_api";
 
-    let is_gs_flag_clear = gamestate.is_flag_clear__keep_y;
-    let set_gs_flag      = gamestate.set_game_flag__keep_y;
+    let is_global_flag_clear_a = gs.is_global_flag_clear_a__keep_y;
+    let is_global_flag_clear   = gs.is_global_flag_clear__keep_y;
+    let set_global_flag_a      = gs.set_global_flag_a__keep_y;
+    let set_global_flag        = gs.set_global_flag__keep_y;
 
-    // NOTE: clobbers Y
-    let gs_increment_key_count__clobbers_y = gamestate.increment_key_count;
+    let is_dungeon_flag_clear_a = gs.is_dungeon_flag_clear_a__keep_y;
+    let is_dungeon_flag_clear   = gs.is_dungeon_flag_clear__keep_y;
+    let set_dungeon_flag_a      = gs.set_dungeon_flag_a__keep_y;
+    let set_dungeon_flag        = gs.set_dungeon_flag__keep_y;
 
 
     // MetaSprite functions
@@ -364,6 +364,12 @@ namespace entities {
     let get_enemy_count_a = entityloop.get_enemy_count_a;
 
     let spawn_entity__clobbers_y = entityloop.spawn_entity;
-}
 
+    // Miscellaneous entity functions
+    import "game/entity-misc";
+    let set_entity_function_and_change_ms_frameset = entity_misc.set_entity_function_and_change_ms_frameset;
+    let change_ms_frameset = entity_misc.change_ms_frameset;
+    let set_entity_function = entity_misc.set_entity_function;
+    let set_ms_draw_function = entity_misc.set_ms_draw_function;
+}
 

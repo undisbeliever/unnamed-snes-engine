@@ -50,10 +50,11 @@ def create_vertical_scrolling_frame(
     canvas = tk.Canvas(parent, borderwidth=0)
 
     frame = tk.Frame(canvas)
+
     v_scroll = tk.Scrollbar(parent, orient=tk.VERTICAL, command=canvas.yview)
 
-    canvas.grid(row=0, column=0, columnspan=columnspan, sticky=tk.NSEW)
-    v_scroll.grid(row=0, column=1 + columnspan, padx=2, sticky=tk.NS)
+    canvas.grid(row=row, column=column, columnspan=columnspan, sticky=tk.NSEW)
+    v_scroll.grid(row=row, column=column + columnspan, padx=2, sticky=tk.NS)
 
     canvas.create_window(0, 0, window=frame, anchor=tk.NW)
 
@@ -493,3 +494,43 @@ class AabbOverridesInput(_OverrideInput):
 
 class ClonedFramesInput(_OverrideInput):
     LINE_REGEX = re.compile(r"^([a-zA-Z0-9_]+) *: *([a-zA-Z0-9_]+ *(hflip|vflip|hvflip)?)$")
+
+
+class PaletteSwapInput(ExpandingTextInput):
+    AUTO_UPDATE_WIDGET_FG = False
+
+    LINE_REGEX: Final = re.compile(r"^([a-zA-Z0-9_]+) *: *([a-zA-Z0-9_]+) +(\d+)")
+
+    def __init__(self, parent: tk.Frame, field: str, label_text: Optional[str] = None):
+        super().__init__(parent, field, label_text)
+        self.widget.tag_configure("invalid", foreground=self.INVALID_FG_COLOR)
+
+    def _load_value(self, value: Any) -> None:
+        if isinstance(value, list):
+            s = "\n".join(f"""{v.get('name')}: {v.get('copies')} {v.get('palette')}""" for v in value if isinstance(v, dict))
+        else:
+            s = str(value)
+        self.set_text(s)
+
+    def value(self) -> tuple[Optional[list[dict[str, Union[str, int]]]], bool]:
+        out: list[dict[str, Union[str, int]]] = list()
+        valid = True
+
+        regex: Final = self.LINE_REGEX
+
+        self.widget.tag_remove("invalid", "0.0", "end")
+
+        for i, line in enumerate(self.get_text().splitlines()):
+            line = line.strip()
+            if line:
+                m = regex.match(line)
+                if m:
+                    out.append({"name": m.group(1), "copies": m.group(2), "palette": int(m.group(3))})
+                else:
+                    valid = False
+                    self.widget.tag_add("invalid", f"{i+1}.0", f"{i+2}.0")
+
+        if valid:
+            return out, True
+        else:
+            return None, False

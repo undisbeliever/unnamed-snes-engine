@@ -13,7 +13,6 @@ import "engine/game/metasprites";
 
 import "gen/enums";
 import "gen/entities";
-import "gen/ms-drawing-functions";
 
 
 namespace entities {
@@ -86,11 +85,11 @@ in code {
 
 // DB = 0x7e
 #[mem8, idx8]
-func init(entityId : u8 in y, parameter : u8 in x) {
+func init(entityId : u8 in y, parameter : u8 in a) {
     // Do not spawn a bomb on the ground if the player is holding a bomb.
-    a = player.state as u8;
-    if a == player.State.HOLDING_BOMB as u8 {
-        if x == DROP_ACTIVE_BOMB_PARAMETER {
+    x = player.state as u8;
+    if x == player.State.HOLDING_BOMB as u8 {
+        if a == DROP_ACTIVE_BOMB_PARAMETER {
             // This bomb was spawned by the player.  It is an active bomb.
             set_state__active__inline(y);
         }
@@ -162,15 +161,7 @@ func set_state__invisible(entityid : u8 in y) {
     a = State.INVISIBLE as u8;
     SoA_state[y] = a as State;
 
-    // Do not draw entity's MetaSprite.
-    //
-    // Setting `ms_draw_function` to null.
-    // The previous method (zPos = 255) created a glitched bomb sprite in the middle of a scroll-up room transition.
-    mem16();
-    #[mem16] {
-        (&SoA.ms_draw_function as *u16)[unaligned y] = aa = &metasprites.drawing_functions.null_function as u16;
-    }
-    mem8();
+    set_ms_draw_function(y, MsDrawFunction.null);
 
     // A is non-zero
     SoA_timer[y] = a;
@@ -213,12 +204,7 @@ func set_state__falling(entityId : u8 in y) {
 
     SoA.zPos[y] = a = SoA.yPos_px[y] + 8;
 
-    // Make the entity visible again.
-    mem16();
-    #[mem16] {
-        (&SoA.ms_draw_function as *u16)[unaligned y] = aa = &metasprites.drawing_functions.square_single16 as u16;
-    }
-    mem8();
+    set_ms_draw_function(y, MsDrawFunction.square_single16);
 
     a = metasprites.ShadowSize.SMALL as u8;
     SoA.shadowSize[y] = a as metasprites.ShadowSize;

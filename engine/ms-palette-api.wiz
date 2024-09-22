@@ -1,0 +1,49 @@
+// Copyright (c) 2024, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+
+import "engine/game/ms_palettes";
+
+namespace ms_palette_callbacks {
+
+in lowram {
+    let N_SLOTS = ms_palettes.N_SLOTS;
+    let BA_SIZE = N_SLOTS * 2 - 1;
+
+    namespace SoA {
+        const currentFrame @ &ms_palettes.PaletteSoA.currentFrame : [u8 ; BA_SIZE];
+        const nFrames @ &ms_palettes.PaletteSoA.nFrames : [u8 ; BA_SIZE];
+
+        const callbackParameters @ &ms_palettes.PaletteSoA.callbackParameters : [u16 ; N_SLOTS];
+
+        var var_0 : [u16 ; N_SLOTS] in ms_palettes.PaletteSoA.callbackVar_0;
+            var var_0_l @ &<:var_0[0] : [u8 ; BA_SIZE];
+            var var_0_h @ &>:var_0[0] : [u8 ; BA_SIZE];
+
+        var var_1 : [u16 ; N_SLOTS] in ms_palettes.PaletteSoA.callbackVar_1;
+            var var_1_l @ &<:var_1[0] : [u8 ; BA_SIZE];
+            var var_1_h @ &>:var_1[0] : [u8 ; BA_SIZE];
+
+        var var_2 : [u16 ; N_SLOTS] in ms_palettes.PaletteSoA.callbackVar_2;
+            var var_2_l @ &<:var_2[0] : [u8 ; BA_SIZE];
+            var var_2_h @ &>:var_2[0] : [u8 ; BA_SIZE];
+
+        var var_3 : [u16 ; N_SLOTS] in ms_palettes.PaletteSoA.callbackVar_3;
+            var var_3_l @ &<:var_3[0] : [u8 ; BA_SIZE];
+            var var_3_h @ &>:var_3[0] : [u8 ; BA_SIZE];
+    }
+}
+
+
+namespace null {
+    in code {
+        #[mem8, idx8]
+        func process(slot: u8 in y) : bool in carry {
+            return false;
+        }
+    }
+}
+
+}
+

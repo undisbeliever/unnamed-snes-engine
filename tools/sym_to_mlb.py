@@ -47,22 +47,25 @@ def parse_snes_sym_file(fp: TextIO, addr_to_rom_offset: Callable[[int], int]) ->
 
     for line in fp:
         if m := SYM_REGEX.match(line):
-            bank = int(m.group(1), 16)
-            cpu_addr = bank << 16 | int(m.group(2), 16)
+            try:
+                bank = int(m.group(1), 16)
+                cpu_addr = bank << 16 | int(m.group(2), 16)
 
-            if bank == 0x7E or bank == 0x7F:
-                memory_type = WORK_RAM_MEMORY_TYPE
-                addr = cpu_addr & 0x01FFFF
+                if bank == 0x7E or bank == 0x7F:
+                    memory_type = WORK_RAM_MEMORY_TYPE
+                    addr = cpu_addr & 0x01FFFF
 
-            elif (bank & 0x7F) < 0x40 and (cpu_addr & 0xFFFF) <= 0x2000:
-                memory_type = WORK_RAM_MEMORY_TYPE
-                addr = cpu_addr & 0x1FFF
+                elif (bank & 0x7F) < 0x40 and (cpu_addr & 0xFFFF) <= 0x2000:
+                    memory_type = WORK_RAM_MEMORY_TYPE
+                    addr = cpu_addr & 0x1FFF
 
-            else:
-                memory_type = SNES_PRG_MEMORY_TYPE
-                addr = addr_to_rom_offset(cpu_addr)
+                else:
+                    memory_type = SNES_PRG_MEMORY_TYPE
+                    addr = addr_to_rom_offset(cpu_addr)
 
-            out.append(Symbol(memory_type=memory_type, addr=addr, name=m.group(3).replace(".", "_").strip()))
+                out.append(Symbol(memory_type=memory_type, addr=addr, name=m.group(3).replace(".", "_").strip()))
+            except ValueError:
+                pass
 
     return out
 

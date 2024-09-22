@@ -4,6 +4,10 @@
       "source": "palettes/title-screen.png",
       "n_rows": 2
     },
+    "file_select": {
+      "source": "palettes/file-select.png",
+      "n_rows": 8
+    },
     "game_over": {
       "source": "palettes/game-over.png",
       "n_rows": 6

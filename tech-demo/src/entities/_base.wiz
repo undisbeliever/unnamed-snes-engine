@@ -8,7 +8,7 @@ import "engine/entity_api";
 import "smoke-particles";
 import "player-bomb";
 
-import "engine/game/entityloop";
+import "engine/gamestate_api";
 import "engine/game/metasprites";
 import "engine/common/math";
 
@@ -95,11 +95,12 @@ var _tmp : u8 in zpTmp_byte_0;
 
         _tmp = a;
 
-        a = player.health - _tmp;
+        a = gs.get_u8(gs.var8.player_health);
+        a = a - _tmp;
         if !carry {
             a = 0;
         }
-        player.health = a;
+        gs.set_u8(gs.var8.player_health, a);
 
 
         player.set_state_hurt__enemy_collision__inline(y);
@@ -125,7 +126,7 @@ inline func __take_damage_from_player_attack__inline(entityId : u8 in y) {
         a = player_bomb.BOMB_ATTACK_POWER;
     }
     else {
-        a = player.swordAttackPower;
+        a = gs.get_u8(gs.var8.player_swordAttackPower);
     }
 
     // rsb (ie, a = health - a)

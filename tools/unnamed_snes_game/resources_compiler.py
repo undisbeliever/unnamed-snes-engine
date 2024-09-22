@@ -14,20 +14,22 @@ from .enums import ResourceType
 from .entity_data import create_entity_rom_data
 from .mt_tileset import convert_mt_tileset
 from .second_layers import convert_second_layer
-from .palette import convert_palette, PaletteResource
+from .palette import convert_palette
+from .ms_palettes import compile_ms_palette
 from .metasprite import convert_static_spritesheet, convert_dynamic_spritesheet, build_ms_fs_data, MsFsEntry, DynamicMsSpritesheet
 from .dungeons import compile_dungeon_header, combine_dungeon_and_room_data
 from .rooms import extract_room_position, compile_room, build_room_dependencies__noexcept, RoomDependencies
-from .snes import ConstSmallTileMap
 from .other_resources import convert_tiles, convert_bg_image
 from .audio import AudioCompiler, COMMON_AUDIO_DATA_RESOURCE_NAME
 from .data_store import (
     EngineData,
     BaseResourceData,
     ResourceData,
+    MsPaletteResourceData,
     MetaSpriteResourceData,
     PaletteResourceData,
     MtTilesetResourceData,
+    SecondLayerResourceData,
     DungeonResourceData,
     RoomData,
     MsFsAndEntityOutput,
@@ -40,10 +42,11 @@ from .data_store import (
     create_resource_error,
 )
 
-from .json_formats import load_mappings_json, load_entities_json, load_ms_export_order_json, load_other_resources_json
+from .json_formats import load_mappings_json, load_entities_json, load_other_resources_json
+from .json_formats import load_ms_export_order_json, load_ms_palettes_json
 from .json_formats import load_metasprites_json, load_audio_project, load_dungeons_json
 from .json_formats import Name, ScopedName, Filename, Mappings, EntitiesJson
-from .json_formats import MsExportOrder, OtherResources, DungeonsJson, AudioProject
+from .json_formats import MsExportOrder, MsPalettesJson, OtherResources, DungeonsJson, AudioProject
 
 
 @unique
@@ -52,6 +55,7 @@ class SharedInputType(Enum):
     ENTITIES = auto()
     OTHER_RESOURCES = auto()
     MS_EXPORT_ORDER = auto()
+    MS_PALETTES = auto()
     DUNGEONS = auto()
     AUDIO_PROJECT = auto()
     SYMBOLS = auto()
@@ -114,6 +118,7 @@ class SharedInput:
         self.entities: Optional[EntitiesJson] = None
         self.other_resources: Optional[OtherResources] = None
         self.ms_export_order: Optional[MsExportOrder] = None
+        self.ms_palettes: Optional[MsPalettesJson] = None
         self.dungeons: Optional[DungeonsJson] = None
         self.audio_project: Optional[AudioProject] = None
         self.symbols: Optional[dict[ScopedName, int]] = None
@@ -136,6 +141,8 @@ class SharedInput:
                 _load("other_resources", OTHER_RESOURCES_FILENAME, load_other_resources_json)
             case SharedInputType.MS_EXPORT_ORDER:
                 _load("ms_export_order", MS_EXPORT_ORDER_FILENAME, load_ms_export_order_json)
+            case SharedInputType.MS_PALETTES:
+                _load("ms_palettes", MS_PALETTES_FILENAME, load_ms_palettes_json)
             case SharedInputType.DUNGEONS:
                 _load("dungeons", DUNGEONS_JSON_FILENAME, load_dungeons_json)
             case SharedInputType.AUDIO_PROJECT:
@@ -150,6 +157,7 @@ MAPPINGS_FILENAME: Final = "mappings.json"
 ENTITIES_FILENAME: Final = "entities.json"
 OTHER_RESOURCES_FILENAME: Final = "other-resources.json"
 MS_EXPORT_ORDER_FILENAME: Final = "ms-export-order.json"
+MS_PALETTES_FILENAME: Final = "metasprites/_ms-palettes.json"
 DUNGEONS_JSON_FILENAME: Final = "dungeons.json"
 AUDIO_PROJECT_FILENAME: Final = "audio/project.terrificaudio"
 
@@ -159,6 +167,7 @@ SHARED_INPUT_FILENAME_MAP: Final = {
     ENTITIES_FILENAME: SharedInputType.ENTITIES,
     OTHER_RESOURCES_FILENAME: SharedInputType.OTHER_RESOURCES,
     MS_EXPORT_ORDER_FILENAME: SharedInputType.MS_EXPORT_ORDER,
+    MS_PALETTES_FILENAME: SharedInputType.MS_PALETTES,
     DUNGEONS_JSON_FILENAME: SharedInputType.DUNGEONS,
     AUDIO_PROJECT_FILENAME: SharedInputType.AUDIO_PROJECT,
 }
@@ -168,6 +177,7 @@ SHARED_INPUT_NAMES: Final = {
     SharedInputType.ENTITIES: "entities JSON",
     SharedInputType.OTHER_RESOURCES: "other Resources JSON",
     SharedInputType.MS_EXPORT_ORDER: "MetaSprite export order JSON",
+    SharedInputType.MS_PALETTES: "MetaSprite palettes JSON",
     SharedInputType.DUNGEONS: "dungeons JSON",
     SharedInputType.AUDIO_PROJECT: "audio Samples JSON",
     SharedInputType.SYMBOLS: "Symbols",
@@ -187,8 +197,8 @@ class BaseResourceCompiler(metaclass=ABCMeta):
     EXPORT_ORDER_SI: Optional[SharedInputType]
     # The Shared inputs that are used by the compiler
     SHARED_INPUTS: Sequence[SharedInputType]
-    USES_PALETTES: bool
-    USES_MT_TILESETS: bool = False
+    # The resource-types that are used by the compiler
+    DEPENDENCIES: Sequence[ResourceType]
 
     def __init__(self, r_type: ResourceType, shared_input: SharedInput) -> None:
         # All fields in a BaseResourceCompiler MUST be final
@@ -264,9 +274,50 @@ class OtherResourcesCompiler(SimpleResourceCompiler):
         return self.filename_map.get(filename)
 
 
-class MsSpritesheetCompiler(BaseResourceCompiler):
+class MsPaletteCompiler(SimpleResourceCompiler):
     def __init__(self, shared_input: SharedInput) -> None:
+        super().__init__(ResourceType.ms_palettes, shared_input)
+        self.filename_map: dict[Filename, int] = dict()
+
+    SHARED_INPUTS = (SharedInputType.MS_PALETTES, SharedInputType.MAPPINGS)
+    EXPORT_ORDER_SI = SharedInputType.MS_PALETTES
+    DEPENDENCIES = ()
+
+    def shared_input_changed(self, s_type: SharedInputType) -> None:
+        if s_type == SharedInputType.MS_PALETTES:
+            if self._shared_input.ms_palettes:
+                self.filename_map = {p.source: p.id for p in self._shared_input.ms_palettes.ms_palettes.values()}
+            else:
+                self.filename_map = dict()
+
+    def test_filename_is_resource(self, filename: Filename) -> Optional[int]:
+        return self.filename_map.get(filename)
+
+    def _get_name_list(self) -> list[Name]:
+        assert self._shared_input.ms_palettes
+        return list(self._shared_input.ms_palettes.ms_palettes.keys())
+
+    def compile_resource(self, resource_id: int) -> BaseResourceData:
+        assert self._shared_input.ms_palettes
+        assert self._shared_input.mappings
+
+        r_name = self.name_list[resource_id]
+        try:
+            ms_palettes_json = self._shared_input.ms_palettes
+            data, ms_palette = compile_ms_palette(ms_palettes_json.ms_palettes[r_name], ms_palettes_json, self._shared_input.mappings)
+
+            return MsPaletteResourceData(self.resource_type, resource_id, r_name, data, ms_palette)
+        except Exception as e:
+            return create_resource_error(self.resource_type, resource_id, r_name, e)
+
+    def _compile(self, r_name: Name) -> EngineData:
+        raise NotImplementedError()
+
+
+class MsSpritesheetCompiler(BaseResourceCompiler):
+    def __init__(self, shared_input: SharedInput, data_store: DataStore) -> None:
         super().__init__(ResourceType.ms_spritesheets, shared_input)
+        self.data_store: Final = data_store
 
     def test_filename_is_resource(self, filename: Filename) -> Optional[int]:
         if m := MS_SPRITESHEET_FILE_REGEX.match(filename):
@@ -274,9 +325,8 @@ class MsSpritesheetCompiler(BaseResourceCompiler):
         return None
 
     SHARED_INPUTS = (SharedInputType.MS_EXPORT_ORDER,)
-    USES_PALETTES = False
-
     EXPORT_ORDER_SI = SharedInputType.MAPPINGS
+    DEPENDENCIES = (ResourceType.ms_palettes,)
 
     def _get_name_list(self) -> list[Name]:
         assert self._shared_input.mappings
@@ -292,7 +342,7 @@ class MsSpritesheetCompiler(BaseResourceCompiler):
 
             ms_input = load_metasprites_json(json_filename)
 
-            data, msfs_entries = convert_static_spritesheet(ms_input, self._shared_input.ms_export_order, ms_dir)
+            data, msfs_entries = convert_static_spritesheet(ms_input, self._shared_input.ms_export_order, ms_dir, self.data_store)
 
             return MetaSpriteResourceData(self.resource_type, resource_id, r_name, data, msfs_entries)
         except Exception as e:
@@ -314,8 +364,8 @@ class PaletteCompiler(OtherResourcesCompiler):
         return d
 
     SHARED_INPUTS = (SharedInputType.OTHER_RESOURCES,)
-    USES_PALETTES = False
     EXPORT_ORDER_SI = SharedInputType.MAPPINGS
+    DEPENDENCIES = ()
 
     def _get_name_list(self) -> list[Name]:
         assert self._shared_input.mappings
@@ -337,9 +387,9 @@ class PaletteCompiler(OtherResourcesCompiler):
 
 
 class MetaTileTilesetCompiler(SimpleResourceCompiler):
-    def __init__(self, shared_input: SharedInput, palettes: dict[Name, PaletteResource]) -> None:
+    def __init__(self, shared_input: SharedInput, data_store: DataStore) -> None:
         super().__init__(ResourceType.mt_tilesets, shared_input)
-        self.__palettes = palettes
+        self.__data_store: Final = data_store
 
     def test_filename_is_resource(self, filename: Filename) -> Optional[int]:
         if m := MT_TILESET_FILE_REGEX.match(filename):
@@ -347,8 +397,8 @@ class MetaTileTilesetCompiler(SimpleResourceCompiler):
         return None
 
     SHARED_INPUTS = (SharedInputType.MAPPINGS,)
-    USES_PALETTES = True
     EXPORT_ORDER_SI = SharedInputType.MAPPINGS
+    DEPENDENCIES = (ResourceType.palettes,)
 
     def _get_name_list(self) -> list[Name]:
         assert self._shared_input.mappings
@@ -360,7 +410,7 @@ class MetaTileTilesetCompiler(SimpleResourceCompiler):
         r_name = self.name_list[resource_id]
         try:
             filename = os.path.join("metatiles/", r_name + ".tsx")
-            data, tile_map = convert_mt_tileset(filename, self._shared_input.mappings, self.__palettes)
+            data, tile_map = convert_mt_tileset(filename, self._shared_input.mappings, self.__data_store)
 
             return MtTilesetResourceData(self.resource_type, resource_id, r_name, data, tile_map)
         except Exception as e:
@@ -371,12 +421,9 @@ class MetaTileTilesetCompiler(SimpleResourceCompiler):
 
 
 class SecondLayerCompiler(OtherResourcesCompiler):
-    def __init__(
-        self, shared_input: SharedInput, palettes: dict[Name, PaletteResource], mt_tileset_tiles: dict[Name, ConstSmallTileMap]
-    ) -> None:
+    def __init__(self, shared_input: SharedInput, data_store: DataStore) -> None:
         super().__init__(ResourceType.second_layers, shared_input)
-        self.__palettes: Final = palettes
-        self.__mt_tileset_tiles: Final = mt_tileset_tiles
+        self.__data_store: Final = data_store
 
     def build_filename_map(self, other_resources: OtherResources) -> dict[Filename, int]:
         second_layers: Final = other_resources.second_layers
@@ -393,20 +440,27 @@ class SecondLayerCompiler(OtherResourcesCompiler):
         SharedInputType.MAPPINGS,
         SharedInputType.OTHER_RESOURCES,
     )
-    USES_PALETTES = True
-    USES_MT_TILESETS = True
     EXPORT_ORDER_SI = SharedInputType.MAPPINGS
+    DEPENDENCIES = (ResourceType.palettes, ResourceType.mt_tilesets)
 
     def _get_name_list(self) -> list[Name]:
         assert self._shared_input.mappings
         return self._shared_input.mappings.second_layers.copy()
 
-    def _compile(self, r_name: Name) -> EngineData:
+    def compile_resource(self, resource_id: int) -> BaseResourceData:
         assert self._shared_input.mappings
         assert self._shared_input.other_resources
 
-        sli = self._shared_input.other_resources.second_layers[r_name]
-        return convert_second_layer(sli, self.__palettes, self.__mt_tileset_tiles, self._shared_input.mappings)
+        r_name = self.name_list[resource_id]
+        try:
+            sli = self._shared_input.other_resources.second_layers[r_name]
+            data, n_tiles = convert_second_layer(sli, self._shared_input.mappings, self.__data_store)
+            return SecondLayerResourceData(self.resource_type, resource_id, r_name, data, n_tiles)
+        except Exception as e:
+            return create_resource_error(self.resource_type, resource_id, r_name, e)
+
+    def _compile(self, r_name: Name) -> EngineData:
+        raise NotImplementedError()
 
 
 class TileCompiler(OtherResourcesCompiler):
@@ -424,8 +478,8 @@ class TileCompiler(OtherResourcesCompiler):
         return d
 
     SHARED_INPUTS = (SharedInputType.OTHER_RESOURCES,)
-    USES_PALETTES = False
     EXPORT_ORDER_SI = SharedInputType.MAPPINGS
+    DEPENDENCIES = ()
 
     def _get_name_list(self) -> list[Name]:
         assert self._shared_input.mappings
@@ -439,9 +493,9 @@ class TileCompiler(OtherResourcesCompiler):
 
 
 class BgImageCompiler(OtherResourcesCompiler):
-    def __init__(self, shared_input: SharedInput, palettes: dict[Name, PaletteResource]) -> None:
+    def __init__(self, shared_input: SharedInput, data_store: DataStore) -> None:
         super().__init__(ResourceType.bg_images, shared_input)
-        self.__palettes = palettes
+        self.__data_store: Final = data_store
 
     def build_filename_map(self, other_resources: OtherResources) -> dict[Filename, int]:
         bg_images: Final = other_resources.bg_images
@@ -455,8 +509,8 @@ class BgImageCompiler(OtherResourcesCompiler):
         return d
 
     SHARED_INPUTS = (SharedInputType.OTHER_RESOURCES,)
-    USES_PALETTES = True
     EXPORT_ORDER_SI = SharedInputType.MAPPINGS
+    DEPENDENCIES = (ResourceType.palettes,)
 
     def _get_name_list(self) -> list[Name]:
         assert self._shared_input.mappings
@@ -466,7 +520,7 @@ class BgImageCompiler(OtherResourcesCompiler):
         assert self._shared_input.other_resources
 
         bi = self._shared_input.other_resources.bg_images[r_name]
-        return convert_bg_image(bi, self.__palettes)
+        return convert_bg_image(bi, self.__data_store)
 
 
 class SongCompiler(SimpleResourceCompiler):
@@ -509,8 +563,8 @@ class SongCompiler(SimpleResourceCompiler):
         return self._file_map.get(filename)
 
     SHARED_INPUTS = (SharedInputType.MAPPINGS, SharedInputType.AUDIO_PROJECT)
-    USES_PALETTES = False
     EXPORT_ORDER_SI = SharedInputType.AUDIO_PROJECT
+    DEPENDENCIES = ()
 
     def _get_name_list(self) -> list[Name]:
         assert self._shared_input.audio_project
@@ -531,17 +585,19 @@ class SongCompiler(SimpleResourceCompiler):
 
 
 class DungeonCompiler(SimpleResourceCompiler):
-    def __init__(self, shared_input: SharedInput) -> None:
+    def __init__(self, shared_input: SharedInput, data_store: DataStore) -> None:
         super().__init__(ResourceType.dungeons, shared_input)
+        self.__data_store: Final = data_store
 
     SHARED_INPUTS = (
         SharedInputType.DUNGEONS,
         SharedInputType.MAPPINGS,
         SharedInputType.OTHER_RESOURCES,
+        SharedInputType.MS_PALETTES,
         SharedInputType.AUDIO_PROJECT,
     )
-    USES_PALETTES = False
     EXPORT_ORDER_SI = SharedInputType.DUNGEONS
+    DEPENDENCIES = (ResourceType.mt_tilesets, ResourceType.second_layers)
 
     def _get_name_list(self) -> list[Name]:
         assert self._shared_input.dungeons
@@ -554,18 +610,25 @@ class DungeonCompiler(SimpleResourceCompiler):
         assert self._shared_input.dungeons
         assert self._shared_input.mappings
         assert self._shared_input.other_resources
+        assert self._shared_input.ms_palettes
         assert self._shared_input.audio_project
 
         r_name = self.name_list[resource_id]
         try:
             dungeon = self._shared_input.dungeons.dungeons[r_name]
-            header = compile_dungeon_header(
-                dungeon, self._shared_input.mappings, self._shared_input.other_resources, self._shared_input.audio_project
+            data, header = compile_dungeon_header(
+                dungeon,
+                self._shared_input.mappings,
+                self._shared_input.other_resources,
+                self._shared_input.ms_palettes,
+                self._shared_input.audio_project,
+                self.__data_store,
             )
             return DungeonResourceData(
                 self.resource_type,
                 resource_id,
                 r_name,
+                data,
                 header,
                 includes_room_data=False,
             )
@@ -584,6 +647,7 @@ class RoomCompiler:
 
     SHARED_INPUTS = (SharedInputType.MAPPINGS, SharedInputType.OTHER_RESOURCES, SharedInputType.ENTITIES, SharedInputType.DUNGEONS)
     EXPORT_ORDER_SI = None
+    DEPENDENCIES = ()
 
     def shared_input_changed(self, s_type: SharedInputType) -> None:
         if s_type == SharedInputType.DUNGEONS or s_type == SharedInputType.MAPPINGS or s_type == SharedInputType.OTHER_RESOURCES:
@@ -629,11 +693,12 @@ class RoomCompiler:
 
 
 class DynamicMetaspriteCompiler:
-    def __init__(self, shared_input: SharedInput) -> None:
+    def __init__(self, shared_input: SharedInput, data_store: DataStore) -> None:
         self._shared_input: Final = shared_input
         self.ms_dir: Final = "dynamic-metasprites"
         self.ms_dir_slash: Final = self.ms_dir + os.path.sep
         self.json_filename: Final = os.path.join(self.ms_dir, "_metasprites.json")
+        self.data_store: Final = data_store
 
     def test_filename_is_resource(self, filename: Filename) -> bool:
         return filename.startswith(self.ms_dir_slash)
@@ -645,10 +710,7 @@ class DynamicMetaspriteCompiler:
         try:
             ms_input = load_metasprites_json(self.json_filename)
             return convert_dynamic_spritesheet(
-                ms_input,
-                self._shared_input.ms_export_order,
-                self.ms_dir,
-                self._shared_input.mappings.memory_map.mode,
+                ms_input, self._shared_input.ms_export_order, self.ms_dir, self._shared_input.mappings.memory_map.mode, self.data_store
             )
         except Exception as e:
             return NonResourceError(DYNAMIC_METASPRITES_ERROR_KEY, "Dynamic Metasprites", e)
@@ -667,6 +729,22 @@ def _build_st_rt_map(
             if s_type == rc.EXPORT_ORDER_SI:
                 s.append(rc.resource_type)
         out[s_type] = frozenset(s)
+
+    return out
+
+
+def _build_dependency_graph(
+    compilers: Sequence[Union[BaseResourceCompiler, RoomCompiler]]
+) -> dict[Optional[ResourceType], frozenset[Optional[ResourceType]]]:
+
+    out: dict[Optional[ResourceType], frozenset[Optional[ResourceType]]] = dict()
+
+    for s_type in ResourceType:
+        d = list()
+        for c in compilers:
+            if s_type in c.DEPENDENCIES:
+                d.append(c.resource_type)
+        out[s_type] = frozenset(d)
 
     return out
 
@@ -691,29 +769,22 @@ class ProjectCompiler:
         self.log_message: Final = message_handler
         self.log_error: Final = err_handler
 
-        self.__palettes: Final[dict[Name, PaletteResource]] = dict()
-        self.__mt_tileset_tiles: Final[dict[Name, ConstSmallTileMap]] = dict()
-
         self.__resource_compilers: Final = (
             PaletteCompiler(self.__shared_input),
-            MetaTileTilesetCompiler(self.__shared_input, self.__palettes),
-            SecondLayerCompiler(self.__shared_input, self.__palettes, self.__mt_tileset_tiles),
-            MsSpritesheetCompiler(self.__shared_input),
+            MsPaletteCompiler(self.__shared_input),
+            MetaTileTilesetCompiler(self.__shared_input, self.data_store),
+            SecondLayerCompiler(self.__shared_input, self.data_store),
+            MsSpritesheetCompiler(self.__shared_input, self.data_store),
             TileCompiler(self.__shared_input),
-            BgImageCompiler(self.__shared_input, self.__palettes),
+            BgImageCompiler(self.__shared_input, self.data_store),
             SongCompiler(self.__shared_input),
-            DungeonCompiler(self.__shared_input),
+            DungeonCompiler(self.__shared_input, self.data_store),
         )
         self.__room_compiler: Final = RoomCompiler(self.__shared_input)
-        self.__dynamic_ms_compiler: Final = DynamicMetaspriteCompiler(self.__shared_input)
+        self.__dynamic_ms_compiler: Final = DynamicMetaspriteCompiler(self.__shared_input, self.data_store)
+        self.resource_dependencies: Final = _build_dependency_graph(self.__resource_compilers)
 
         assert len(self.__resource_compilers) == len(ResourceType)
-
-        self.resource_dependencies: Final[dict[Optional[ResourceType], frozenset[Optional[ResourceType]]]] = {
-            ResourceType.palettes: frozenset(c.resource_type for c in self.__resource_compilers if c.USES_PALETTES),
-            ResourceType.mt_tilesets: frozenset(c.resource_type for c in self.__resource_compilers if c.USES_MT_TILESETS),
-            ResourceType.dungeons: frozenset([None]),
-        }
 
         self.ST_RT_MAP: Final = _build_st_rt_map(*self.__resource_compilers, self.__room_compiler)
 
@@ -782,35 +853,9 @@ class ProjectCompiler:
                 self.data_store.insert_data(co)
                 if isinstance(co, ResourceError):
                     self.log_error(co)
-                if co.resource_type == ResourceType.palettes:
-                    self._palette_changed(co)
+                if deps := self.resource_dependencies[co.resource_type]:
+                    self.__compile_resource_lists(set(deps))
             return co
-
-    # MUST NOT be called by `self.__compile_resource_lists()`
-    def _palette_changed(self, co: BaseResourceData) -> None:
-        assert co.resource_type == ResourceType.palettes
-
-        if isinstance(co, PaletteResourceData):
-            self.__palettes[co.resource_name] = co.palette
-        else:
-            self.__palettes.pop(co.resource_name)
-
-        # Recompile the resource that uses palettes
-        # ::TODO only recompile the resources that use the changed palette::
-        self.__compile_resource_lists(set(self.resource_dependencies[ResourceType.palettes]))
-
-    # MUST NOT be called by `self.__compile_resource_lists()`
-    def _mt_tileset_changed(self, co: BaseResourceData) -> None:
-        assert co.resource_type == ResourceType.mt_tilesets
-
-        if isinstance(co, MtTilesetResourceData):
-            self.__mt_tileset_tiles[co.resource_name] = co.tile_map
-        else:
-            self.__mt_tileset_tiles.pop(co.resource_name)
-
-        # Recompile the resources that depend on mt_tilesets
-        # ::TODO only recompile the resources that use the changed mt_tileset::
-        self.__compile_resource_lists(set(self.resource_dependencies[ResourceType.mt_tilesets]))
 
     def _log_cannot_compile_si_error(self, res_name: str) -> None:
         si_list = [SHARED_INPUT_NAMES[s_type] for s_type in self.__shared_inputs_with_errors]
@@ -837,12 +882,6 @@ class ProjectCompiler:
 
             error = NonResourceError(ErrorKey(None, s_type), SHARED_INPUT_NAMES[s_type], e)
             self.data_store.add_non_resource_error(error)
-            return
-
-        for c in self.__resource_compilers:
-            if s_type == c.EXPORT_ORDER_SI:
-                c.update_name_list()
-                self.data_store.reset_data(c.resource_type, c.n_items())
 
         if s_type == SharedInputType.MAPPINGS:
             self.data_store.set_mappings(self.__shared_input.mappings)
@@ -852,6 +891,12 @@ class ProjectCompiler:
             if self.__shared_input.entities:
                 n_entities = len(self.__shared_input.entities.entities)
                 self.data_store.set_n_entities(n_entities)
+
+        if s_type not in self.__shared_inputs_with_errors:
+            for c in self.__resource_compilers:
+                if s_type == c.EXPORT_ORDER_SI:
+                    c.update_name_list()
+                    self.data_store.reset_data(c.resource_type, c.n_items())
 
         # Must be called after `c.update_name_list()`
         for c in self.__resource_compilers:
@@ -881,7 +926,12 @@ class ProjectCompiler:
         self.data_store.set_dyanamic_ms_data(d)
 
     def __compile_msfs_and_entity_data(self) -> None:
-        if self.__shared_input.mappings is None or self.__shared_input.entities is None or self.__shared_input.symbols is None:
+        if (
+            self.__shared_input.mappings is None
+            or self.__shared_input.entities is None
+            or self.__shared_input.ms_export_order is None
+            or self.__shared_input.symbols is None
+        ):
             self._log_cannot_compile_si_error("MsFs and Entity Data")
             self.data_store.set_msfs_and_entity_data(None)
             return
@@ -897,7 +947,10 @@ class ProjectCompiler:
             try:
                 static_msfs_lists = cast(list[list[MsFsEntry]], optional_msfs_lists)
                 rom_data, ms_map = build_ms_fs_data(
-                    dynamic_ms_data, static_msfs_lists, self.__shared_input.symbols, self.__shared_input.mappings.memory_map.mode
+                    dynamic_ms_data,
+                    static_msfs_lists,
+                    self.__shared_input.ms_export_order,
+                    self.__shared_input.mappings.memory_map.mode,
                 )
                 ms_fs_data = bytes(rom_data.data())
                 entity_rom_data = create_entity_rom_data(self.__shared_input.entities, self.__shared_input.symbols, ms_map)
@@ -909,15 +962,6 @@ class ProjectCompiler:
 
         self.data_store.set_msfs_and_entity_data(data)
 
-    def __compile_list(self, rt: ResourceType) -> list[BaseResourceData]:
-        c = self.__resource_compilers[rt]
-        rt_data = [c.compile_resource(i) for i in range(len(c.name_list))]
-        for co in rt_data:
-            self.data_store.insert_data(co)
-            if isinstance(co, ResourceError):
-                self.log_error(co)
-        return rt_data
-
     def __compile_resource_lists(self, to_recompile: Set[Optional[ResourceType]]) -> None:
         # Uses multiprocessing to speed up the compilation
 
@@ -925,8 +969,8 @@ class ProjectCompiler:
             self._log_cannot_compile_si_error("resources")
             return
 
-        for rt, deps in self.resource_dependencies.items():
-            if rt in to_recompile:
+        for d_rt, deps in self.resource_dependencies.items():
+            if d_rt in to_recompile:
                 to_recompile |= deps
 
         if to_recompile == self.ALL_RESOURCE_LISTS:
@@ -938,23 +982,16 @@ class ProjectCompiler:
                 else:
                     self.log_message("Compiling all rooms")
 
-        if ResourceType.palettes in to_recompile:
-            to_recompile.remove(ResourceType.palettes)
-            pal_l = self.__compile_list(ResourceType.palettes)
+        self.data_store.reset_resources(to_recompile)
 
-            self.__palettes.clear()
-            self.__palettes.update((co.resource_name, co.palette) for co in pal_l if isinstance(co, PaletteResourceData))
-
-        if ResourceType.mt_tilesets in to_recompile:
-            to_recompile.remove(ResourceType.mt_tilesets)
-            mt_l = self.__compile_list(ResourceType.mt_tilesets)
-
-            self.__mt_tileset_tiles.clear()
-            self.__mt_tileset_tiles.update((co.resource_name, co.tile_map) for co in mt_l if isinstance(co, MtTilesetResourceData))
-
-        for rt in to_recompile:
-            if rt is not None:
-                self.__compile_list(rt)
+        for rt in ResourceType:
+            if rt in to_recompile:
+                c = self.__resource_compilers[rt]
+                for i in range(len(c.name_list)):
+                    co = c.compile_resource(i)
+                    self.data_store.insert_data(co)
+                    if isinstance(co, ResourceError):
+                        self.log_error(co)
 
         if None in to_recompile:
             assert self.__shared_input.dungeons
@@ -975,21 +1012,20 @@ def append_room_data_to_dungeons(data_store: DataStore, err_handler: Callable[[U
     dungeons = data_store.get_resource_data_list(ResourceType.dungeons)
 
     for d_id, d in enumerate(dungeons):
-        if isinstance(d, DungeonResourceData):
-            assert d.includes_room_data is False
-            try:
-                rooms = data_store.get_dungeon_rooms(d_id)
-                data = combine_dungeon_and_room_data(d.resource_name, d.data, rooms)
+        assert d is not None
+        try:
+            rooms = data_store.get_dungeon_rooms(d_id)
+            data = combine_dungeon_and_room_data(d, rooms)
 
-                data_store.insert_data(
-                    ResourceData(
-                        resource_type=d.resource_type,
-                        resource_id=d.resource_id,
-                        resource_name=d.resource_name,
-                        data=data,
-                    )
+            data_store.insert_data(
+                ResourceData(
+                    resource_type=d.resource_type,
+                    resource_id=d.resource_id,
+                    resource_name=d.resource_name,
+                    data=data,
                 )
+            )
 
-            except Exception as e:
-                err_handler(e)
-                data_store.insert_data(create_resource_error(d.resource_type, d.resource_id, d.resource_name, e))
+        except Exception as e:
+            err_handler(e)
+            data_store.insert_data(create_resource_error(d.resource_type, d.resource_id, d.resource_name, e))

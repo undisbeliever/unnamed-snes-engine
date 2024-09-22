@@ -6,27 +6,27 @@
 import argparse
 from io import StringIO
 
-from collections import OrderedDict
-
-from unnamed_snes_game.json_formats import load_ms_export_order_json, Name, MsPattern, MsExportOrder
+from unnamed_snes_game.json_formats import load_ms_export_order_json, MsPattern, MsExportOrder
 
 
 def generate_pattern_code(out: StringIO, pattern: MsPattern) -> None:
-    # Kept `square_four_32` in `src/metasprites.wiz` as an example
-    if pattern.name == "square_four_32":
-        return
-
     out.write(
         f"""
+// DB = 0x7e
+#[mem8, idx16]
+func __{pattern.name}_return() {{
+}}
+
+
 // DB = 0x7e
 #[mem8, idx16]
 func {pattern.name}(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {{
     xx = yy;
 
-    _subtract_ms_offset_from_position(xx, xPos, yPos);
-
     yy = bufferPos;
-    return if negative || yy < {(len(pattern.objects)-1) * 4};
+    goto __{pattern.name}_return if negative || yy < {(len(pattern.objects)-1) * 4};
+
+    _subtract_ms_offset_from_position(xx, xPos, yPos);
 
 """
     )
@@ -89,22 +89,33 @@ func {pattern.name}(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos)
     )
 
 
-def generate_ms_patterns_table(out: StringIO, ms_patterns: OrderedDict[Name, MsPattern]) -> None:
-    table_size = 1
-    while table_size < len(ms_patterns):
-        table_size *= 2
+def generate_ms_patterns_table(out: StringIO, ms: MsExportOrder) -> None:
+    power_of_two_size = 1
+    while power_of_two_size <= len(ms.patterns):
+        power_of_two_size *= 2
 
-    out.write(f"let MS_PATTERNS_TABLE_MASK = 0x{ (table_size - 1) * 2 :02x};\n\n")
+    if ms.dynamic_pattern_id > 0xFF:
+        raise RuntimeError("Too many patterns and custom_draw_functions")
+
+    table_size = ms.dynamic_pattern_id // 2 + 1
+
+    out.write(f"let MS_PATTERNS_TABLE_MASK = 0x{ (power_of_two_size - 1) * 2 :02x};\n\n")
 
     out.write(
-        f"const ms_patterns_table : [ func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos) ; { table_size } ] = [\n"
+        f"const ms_draw_function_table : [ func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos) ; { table_size } ] = [\n"
     )
+    out.write("  metasprites.drawing_functions.null_function,\n")
 
-    for p in ms_patterns.values():
+    for p in ms.patterns.values():
         out.write(f"  metasprites.drawing_functions.{ p.name },\n")
 
-    for i in range(table_size - len(ms_patterns)):
+    for i in range(power_of_two_size - len(ms.patterns) - 1):
         out.write("  metasprites.drawing_functions.null_function,\n")
+
+    for c in ms.custom_draw_functions.keys():
+        out.write(f"  metasprites.drawing_functions.{c},\n")
+
+    out.write("  metasprites.drawing_functions.dynamic_pattern,\n")
 
     out.write("];\n")
 
@@ -119,6 +130,7 @@ def generate_wiz_code(ms_export_orders: MsExportOrder) -> str:
 
 import "src/memmap";
 import "engine/game/metasprites";
+import "src/custom-ms-drawing-functions";
 
 namespace metasprites {
 namespace drawing_functions {
@@ -131,7 +143,7 @@ in code {
         for pattern in ms_patterns.values():
             generate_pattern_code(out, pattern)
 
-        generate_ms_patterns_table(out, ms_patterns)
+        generate_ms_patterns_table(out, ms_export_orders)
 
         out.write("}\n")
         out.write("}\n\n")

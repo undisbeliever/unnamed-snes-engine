@@ -4,6 +4,8 @@
 import "memmap";
 
 import "engine/entity_api";
+import "engine/gamestate_api";
+
 import "entities/_base";
 
 // ::TODO remove this import::
@@ -38,33 +40,12 @@ let _is_ms_non_looping_animation_running = metasprites.is_player_non_looping_ani
 
 
 
-// The player state stored within the gamestate.
-struct GameState__PlayerState {
-    xPos                : u8,
-    yPos                : u8,
-    zPos                : u8,
+let STARTING_SWORD_ATTACK_POWER = 2;
 
-    health              : u8,
-    maxHealth           : u8,
-    swordAttackPower    : u8,
+let STARTING_MAX_HEALTH = 16;
+let MIN_MAX_HEALTH = 8;
 
-    state               : u8,
-    facingDirection     : u8,
-};
-
-let InitialPlayerState = GameState__PlayerState{
-
-    xPos                = DISPLAY_WIDTH / 2,
-    yPos                = DISPLAY_HEIGHT * 2 / 3,
-    zPos                = 0,
-
-    swordAttackPower    = 2,
-    health              = 16,
-    maxHealth           = 16,
-
-    state               = State.WALKING as u8,
-    facingDirection     = FacingDirection.UP as u8,
-};
+let STARTING_MIN_PLAYER_HEALTH = 6;
 
 
 // If the player health is below this value, sound a different 'player hurt' sound effect.
@@ -189,12 +170,6 @@ in zeropage {
 
 
 in wram7e_roomstate {
-    // The amount of health on a full HP
-    //
-    // MUST be a multiple of 4
-    var maxHealth : u8;
-
-
 
 var state                   : u8 in entities.SoA.var_0_l[0];
 
@@ -258,17 +233,19 @@ inline func init() {
     mem8();
 
 
-    restore_player_state__inline();
-
     // Reset MetaSprite Animations
     init_metasprites();
+
+
+    // Make sure the player has health
+    validate_player_health();
 }
 
 
 
 // Initialise the player's MetaSprites.
 //
-// Called on init or when MetaSprite resources have changed.
+// Called on dungeon load, just before fade-in.
 //
 // DB = 0x7e
 #[mem8, idx8]
@@ -277,14 +254,14 @@ func init_metasprites() {
 
     mem16();
     #[mem16] {
-        // Set player's ms_draw function
-        aa = ms_draw_function as u16;
-        entities.SoA.ms_draw_function[0] = aa as func(u16 in yy, u16 in metasprites.xPos, u16 in metasprites.yPos);
-
         entities.SoA.metaSpriteFrameTable[0] = aa = metasprites.MsFsData.frameTable[unaligned MS_FS_DATA_ADDR];
         entities.SoA.msAnimationTable[0] = aa = metasprites.MsFsData.animationTable[unaligned MS_FS_DATA_ADDR];
     }
     mem8();
+
+    // Set player's ms_draw function
+    a = MsDrawFunction.draw_player as u8;
+    entities.SoA.msDrawFunction[0] = a as MsDrawFunction;
 
     metasprites.init_player_metasprite_animation__inline();
 
@@ -297,23 +274,9 @@ func init_metasprites() {
 // ===================
 
 
-
-// Save the player state into the GameStateData
-//
-// Called on a successful room transition.
-//
 // DB = 0x7e
 #[mem8, idx8]
-inline func save_player_state__inline() {
-    gamestate.data.playerState.xPos = a = xPos.px;
-    gamestate.data.playerState.yPos = a = yPos.px;
-    gamestate.data.playerState.zPos = a = zPos;
-
-    gamestate.data.playerState.health = a = health;
-    gamestate.data.playerState.maxHealth = a = maxHealth;
-
-    gamestate.data.playerState.swordAttackPower = a = swordAttackPower;
-
+inline func get_roomtoload_player_state__inline() : u8 in a {
     a = state as u8;
     if a == State.HURT as u8 {
         // Ensure the previous state does not disappear when restoring a gamestate backup.
@@ -322,56 +285,26 @@ inline func save_player_state__inline() {
         //  bomb when restoring the gamestate backup)
         a = previousState as u8;
     }
-    gamestate.data.playerState.state = a;
-
-    gamestate.data.playerState.facingDirection = a = facingDirection;
+    return a;
 }
 
 
-
-// Reset the player state
-//
-// Called by `gamestate.continue_game()`
-//
 // DB = 0x7e
 #[mem8, idx8]
-inline func continue_player_gamestate__inline() {
-
-    gamestate.data.playerState.health = a = gamestate.data.playerState.maxHealth;
-
-    gamestate.data.playerState.state = State.WALKING as u8;
-
-    gamestate.data.playerState.facingDirection = a = InitialPlayerState.facingDirection;
+inline func get_roomtoload_player_direction__inline() : u8 in a {
+    return facingDirection as u8;
 }
 
 
-
-// restore player state from the GameStateData
-//
 // DB = 0x7e
 #[mem8, idx8]
-inline func restore_player_state__inline() {
-    xPos.sx = 0;
-    xPos.px = a = gamestate.data.playerState.xPos;
+inline func dungeon_loaded__restore_player_state_and_direction__inline(state: u8 in x, direction: u8 in a) {
+    facingDirection = a = a & 3;
 
-    yPos.sx = 0;
-    yPos.px = a = gamestate.data.playerState.yPos;
-
-    zPos = a = gamestate.data.playerState.zPos;
-
-    health = a = gamestate.data.playerState.health;
-    maxHealth = a = gamestate.data.playerState.maxHealth;
-
-    swordAttackPower = a = gamestate.data.playerState.swordAttackPower;
-
-    facingDirection = a = gamestate.data.playerState.facingDirection & 3;
-
-
-    a = gamestate.data.playerState.state;
-    if a == State.WALK_THROUGH_DOORWAY as u8 || a == State.ATTACKING_IN_DOORWAY as u8 {
+    if x == State.WALK_THROUGH_DOORWAY as u8 || x == State.ATTACKING_IN_DOORWAY as u8 {
         set_state__walk_through_doorway__restore_player_state();
     }
-    else if a == State.HOLDING_BOMB as u8 {
+    else if x == State.HOLDING_BOMB as u8 {
         set_state__holding_bomb__restore_player_state();
     }
     else {
@@ -382,45 +315,55 @@ inline func restore_player_state__inline() {
 
 
 
-// METASPRITES
-// ===========
-
-
-
-// Metasprite drawing function.
+// Initialise player gamestate variables
 //
-// Draws the player and the `itemAboveHead_msFrameAddr` MetaSprite (if non-zero)
+// Called by `gamestate.continue_game()`
 //
 // DB = 0x7e
-#[mem8, idx16]
-func ms_draw_function(msFrame : u16 in yy, ms_xPos : u16 in metasprites.xPos, ms_yPos : u16 in metasprites.yPos) {
+#[mem8, idx8]
+inline func new_player_gamestate__inline() {
+    gs.set_u8(gs.var8.player_health, STARTING_MAX_HEALTH);
+    gs.set_u8(gs.var8.player_maxHealth, STARTING_MAX_HEALTH);
 
-// Safe (for now) - MS drawing functions do not use zpTmp variables.
-var _tmpX : u16 in zpTmp_word_0;
-var _tmpY : u16 in zpTmp_word_1;
-
-    dynamicMsFrameAddr = yy;
-
-    // I need to save a copy of metasprite position
-    // Required when holding items during room transitions (cannot calculate metasprite position from player position).
-    _tmpX = xx = metasprites.xPos;
-    _tmpY = xx = metasprites.yPos;
-
-    metasprites.drawing_functions.dynamic_pattern(yy, metasprites.xPos, metasprites.yPos);
-
-    // The metasprite drawing function changes the metasprite xPos/yPos variables
+    gs.set_u8(gs.var8.player_swordAttackPower, STARTING_SWORD_ATTACK_POWER);
+}
 
 
-    yy = itemAboveHead_msFrameAddr;
-    if !zero {
-        mem16();
-        #[mem16] {
-            metasprites.xPos = aa = _tmpX;
-            metasprites.yPos = aa = _tmpY - ITEM_ABOVE_HEAD_Y_OFFSET;
-        }
-        mem8();
 
-        ^return metasprites.drawing_functions.dynamic_pattern(yy, metasprites.xPos, metasprites.yPos);
+// Reset the player's health when on continue game.
+//
+// Called by `gamestate.continue_game()`
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func continue_player_gamestate__inline() {
+    validate_player_health();
+
+    a = gs.get_u8(gs.var8.player_maxHealth);
+    gs.set_u8(gs.var8.player_health, a);
+}
+
+
+
+// Check player's health and maxHealth is valid.
+//
+// This function exists because I accidentally loaded a save with 0 maxHealth
+// and got stuck in a game-over loop.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func validate_player_health() {
+    // Max health must be a multiple of 4
+    a = gs.get_u8(gs.var8.player_maxHealth);
+    a &= 0b111111_00;
+    if a < MIN_MAX_HEALTH {
+        a = STARTING_MAX_HEALTH;
+    }
+    gs.set_u8(gs.var8.player_maxHealth, STARTING_MAX_HEALTH);
+
+    a = gs.get_u8(gs.var8.player_health);
+    if a < STARTING_MIN_PLAYER_HEALTH {
+        gs.set_u8(gs.var8.player_health, STARTING_MIN_PLAYER_HEALTH);
     }
 }
 
@@ -1201,11 +1144,12 @@ var _damage : u8 in zpTmp_byte_0;
             }
 
             // Player takes damage
-            a = player.health - _damage;
+            a = gs.get_u8(gs.var8.player_health);
+            a = a - _damage;
             if !carry {
                 a = 0;
             }
-            player.health = a;
+            gs.set_u8(gs.var8.player_health, a);
 
             player_hurt_sound_effect();
 
@@ -1221,7 +1165,7 @@ var _damage : u8 in zpTmp_byte_0;
 #[mem8, idx8]
 func player_hurt_sound_effect() {
     // Hurt sound effect
-    a = health;
+    a = gs.get_u8(gs.var8.player_health);
     if !zero && a < player.LOW_HEALTH_ALARM + 1 {
         a = sound_effects.player_hurt_low_health as u8;
     }
@@ -1709,6 +1653,18 @@ func process__holding_bomb() {
 }
 
 
+// Miscellaneous
+// =============
+
+// Heal the player
+//
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+func heal_player(amount: u8 in a) {
+    gs.add_with_limit_u8__inline(gs.var8.player_health, gs.var8.player_maxHealth, a);
+}
+
 }
 
 
@@ -1724,4 +1680,6 @@ in rodata0 {
 
 
 }
+
+import "engine/game/gamestate";
 

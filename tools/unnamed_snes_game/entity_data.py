@@ -8,8 +8,7 @@ from .json_formats import Name, ScopedName, EntitiesJson
 
 
 ENTITY_ROM_DATA_SOA_LABELS = (
-    "entity_rom_data.__init_funtions",
-    "entity_rom_data.__process_funtions",
+    "entity_rom_data.__entity_function_index",
     "entity_rom_data.__metasprite_framesets",
     "entity_rom_data.__initial_zpos_and_death_function_and_is_enemy",
     "entity_rom_data.__vision_ab",
@@ -32,15 +31,8 @@ def validate_entity_rom_data_symbols(symbols: dict[str, int], n_entities: int) -
         addr += array_size
 
 
-def expected_blank_entity_rom_data(symbols: dict[str, int], n_entities: int) -> bytes:
-    blank_init_function_addr = symbols["entities._blank_init_function"] & 0xFFFF
-    blank_entity_function_addr = symbols["entities._blank_entity_function"] & 0xFFFF
-
-    return (
-        blank_init_function_addr.to_bytes(2, byteorder="little") * n_entities
-        + blank_entity_function_addr.to_bytes(2, byteorder="little") * n_entities
-        + b"\xaa" * (2 * (len(ENTITY_ROM_DATA_SOA_LABELS) - 2) * n_entities)
-    )
+def expected_blank_entity_rom_data(n_entities: int) -> bytes:
+    return bytes(2 * n_entities) + b"\xaa" * (2 * (len(ENTITY_ROM_DATA_SOA_LABELS) - 1) * n_entities)
 
 
 def create_entity_rom_data(
@@ -63,19 +55,10 @@ def create_entity_rom_data(
     entities: Final = entities_input.entities.values()
     death_functions: Final = entities_input.death_functions
 
-    # init_functions
+    # __entity_function_index
     for e in entities:
-        write_function_addr(f"entities.{ e.code.name }.init")
-
-    # process_functions
-    for e in entities:
-        # Some entities will reuse the process() function from a different entity
-        ef = e.code
-        if ef.uses_process_function_from:
-            ns = ef.uses_process_function_from
-        else:
-            ns = ef.name
-        write_function_addr(f"entities.{ ns }.process")
+        out[i] = e.code.id
+        i += 2
 
     # metasprite_framesets
     for e in entities:

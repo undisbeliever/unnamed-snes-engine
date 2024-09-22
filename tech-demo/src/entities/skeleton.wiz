@@ -44,18 +44,18 @@ in code {
 //
 // DB = 0x7e
 #[mem8, idx8]
-func init(entityId : u8 in y, parameter : u8 in x) {
+func init(entityId : u8 in y, parameter : u8 in a) {
 
-    if x == init_parameter.left as u8 {
+    if a == init_parameter.left as u8 {
         set_direction_west(y);
     }
-    else if x == init_parameter.right as u8 {
+    else if a == init_parameter.right as u8 {
         set_direction_east(y);
     }
-    else if x == init_parameter.up as u8 {
+    else if a == init_parameter.up as u8 {
         set_direction_north(y);
     }
-    else if x == init_parameter.down as u8 {
+    else if a == init_parameter.down as u8 {
         set_direction_south(y);
     }
     else {

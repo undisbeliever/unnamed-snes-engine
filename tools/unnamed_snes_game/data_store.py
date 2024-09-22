@@ -19,6 +19,8 @@ if TYPE_CHECKING:
     from .resources_compiler import SharedInputType
     from .palette import PaletteResource
     from .metasprite import MsFsEntry, DynamicMsSpritesheet
+    from .ms_palettes import MsPalette
+    from .dungeons import DungeonIntermediate
 
 
 class FixedSizedData:
@@ -109,6 +111,11 @@ class ResourceData(BaseResourceData):
 
 
 @dataclass(frozen=True)
+class MsPaletteResourceData(ResourceData):
+    palette: "MsPalette"
+
+
+@dataclass(frozen=True)
 class MetaSpriteResourceData(ResourceData):
     msfs_entries: list["MsFsEntry"]
 
@@ -124,7 +131,13 @@ class MtTilesetResourceData(ResourceData):
 
 
 @dataclass(frozen=True)
+class SecondLayerResourceData(ResourceData):
+    n_tiles: int
+
+
+@dataclass(frozen=True)
 class DungeonResourceData(ResourceData):
+    header: "DungeonIntermediate"
     includes_room_data: bool
 
 
@@ -190,6 +203,8 @@ class DataStore:
             self._resources: list[list[Optional[BaseResourceData]]] = [list() for rt in ResourceType]
             self._rooms: list[dict[tuple[int, int], RoomData]] = list()
 
+            self._resource_name_map: list[dict[Name, Optional[BaseResourceData]]] = [dict() for rt in ResourceType]
+
             self._errors: OrderedDict[ErrorKey, Union[ResourceError, NonResourceError]] = OrderedDict()
 
             self._dynamic_ms_data: Optional[DynamicMsSpritesheet] = None
@@ -223,6 +238,7 @@ class DataStore:
                 if rt is not None:
                     n_resources = len(self._resources[rt])
                     self._resources[rt] = [None] * n_resources
+                    self._resource_name_map[rt].clear()
                 else:
                     for r in self._rooms:
                         r.clear()
@@ -268,6 +284,9 @@ class DataStore:
                 self._msfa_and_entity_rom_data = None
                 self._msfs_and_entity_data_valid = False
 
+            if c.resource_type is not None:
+                self._resource_name_map[c.resource_type][c.resource_name] = c
+
             if isinstance(c, ResourceError):
                 self._errors[c.error_key] = c
             else:
@@ -305,6 +324,10 @@ class DataStore:
         with self._lock:
             if not self._mappings:
                 raise RuntimeError("No mappings")
+            return self._mappings
+
+    def try_get_mappings(self) -> Optional[Mappings]:
+        with self._lock:
             return self._mappings
 
     def get_mappings_symbols_and_n_entities(self) -> tuple[Mappings, dict[ScopedName, int], int]:
@@ -372,3 +395,35 @@ class DataStore:
     def get_data_for_all_rooms(self) -> list[Optional[EngineData]]:
         with self._lock:
             return [r.data if isinstance(r, ResourceData) else None for r in self._rooms]
+
+    def get_palette(self, name: Name) -> Optional[PaletteResourceData]:
+        with self._lock:
+            co = self._resource_name_map[ResourceType.palettes].get(name)
+            if isinstance(co, PaletteResourceData):
+                return co
+            else:
+                return None
+
+    def get_ms_palette(self, name: Name) -> Optional[MsPaletteResourceData]:
+        with self._lock:
+            co = self._resource_name_map[ResourceType.ms_palettes].get(name)
+            if isinstance(co, MsPaletteResourceData):
+                return co
+            else:
+                return None
+
+    def get_mt_tileset(self, name: Name) -> Optional[MtTilesetResourceData]:
+        with self._lock:
+            co = self._resource_name_map[ResourceType.mt_tilesets].get(name)
+            if isinstance(co, MtTilesetResourceData):
+                return co
+            else:
+                return None
+
+    def get_second_layer(self, name: Name) -> Optional[SecondLayerResourceData]:
+        with self._lock:
+            co = self._resource_name_map[ResourceType.second_layers].get(name)
+            if isinstance(co, SecondLayerResourceData):
+                return co
+            else:
+                return None

@@ -1,0 +1,458 @@
+// Copyright (c) 2024, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "game/gamestate";
+import "gen/enums";
+
+namespace gs {
+
+in code {
+
+// u8 GameState Variables
+// ======================
+
+// CAUTION: gsVar8 is not bounds or alignment checked.
+// KEEP: Y
+// DB = 0x7e
+#[mem8]
+inline func get_u8(let gsVar8 : var8) : u8 in a {
+    return gamestate.data.u8_vars[unaligned gsVar8 as u8];
+}
+
+// CAUTION: gsVar8 is not bounds or alignment checked.
+// KEEP: Y
+// DB = 0x7e
+#[idx8]
+inline func get_u8_x(let gsVar8 : var8) : u8 in x {
+    return gamestate.data.u8_vars[unaligned gsVar8 as u8];
+}
+
+
+// CAUTION: gsVar8 is not bounds or alignment checked.
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+inline func get_dyn_u8(gsVar8 : var8 in x) : u8 in a {
+    return gamestate.data.u8_vars[unaligned x];
+}
+
+
+// CAUTION: gsVar8 is not bounds or alignment checked.
+// KEEP: Y
+// DB = 0x7e
+#[mem8]
+inline func set_u8(let gsVar8 : var8, value: u8 in a) {
+    gamestate.data.u8_vars[unaligned gsVar8 as u8] = a;
+}
+
+
+// CAUTION: gsVar8 is not bounds or alignment checked.
+// KEEP: Y
+// DB = 0x7e
+#[idx8]
+inline func set_u8_x(let gsVar8 : var8, value: u8 in x) {
+    gamestate.data.u8_vars[unaligned gsVar8 as u8] = x;
+}
+
+
+// CAUTION: gsVar8 is not bounds or alignment checked.
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+inline func set_dyn_u8(gsVar8 : var8 in x, value: u8 in a) {
+    gamestate.data.u8_vars[unaligned x] = a;
+}
+
+
+// CAUTION: gsVar8 is not bounds or alignment checked.
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+func saturating_inc_u8(gsVar8 : var8 in x) : u8 in a {
+    a = gamestate.data.u8_vars[unaligned x];
+    a++;
+    if zero {
+        a--;
+    }
+    gamestate.data.u8_vars[unaligned x] = a;
+
+    return a;
+}
+
+
+// CAUTION: gsVar8 is not bounds or alignment checked.
+// OUT: A = new gamestate value.
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+func checked_dec_u8(gsVar8 : var8 in x) : bool in carry {
+    a = gamestate.data.u8_vars[unaligned x];
+    cmp(a, 1);
+    if carry {
+        a--;
+        gamestate.data.u8_vars[unaligned x] = a;
+    }
+    return carry;
+}
+
+
+// CAUTION: gsVar8 is not bounds or alignment checked.
+// OUT: negative/zero/carry = cmp(a, gsVar8)
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+inline func cmp_a_u8(_a : u8 in a, let gsVar8 : var8) {
+    cmp(a, gamestate.data.u8_vars[unaligned gsVar8 as u8]);
+}
+
+
+// CAUTION: var and max are not bounds or alignment checked.
+// OUT: A = new gamestate value.
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+inline func add_with_limit_u8__inline(let v : var8, let max : var8, toAdd : u8 in a) {
+    a += gamestate.data.u8_vars[unaligned v as u8];
+    if carry || a >= gamestate.data.u8_vars[unaligned max as u8] {
+        a = gamestate.data.u8_vars[unaligned max as u8];
+    }
+    gamestate.data.u8_vars[unaligned v as u8] = a;
+}
+
+
+
+// u16 GameState Variables
+// =======================
+
+// CAUTION: gsVar16 is not bounds or alignment checked.
+// KEEP: Y
+// DB = 0x7e
+#[mem16]
+inline func get_u16_aa(let gsVar16 : var16) : u16 in aa {
+    return gamestate.data.u16_vars[unaligned gsVar16 as u16];
+}
+
+// CAUTION: gsVar16 is not bounds or alignment checked.
+// KEEP: Y
+// DB = 0x7e
+#[idx16]
+inline func get_u16_xx(let gsVar16 : var16) : u16 in xx {
+    return gamestate.data.u16_vars[unaligned gsVar16 as u16];
+}
+
+
+// CAUTION: gsVar16 is not bounds or alignment checked.
+// KEEP: Y
+// DB = 0x7e
+#[mem16, idx8]
+inline func get_dyn_u16(gsVar16 : var16 in x) : u16 in aa {
+    return gamestate.data.u16_vars[unaligned x];
+}
+
+
+// CAUTION: gsVar16 is not bounds or alignment checked.
+// KEEP: Y
+// DB = 0x7e
+#[mem16]
+inline func set_u16_aa(let gsVar16 : var16, value: u16 in aa) {
+    gamestate.data.u16_vars[unaligned gsVar16 as u16] = aa;
+}
+
+
+// CAUTION: gsVar16 is not bounds or alignment checked.
+// KEEP: Y
+// DB = 0x7e
+#[idx16]
+inline func set_u16_xx(let gsVar16 : var16, value: u16 in xx) {
+    gamestate.data.u16_vars[unaligned gsVar16 as u16] = xx;
+}
+
+
+// CAUTION: gsVar16 is not bounds or alignment checked.
+// KEEP: Y
+// DB = 0x7e
+#[mem16, idx8]
+inline func set_dyn_u16(gsVar16 : var16 in x, value: u16 in aa) {
+    gamestate.data.u16_vars[unaligned x] = aa;
+}
+
+
+// CAUTION: gsVar16 is not bounds or alignment checked.
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+func saturating_inc_u16__mem8(gsVar16 : var16 in x) {
+    mem16();
+    #[mem16] {
+        aa = gamestate.data.u16_vars[unaligned x];
+        aa++;
+        if zero {
+            aa--;
+        }
+        gamestate.data.u16_vars[unaligned x] = aa;
+    }
+    mem8();
+}
+
+
+// CAUTION: gsVar16 is not bounds or alignment checked.
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+func checked_dec_u16__mem8(gsVar16 : var16 in x) : bool in carry {
+    mem16();
+    #[mem16] {
+        aa = gamestate.data.u16_vars[unaligned x];
+        cmp(aa, 1);
+        if carry {
+            aa--;
+            gamestate.data.u16_vars[unaligned x] = aa;
+        }
+    }
+    mem8();
+    return carry;
+}
+
+
+// Global flags
+// ============
+
+
+// Returns true if the game flag is clear
+//
+// DB = 0x7e
+let is_global_flag_clear_a = __is_global_flag_clear_a as func(flag_id : gf in a) : bool in zero;
+#[fallthrough, mem8, idx8]
+func __is_global_flag_clear_a(flag_id : gf in a) {
+    x = a;
+
+// Fallthrough into is_global_flag_clear()
+}
+
+
+// Returns true if the game flag is clear
+//
+// DB = 0x7e
+#[mem8, idx8]
+func is_global_flag_clear(flag_id : gf in x) : bool in zero {
+    y = a = x >>> 3;
+    x = a = x & 7;
+
+    a = gamestate.data.globalFlags[y] & _BitTable[x];
+    return zero;
+}
+
+
+// Returns true if the game flag is clear (without clobbering the Y register)
+//
+// DB = 0x7e
+let is_global_flag_clear_a__keep_y = __is_global_flag_clear_a__keep_y as func(flag_id : gf in a) : bool in zero;
+#[fallthrough, mem8, idx8]
+func __is_global_flag_clear_a__keep_y(flag_id : gf in a) {
+    x = a;
+
+// Fallthrough into is_global_flag_clear__keep_y()
+}
+
+
+// Returns true if the game flag is clear (without clobbering the Y register)
+//
+// KEEP: y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func is_global_flag_clear__keep_y(flag_id : gf in x) : bool in zero {
+var _tmp : u8 in zpTmp_byte_0;
+
+    _tmp = y;
+
+    y = a = x >>> 3;
+    x = a = x & 7;
+
+    a = gamestate.data.globalFlags[y];
+
+    y = _tmp;
+
+    a &= _BitTable[x];
+    return zero;
+}
+
+
+
+// DB = 0x7e
+let set_global_flag_a = __set_global_flag_a as func(flag_id : u8 in a) : bool in zero;
+#[fallthrough, mem8, idx8]
+func __set_global_flag_a(flag_id : u8 in a) {
+    x = a;
+
+// Fallthrough into set_global_flag()
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_global_flag(flag_id : gf in x) {
+    y = a = x >>> 3;
+    x = a = x & 7;
+
+    gamestate.data.globalFlags[y] = a = gamestate.data.globalFlags[y] | _BitTable[x];
+}
+
+
+
+
+// KEEP: Y
+// DB = 0x7e
+let set_global_flag_a__keep_y = __set_global_flag_a__keep_y as func(flag_id : u8 in a) : bool in zero;
+#[fallthrough, mem8, idx8]
+func __set_global_flag_a__keep_y(flag_id : u8 in a) {
+    x = a;
+
+// Fallthrough into set_global_flag__keep_y()
+}
+
+
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+func set_global_flag__keep_y(flag_id : gf in x) {
+var _tmp : u8 in zpTmp_byte_0;
+
+    _tmp = y;
+
+    y = a = x >>> 3;
+    x = a = x & 7;
+
+    gamestate.data.globalFlags[y] = a = gamestate.data.globalFlags[y] | _BitTable[x];
+
+    y = _tmp;
+}
+
+
+
+// Dungeon flags
+// =============
+
+
+// Returns true if the dungeon flag is clear
+//
+// DB = 0x7e
+let is_dungeon_flag_clear_a = __is_dungeon_flag_clear_a as func(flag_id : u8 in a) : bool in zero;
+#[fallthrough, mem8, idx8]
+func __is_dungeon_flag_clear_a(flag_id : u8 in a) {
+    x = a;
+
+// Fallthrough into is_dungeon_flag_clear()
+}
+
+
+// Returns true if the dungeon flag is clear
+//
+// DB = 0x7e
+#[mem8, idx8]
+func is_dungeon_flag_clear(flag_id : u8 in x) : bool in zero {
+    y = a = x >>> 3;
+    x = a = x & 7;
+
+    a = gamestate.data.dungeonFlags[y] & _BitTable[x];
+    return zero;
+}
+
+
+
+// Returns true if the dungeon flag is clear (without clobbering the Y register)
+//
+// KEEP: Y
+// DB = 0x7e
+let is_dungeon_flag_clear_a__keep_y = __is_dungeon_flag_clear_a__keep_y as func(flag_id : u8 in a) : bool in zero;
+#[fallthrough, mem8, idx8]
+func __is_dungeon_flag_clear_a__keep_y(flag_id : u8 in a) {
+    x = a;
+
+// Fallthrough into is_dungeon_flag_clear__keep_y()
+}
+
+
+// Returns true if the dungeon flag is clear (without clobbering the Y register)
+//
+// KEEP: Y
+// DB = 0x7e
+#[mem8, idx8]
+func is_dungeon_flag_clear__keep_y(flag_id : u8 in x) : bool in zero {
+var _tmp : u8 in zpTmp_byte_0;
+
+    _tmp = y;
+
+    y = a = x >>> 3;
+    x = a = x & 7;
+
+    a = gamestate.data.dungeonFlags[y];
+
+    y = _tmp;
+
+    a &= _BitTable[x];
+    return zero;
+}
+
+
+// KEEP: Y
+// DB = 0x7e
+let set_dungeon_flag_a = __set_dungeon_flag_a as func(flag_id : u8 in a) : bool in zero;
+#[fallthrough, mem8, idx8]
+func __set_dungeon_flag_a(flag_id : u8 in a) {
+    x = a;
+
+// Fallthrough into set_dungeon_flag()
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_dungeon_flag(flag_id : u8 in x) {
+    y = a = x >>> 3;
+    x = a = x & 7;
+
+    gamestate.data.dungeonFlags[y] = a = gamestate.data.dungeonFlags[y] | _BitTable[x];
+}
+
+
+
+// KEEP: Y
+// DB = 0x7e
+let set_dungeon_flag_a__keep_y = __set_dungeon_flag_a__keep_y as func(flag_id : u8 in a) : bool in zero;
+#[fallthrough, mem8, idx8]
+func __set_dungeon_flag_a__keep_y(flag_id : u8 in a) {
+    x = a;
+
+// Fallthrough into set_dungeon_flag__keep_y()
+}
+
+
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_dungeon_flag__keep_y(flag_id : u8 in x) {
+var _tmp : u8 in zpTmp_byte_0;
+
+    _tmp = y;
+
+    y = a = x >>> 3;
+    x = a = x & 7;
+
+    gamestate.data.dungeonFlags[y] = a = gamestate.data.dungeonFlags[y] | _BitTable[x];
+
+    y = _tmp;
+}
+
+}
+
+in rodata0 {
+
+const __BitTable : [ u8 ; 8 ] = [ 1 << i for let i in 0..7 ];
+    let _BitTable = far &__BitTable as far *u8;
+}
+
+}
+

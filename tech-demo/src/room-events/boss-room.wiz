@@ -8,6 +8,7 @@ import "engine/audio";
 
 import "monster-doors";
 
+import "gen/room-events";
 import "gen/enums";
 
 namespace room_events {
@@ -20,12 +21,19 @@ in code {
 // DB = 0x7e
 #[mem8, idx8]
 func init() {
-    room_events.monster_doors.init();
+    zero = is_global_flag_clear(parameter__flag);
+    if zero {
+        if a < room_events.monster_doors.State.DISABLED as u8 {
+            audio.songs_start_paused();
+            audio.load_song_if_changed(resources.songs.BossTheme);
+        }
 
-    a = room_events.monster_doors.state as u8;
-    if a < room_events.monster_doors.State.DISABLED as u8 {
-        audio.songs_start_paused();
-        audio.load_song_if_changed(resources.songs.BossTheme);
+        // Disable `monster_doors` flag parameter.
+        *(&parameter__flag as *u8) = 0;
+        room_events.monster_doors.init();
+    }
+    else {
+        *(&room_events.monster_doors.state as *u8) = a = room_events.monster_doors.State.DISABLED as u8;
     }
 }
 

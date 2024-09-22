@@ -74,21 +74,21 @@ func wait_one_second() {
 //
 // REQUIRES: NMI enabled, IRQs disabled
 //
-// DB = lowram
+// DB unknown
 func wait_frame() {
     // MUST NOT modify zpTmp variables.
 
     push8(p);
     push8(data_bank);
 
-    push8(program_bank);
-    data_bank = pop8();
-// DB = 0x80
-
-
     mem8();
     idx16();
     #[mem8, idx16] {
+        a = 0x80;
+        push8(a);
+        data_bank = pop8();
+    // DB = 0x80
+
         a = _brightness_buffer | INIDISP_FORCE_BLANK;
 
         wait_until_interrupt();
@@ -98,6 +98,7 @@ func wait_frame() {
 
 
         metasprites.update_oam__vblank();
+        ms_palettes.update_cgram__vblank();
 
         metatiles.transitions.transfer_buffer__vblank();
         second_layer.transfer_buffers__vblank();
@@ -268,4 +269,5 @@ func wait_multiple_frames_and_fadein() {
 }
 
 import "game/second-layer";
+import "game/ms_palettes";
 

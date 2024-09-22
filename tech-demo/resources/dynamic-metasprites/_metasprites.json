@@ -1,6 +1,6 @@
 {
   "name": "dynamic",
-  "palette": "_palette.png",
+  "palette": "common",
   "firstTile": 2,
   "endTile": 8,
   "framesets": [
@@ -150,5 +150,6 @@
         "hurt_west": "hurt_east hflip"
       }
     }
-  ]
+  ],
+  "palette_swaps": [ ]
 }

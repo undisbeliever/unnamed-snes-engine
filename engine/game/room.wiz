@@ -70,6 +70,8 @@ struct WarpRoom {
     // Only read if MOVE_PLAYER_BIT flag is set
     player_x: u8,
     player_y: u8,
+
+    // ::TODO add optional player_state and player_direction::
 }
 
 
@@ -102,19 +104,5 @@ in wram7e_roomstate {
     var forceFadeoutRoomTransition : u8;
 }
 
-}
-
-
-struct RoomToLoad {
-    dungeon : u8,
-    roomPos_x : u8,
-    roomPos_y : u8,
-    playerPos_x : u8,
-    playerPos_y : u8,
-}
-
-in wram7e {
-    var __roomToLoad : RoomToLoad;
-        var roomToLoad @ &__roomToLoad : RoomToLoad;
 }
 

@@ -1,0 +1,626 @@
+// Copyright (c) 2024, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+import "engine/registers";
+import "engine/common/reset";
+
+import "engine/vram-map";
+import "engine/audio";
+import "engine/gamemodes";
+import "engine/textbox";
+import "engine/wait-frame";
+import "engine/common/reset";
+import "engine/game/gamestate";
+import "engine/resources/resources";
+import "engine/resources/palette";
+
+import "../joypad";
+
+import "gen/enums";
+
+
+namespace gamemodes {
+namespace file_select {
+
+let JOYH_CONFIRM = joypad.JOYH.START | joypad.JOYH.B;
+let JOYH_CANCEL = joypad.JOYH.Y;
+
+
+let N_SAVE_SLOTS = gamestate.N_SAVE_SLOTS;
+
+let N_ITEMS = N_SAVE_SLOTS + 2;
+
+let SAVE_SLOT_HEIGHT = 2;
+let SAVE_SLOT_Y_OFFSET = 2;
+
+let SMALL_TEXTBOX_HEIGHT = 1;
+let SMALL_TEXTBOX_Y_OFFSET = 22;
+
+
+let N_STATES = 4;
+
+enum State : u8 {
+    NORMAL = 0,
+    ERASE = 2,
+    COPY_SOURCE = 4,
+    COPY_DESTINATION = 6,
+};
+
+in code {
+    const StateFunctionTable : [func ; N_STATES] = [
+        process_normal,
+        process_erase,
+        process_copy_source,
+        process_copy_destination,
+    ];
+}
+
+in rodata0 {
+    const NewGameText = "New Game\0";
+    const LoadGameText = "Game \xfd\n\0";
+
+    const StateSmallTextbox : [*const u8 ; N_STATES] = [
+        @"    COPY        ERASE\0",
+        @"SELECT GAME TO ERASE\0",
+        @"SELECT GAME TO COPY\0",
+        @"SELECT COPY DESTINATION\0",
+    ];
+
+    const EraseConfirm = "ERASE GAME???\n"
+                       ~ " \x03 No          \x04 Yes\0";
+    let ERASE_CONFIRM_OPTION = 1;
+
+    let NORMAL_COLDATA_A = COLDATA_PLANE_R | 17;
+    let NORMAL_COLDATA_B = COLDATA_PLANE_G | 14;
+
+    const StateColData : [u8 ; N_STATES * 2] = [
+        NORMAL_COLDATA_A,     NORMAL_COLDATA_B,     // Gold
+        COLDATA_PLANE_R | 17, 0,                    // Red
+        COLDATA_PLANE_B | 17, 0,                    // Blue
+        COLDATA_PLANE_B | 17, COLDATA_PLANE_R | 10, // Purple
+    ];
+}
+
+
+in lowram {
+    var state : State;
+
+    // The currently selected item.
+    // CAUTION: Might not be a save file.
+    var selectedItem : u8;
+
+    // The save slot used when copying the save.
+    var copySourceSlot : u8;
+}
+
+in wram7e {
+    // Each element MUST be 0 or 1
+    var saveExists : [u8 ; N_SAVE_SLOTS];
+}
+
+
+in code {
+
+
+// Game Over GameMode
+//
+// DB = 0x7e
+#[mem8, idx8]
+func exec() {
+    // Ensures menu_select sound effect is finished before room transition loads a new song
+    wait_multiple_frames_and_fadeout();
+
+    audio.load_song_if_changed(resources.songs.TitleScreenTheme);
+
+    idx16();
+    #[idx16] {
+        push16(0x7e80);
+        data_bank = pop8();
+    // DB = 0x80
+
+        setup_ppu__inline();
+
+        data_bank = pop8();
+    // DB = 0x7e
+    }
+    mem8_idx8();
+
+    // Play without a sound effect
+    set_normal_state(0xff as sound_effects);
+
+    x = N_SAVE_SLOTS;
+    do {
+        x--;
+        set_selected_and_load_and_display_slot(x);
+
+        // ::TODO replace with textbox.flush__forceblank()::
+        wait_frame();
+
+        x = selectedItem;
+    } while !zero;
+
+
+    wait_multiple_frames_and_fadein();
+
+    while true {
+        wait_frame();
+
+        // ::HACK in vblank time::
+        // ::TODO add a method of calling a function pointer in wait_frame()::
+        {
+        push16(0x7e80);
+        data_bank = pop8();
+    // DB = 0x80
+
+            COLDATA = a = COLDATA_PLANE_ALL | 0;
+
+            x = a = selectedItem << 1;
+
+            mem16();
+            #[mem16] {
+                A1T7 = aa = (far &hdma_tables.HdmaTables as far *u16)[unaligned x];
+
+                x = state as u8;
+                aa = (far &StateColData as far *u16)[unaligned x];
+            }
+            mem8_idx8();
+
+            COLDATA = a;
+            swap_bytes(aa);
+            COLDATA = a;
+
+
+        data_bank = pop8();
+    // DB = 0x7e
+        }
+
+        x = state as u8;
+        StateFunctionTable[unaligned x]();
+    }
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_erase_state() {
+    carry = select_first_save_exists_matches(1);
+    goto set_normal_state__error_sfx if !carry;
+
+    return _set_state_play_sfx_and_update_small_textbox(State.ERASE, sound_effects.menu_select_fast);
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_copy_source_state() {
+    a = count_n_saves__inline();
+    if a >= 1 && a < N_SAVE_SLOTS {
+        carry = select_first_save_exists_matches(1);
+        if carry {
+            return _set_state_play_sfx_and_update_small_textbox(State.COPY_SOURCE, sound_effects.menu_select_fast);
+        }
+    }
+
+    return set_normal_state__error_sfx();
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_copy_destination_state() {
+    copySourceSlot = a = selectedItem;
+
+    carry = select_first_save_exists_matches(0);
+    goto set_normal_state__error_sfx if !carry;
+
+    return _set_state_play_sfx_and_update_small_textbox(State.COPY_DESTINATION, sound_effects.menu_select_fast);
+}
+
+
+
+// DB = 0x7e
+#[fallthrough, mem8, idx8]
+func set_normal_state__error_sfx() {
+    a = sound_effects.menu_incorrect as u8;
+
+// Fallthrough into set_normal_state
+}
+
+
+// DB = 0x7e
+#[fallthrough, mem8, idx8]
+func set_normal_state(sfxId : sound_effects in a) {
+    x = State.NORMAL as u8;
+
+    copySourceSlot = y = 0xff;
+
+// Fallthrough into _set_state_play_sfx_and_update_small_textbox
+}
+
+
+// DB = 0x7e
+#[fallthrough, mem8, idx8]
+func _set_state_play_sfx_and_update_small_textbox(_state : State in x, sfxId : sound_effects in a) {
+    state = x as State;
+
+    audio.queue_sound_effect(sfxId);
+
+    textbox.setup_textbox(SMALL_TEXTBOX_HEIGHT, SMALL_TEXTBOX_Y_OFFSET);
+
+    x = state as u8;
+    mem16_idx16();
+    #[mem16, idx16] {
+        xx = aa = (far &StateSmallTextbox as far *u16)[unaligned xx];
+    }
+    mem8();
+    #[mem8, idx16] {
+        textbox.print_textbox(#:far &StateSmallTextbox, xx);
+    }
+    mem8_idx8();
+
+    wait_frame();
+
+
+    x = selectedItem;
+    if x < N_SAVE_SLOTS {
+        set_selected_and_load_and_display_slot(x);
+    }
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process_normal() {
+    x = selectedItem;
+
+    a = joypad.pressed_h;
+    if a & JOYH_CONFIRM != 0 {
+        if x < N_SAVE_SLOTS {
+            carry = gamestate.load_gamestate_from_cart(selectedItem);
+            if !carry {
+                gamestate.new_game();
+                gamestate.save_gamestate_to_cart_slot(selectedItem);
+            }
+            set_next_game_mode_to_room_transition(RoomTransitions.fadein_reset_player);
+
+            audio.queue_sound_effect(sound_effects.menu_select);
+
+            // Ensures menu_select sound effect is finished before room transition loads a new song
+            // ::MAYDO shorter sound-effect and faster fadeout::
+            wait_multiple_frames_and_fadeout__slow();
+
+            ^return execute_game_mode();
+        }
+
+        if x == N_SAVE_SLOTS + 1 {
+            ^return set_erase_state();
+        }
+        ^return set_copy_source_state();
+    }
+    if a & (joypad.JOYH.UP | joypad.JOYH.DOWN) != 0 {
+        if a & joypad.JOYH.DOWN != 0 {
+            x++;
+            if x >= N_ITEMS {
+                x = 0;
+            }
+        }
+        else {
+            x--;
+            if negative {
+                x = N_ITEMS - 1;
+            }
+        }
+
+        set_selected_and_load_and_display_slot(x);
+
+        audio.queue_sound_effect(sound_effects.menu_cursor);
+    }
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process_erase() {
+    carry = move_cursor_slot(1);
+    if carry {
+        idx16();
+        #[idx16] {
+            a = textbox.print_textbox_and_wait(#:far &EraseConfirm, &EraseConfirm as u16,
+                                               JOYH_CONFIRM << 8);
+        }
+        mem8_idx8();
+        y = a;
+
+        a = sound_effects.menu_back as u8;
+        if y == ERASE_CONFIRM_OPTION {
+            gamestate.clear_save_slot_from_cart(selectedItem);
+
+            a = sound_effects.menu_erase_save as u8;
+        }
+        ^return set_normal_state(a as sound_effects);
+    }
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process_copy_source() {
+    carry = move_cursor_slot(1);
+    if carry {
+        ^return set_copy_destination_state();
+    }
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func process_copy_destination() {
+    carry = move_cursor_slot(0);
+    if carry {
+        carry = gamestate.load_gamestate_from_cart(copySourceSlot);
+
+        a = sound_effects.menu_incorrect as u8;
+        if carry {
+            gamestate.save_gamestate_to_cart_slot(selectedItem);
+
+            a = sound_effects.menu_copy_save as u8;
+        }
+        ^return set_normal_state(a as sound_effects);
+    }
+}
+
+
+
+// Move the selected item to a save slot where `saveExists == matches`.
+//
+//  * Returns true if `JOYH_CONFIRM` is pressed.
+//  * Changes state to normal and returns false if `JOYH_CANCEL` is pressed.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func move_cursor_slot(matches : u8 in a) : bool in carry {
+var _tmp : u8 in zpTmp_byte_0;
+    _tmp = a;
+
+    a = joypad.pressed_h;
+
+    if a & JOYH_CANCEL != 0 {
+        set_normal_state(sound_effects.menu_back);
+        return false;
+    }
+    if a & JOYH_CONFIRM != 0 {
+        return true;
+    }
+    if a & (joypad.JOYH.UP | joypad.JOYH.DOWN) != 0 {
+        x = selectedItem;
+
+        if a & joypad.JOYH.DOWN != 0 {
+            do {
+                x++;
+                if x >= N_SAVE_SLOTS {
+                    x = 0;
+                }
+                a = saveExists[x];
+            } while a != _tmp && x != selectedItem;
+        }
+        else {
+            do {
+                x--;
+                if negative {
+                    x = N_SAVE_SLOTS - 1;
+                }
+                a = saveExists[x];
+            } while a != _tmp && x != selectedItem;
+        }
+
+        set_selected_and_load_and_display_slot(x);
+
+        audio.queue_sound_effect(sound_effects.menu_cursor);
+    }
+
+    return false;
+}
+
+
+
+// Sets `selectedItem` to the first slot where `saveExists` == `match`.
+//
+// CAUTION: Does not draw or update save slot textbox.
+// DB = 0x7e
+#[mem8, idx8]
+func select_first_save_exists_matches(match : u8 in a) : bool in carry {
+    x = 0;
+    do {
+        if a == saveExists[x] {
+            selectedItem = x;
+            return true;
+        }
+
+        x++;
+    } while x < N_SAVE_SLOTS;
+
+    return false;
+}
+
+
+
+// Return the number of saves
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func count_n_saves__inline() : u8 in a {
+    a = 0;
+
+    x = N_SAVE_SLOTS - 1;
+    do {
+        a += saveExists[x];
+        x--;
+    } while !negative;
+
+    return a;
+}
+
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_selected_and_load_and_display_slot(item: u8 in x) {
+    selectedItem = x;
+
+    if x < N_SAVE_SLOTS {
+        push8(x);
+        saveExists[x] = 0;
+
+        y = a = (((x << 2) +# selectedItem)) +# SAVE_SLOT_Y_OFFSET;
+        textbox.setup_textbox_flags(
+            SAVE_SLOT_HEIGHT,
+            y,
+            textbox.Flags.NO_BOTTOM_BORDER
+        );
+
+        carry = gamestate.load_gamestate_from_cart(selectedItem);
+        x = pop8();
+
+        idx16();
+        #[idx16] {
+            if carry {
+                saveExists[xx]++;
+
+                xx++;
+                textbox.firstU16parameter = xx;
+
+                xx = &LoadGameText as u16;
+            }
+            else {
+                xx = &NewGameText as u16;
+            }
+            textbox.print_textbox(#:far &LoadGameText, xx);
+        }
+        mem8_idx8();
+    }
+}
+
+
+
+// Setup the PPU
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func setup_ppu__inline() {
+    // ::TODO create some kind of system for setting PPU registers::
+
+    reset_registers();
+    textbox.setup_ppu__forceblank();
+
+    // ::TODO add background image::
+    palette.load_palette__forceblank(resources.palettes.file_select);
+
+    BGMODE = a = BGMODE_MODE_1;
+    BG3SC = a = ((VRAM_BG3_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_32x32;
+    BG34NBA = a = ((VRAM_BG3_TILES_WADDR / BG34NBA_WALIGN) << BG34NBA_BG3_SHIFT);
+    TM = a = TM_BG3;
+
+    a = -1 as u8;
+    BG3VOFS = a;
+    BG3VOFS = a;
+
+    // Clip colors to black outside the color window
+    // Disable color math everywhere
+    CGWSEL = a = CGWSEL_ADD_SUBSCREEN |  CGWSEL_MSB_NOWHERE | CGWSEL_SST_OUTSIDE;
+
+    CGADSUB = a = CGADSUB_COLOR_ADD | CGADSUB_ENABLE_BACKDROP | CGADSUB_ENABLE_BG3;
+
+    // Enable colour math
+    WOBJSEL = a = WSEL_W1_ENABLE << WOBJSEL_COLOR_SHIFT;
+
+    COLDATA = a = NORMAL_COLDATA_A;
+    COLDATA = a = NORMAL_COLDATA_B;
+
+    DMAP7 = a = DMAP_TO_PPU | DMAP_TRANSFER_TWO;
+    BBAD7 = a = <:&WH0;
+    A1T7 = xx = &hdma_tables.SaveSlot0 as u16;
+    A1B7 = a = #:far &hdma_tables.HdmaTables;
+
+    HDMAEN = a = HDMAEN_DMA7;
+}
+
+}
+
+in rodata0 {
+
+namespace hdma_tables {
+    let _SH = SAVE_SLOT_HEIGHT * 16 + 3;
+
+    let _SY = (SAVE_SLOT_Y_OFFSET + 1) * 8 - 3;
+    let _SYS = 5 * 8;
+
+    let _SX1 = 3 * 8 + 1;
+    let _SX2 = 29 * 8 - 2;
+    let _SXM = (_SX1 + _SX2) / 2;
+
+    let _EY = (SMALL_TEXTBOX_Y_OFFSET + 1) * 8 - 3;
+    let _EH = SMALL_TEXTBOX_HEIGHT * 16 + 6;
+
+    const SaveSlot0 : [u8] = [
+        _SY + 0 * _SYS, 0xff, 0x00,
+        _SH,            _SX1, _SX2,
+        1,              0xff, 0x00,
+        0,
+    ];
+
+    const SaveSlot1 : [u8] = [
+        _SY + 1 * _SYS, 0xff, 0x00,
+        _SH,            _SX1, _SX2,
+        1,              0xff, 0x00,
+        0,
+    ];
+
+    const SaveSlot2 : [u8] = [
+        _SY + 2 * _SYS,         0xff, 0x00,
+        _SH,                    _SX1, _SX2,
+        1,                      0xff, 0x00,
+        0,
+    ];
+
+    const SaveSlot3 : [u8] = [
+        120,                    0xff, 0x00,
+        _SY + 3 * _SYS - 120,   0xff, 0x00,
+        _SH,                    _SX1, _SX2,
+        1,                      0xff, 0x00,
+        0,
+    ];
+
+    const Copy : [u8] = [
+        120,                    0xff, 0x00,
+        _EY - 120,              0xff, 0x00,
+        _EH,                    _SX1, _SXM - 1,
+        1,                      0xff, 0x00,
+        0,
+    ];
+
+    const Erase : [u8] = [
+        120,                    0xff, 0x00,
+        _EY - 120,              0xff, 0x00,
+        _EH,                _SXM + 1, _SX2,
+        1,                      0xff, 0x00,
+        0,
+    ];
+
+
+    const HdmaTables : [u16 ; N_ITEMS] = [
+        &SaveSlot0 as u16, &SaveSlot1 as u16, &SaveSlot2 as u16, &SaveSlot3 as u16,
+        &Copy as u16, &Erase as u16,
+    ];
+}
+
+}
+
+}
+}
+
