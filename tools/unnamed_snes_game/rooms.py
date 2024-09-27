@@ -605,11 +605,10 @@ def process_warp_room(warp_room: TmxWarpRoom, dependencies: RoomDependencies, du
         dungeon = dungeons.dungeons.get(dungeon_name)
         if dungeon is None:
             error_list.append(f"Unknown dungeon: {dungeon_name}")
-            dungeon = dependencies.dungeon
     else:
         dungeon = dependencies.dungeon
 
-    if room_x < 0 or room_x >= dungeon.width or room_y < 0 or room_y >= dungeon.height:
+    if dungeon and (room_x < 0 or room_x >= dungeon.width or room_y < 0 or room_y >= dungeon.height):
         error_list.append(f"room location out of bounds: {room_x}, {room_y} (dungeon is {dungeon.width}x{dungeon.height})")
 
     if player_pos:
@@ -629,6 +628,8 @@ def process_warp_room(warp_room: TmxWarpRoom, dependencies: RoomDependencies, du
 
     if error_list:
         raise RoomError("Error compiling warp room", error_list)
+
+    assert dungeon
 
     return bytes((WARP_ROOM_DATA_TYPE, flags, dungeon.id, room_x, room_y, player_x, player_y))
 
