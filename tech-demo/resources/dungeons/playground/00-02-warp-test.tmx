@@ -2,7 +2,7 @@
 <map version="1.11" tiledversion="1.11.0" orientation="orthogonal" renderorder="right-down" width="16" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="3" nextobjectid="2">
  <objectgroup id="2" name="Warp">
   <object id="1" x="16" y="16" width="224" height="48">
-   <text wrap="1">warp dungeon 05-06 128,64</text>
+   <text wrap="1">warp 00-01</text>
   </object>
  </objectgroup>
 </map>
