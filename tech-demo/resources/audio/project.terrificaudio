@@ -1,7 +1,7 @@
 {
   "_about": {
     "file_type": "Terrific Audio Driver project file",
-    "version": "0.0.10"
+    "version": "0.0.11"
   },
   "instruments": [
     {
@@ -282,6 +282,10 @@
     {
       "name": "VillageTheme",
       "source": "songs/VillageTheme.mml"
+    },
+    {
+      "name": "FoggyForest",
+      "source": "songs/FoggyForest.mml"
     }
   ]
 }
