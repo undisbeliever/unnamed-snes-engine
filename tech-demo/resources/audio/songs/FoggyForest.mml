@@ -1,0 +1,220 @@
+;Foggy Forest Theme
+;By KungFuFurby
+;Made for undisbeliever's Terrific Audio Driver v0.0.11
+
+#Title Foggy Forest Theme
+#Game unnamed-snes-game
+#Author KungFuFurby
+#Composer KungFuFurby
+#Copyright 2024 undisbeliever
+#Date 2024
+#License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
+
+;Echo Parameters
+#EchoLength 48
+#EchoFeedback 126
+#EchoVolume 12
+#FirFilter 64 32 16 8 4 2 1 0
+
+@GuitarB2 GuitarB2
+@Flute1 Flute1
+@sine sine gain 127
+@trumpet_2 trumpet_2
+@Strings8 Strings8
+@PIANO_C5 PIANO_C5
+
+#ZenLen 192
+
+A T144
+A @GuitarB2 A15,7,7,16 V96 E0 L
+!ARiff1 l4 o1gfd+[fg]2
+!ARiff2 l4 o2c<a+g+g
+A [!ARiff1 : o1a4]5 o1a8a+8
+A !ARiff2 l4 o2c<a+>cd
+A [!ARiff2 ]2
+A !ARiff1 o1a4
+
+B @GuitarB2 A15,7,7,16 V48 E0 p56 r16 L
+C @GuitarB2 A15,7,7,16 V48 E0 p72 L
+!BCRiff1BSide l8 o4d <d f>c <a+
+!BCRiff1CSide l8 o3a+>c<a^   g
+B [   !BCRiff1BSide l8 o3d+ff
+C [r8 !BCRiff1CSide l8   o3ac^
+B !BCRiff1BSide : l8 o3a+f>c]3
+C !BCRiff1CSide : l8   o3aa&]3
+B o3a+a>f
+C   o4c<f&
+B   o4g<g>cc <a+d+ca
+C r o4d f<a ^ g f<a&
+!BCRiff2aBSide l8   o3a+dff g
+!BCRiff2aCSide l8 r o3g ac^
+!BCRiff2BSide !BCRiff2aBSide l8 o3gff
+!BCRiff2CSide !BCRiff2aCSide l8 o3dac&
+!BCRiff3BSide !BCRiff2aBSide l8 o2a+>c c
+!BCRiff3CSide !BCRiff2aCSide l8 o3d+ f<a&
+B !BCRiff2BSide
+C !BCRiff2CSide
+B !BCRiff3BSide
+C !BCRiff3CSide
+B !BCRiff2aBSide o3gf>d
+C !BCRiff2aCSide o3da>c&
+!BCRiff4aBSide l8   o4d+<ga+>d c
+!BCRiff4aCSide l8 r o4c  d<f ^ g+
+!BCRiff4BSide l8 !BCRiff4aBSide o3d+gb
+!BCRiff4CSide l8 !BCRiff4aCSide o3b d&
+B !BCRiff4BSide
+C !BCRiff4CSide
+B !BCRiff4aBSide o4c<b>d
+C !BCRiff4aCSide o4d<g&
+B   o4c<d+ff g+cd>d
+C r o3g a+d^ d+gg&
+B !BCRiff4BSide
+C !BCRiff4CSide
+B !BCRiff3BSide
+C !BCRiff3CSide
+B !BCRiff2BSide
+C !BCRiff2CSide
+
+D l1 r^
+D V40 E1
+!DRiff1a @Flute1 {o3fg}16,32& w2 GE14 r4..
+!DRiff1 !DRiff1a
+!DRiff1 @Flute1 {o4fg}16,32& w2 GE14 r4..
+!DRiff1 @Flute1 {o4cd}16,32& w2 GE14 r4..
+!DRiff1 !DRiff1a
+!DRiff2 @sine A8,7,7,0
+!DRiff2a l8 o5g.& {o5gf}32,,255& {o5fg}32,,255
+!DRiff2a o6dfe
+!DRiff2 !DRiff2a
+!DRiff2 l8 o6c<a+a
+!DRiff2 o5a+& {o5a+a}32,,255& {o5aa+}32,,255& {o5a+a}32,,255& {o5af}32,,255&
+!DRiff2 {o5fc},,255 o4a16>c16 d<a+16>d16 cd
+!DRiff2 !DRiff2a
+!DRiff2 l8 o6a+af16c16
+!DRiff2 o6d.& {o6dc}32,,255& {o6cd}32,,255&
+!DRiff2 {o6dg}8,,255 o6f16 {o6fg}16,,255&
+!DRiff2 {o6ga}8,,255 {o6aa+}8,,255 {o6a+a}8,,255 {o6ag}8,,255
+!DRiff2 l8 o6c4 {o6cg}4,,255 o6f.d+16 dd+16f16
+!DRiff2 l8 o6d+.& {o6d+c}.,,96 o5a+16>c16 dc<b>d
+!DRiff2 l8 o6c4 {o6cg}8,,255 o6d+16g16 fd+df
+!DRiff2 l8 o6d+d16d+16dc<bagd
+!DRiff2 o5g1& GD1 r1
+!DRiff3 @Flute1 {o3fg}16,32& w1 GE13 r2...
+!DRiff4 @Flute1 {o2fg}16,32& w1 GE13 r2...
+!DRiff5 @Flute1 [
+!DRiff5 l8 Q2o5g>ddd
+!DRiff5 l32 Q4c16<a+16a16ga Q8[a64a+64]4afcf :
+!DRiff5 l16 Q2o5g8>d8 Q4defg
+!DRiff5 l16 Q4o6afc<a+aa+af]2
+!DRiff5 l8 Q2o5gQ4d<gd
+!DRiff5 l8 Q8o4gaa+>d [
+!DRiff5 {o4a+>c}16,32& r16^24 <a+24>c24 :
+!DRiff5 {o5fg}16,32& r16^24 f24g24
+!DRiff5 l12 o5d+dd+ fd+d24<a+24 ]2
+!DRiff5 {o4fg}16,32& r16^24 f24g24
+!DRiff5 {o3a+>c}16,32& r8 d16
+!DRiff5 l16 o4d+fd+d
+!DRiff5 l12 o4d+d<g a+8.a32a+32
+!DRiff5 l8 o4c. <b32>c32 df
+!DRiff5 l12 o4d+d<g a+8>c8
+!DRiff5 l8 o4c. d32c32 <ba
+!DRiff5aa l16 o3g>gd<g>fc<f>c
+!DRiff5a !DRiff5aa l16 o3d+>d+<a+d+>fc<f>c
+!DRiff5 !DRiff5a !DRiff5a
+!DRiff6 !DRiff5a
+!DRiff6 !DRiff5aa
+!DRiff6 l16 o3d+>d+<a+d+>d<ada
+!DRiff1_2_3_4 !DRiff1 !DRiff2 !DRiff3 !DRiff4 r1^1
+!DRiffVib1_2_3_4 ~2,5 !DRiff1
+!DRiffVib1_2_3_4 ~44,2 !DRiff2
+!DRiffVib1_2_3_4 ~2,5 !DRiff3
+!DRiffVib1_2_3_4 ~1,5 !DRiff4
+!DRiffVib1_2_3_4 r1^1
+D !DRiffVib1_2_3_4
+D ~2,5 !DRiff5
+D !DRiff6
+D !DRiff1
+D ~44,2 !DRiff2
+D l1 r^^^^^ L
+D ~2,5 !DRiff5
+D !DRiff6
+D !DRiffVib1_2_3_4
+
+E l1 r^^24 E1
+E V28
+E !DRiff1_2_3_4 V16
+E !DRiff5
+E !DRiff6
+E V28
+E !DRiff1
+E !DRiff2
+E l1 r^^^^^ V16
+E !DRiff5 r48 L
+E @PIANO_C5 A15,7,7,17 V24
+E l16 Q4o5g32g32Q8gd32g32
+E l16 o5ff32g32fc
+E l16 Q4ro5d+32d+32Q8d+<a+32>d+32
+E l16 [o5f64g64]4 fc
+E l16 Q4ro5g32g32Q8gd32g32
+E l16 o5ff32g32ga
+E l16 Q4ro5a+32a+32Q8a+g32a+32
+E l16 [o5a64a+64]4 af
+!ERiff1 l48 o4cdfga>cdfgfdc
+!ERiff2 l48 o4ga>cdfga>cdc<ag
+!ERiff3 l48 o3ga>cdfga>cdc
+E V24 [!ERiff1 V-6]4
+E V24 [!ERiff2 V-6]4
+E V24 [!ERiff1 V-6]4
+E V24 [!ERiff3 o4a48g48 V-6]4
+E @Strings8 V4 ~4,8 l1
+!ERiff4a l1 GI1 o7d& GD1 r
+!ERiff4a l1 GI1 o6g& GD1 r
+!ERiff4 !ERiff4a
+!ERiff4 l1 GI1 o7c& GD1 r
+!ERiff4 l1 GI1 o6g& GD1 r
+!ERiff4 [!ERiff4a ]3
+!ERiff4 l1 GI1 o7c& GD1 r
+!ERiff4 l1 GI1 o6g& GD1 r
+E !ERiff4
+E GI1 o6g& GD1 r^16 ~0
+
+F l1 r^^^^^^^^^^^^^^ E1 V96 ~1,8
+!FRiff1 @trumpet_2 l1 o3g& A15,7,7,10
+F [!FRiff1 l1 r^^^]2
+F r^^^^^
+F @Strings8 V4 ~4,8
+F [GI1 o7d& GD1 r^]2 r
+F !ERiff4 ~0
+F @PIANO_C5 A15,7,7,17 L V24 [
+F l16 Q4ro4a+32a+32Q8a+a32a+32
+F l16 o5c<a+32a32ga
+F l16 Q4ro4g32g32Q8gf32g32
+F l16 [o4a64a+64]4 af
+F l16 Q4ro4a+32a+32Q8a+a32a+32
+F l16 o5c<a+32>c32df
+F l16 Q4ro5g32g32Q8gd32g32
+F l16 [o5f64g64]4 fc ]2
+F r32
+F V12 [!ERiff1 V-3]4
+F V12 [!ERiff2 V-3]4
+F V12 [!ERiff1 V-3]4
+F V12 [!ERiff3 : o3a48g48 V-3]4 o3a96 V12
+!FRiff2 [l8 o6d.<g.a.:d4^16
+!FRiff2 r1^8]2
+!FRiff2 o5g4^16 [
+!FRiff2 r1^8
+!FRiff2 l8 o6d.<f.g.c4^16 ]2
+F r1^8
+F !FRiff2
+F r1 V96 ~1,8
+F !FRiff1 l1 r^^^
+F !FRiff1 l1 r^^8
+F @PIANO_C5 A15,7,7,17 V12 ~0
+F !FRiff2
+
+
+G l1 r^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^24 E1 V16 @Flute1 L
+G !DRiff6
+G V28
+G !DRiff1_2_3_4 V16
+G !DRiff5
