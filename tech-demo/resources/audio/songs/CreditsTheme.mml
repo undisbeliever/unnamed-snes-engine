@@ -1,6 +1,6 @@
 ;Credits Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.11
+;Made for undisbeliever's Terrific Audio Driver v0.0.12
 
 #Title Credits Theme
 #Game unnamed-snes-game
@@ -23,13 +23,14 @@
 #ZenLen 192
 
 A T224
-A E1 @Strings8Detache V160
+!Strings8Detache_V160_E1 E1 @Strings8Detache V160
+A !Strings8Detache_V160_E1
 A L l16 [o4c]7c32c32
 
-B E1 @Strings8Detache V160 p32
+B !Strings8Detache_V160_E1 p32
 B L l16 [o4e]7e32e32 [o4f]7f32f32
 
-C E1 @Strings8Detache V160 p96 L
+C !Strings8Detache_V160_E1 p96 L
 !CRiff1 l16 [o3a]7a32a32
 C [l16 [o4g]7g32g32 !CRiff1 ]2
 C [l16 [o3g]7g32g32 !CRiff1 ]2

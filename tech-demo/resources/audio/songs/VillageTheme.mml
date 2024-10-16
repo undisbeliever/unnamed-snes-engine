@@ -1,6 +1,6 @@
 ;Village Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.11
+;Made for undisbeliever's Terrific Audio Driver v0.0.12
 
 #Title Village Theme
 #Game unnamed-snes-game
@@ -47,12 +47,13 @@ C !CRiff2 o5a+8d+8a+8
 C o6c8[d32c32]12d16c16<a+4g+4g4d+8g8
 C o5f4d+4d4f4d+1
 
-D r8^48 @GuitarB2_1 V56 L
+!GuitarB2_1_V56 @GuitarB2_1 V56
+D r8^48 !GuitarB2_1_V56 L
 D [[o4d+8.^24d+4^48]2 [o4c+8.^24c+4^48]2[o4d+8.^24d+4^48]4]6
 D [[o4d+8.^24d+4^48]14 [o3a+8.^24a+4^48]2]2
 
 !ERiff1 [o4g8.^48g4^24]2
-E r8^24 @GuitarB2_1 V56 p80 L
+E r8^24 !GuitarB2_1_V56 p80 L
 E [[!ERiff1 :[o4f8.^48f4^24]2]2[o4g+8.^48g+4^24]2 ]6
 E [[[o4g+8.^48g+4^24]2 !ERiff1 [o4f8.^48f4^24]2:!ERiff1 ]2
 E [o4d+8.^48d+4^24]2]2
@@ -61,6 +62,6 @@ F @GuitarB2_2 V64 L
 F l2 [o2d+d+c+c+[d+]4]6
 F [o2g+d+gd+f[d+]3]4
 
-G r8 @GuitarB2_1 V56 p48 L
+G r8 !GuitarB2_1_V56 p48 L
 G l4 [o3[a+]4[g+]4[a+]8]6
 G [[o4[c]4<[a+]8:[a+]4]2 [g]4]2

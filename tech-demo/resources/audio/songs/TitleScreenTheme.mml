@@ -1,6 +1,6 @@
 ;Title Screen Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.11
+;Made for undisbeliever's Terrific Audio Driver v0.0.12
 
 #Title Title Screen Theme
 #Game unnamed-snes-game
@@ -51,9 +51,10 @@ A [[!ARiff5 !ARiff7 ]3 !ARiff5 !ARiff6 ]10
 A [!ARiff5 !ARiff7 : !ARiff5 !ARiff6 ]4
 A @Kick3 V140 o5c32 !Drum_HatClosed_32 @Kick3 V140 o5c32c32
 A !Drum_Snare_32 !Drum_HatClosed_32 @Snare02 V112 [o5c64]4
-A E1 @Strings8 V80 p56 
-A [GI7 o4e4& GD7 r4 GI7 o4d4& GD7 r4 GI7 o4c4& GD7 r4 GI7 o4d4& GD7 r4]2
-A GI7 [o4c4 @Strings8 V52 o4e4d4:<b4]2 o4g4
+!Strings8_V80_GI7_E1 E1 @Strings8 V80 GI7
+A !Strings8_V80_GI7_E1 p56
+A [o4e4& GDT7 r4 o4d4& GT r4 o4c4& GT r4 o4d4& GT r4]2
+A [o4c4 @Strings8 V52 o4e4d4:<b4]2 o4g4
 A p64 o4g+8g8f8d+8f4d4
 A o4e4c8e8f+4d4
 
@@ -71,7 +72,8 @@ A o4e4c8e8f+4d4
 !BRiff1S_3S !BRiff1_2_1_A2 !BRiff1_2_1_A2 !BRiff3_2_3_A2 !BRiff3_2_3_A2
 B !StringsDetache8_V160_E1 p80
 B !BRiff1S_3S
-!BRiff5 @Crash2 V120 o5c2 r4 GI10 V160 o4c4
+!Crash2_V120 @Crash2 V120
+!BRiff5 !Crash2_V120 o5c2 r4 GI10 V160 o4c4
 B p64 !BRiff5
 !BRiff6 l8 [o4c>c]2
 !BRiff6 l8 [o4d>d]2
@@ -92,9 +94,9 @@ B [o4d>d]2
 B !BRiff6
 B ]2
 B !BRiff6 !BRiff6
-B E1 @Strings8 V80 p72
-B [GI7 o4c4& GD7 r4 GI7 o3b4& GD7 r4 GI7 o3a4& GD7 r4 GI7 o3b4& GD7 r4]2
-B GI7 [o3a4 @Strings8 V52 o4c4<b4:g4]2 o4d4
+B !Strings8_V80_GI7_E1 p72
+B [o4c4& GDT7 r4 o3b4& GT r4 o3a4& GT r4 o3b4& GT r4]2
+B [o3a4 @Strings8 V52 o4c4<b4:g4]2 o4d4
 !trumpet2_V64_vib8_4 @trumpet_2 V64 ~8,4
 B !trumpet2_V64_vib8_4 p64
 B r16o5g+32g+32 o6d+8c8d+16g16
@@ -129,9 +131,9 @@ D l1 r^ [!trumpet2_V64_vib8_4
 !DRiff1 o6c24<g24>c24 e8c8<g16>e16 f+8g8a8f+8
 D !DRiff1 :
 D o6g+4.. Q4o7e32e32 Q8o7e2 ~0
-D @Crash2 V120 o5c^
+D !Crash2_V120 o5c^
 D ]2 L
-!DRiff2 @Crash2 V120 ~0 o5c16
+!DRiff2 !Crash2_V120 ~0 o5c16
 D [!DRiff2
 D !trumpet2_V64_vib8_4
 D o6e32e32b16e16g+16:e16g+16b16
@@ -167,7 +169,7 @@ D l48 o4fdfa+fa+>d<a+>dfdfa+fa+fdfd<a+>d<a+fa+
 D l48 o4geg>c<g>cecegeg>c<g>c<gegecec<g>c
 D l48 o4af+a>d<a>df+df+af+a>d<a>d<af+af+df+d<a>d
 D [l48 o4bg+b>e<b>eg+eg+bg+b>e<b>e<bg+bg+eg+e<b>e]2
-D @Crash2 V120 o5c1^1
+D !Crash2_V120 o5c1^1
 D !trumpet2_V64_vib8_4 !DRiff1
 
 E E0 @Strings8 V32
@@ -219,9 +221,9 @@ G !ARiff1
 G !ARiff3
 G [o4g16g32g32]4
 G !ARiff3
-G @Strings8 V80
-G [[GI7 o3g4& GD7 r4]2 GI7 o3f4& GD7 r4 GI7 o3g4& GD7 r4]2
-G GI7 [o3f4 @Strings8 V52 o3a4g4:d4]2 o3b4 V40
+G !Strings8_V80_GI7_E1
+G [[o3g4& GDT7 r4]2 o3f4& GT r4 o3g4& GT r4]2
+G [o3f4 @Strings8 V52 o3a4g4:d4]2 o3b4 V40
 G o4d+8d8c8c8d4<a+4
 G o4c4<g8>c8d4<a4
 G o4e1

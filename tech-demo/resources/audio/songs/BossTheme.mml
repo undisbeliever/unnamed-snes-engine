@@ -1,6 +1,6 @@
 ;Boss Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.11
+;Made for undisbeliever's Terrific Audio Driver v0.0.12
 
 #Title Boss Theme
 #Game unnamed-snes-game
@@ -56,7 +56,8 @@ A !ARiff1_3x_2_3 : !ARiff4 ]2 !ARiff6 ]2]2
 A @Snare02 [[V192 o4a48 V48 a48a48 V96 a48]9 V192 o4a48 V0 [V+16 o4a48]11 ]2
 
 B E0 @TimpaniB V156 [o2b16b8b32b32 : b16b8.]4 V0 [V+13 o2b48]12 L
-B @Crash2 V136 E0 o5c1^1
+!Crash2_V136_E0 @Crash2 V136 E0
+B !Crash2_V136_E0 o5c1^1
 !BRiff1 l48 o6f+<bf+<bf+<bf+b>f+b>f+b
 !BRiff2 l48 o6e<ae<ae<aea>ea>ea
 !BRiff3 l48 o6gc<gc<gc<g>cg>cg>c
@@ -65,10 +66,10 @@ B @Crash2 V136 E0 o5c1^1
 B @Flute1 E1
 B V0 [V+3 !BRiff1 ]2 [V+3 !BRiff2 ]2 [V+3 !BRiff1 ]2 [V+3 !BRiff3 ]2
 B [!BRiff1 !BRiff1 !BRiff2 !BRiff2 !BRiff1 !BRiff1 : !BRiff3 !BRiff3 ]4
-B !BRiff4 !BRiff4 E0
-B @Crash2 V136 [o5c4]8
+B !BRiff4 !BRiff4
+B !Crash2_V136_E0 [o5c4]8
 B A15,7,7,13 o3f+1. @TimpaniB V0 [V+6 o3f+48]24
-B @Crash2 V136 o5c4 @Flute1 E1 V6 !BRiff5 [V+3 !BRiff4 ]2 [V+3 !BRiff5 ]2 [V+3 !BRiff4 ]2
+B !Crash2_V136_E0 o5c4 @Flute1 E1 V6 !BRiff5 [V+3 !BRiff4 ]2 [V+3 !BRiff5 ]2 [V+3 !BRiff4 ]2
 B [!BRiff5 !BRiff5 !BRiff4 !BRiff4 ]3
 B !BRiff1 !BRiff1 [!BRiff4 !BRiff4 !BRiff5 !BRiff5 ]2
 B [l48 o7c<fc<fc<fcf>cf>cf]2
