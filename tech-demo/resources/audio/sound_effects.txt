@@ -241,15 +241,11 @@ A @1 V160 {o4c+ o2c+}%96
 
     set_instrument_and_adsr sine        10 2 4 28
 
+    start_loop 2
     play_note e4 no_keyoff 6
     play_note g+4 no_keyoff 6
     play_note c5 keyoff 6
-
-    play_note e4 no_keyoff 6
-    play_note g+4 no_keyoff 6
-    play_note c5 keyoff 6
-
-
+    end_loop
 === spawn_enemy_with_smoke ===
    set_volume 64
 
