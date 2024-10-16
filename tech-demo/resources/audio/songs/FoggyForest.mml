@@ -1,6 +1,6 @@
 ;Foggy Forest Theme
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.11
+;Made for undisbeliever's Terrific Audio Driver v0.0.12
 
 #Title Foggy Forest Theme
 #Game unnamed-snes-game
@@ -16,17 +16,17 @@
 #EchoVolume 12
 #FirFilter 64 32 16 8 4 2 1 0
 
-@GuitarB2 GuitarB2
+@GuitarB2 GuitarB2 adsr 15 7 7 16
 @Flute1 Flute1
-@sine sine gain 127
+@sine sine adsr 8 7 7 0
 @trumpet_2 trumpet_2
 @Strings8 Strings8
-@PIANO_C5 PIANO_C5
+@PIANO_C5 PIANO_C5 adsr 15 7 7 17
 
 #ZenLen 192
 
 A T144
-A @GuitarB2 A15,7,7,16 V96 E0 L
+A @GuitarB2 V96 E0 L
 !ARiff1 l4 o1gfd+[fg]2
 !ARiff2 l4 o2c<a+g+g
 A [!ARiff1 : o1a4]5 o1a8a+8
@@ -34,8 +34,8 @@ A !ARiff2 l4 o2c<a+>cd
 A [!ARiff2 ]2
 A !ARiff1 o1a4
 
-B @GuitarB2 A15,7,7,16 V48 E0 p56 r16 L
-C @GuitarB2 A15,7,7,16 V48 E0 p72 L
+B @GuitarB2 V48 E0 p56 r16 L
+C @GuitarB2 V48 E0 p72 L
 !BCRiff1BSide l8 o4d <d f>c <a+
 !BCRiff1CSide l8 o3a+>c<a^   g
 B [   !BCRiff1BSide l8 o3d+ff
@@ -77,12 +77,14 @@ C !BCRiff2CSide
 
 D l1 r^
 D V40 E1
-!DRiff1a @Flute1 {o3fg}16,32& w2 GE14 r4..
+;NOTE: Manual portamento was converted from pre-compiled data using 32nd note length
+;portamento duration in order to handle these without setting an instrument first.
+!DRiff1a {o3fg}16,32,14& w2 GET14 r4..
+!DRiff1 @Flute1 !DRiff1a
+!DRiff1 {o4fg}16,32& w2 GT r4..
+!DRiff1 {o4cd}16,32& w2 GT r4..
 !DRiff1 !DRiff1a
-!DRiff1 @Flute1 {o4fg}16,32& w2 GE14 r4..
-!DRiff1 @Flute1 {o4cd}16,32& w2 GE14 r4..
-!DRiff1 !DRiff1a
-!DRiff2 @sine A8,7,7,0
+!DRiff2 @sine
 !DRiff2a l8 o5g.& {o5gf}32,,255& {o5fg}32,,255
 !DRiff2a o6dfe
 !DRiff2 !DRiff2a
@@ -98,9 +100,9 @@ D V40 E1
 !DRiff2 l8 o6d+.& {o6d+c}.,,96 o5a+16>c16 dc<b>d
 !DRiff2 l8 o6c4 {o6cg}8,,255 o6d+16g16 fd+df
 !DRiff2 l8 o6d+d16d+16dc<bagd
-!DRiff2 o5g1& GD1 r1
-!DRiff3 @Flute1 {o3fg}16,32& w1 GE13 r2...
-!DRiff4 @Flute1 {o2fg}16,32& w1 GE13 r2...
+!DRiff2 o5g1& GDT1 r1
+!DRiff3 @Flute1 {o3fg}16,32& w1 GET13 r2...
+!DRiff4 {o2fg}16,32,7& w1 GET13 r2...
 !DRiff5 @Flute1 [
 !DRiff5 l8 Q2o5g>ddd
 !DRiff5 l32 Q4c16<a+16a16ga Q8[a64a+64]4afcf :
@@ -150,7 +152,7 @@ E !DRiff1
 E !DRiff2
 E l1 r^^^^^ V16
 E !DRiff5 r48 L
-E @PIANO_C5 A15,7,7,17 V24
+E @PIANO_C5 V24
 E l16 Q4o5g32g32Q8gd32g32
 E l16 o5ff32g32fc
 E l16 Q4ro5d+32d+32Q8d+<a+32>d+32
@@ -166,26 +168,27 @@ E V24 [!ERiff1 V-6]4
 E V24 [!ERiff2 V-6]4
 E V24 [!ERiff1 V-6]4
 E V24 [!ERiff3 o4a48g48 V-6]4
-E @Strings8 V4 ~4,8 l1
-!ERiff4a l1 GI1 o7d& GD1 r
-!ERiff4a l1 GI1 o6g& GD1 r
+!Strings8_V4_GI1_Vib_4_8 @Strings8 V4 ~4,8 GI1
+E !Strings8_V4_GI1_Vib_4_8 l1
+!ERiff4a l1 GI1 o7d& GDT1 r
+!ERiff4a l1 o6g& GT r
 !ERiff4 !ERiff4a
-!ERiff4 l1 GI1 o7c& GD1 r
-!ERiff4 l1 GI1 o6g& GD1 r
+!ERiff4 l1 o7c& GT r
+!ERiff4 l1 o6g& GT r
 !ERiff4 [!ERiff4a ]3
-!ERiff4 l1 GI1 o7c& GD1 r
-!ERiff4 l1 GI1 o6g& GD1 r
+!ERiff4 l1 o7c& GT r
+!ERiff4 l1 o6g& GT r
 E !ERiff4
-E GI1 o6g& GD1 r^16 ~0
+E o6g& GT r^16 ~0
 
 F l1 r^^^^^^^^^^^^^^ E1 V96 ~1,8
-!FRiff1 @trumpet_2 l1 o3g& A15,7,7,10
+!FRiff1 @trumpet_2 l1 o3g& GET10
 F [!FRiff1 l1 r^^^]2
 F r^^^^^
-F @Strings8 V4 ~4,8
-F [GI1 o7d& GD1 r^]2 r
+F !Strings8_V4_GI1_Vib_4_8
+F [o7d& GDT1 r^]2 r
 F !ERiff4 ~0
-F @PIANO_C5 A15,7,7,17 L V24 [
+F @PIANO_C5 L V24 [
 F l16 Q4ro4a+32a+32Q8a+a32a+32
 F l16 o5c<a+32a32ga
 F l16 Q4ro4g32g32Q8gf32g32
@@ -209,7 +212,7 @@ F !FRiff2
 F r1 V96 ~1,8
 F !FRiff1 l1 r^^^
 F !FRiff1 l1 r^^8
-F @PIANO_C5 A15,7,7,17 V12 ~0
+F @PIANO_C5 V12 ~0
 F !FRiff2
 
 
