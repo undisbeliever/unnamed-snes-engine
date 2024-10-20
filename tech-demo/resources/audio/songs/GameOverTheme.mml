@@ -35,7 +35,8 @@ A !ARiff2 T168o5f+8T172d8T176
 A o5b4&T180b4&T184b4&T188b4T192
 A @Strings8WF V8 p64 ~6,2
 A o6b4& T200 b4& T208 GET13 b4& T216 b16& T232 b16& T240 b16& T255 b16
-A T192 o7e2& GET9 e2^1 ~0
+!ARiff3 GET9 r2^1
+A T192 o7e2& !ARiff3 ~0
 !PIANO_C5_V12_E1 @PIANO_C5 V12 E1
 A !PIANO_C5_V12_E1 p72 L
 A !ARiff1 o4a8f+8
@@ -67,7 +68,7 @@ C [o3b4a4]12
 !Strings8_V24_E0 @Strings8 V24 E0
 D !Strings8_V24_E0 p48
 D [o4e4d4]4 o4c2<[b2]3
-D V64 p64 o2e2& GET9 e2^1
+D V64 p64 o2e2& !ARiff3
 D l1 r^^^^^64
 D !PIANO_C5_V12_E1 p80 L
 !DRiff1 o6e8g8f+16d16<a16>d16 e8g8f+8d8
@@ -84,14 +85,14 @@ D !DRiff2
 
 E !Strings8_V24_E0 
 E [o3b4a4]4 o3g2g2f+2f+2
-E V128 p64 o1e2& GET9 e2^1
+E V128 p64 o1e2& !ARiff3
 
 F !Strings8_V24_E0 p80
 F [o3g4f+4]4 [o3e2]3d+2
-F @trumpet_2 V128 p64 o3e2& GET9 e2^1
+F @trumpet_2 V128 p64 o3e2& !ARiff3
 
 G !Strings8_V24_E0 
 G [o3e4d4]4 o3c2<[b2]3
-G V192 o0e2& GET9 e2^1
+G V192 o0e2& !ARiff3
 
 H E0 @Strings8 V48 l1 r^^^2 o1b2
