@@ -79,12 +79,12 @@ D l1 r^
 D V40 E1
 ;NOTE: Manual portamento was converted from pre-compiled data using 32nd note length
 ;portamento duration in order to handle these without setting an instrument first.
-!DRiff1a {o3fg}16,32,14& w2 GET14 r4..
-!DRiff1 @Flute1 !DRiff1a
-!DRiff1 {o4fg}16,32& w2 GT r4..
-!DRiff1 {o4cd}16,32& w2 GT r4..
+!DRiff1a {o3fg}16,32,14& r2...
+!DRiff1 q84,E14 @Flute1 !DRiff1a
+!DRiff1 {o4fg}16,32& r2...
+!DRiff1 {o4cd}16,32& r2...
 !DRiff1 !DRiff1a
-!DRiff2 @sine
+!DRiff2 q0 @sine
 !DRiff2a l8 o5g.& {o5gf}32,,255& {o5fg}32,,255
 !DRiff2a o6dfe
 !DRiff2 !DRiff2a
@@ -102,7 +102,7 @@ D V40 E1
 !DRiff2 l8 o6d+d16d+16dc<bagd
 !DRiff2 o5g1& GDT1 r1
 !DRiff3 @Flute1 {o3fg}16,32& w1 GET13 r2...
-!DRiff4 {o2fg}16,32,7& w1 GET13 r2...
+!DRiff4 {o2fg}16,32,7& w1 GT r2...
 !DRiff5 @Flute1 [
 !DRiff5 l8 Q2o5g>ddd
 !DRiff5 l32 Q4c16<a+16a16ga Q8[a64a+64]4afcf :
@@ -170,7 +170,7 @@ E V24 [!ERiff1 V-6]4
 E V24 [!ERiff3 o4a48g48 V-6]4
 !Strings8_V4_GI1_Vib_4_8 @Strings8 V4 ~4,8 GI1
 E !Strings8_V4_GI1_Vib_4_8 l1
-!ERiff4a l1 GI1 o7d& GDT1 r
+!ERiff4a l1 o7d& GDT1 r
 !ERiff4a l1 o6g& GT r
 !ERiff4 !ERiff4a
 !ERiff4 l1 o7c& GT r
