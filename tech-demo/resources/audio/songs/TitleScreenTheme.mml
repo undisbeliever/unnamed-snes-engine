@@ -51,9 +51,9 @@ A [[!ARiff5 !ARiff7 ]3 !ARiff5 !ARiff6 ]10
 A [!ARiff5 !ARiff7 : !ARiff5 !ARiff6 ]4
 A @Kick3 V140 o5c32 !Drum_HatClosed_32 @Kick3 V140 o5c32c32
 A !Drum_Snare_32 !Drum_HatClosed_32 @Snare02 V112 [o5c64]4
-!Strings8_V80_GI7_E1 E1 @Strings8 V80 GI7
-A !Strings8_V80_GI7_E1 p56
-A [o4e4& GDT7 r4 o4d4& GT r4 o4c4& GT r4 o4d4& GT r4]2
+!Strings8_V80_GI7_E1_q48_D7 E1 @Strings8 V80 GI7 q48,D7
+A !Strings8_V80_GI7_E1_q48_D7 p56
+A [o4e2d2c2d2]2 q0
 A [o4c4 @Strings8 V52 o4e4d4:<b4]2 o4g4
 A p64 o4g+8g8f8d+8f4d4
 A o4e4c8e8f+4d4
@@ -94,8 +94,8 @@ B [o4d>d]2
 B !BRiff6
 B ]2
 B !BRiff6 !BRiff6
-B !Strings8_V80_GI7_E1 p72
-B [o4c4& GDT7 r4 o3b4& GT r4 o3a4& GT r4 o3b4& GT r4]2
+B !Strings8_V80_GI7_E1_q48_D7 p72
+B [o4c2<b2a2b2]2 q0
 B [o3a4 @Strings8 V52 o4c4<b4:g4]2 o4d4
 !trumpet2_V64_vib8_4 @trumpet_2 V64 ~8,4
 B !trumpet2_V64_vib8_4 p64
@@ -221,8 +221,8 @@ G !ARiff1
 G !ARiff3
 G [o4g16g32g32]4
 G !ARiff3
-G !Strings8_V80_GI7_E1
-G [[o3g4& GDT7 r4]2 o3f4& GT r4 o3g4& GT r4]2
+G !Strings8_V80_GI7_E1_q48_D7
+G [o3g2g2f2g2]2 q0
 G [o3f4 @Strings8 V52 o3a4g4:d4]2 o3b4 V40
 G o4d+8d8c8c8d4<a+4
 G o4c4<g8>c8d4<a4
