@@ -1,6 +1,6 @@
 ;Game Over Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.12
+;Made for undisbeliever's Terrific Audio Driver v0.0.13
 
 #Title Game Over Theme
 #Game unnamed-snes-game
@@ -71,17 +71,16 @@ D [o4e4d4]4 o4c2<[b2]3
 D V64 p64 o2e2& !ARiff3
 D l1 r^^^^^64
 D !PIANO_C5_V12_E1 p80 L
-!DRiff1 o6e8g8f+16d16<a16>d16 e8g8f+8d8
-!DRiff2 l32 o6bge<bge<bg o6af+d<af+d<af+
-!DRiff2 l32 o6ge<bge<bge o6f+d<af+d<af+d
-D !DRiff2
-D !DRiff1
+D [
+D l32 o6bge<bge<bg o6af+d<af+d<af+
+D l32 o6ge<bge<bge o6f+d<af+d<af+d:
+D [o6e8g8f+16d16<a16>d16 e8g8f+8d8:
 D o5b8>d8c+16<a16f+16a16 o5g8e8f+8d16f+16
 D [o5g8b8a16g16f+16a16 g8b8 : o5a8f+8
 D o5g8e16g16f+16e16d16f+16 o5g8e16g16f+8d8]2
 D o5a8>d8
-D !DRiff1
-D !DRiff2
+D ]2
+D ]2
 
 E !Strings8_V24_E0 
 E [o3b4a4]4 o3g2g2f+2f+2
