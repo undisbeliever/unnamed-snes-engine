@@ -1,6 +1,6 @@
 ;Title Screen Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.12
+;Made for undisbeliever's Terrific Audio Driver v0.0.13
 
 #Title Title Screen Theme
 #Game unnamed-snes-game
@@ -39,16 +39,15 @@ A T144
 !StringsDetache8_V160_E1 @Strings8Detache V160 E1
 A !StringsDetache8_V160_E1 p48
 A !ARiff1_2_1_3
-!ARiff4 @TimpaniB V128 [o3e12e12e24e24]3 [o3e24]6
-A L E0 p64 !ARiff4
+A L E0 p64 @TimpaniB V128 [o3e12e12e24e24]3 [o3e24]6
 !Drum_HatClosed_32 @HatClosed V56 o5c32
 !Drum_Snare_32 @Snare02 V112 o5c32
-!ARiff5 @Kick3 V140 o5c16 !Drum_HatClosed_32 o5c32
-!ARiff6 !Drum_Snare_32 !Drum_HatClosed_32 !Drum_Snare_32 o5c32
-!ARiff7 @Snare02 V112 o5c16 !Drum_HatClosed_32 o5c32
-A [!ARiff5 ]15 !ARiff6
-A [[!ARiff5 !ARiff7 ]3 !ARiff5 !ARiff6 ]10
-A [!ARiff5 !ARiff7 : !ARiff5 !ARiff6 ]4
+!ARiff4 @Kick3 V140 o5c16 !Drum_HatClosed_32 o5c32
+!ARiff5 !Drum_Snare_32 !Drum_HatClosed_32 !Drum_Snare_32 o5c32
+!ARiff6 @Snare02 V112 o5c16 !Drum_HatClosed_32 o5c32
+A [!ARiff4 ]15 !ARiff5
+A [[!ARiff4 !ARiff6 ]3 !ARiff4 !ARiff5 ]10
+A [!ARiff4 !ARiff6 : !ARiff4 !ARiff5 ]4
 A @Kick3 V140 o5c32 !Drum_HatClosed_32 @Kick3 V140 o5c32c32
 A !Drum_Snare_32 !Drum_HatClosed_32 @Snare02 V112 [o5c64]4
 !Strings8_V80_GI7_E1_q48_D7 E1 @Strings8 V80 GI7 q48,D7
@@ -73,10 +72,10 @@ A o4e4c8e8f+4d4
 B !StringsDetache8_V160_E1 p80
 B !BRiff1S_3S
 !Crash2_V120 @Crash2 V120
-!BRiff5 !Crash2_V120 o5c2 r4 GI10 V160 o4c4
-B p64 !BRiff5
-!BRiff6 l8 [o4c>c]2
-!BRiff6 l8 [o4d>d]2
+!BRiff4 !Crash2_V120 o5c2 r4 GI10 V160 o4c4
+B p64 !BRiff4
+!BRiff5 l8 [o4c>c]2
+!BRiff5 l8 [o4d>d]2
 B L @PianoC2_16 V50 l8
 B [
 B [o3a>a]2
@@ -86,14 +85,14 @@ B ]2
 B [
 B [o4c>c]2
 B [o3b>b]2
-B !BRiff6
+B !BRiff5
 B ]2
 B [
 B [o4e>e]2
 B [o4d>d]2
-B !BRiff6
+B !BRiff5
 B ]2
-B !BRiff6 !BRiff6
+B !BRiff5 !BRiff5
 B !Strings8_V80_GI7_E1_q48_D7 p72
 B [o4c2<b2a2b2]2 q0
 B [o3a4 @Strings8 V52 o4c4<b4:g4]2 o4d4
@@ -104,22 +103,22 @@ B o6f8d8c8<a+8 >c4g4f+4d8a8
 B o6b4..Q4>e32e32 Q8e2 ~0
 
 C E1 @Flute1 V12
-!CRiff1 r4 [r32 o5a64&b64&>c48&d48&e48]2
-!CRiff2 r16 o6d32c32<b32r32 b32a32 [o5b64&>c64&]6 o5b32g32
-!CRiff3 r16 o6f+32d32<a32r32 a32>d32 [o6f+64&g64&]6 o6f+32d32
-!CRiff1_2_1_3_x4 [!CRiff1 !CRiff2 !CRiff1 !CRiff3 ]4
+!CRiff1 [[r4 [r32 o5a64&b64&>c48&d48&e48]2:
+!CRiff1  r16 o6d32c32<b32r32 b32a32 [o5b64&>c64&]6 o5b32g32
+!CRiff1  ]2
+!CRiff1  r16 o6f+32d32<a32r32 a32>d32 [o6f+64&g64&]6 o6f+32d32 ]4
 C [
-C !CRiff1_2_1_3_x4 :
+C !CRiff1 :
 C l48 [o6e<be <b>eb >eb>e be<b]4
 C ]2 L
-!CRiff4 [l48 o6be<b e<be <b>eb >eb>e]2
-!CRiff5 [l48 o6ad<a d<ad <a>da >da>d]2
-!CRiff6 [l48 o6gc<g c<gc <g>cg >cg>c]2
-C [!CRiff4 !CRiff5 !CRiff6 !CRiff5 ]2
-C !CRiff6 !CRiff5 !CRiff4 !CRiff5
+!CRiff2 [l48 o6be<b e<be <b>eb >eb>e]2
+!CRiff3 [l48 o6ad<a d<ad <a>da >da>d]2
+!CRiff4 [l48 o6gc<g c<gc <g>cg >cg>c]2
+C [!CRiff2 !CRiff3 !CRiff4 !CRiff3 ]2
+C !CRiff4 !CRiff3 !CRiff2 !CRiff3
 C @HatClosed [V32 o6c32 V4 o6c32 V8 o6c32 V16 o6c32]64
-C !BRiff5
-C @Flute1 V12 !CRiff1_2_1_3_x4
+C !BRiff4
+C @Flute1 V12 !CRiff1
 
 D E1
 D l1 r^ [!trumpet2_V64_vib8_4
