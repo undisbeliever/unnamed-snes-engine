@@ -1,6 +1,6 @@
 ;Foggy Forest Theme
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.12
+;Made for undisbeliever's Terrific Audio Driver v0.0.13
 
 #Title Foggy Forest Theme
 #Game unnamed-snes-game
@@ -36,62 +36,53 @@ A !ARiff1 o1a4
 
 B @GuitarB2 V48 E0 p56 r16 L
 C @GuitarB2 V48 E0 p72 L
-!BCRiff1BSide l8 o4d <d f>c <a+
-!BCRiff1CSide l8 o3a+>c<a^   g
-B [   !BCRiff1BSide l8 o3d+ff
-C [r8 !BCRiff1CSide l8   o3ac^
-B !BCRiff1BSide : l8 o3a+f>c]3
-C !BCRiff1CSide : l8   o3aa&]3
+BC [
+B     [l8 o4d <d f>c <a+: o3d+ff
+C  r8 [l8 o3a+>c<a^   g :   o3ac^
+BC ]2 :
+B l8 o3a+f>c
+C l8   o3aa&
+BC ]3
 B o3a+a>f
 C   o4c<f&
 B   o4g<g>cc <a+d+ca
 C r o4d f<a ^ g f<a&
-!BCRiff2aBSide l8   o3a+dff g
-!BCRiff2aCSide l8 r o3g ac^
-!BCRiff2BSide !BCRiff2aBSide l8 o3gff
-!BCRiff2CSide !BCRiff2aCSide l8 o3dac&
-!BCRiff3BSide !BCRiff2aBSide l8 o2a+>c c
-!BCRiff3CSide !BCRiff2aCSide l8 o3d+ f<a&
-B !BCRiff2BSide
-C !BCRiff2CSide
-B !BCRiff3BSide
-C !BCRiff3CSide
-B !BCRiff2aBSide o3gf>d
-C !BCRiff2aCSide o3da>c&
-!BCRiff4aBSide l8   o4d+<ga+>d c
-!BCRiff4aCSide l8 r o4c  d<f ^ g+
-!BCRiff4BSide l8 !BCRiff4aBSide o3d+gb
-!BCRiff4CSide l8 !BCRiff4aCSide o3b d&
-B !BCRiff4BSide
-C !BCRiff4CSide
-B !BCRiff4aBSide o4c<b>d
-C !BCRiff4aCSide o4d<g&
+!BCRiff1BSide l8   o3a+dff g
+!BCRiff1CSide l8 r o3g ac^
+BC [
+B !BCRiff1BSide l8 o3gff  :
+C !BCRiff1CSide l8 o3dac& :
+BC [
+B !BCRiff1BSide l8 o2a+>c c :
+C !BCRiff1CSide l8 o3d+ f<a& :
+B !BCRiff1BSide o3gf>d
+C !BCRiff1CSide o3da>c&
+!BCRiff2BSide l8   o4d+<ga+>d c
+!BCRiff2CSide l8 r o4c  d<f ^ g+
+BC [
+B l8 !BCRiff2BSide o3d+gb :
+C l8 !BCRiff2CSide o3b d& :
+B !BCRiff2BSide o4c<b>d
+C !BCRiff2CSide o4d<g&
 B   o4c<d+ff g+cd>d
 C r o3g a+d^ d+gg&
-B !BCRiff4BSide
-C !BCRiff4CSide
-B !BCRiff3BSide
-C !BCRiff3CSide
-B !BCRiff2BSide
-C !BCRiff2CSide
+BC ]2
+BC ]2
+BC ]2
 
 D l1 r^
 D V40 E1
-;NOTE: Manual portamento was converted from pre-compiled data using 32nd note length
-;portamento duration in order to handle these without setting an instrument first.
-!DRiff1a {o3fg}16,32,14& r2...
-!DRiff1 q84,E14 @Flute1 !DRiff1a
+!DRiff1 q84,E14 @Flute1 [
+!DRiff1 {o3fg}16,32& r2... :
 !DRiff1 {o4fg}16,32& r2...
 !DRiff1 {o4cd}16,32& r2...
-!DRiff1 !DRiff1a
+!DRiff1 ]2
 !DRiff2 q0 @sine
-!DRiff2a l8 o5g.& {o5gf}32,,255& {o5fg}32,,255
-!DRiff2a o6dfe
-!DRiff2 !DRiff2a
-!DRiff2 l8 o6c<a+a
+!DRiff2 [l8 o5g.& {o5gf}32,,255& {o5fg}32,,255
+!DRiff2 o6dfe:c<a+a
 !DRiff2 o5a+& {o5a+a}32,,255& {o5aa+}32,,255& {o5a+a}32,,255& {o5af}32,,255&
 !DRiff2 {o5fc},,255 o4a16>c16 d<a+16>d16 cd
-!DRiff2 !DRiff2a
+!DRiff2 ]2
 !DRiff2 l8 o6a+af16c16
 !DRiff2 o6d.& {o6dc}32,,255& {o6cd}32,,255&
 !DRiff2 {o6dg}8,,255 o6f16 {o6fg}16,,255&
@@ -102,6 +93,8 @@ D V40 E1
 !DRiff2 l8 o6d+d16d+16dc<bagd
 !DRiff2 o5g1& GDT1 r1
 !DRiff3 @Flute1 {o3fg}16,32& w1 GET13 r2...
+;NOTE: Manual portamento was converted from pre-compiled data using 32nd note length
+;portamento duration in order to handle these without setting an instrument first.
 !DRiff4 {o2fg}16,32,7& w1 GT r2...
 !DRiff5 @Flute1 [
 !DRiff5 l8 Q2o5g>ddd
@@ -164,20 +157,19 @@ E l16 [o5a64a+64]4 af
 !ERiff1 l48 o4cdfga>cdfgfdc
 !ERiff2 l48 o4ga>cdfga>cdc<ag
 !ERiff3 l48 o3ga>cdfga>cdc
-E V24 [!ERiff1 V-6]4
-E V24 [!ERiff2 V-6]4
-E V24 [!ERiff1 V-6]4
+E [
+E V24 [!ERiff1 V-6]4 :
+E V24 [!ERiff2 V-6]4]2
 E V24 [!ERiff3 o4a48g48 V-6]4
 !Strings8_V4_GI1_Vib_4_8 @Strings8 V4 ~4,8 GI1
 E !Strings8_V4_GI1_Vib_4_8 l1
 !ERiff4a l1 o7d& GDT1 r
 !ERiff4a l1 o6g& GT r
-!ERiff4 !ERiff4a
+!ERiff4 !ERiff4a [
 !ERiff4 l1 o7c& GT r
-!ERiff4 l1 o6g& GT r
+!ERiff4 l1 o6g& GT r :
 !ERiff4 [!ERiff4a ]3
-!ERiff4 l1 o7c& GT r
-!ERiff4 l1 o6g& GT r
+!ERiff4 ]2
 E !ERiff4
 E o6g& GT r^16 ~0
 
@@ -189,31 +181,31 @@ F !Strings8_V4_GI1_Vib_4_8
 F [o7d& GDT1 r^]2 r
 F !ERiff4 ~0
 F @PIANO_C5 L V24 [
+F [
 F l16 Q4ro4a+32a+32Q8a+a32a+32
-F l16 o5c<a+32a32ga
+F l16 o5c<a+32:a32ga
 F l16 Q4ro4g32g32Q8gf32g32
 F l16 [o4a64a+64]4 af
-F l16 Q4ro4a+32a+32Q8a+a32a+32
-F l16 o5c<a+32>c32df
+F ]2
+F l16 o5c32df
 F l16 Q4ro5g32g32Q8gd32g32
 F l16 [o5f64g64]4 fc ]2
-F r32
-F V12 [!ERiff1 V-3]4
-F V12 [!ERiff2 V-3]4
-F V12 [!ERiff1 V-3]4
+F r32 [
+F V12 [!ERiff1 V-3]4:
+F V12 [!ERiff2 V-3]4 ]2
 F V12 [!ERiff3 : o3a48g48 V-3]4 o3a96 V12
-!FRiff2 [l8 o6d.<g.a.:d4^16
-!FRiff2 r1^8]2
-!FRiff2 o5g4^16 [
-!FRiff2 r1^8
-!FRiff2 l8 o6d.<f.g.c4^16 ]2
 F r1^8
-F !FRiff2
+F [
+F [l8 o6d.<g.a.:d4^16
+F r1^8]2
+F o5g4^16 [
+F r1^8
+F l8 o6d.<f.g.c4^16 ]2:
 F r1 V96 ~1,8
 F !FRiff1 l1 r^^^
 F !FRiff1 l1 r^^8
 F @PIANO_C5 V12 ~0
-F !FRiff2
+F ]2
 
 
 G l1 r^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^24 E1 V16 @Flute1 L
