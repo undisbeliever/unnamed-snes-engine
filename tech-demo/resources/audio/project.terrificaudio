@@ -288,6 +288,10 @@
       "source": "songs/FoggyForest.mml"
     },
     {
+      "name": "JungleTheme",
+      "source": "songs/JungleTheme.mml"
+    },
+    {
       "name": "BossClearTheme",
       "source": "songs/BossClearTheme.mml"
     }
