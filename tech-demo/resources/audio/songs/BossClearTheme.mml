@@ -1,0 +1,184 @@
+;Boss Clear Theme for unnamed-snes-game
+;By KungFuFurby
+;Made for undisbeliever's Terrific Audio Driver v0.0.13
+
+#Title Boss Clear Theme
+#Game unnamed-snes-game
+#Author KungFuFurby
+#Composer KungFuFurby
+#Copyright 2024 undisbeliever
+#Date 2024
+#License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
+
+;Echo Parameters
+#EchoLength 48
+#EchoFeedback 120
+#EchoVolume 16
+
+;Instrument Definitions
+@Strings8 Strings8
+@trumpet_2 trumpet_2
+@TimpaniB TimpaniB
+@Crash2 Crash2
+@HatClosed HatClosed
+@Flute1 Flute1
+@PianoC2_16 PianoC2_16
+@Kick3 Kick3
+@Snare02 Snare02
+
+A \asm {
+	set_song_tick_clock 160
+	set_instrument Snare02
+	set_volume 192
+	start_loop 5
+	play_note c5 12 | play_note c5 6
+	end_loop
+	start_loop 24
+	play_note c5 3
+	end_loop
+	play_note c5 192
+}
+
+B \asm {
+	set_instrument_and_adsr TimpaniB 15 7 7 16
+	set_volume 156
+	start_loop 2
+	play_note b3 18 | play_note f+3 18
+	end_loop
+	play_note b3 18 | play_note b3 72
+	set_instrument Kick3
+	set_volume 255
+	play_note f4 192
+}
+
+C \asm {
+	set_instrument_and_adsr Crash2 15 7 7 16
+	set_volume 136
+	play_note c5 36 | play_note c5 36
+	play_note c5 18 | play_note c5 72 | play_note c5 192
+}
+
+!Strings8_V48_q254_4_D12 \asm {
+	set_instrument Strings8
+	set_volume 48
+	set_early_release 254 4 D12
+}
+
+D \asm {
+	call_subroutine Strings8_V48_q254_4_D12
+	play_note f+4 18
+	start_loop 3
+	play_note f+4 6
+	end_loop
+	play_note e4 18
+	start_loop 3
+	play_note e4 6
+	end_loop
+	play_note f+4 12
+	play_note d+4 6
+	disable_early_release
+	play_note f+4 no_keyoff 36
+	set_temp_gain_and_rest D8 36
+	set_adsr 15 7 7 19
+	play_note b3 192
+}
+
+!ERiff1 \asm {
+	play_note b4 3
+	play_note f+5 3
+	play_note b5 3
+	play_note f+6 3
+	play_note b6 3
+	play_note f+6 3
+	play_note b5 3
+	play_note f+5 3
+}
+
+E \asm {
+	set_early_release 8 4 E24
+	rest 9
+	set_instrument trumpet_2
+	set_volume 96
+	enable_echo
+	set_vibrato 24 2
+	start_loop 3
+	play_note b6 3
+	end_loop
+	play_note c+7 12
+	play_note d+7 6
+	play_note e7 12
+	play_note e7 6
+	play_note c+7 6
+	play_note e7 6
+	play_note a7 6
+	play_note b7 12
+	play_note f+7 6
+	disable_early_release
+	play_note b7 72
+	set_instrument Flute1
+	set_volume 48
+	start_loop 3
+	call_subroutine ERiff1
+	adjust_volume -12
+	end_loop
+	call_subroutine ERiff1
+	adjust_volume -6
+	call_subroutine ERiff1
+	set_gain F64
+	call_subroutine ERiff1
+	set_gain F32
+	call_subroutine ERiff1
+	set_gain F16
+	call_subroutine ERiff1
+}
+
+F \asm {
+	set_instrument_and_adsr PianoC2_16 15 7 7 15
+	set_volume 104
+	play_note b3 18
+	play_note b4 18
+	play_note a3 18
+	play_note a4 18
+	play_note b3 18
+	play_note b4 72
+	set_adsr 15 7 7 19
+	play_note b3 192
+}
+
+G \asm {
+	call_subroutine Strings8_V48_q254_4_D12
+	play_note d+4 18
+	start_loop 3
+	play_note d+4 6
+	end_loop
+	play_note c+4 18
+	start_loop 3
+	play_note c+4 6
+	end_loop
+	play_note d+4 12
+	play_note b3 6
+	disable_early_release
+	play_note d+4 no_keyoff 36
+	set_temp_gain_and_rest D8 36
+	set_adsr 15 7 7 19
+	play_note b2 192
+}
+
+H \asm {
+	call_subroutine Strings8_V48_q254_4_D12
+	play_note b3 18
+	start_loop 3
+	play_note b3 6
+	end_loop
+	play_note a3 18
+	start_loop 3
+	play_note a3 6
+	end_loop
+	play_note b3 12
+	play_note f+3 6
+	disable_early_release
+	play_note b3 no_keyoff 36
+	set_temp_gain_and_rest D8 36
+	set_adsr 15 7 7 19
+	play_note b1 192
+}
