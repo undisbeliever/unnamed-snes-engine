@@ -100,17 +100,17 @@ B [o3a4 @Strings8 V52 o4c4<b4:g4]2 o4d4
 B !trumpet2_V64_vib8_4 p64
 B r16o5g+32g+32 o6d+8c8d+16g16
 B o6f8d8c8<a+8 >c4g4f+4d8a8
-B o6b4..Q4>e32e32 Q8e2 ~0
+!BRiff6 Q4o7e32e32 Q8o7e2
+B o6b4.. !BRiff6 ~0
 
 C E1 @Flute1 V12
 !CRiff1 [[r4 [r32 o5a64&b64&>c48&d48&e48]2:
 !CRiff1  r16 o6d32c32<b32r32 b32a32 [o5b64&>c64&]6 o5b32g32
 !CRiff1  ]2
 !CRiff1  r16 o6f+32d32<a32r32 a32>d32 [o6f+64&g64&]6 o6f+32d32 ]4
-C [
-C !CRiff1 :
-C l48 [o6e<be <b>eb >eb>e be<b]4
-C ]2 L
+C !CRiff1
+C l48 [o6e<be <b>eb >eb>e be<b]4 L
+C !CRiff1
 !CRiff2 [l48 o6be<b e<be <b>eb >eb>e]2
 !CRiff3 [l48 o6ad<a d<ad <a>da >da>d]2
 !CRiff4 [l48 o6gc<g c<gc <g>cg >cg>c]2
@@ -118,20 +118,21 @@ C [!CRiff2 !CRiff3 !CRiff4 !CRiff3 ]2
 C !CRiff4 !CRiff3 !CRiff2 !CRiff3
 C @HatClosed [V32 o6c32 V4 o6c32 V8 o6c32 V16 o6c32]64
 C !BRiff4
-C @Flute1 V12 !CRiff1
+C @Flute1 V12
 
 D E1
-D l1 r^ [!trumpet2_V64_vib8_4
+D l1 r^
+!DRiff1 !trumpet2_V64_vib8_4
 !DRiff1 o5a4>e16d16e16<a16 b16>c16d24c24<a24b8g8
 !DRiff1 o5a4>e16<a16>c16e16 f+24e24d48e48 f+16g16a16d16e16f+16
 !DRiff1 [o6e8<g8>c8e8 : d24c24<b48>c48 d16c16<b16g16b16>d16]2
 !DRiff1 o6f+24e24f+48g48 a16.d16.f+16g16f+16
 !DRiff1 o6e24c24e24 g8>c8<b16a16 g8f+8e8d16<b16
 !DRiff1 o6c24<g24>c24 e8c8<g16>e16 f+8g8a8f+8
-D !DRiff1 :
-D o6g+4.. Q4o7e32e32 Q8o7e2 ~0
-D !Crash2_V120 o5c^
-D ]2 L
+D !DRiff1
+D o6g+4.. !BRiff6 ~0
+D !Crash2_V120 o5c^ L
+D !DRiff1
 !DRiff2 !Crash2_V120 ~0 o5c16
 D [!DRiff2
 D !trumpet2_V64_vib8_4
@@ -169,33 +170,28 @@ D l48 o4geg>c<g>cecegeg>c<g>c<gegecec<g>c
 D l48 o4af+a>d<a>df+df+af+a>d<a>d<af+af+df+d<a>d
 D [l48 o4bg+b>e<b>eg+eg+bg+b>e<b>e<bg+bg+eg+e<b>e]2
 D !Crash2_V120 o5c1^1
-D !trumpet2_V64_vib8_4 !DRiff1
 
 E E0 @Strings8 V32
 !ERiff1 l2 [o2agaa]2
 !ERiff1 l2 [o3c<b>cd]2
-E [
-E !ERiff1 :
-E l2 o3ee
-E ]2 L
+E !ERiff1
+E l2 o3ee L
+E !ERiff1
 E l2 o3edcdef+ga
 E l2 o3gf+ga
 E [l2 o3c<bab]2
 E l2 [o2ab]2>[cd]2e1
-E !ERiff1
 
 F E0 @Strings8 V32
 !FRiff1 l2 [o1agaa]2
 !FRiff1 l2 [o2c<b>cd]2
-F [
-F !FRiff1 :
-F l2 o2ee
-F ]2 L
+F !FRiff1
+F l2 o2ee L
+F !FRiff1
 F l2 o2edcdef+ga
 F l2 o2gf+ga
 F [l2 o2c<bab]2
 F l2 [o1ab]2>[cd]2e1
-F !FRiff1
 
 G !StringsDetache8_V160_E1
 G [
