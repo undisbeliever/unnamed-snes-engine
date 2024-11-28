@@ -70,8 +70,8 @@ B ~16,2 o4d2. GFT127 {f+ c+}4,8& c+2& GET14 c+2
 !GET9_R1_1 l1 GET9 r^
 B E0 !Strings8_V64_NoVib p80 l1 o1b^& !GET9_R1_1 p64
 B l1 r^^^
-!BRiff5 [[l16 ro3e>b<b o2b>b>d<d o4c+<c+a<a : o3gf+df+]2 l16 o4dc+<a>e]8
-B @PIANO_C5 V24 E1
+!BRiff5 @PIANO_C5 [[l16 ro3e>b<b o2b>b>d<d o4c+<c+a<a : o3gf+df+]2 l16 o4dc+<a>e]8
+B V24 E1
 B !BRiff5
 B !Strings8_V24_E0 p80 o4c1d1e1d1c1d1d1d+2e4<b4
 
@@ -154,6 +154,6 @@ G !Strings8_V24_E0 o3e1f+1a1a1e1f+1f+1f+2g+4g+4
 H l1 r^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ L E0
 H @Strings8 V80 l1 o0e^& !GET9_R1_1
 H l1 r^^^^16.
-H @PIANO_C5 V9 E1
+H V9 E1
 H !BRiff5
 H l1 r^^^^^^^^^^^^^^^^^^^^^^^^^^^^^2..^32
