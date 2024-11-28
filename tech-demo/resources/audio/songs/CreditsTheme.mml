@@ -35,8 +35,8 @@ C !Strings8Detache_V160_E1 p96 L
 C [l16 [o4g]7g32g32 !CRiff1 ]2
 C [l16 [o3g]7g32g32 !CRiff1 ]2
 
-D E1 @PIANO_C5 V20
-!DRiff1 l48 o4c<g>c gcg >c<g>c gcg >c<g>c <gcg c<g>c <gcg
+D E1 V20
+!DRiff1 @PIANO_C5 l48 o4c<g>c gcg >c<g>c gcg >c<g>c <gcg c<g>c <gcg
 D L !DRiff1
 
 E E0 @Strings8 V40
@@ -45,8 +45,8 @@ E L l1 o3c&
 F E0 @Strings8 V40
 F L l1 o2c&
 
-G E1 @PIANO_C5 V10 r32.
+G E1 V10 r32.
 G L !DRiff1
 
-H E1 @PIANO_C5 V5 r16.
+H E1 V5 r16.
 H L !DRiff1
