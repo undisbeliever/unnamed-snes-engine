@@ -1,6 +1,6 @@
 ;Jungle Theme
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.13
+;Made for undisbeliever's Terrific Audio Driver v0.0.14
 
 #Title Jungle Theme
 #Game unnamed-snes-game
@@ -143,10 +143,11 @@ C [!CRiff3 ]2
 D E0
 D @noise 
 D l1 r^^^^^ L
-!DRiff1a GI12 o6b192& GD12 b192&
+!DRiff1aa GI12 o6b192& GD12 b192&
+!DRiff1a V0 Vs+64,32 [!DRiff1aa ]24 Vs-64,32 [!DRiff1aa ]16 r12
 !DRiff1 [
-!DRiff1 p16 V0 [V+4 !DRiff1a p+2]16 [!DRiff1a p+2]8 [V-4 !DRiff1a p+2]16 r12
-!DRiff1 p96 V0 [V+4 !DRiff1a p-2]16 [!DRiff1a p-2]8 [V-4 !DRiff1a p-2]16 r12
+!DRiff1 p16 ps+80,80 !DRiff1a
+!DRiff1 ps-80,80 !DRiff1a
 !DRiff1 ]2 p64 A12,7,4,24
 !DRiff1 r24.
 !DRiff2aa l24 V8 b V4 b48 V16
@@ -198,6 +199,7 @@ E _-2
 E [!ERiff2 ]3
 E [o2f+16]12 [o2f+24]6
 
+F p64 p~15,127
 F l1 r^^^^^^^^^^^^^2...
 !FRiff1 o2g+48&>d+48&<g+48& w2 GDT3 {g+g}1,,1& r4..
 F @Flute1 V64 E1 ~1,6 !FRiff1 !FRiff1 r16
