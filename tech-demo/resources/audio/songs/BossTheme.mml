@@ -1,6 +1,6 @@
 ;Boss Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.12
+;Made for undisbeliever's Terrific Audio Driver v0.0.14
 
 #Title Boss Theme
 #Game unnamed-snes-game
@@ -38,7 +38,6 @@ A T132 E0
 !ARiff2 !Drum_Kick3_32 !ARiff1aa
 !ARiff3 !Drum_Snare02_32 !Drum_HatClosed_32 
 !ARiff1_2_3 !ARiff1a !ARiff1b !ARiff2 !ARiff3
-!ARiff1_3x_2_3 [!ARiff1a !ARiff1b ]3 !ARiff2 !ARiff3
 !ARiff4 !Drum_Kick3_32 !Drum_Snare02_32 @Kick3 V255 o4f96f48
 !ARiff5 !Drum_Kick3_32 o4f32 !Drum_Snare02_32
 !ARiff6 !Drum_Kick3_32 !Drum_Snare02_32 o4a32
@@ -51,8 +50,8 @@ A !ARiff1_2_3 : !ARiff2 ]2 !ARiff6 ]3 [
 A [[!ARiff2 !ARiff2 !Drum_Snare02_32 !Drum_Kick3_32
 A !ARiff2 !ARiff2 : !Drum_Kick3_32 !Drum_Snare02_32 ]2
 A @Snare02 V192 [o4a48]3]4 :
-A [[!ARiff1_3x_2_3 !ARiff5
-A !ARiff1_3x_2_3 : !ARiff4 ]2 !ARiff6 ]2]2
+A [[[[!ARiff1a !ARiff1b ]3 !ARiff2 !ARiff3 : !ARiff5
+A ]2 : !ARiff4 ]2 !ARiff6 ]2]2
 A @Snare02 [[V192 o4a48 V48 a48a48 V96 a48]9 V192 o4a48 V0 [V+16 o4a48]11 ]2
 
 B E0 @TimpaniB V156 [o2b16b8b32b32 : b16b8.]4 V0 [V+13 o2b48]12 L

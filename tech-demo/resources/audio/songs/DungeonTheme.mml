@@ -1,6 +1,6 @@
 ;Dungeon Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.12
+;Made for undisbeliever's Terrific Audio Driver v0.0.14
 
 #Title Dungeon Theme
 #Game unnamed-snes-game
@@ -64,13 +64,14 @@ B !Flute1_E1_V48_Vib6_2 l8 o5d^c+dc+^<a^ g<b>g^^f+de
 B l8 o5ef+gf+edc<b16g16 ae16c16<e16a16>e f+g+f+16d16c+16d16
 ;NOTE: Manual portamento was converted from pre-compiled data using 8th note length
 ;portamento duration in order to handle these without setting an instrument first.
-!BRiff4 A4,7,7,0 o4g2. GFT127 {b f+}4,8,21& f+2& GET14
+!BRiff4 GI9 o4g2. GFT127 {b f+}4,8,21& f+2& GET14
 B w16 ~0 !BRiff4 f+4..
 B ~16,2 o4d2. GFT127 {f+ c+}4,8& c+2& GET14 c+2
-B E0 !Strings8_V64_NoVib p80 l1 o1b^& GET9 b^ p64
+!GET9_R1_1 l1 GET9 r^
+B E0 !Strings8_V64_NoVib p80 l1 o1b^& !GET9_R1_1 p64
 B l1 r^^^
-!BRiff5 [[l16 ro3e>b<b o2b>b>d<d o4c+<c+a<a : o3gf+df+]2 l16 o4dc+<a>e]8
-B @PIANO_C5 V24 E1
+!BRiff5 @PIANO_C5 [[l16 ro3e>b<b o2b>b>d<d o4c+<c+a<a : o3gf+df+]2 l16 o4dc+<a>e]8
+B V24 E1
 B !BRiff5
 B !Strings8_V24_E0 p80 o4c1d1e1d1c1d1d1d+2e4<b4
 
@@ -88,7 +89,7 @@ C o5e16
 C o4a8 l64 ^b>cde f+ga l16b^a^ gagf+gf+ed
 C l16 o5c<bae <a>ega b>c+dc+<bf+ef+
 C ~16,2 [!BRiff4 f+2]2
-C E0 !Strings8_V64_NoVib p48 l1 o2e^& GET9 e^ p64
+C E0 !Strings8_V64_NoVib p48 l1 o2e^& !GET9_R1_1 p64
 C l1 r^^^^^
 C @PianoC2_16 V64 [o3e1]14
 C !Strings8_V24_E0 o3a1a1>c1<b1a1a1b1b2b4r4
@@ -107,7 +108,7 @@ E [o1e4]6e2
 E L !Strings8_V64_NoVib
 E l1 o1e^^^^^^^^^^^^^
 E l1 o1a.b2
-E l1 o1e^^^e^& GET9 e^
+E l1 o1e^^^e^& !GET9_R1_1
 E l1 r^^^^^^^
 E @Flute1 V8 GF96 E1~8,2
 E [[o6b16b32a32b16a16 o6e16e32d32e16d16 o5b16b32a32b16 :
@@ -120,7 +121,7 @@ F @trumpet_2 V96 E0 o3e^f^e^f^
 F l4 [o3e]6e2 L V96 E0
 F l1 o3e^^^^^^^^^^^^^
 F l1 o3a.b2
-F l1 o3e^^^e^& GET9 e^
+F l1 o3e^^^e^& !GET9_R1_1
 F l1 r^^^^^^^^^^^
 F @Clarinet E1 V8 GF96 ~8,2
 F [o6e4b8>d8 c+8c+16d16 : o7c+16c48<b48a+48a8
@@ -146,13 +147,13 @@ G l8 [o3e]12 r^^^
 G l8 [o3f]16 E0 L
 G l4 V32 GF127 [o2e]6 e2
 G l1 r^^^^^^^^^^^^^^^^^^^
-G @Strings8 V80 l1 o0b^& GET9 b^
+G @Strings8 V80 l1 o0b^& !GET9_R1_1
 G l1 r^^^^^^^^^^^^^^^^^^^
 G !Strings8_V24_E0 o3e1f+1a1a1e1f+1f+1f+2g+4g+4
 
 H l1 r^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ L E0
-H @Strings8 V80 l1 o0e^& GET9 b^
+H @Strings8 V80 l1 o0e^& !GET9_R1_1
 H l1 r^^^^16.
-H @PIANO_C5 V9 E1
+H V9 E1
 H !BRiff5
 H l1 r^^^^^^^^^^^^^^^^^^^^^^^^^^^^^2..^32
