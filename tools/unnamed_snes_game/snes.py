@@ -314,7 +314,9 @@ class RgbImageTileExtractor(ImageTileExtractor):
         stride: Final = self.width_px
 
         return [
-            convert_rgb_color(imgdata[i]) for s in range(ypos * stride + xpos, (ypos + 8) * stride, stride) for i in range(s, s + 8)
+            convert_rgb_color(imgdata[i])  # type: ignore[arg-type]
+            for s in range(ypos * stride + xpos, (ypos + 8) * stride, stride)
+            for i in range(s, s + 8)
         ]
 
     def large_tile(self, xpos: int, ypos: int) -> LargeColorTile:
@@ -325,7 +327,9 @@ class RgbImageTileExtractor(ImageTileExtractor):
         stride: Final = self.width_px
 
         return [
-            convert_rgb_color(imgdata[i]) for s in range(ypos * stride + xpos, (ypos + 16) * stride, stride) for i in range(s, s + 16)
+            convert_rgb_color(imgdata[i])  # type: ignore[arg-type]
+            for s in range(ypos * stride + xpos, (ypos + 16) * stride, stride)
+            for i in range(s, s + 16)
         ]
 
 
@@ -368,7 +372,11 @@ class IndexedImageTileExtractor(ImageTileExtractor):
         imgdata: Final = self.__image.getdata()
         stride: Final = self.width_px
 
-        return [pal[imgdata[i]] for s in range(ypos * stride + xpos, (ypos + 8) * stride, stride) for i in range(s, s + 8)]
+        return [
+            pal[imgdata[i]]  # type: ignore[call-overload]
+            for s in range(ypos * stride + xpos, (ypos + 8) * stride, stride)
+            for i in range(s, s + 8)
+        ]
 
     def large_tile(self, xpos: int, ypos: int) -> LargeColorTile:
         if xpos + 16 > self.width_px or ypos + 16 > self.height_px:
@@ -378,7 +386,11 @@ class IndexedImageTileExtractor(ImageTileExtractor):
         imgdata: Final = self.__image.getdata()
         stride: Final = self.width_px
 
-        return [pal[imgdata[i]] for s in range(ypos * stride + xpos, (ypos + 16) * stride, stride) for i in range(s, s + 16)]
+        return [
+            pal[imgdata[i]]  # type: ignore[call-overload]
+            for s in range(ypos * stride + xpos, (ypos + 16) * stride, stride)
+            for i in range(s, s + 16)
+        ]
 
 
 def load_image_tile_extractor(filename: Filename) -> ImageTileExtractor:
