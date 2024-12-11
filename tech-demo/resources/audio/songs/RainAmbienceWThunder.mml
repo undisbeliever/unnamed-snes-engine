@@ -1,6 +1,6 @@
 ;Rain Ambience + Thunder for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.14
+;Made for undisbeliever's Terrific Audio Driver v0.0.15
 
 #Title Rain Ambience
 #Game unnamed-snes-game
@@ -19,7 +19,7 @@
 ;Instrument Definitions
 @noise noise
 @HatClosed HatClosed
-@Snare02SMP Snare02SMP
+@Snare02 Snare02
 
 #ZenLen 192
 
@@ -33,5 +33,5 @@ C @HatClosed V2 [!CRiff1 V+2]8 L !CRiff1
 D @HatClosed V20 w%654 L o5a%11g%11f+%12g%13a%14 w%24 a%16g%8f%64 d%31 d%15 f+%49 d%16 e%48 f+%32 g%25 g%21 g%20
 
 ;Disable channels E and F to disable thunder FX
-E @Snare02SMP E1 V192 w%3456 L s1,%80 s2,%256 w%543 s2,%256 w%555 s2,%256 w%684
-F @Snare02SMP E1 V192 w%3449 L s0,%48 s0,%128 w%1555 s0,%160 w%739
+E @Snare02 E1 V192 w%3456 L P69,%80 P28,%256 w%543 P28,%256 w%555 P28,%256 w%684
+F @Snare02 E1 V192 w%3449 L P49,%48 P49,%128 w%1555 P49,%160 w%739
