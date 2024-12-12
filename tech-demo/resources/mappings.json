@@ -59,8 +59,7 @@
    "sl_floor"
  ],
  "ms_spritesheets": [
-   "common",
-   "dungeon"
+   "common"
  ],
  "tiles": [
    "ui",

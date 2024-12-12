@@ -10,8 +10,8 @@
     "palette": "dungeon",
     "tileset": "dungeon",
     "second_layer": "sl_floor",
-    "ms_palette": "dungeon",
-    "ms_spritesheet": "dungeon",
+    "ms_palette": "common",
+    "ms_spritesheet": "common",
     "song": "blank"
   }
   ]

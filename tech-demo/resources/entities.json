@@ -27,80 +27,6 @@
       }
     },
     {
-      "name": "bouncing_off_walls",
-      "source": "bouncing-off-walls",
-      "is_enemy": true,
-      "ms-export-order": "eight_direction_spinner",
-      "parameter": {
-        "type": "enum",
-        "values": [ "right", "up_right", "up", "up_left", "left", "down_left", "down", "down_right" ]
-      }
-    },
-    {
-      "name": "crossbow_man",
-      "source": "crossbow-man",
-      "is_enemy": true,
-      "ms-export-order": "crossbow_man",
-      "parameter": {
-        "type": "enum",
-        "values": [ "down", "up", "right", "left" ]
-      }
-    },
-    {
-      "name": "skeleton",
-      "source": "skeleton",
-      "is_enemy": true,
-      "ms-export-order": "skeleton",
-      "parameter": {
-        "type": "enum",
-        "values": [ "down", "up", "left", "right", "swarm" ]
-      }
-    },
-    {
-      "name": "slime",
-      "source": "slime",
-      "is_enemy": true,
-      "ms-export-order": "slime",
-      "parameter": {
-        "type": "enum",
-        "values": [ "left", "right", "up", "down", "random" ]
-      }
-    },
-    {
-      "name": "swarming",
-      "source": "swarming",
-      "is_enemy": true,
-      "ms-export-order": "skeleton"
-    },
-    {
-      "name": "rook",
-      "source": "rook",
-      "is_enemy": true,
-      "ms-export-order": "rook",
-      "parameter": {
-        "type": "dungeon_flag"
-      }
-    },
-    {
-      "name": "boss",
-      "source": "boss",
-      "is_enemy": true,
-      "ms-export-order": "boss",
-      "parameter": {
-        "type": "global_flag"
-      }
-    },
-    {
-      "name": "boss_bomb",
-      "source": "boss-bomb",
-      "is_enemy": false,
-      "ms-export-order": "bomb",
-      "parameter": {
-        "comment": "Angle to launch the bomb",
-        "type": "u8"
-      }
-    },
-    {
       "name": "projectile",
       "source": "projectile",
       "is_enemy": false,
@@ -134,18 +60,6 @@
       "source": "player-bomb",
       "is_enemy": false,
       "ms-export-order": "bomb"
-    },
-    {
-      "name": "credits_orb",
-      "source": "credits-orb",
-      "is_enemy": false,
-      "ms-export-order": "particle"
-    },
-    {
-      "name": "test__calc_angle",
-      "source": "test--calc-angle",
-      "is_enemy": false,
-      "ms-export-order": "eight_direction_spinner"
     }
   ],
   "entities": [
@@ -166,62 +80,6 @@
       "zpos": "30",
       "health": 255,
       "attack": 0
-    },
-    {
-      "name": "crossbow_man",
-      "code": "crossbow_man",
-      "metasprites": "dungeon.CrossbowMan",
-      "death_function": "small_smoke",
-      "zpos": "0",
-      "vision": "200 14",
-      "health": 4,
-      "attack": 1
-    },
-    {
-      "name": "skeleton",
-      "code": "skeleton",
-      "metasprites": "dungeon.Skeleton",
-      "death_function": "small_smoke",
-      "zpos": "0",
-      "vision": "75 28",
-      "health": 6,
-      "attack": 3
-    },
-    {
-      "name": "slime",
-      "code": "slime",
-      "metasprites": "dungeon.Slime",
-      "death_function": "small_smoke",
-      "zpos": "0",
-      "health": 5,
-      "attack": 4
-    },
-    {
-      "name": "skull",
-      "code": "bouncing_off_walls",
-      "metasprites": "dungeon.Skull",
-      "death_function": "small_smoke",
-      "zpos": "4",
-      "health": 8,
-      "attack": 3
-    },
-    {
-      "name": "rook",
-      "code": "rook",
-      "metasprites": "dungeon.Rook",
-      "death_function": "small_smoke",
-      "zpos": "0",
-      "health": 255,
-      "attack": 0
-    },
-    {
-      "name": "boss",
-      "code": "boss",
-      "metasprites": "dungeon.Boss",
-      "death_function": "none",
-      "zpos": "0",
-      "health": 4,
-      "attack": 2
     },
     {
       "name": "bolt_straight",
@@ -254,33 +112,6 @@
       "name": "player_bomb",
       "code": "player_bomb",
       "metasprites": "common.Bomb",
-      "death_function": "none",
-      "zpos": "0",
-      "health": 255,
-      "attack": 0
-    },
-    {
-      "name": "boss_bomb",
-      "code": "boss_bomb",
-      "metasprites": "common.EnemyBomb",
-      "death_function": "none",
-      "zpos": "24",
-      "health": 255,
-      "attack": 2
-    },
-    {
-      "name": "credits_orb",
-      "code": "credits_orb",
-      "metasprites": "dungeon.CreditsOrb",
-      "death_function": "none",
-      "zpos": "8",
-      "health": 255,
-      "attack": 0
-    },
-    {
-      "name": "test__calc_angle",
-      "code": "test__calc_angle",
-      "metasprites": "dungeon.Skull",
       "death_function": "none",
       "zpos": "0",
       "health": 255,

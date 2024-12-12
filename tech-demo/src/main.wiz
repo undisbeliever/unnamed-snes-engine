@@ -20,21 +20,11 @@ import "engine/resources/resources-over-usb2snes";
 
 
 import "src/entities/sword-particles";
-import "src/entities/bouncing-off-walls";
-import "src/entities/crossbow-man";
 import "src/entities/key";
-import "src/entities/skeleton";
-import "src/entities/slime";
-import "src/entities/swarming";
-import "src/entities/rook";
-import "src/entities/boss";
-import "src/entities/boss-bomb";
 import "src/entities/smoke-particles";
 import "src/entities/player-bomb";
-import "src/entities/credits-orb";
 import "src/entities/projectile";
 import "src/entities/projectile-angled";
-import "src/entities/test--calc-angle";
 
 import "gen/enums";
 import "gen/function-tables";

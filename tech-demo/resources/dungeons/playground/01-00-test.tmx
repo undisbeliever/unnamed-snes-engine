@@ -12,30 +12,4 @@
    H4sIAAAAAAAAAxNmYGAQxoFFGFCBEBY1o2DoAkUK9RtSaIYj1AxK3TCQ+h3R+LA8gp53cAEA9ueSi4ADAAA=
   </data>
  </layer>
- <objectgroup id="4" name="Enemies">
-  <object id="1" type="skull" x="128" y="96">
-   <properties>
-    <property name="parameter" value="right"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="2" type="skull" x="152" y="96">
-   <properties>
-    <property name="parameter" value="right"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="3" type="skull" x="128" y="112">
-   <properties>
-    <property name="parameter" value="right"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="4" type="skull" x="152" y="112">
-   <properties>
-    <property name="parameter" value="right"/>
-   </properties>
-   <point/>
-  </object>
- </objectgroup>
 </map>
