@@ -1,6 +1,6 @@
 ;Jungle Theme
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.14
+;Made for undisbeliever's Terrific Audio Driver v0.0.15
 
 #Title Jungle Theme
 #Game unnamed-snes-game
@@ -44,39 +44,39 @@ A [l24
 A [o4f.]6 [ff48]2
 A [o4f.]4 [ff48]4
 A ]2
-!ARiff6 l24 o4f.o5fo4f48
-!ARiff7 l24 o4ff48>f<f48
-!ARiff8 l24 o4ff48>ff48
-A !ARiff6 l24 o4f.o5f.
-A !ARiff6 l24 o4f.o5ff48
-!ARiff6_7_6_8 !ARiff6 !ARiff7 !ARiff6 !ARiff8
-A [!ARiff6_7_6_8 ]2
-A [!ARiff7 !ARiff8 ]2
-!ARiff9a l24 o5cc48
-!ARiff9 [l24
-!ARiff9 [o5c.]6 [!ARiff9a ]2
-!ARiff9 [o5c.]4 [!ARiff9a ]4
-!ARiff9 ]2
-A !ARiff9
-A [[!ARiff9a ]12 [o5f]6]2
+!ARiff5 l24 o4f.o5fo4f48
+!ARiff6 l24 o4ff48>f<f48
+!ARiff7 l24 o4ff48>ff48
+A !ARiff5 l24 o4f.o5f.
+A !ARiff5 l24 o4f.o5ff48
+!ARiff5_6_5_7 !ARiff5 !ARiff6 !ARiff5 !ARiff7
+A [!ARiff5_6_5_7 ]2
+A [!ARiff6 !ARiff7 ]2
+!ARiff8a l24 o5cc48
+!ARiff8 [l24
+!ARiff8 [o5c.]6 [!ARiff8a ]2
+!ARiff8 [o5c.]4 [!ARiff8a ]4
+!ARiff8 ]2
+A !ARiff8
+A [[!ARiff8a ]12 [o5f]6]2
 !o5f24_X12 [o5f24]12
-!ARiff10 [l24 [o5f.]4ff48ff.f48ff48]3
-!ARiff10 !o5f24_X12
-A !ARiff10
-A [!ARiff9 ]2
-A [!ARiff6_7_6_8 ]3
+A [
+A [l24 [o5f.]4ff48ff.f48ff48]3
+A !o5f24_X12 :
+A [!ARiff8 ]2
+A [!ARiff5_6_5_7 ]3
 A !o5f24_X12
-A [!ARiff9a ]64
-A !ARiff10
-A [!ARiff9a ]64
-!ARiff11 l24 o5cc96<a+96>!ARiff9a c96c48c96c48c48c48c48
-A !ARiff11
+A [!ARiff8a ]64
+A ]2
+A [!ARiff8a ]64
+!ARiff9 l24 o5cc96<a+96>!ARiff8a c96c48c96c48c48c48c48
+A !ARiff9
 A [l24 V32 o5c V48 c48 V128 c : V48 c48]2 c48
-A !ARiff11
+A !ARiff9
 A V40 o5c48. V32 c48 [V+11 c48.]3 V80 c48 c48[c64]4 V128
-A !ARiff11
-A [!ARiff9a ]4
-A !ARiff11
+A !ARiff9
+A [!ARiff8a ]4
+A !ARiff9
 A l24 [o5c]6 [
 A [!ARiff1 ]3 !ARiff2
 A [!ARiff1 ]3 !ARiff3 ]4
@@ -170,33 +170,33 @@ D [!DRiff2a ]44
 D !DRiff3
 D !DRiff1 l24 !DRiff2 o6b12 !DRiff2 b48]2
 D [!DRiff2a ]32
-!DRiff4 [A12,4,4,20 l8 V16 o6b A12,7,4,24 V4 b b b]4
-D !DRiff4
+D [
+D [A12,4,4,20 l8 V16 o6b A12,7,4,24 V4 b b b]4:
 D [!DRiff2a ]16
-D !DRiff4
+D ]2
 D [!DRiff2a ]6
 D V12 b48& [GIT24 b96&:GDT24 b96&]11 GDT24 b96
 
 E l1 r^^^^^^^^^^^ L
 E @Kick3 V128
-!ERiff1 [l24 [o5c+.]4c+c+48c+c+.c+48c+c+48]3
-!ERiff1 [o5c+24]12
-E !ERiff1
-!ERiff2 @Bongo _-2
-!ERiff2 [[o2f+8 f+24f+12 : f+8 f+16f+16]2
-!ERiff2 :f+12f+24 f+16f+16]2
-!ERiff2 f+16.f+32 f+16f+16
-E [!ERiff2 ]2
+E [
+E [l24 [o5c+.]4c+c+48c+c+.c+48c+c+48]3
+E [o5c+24]12 :
+!ERiff1 @Bongo _-2
+!ERiff1 [[o2f+8 f+24f+12 : f+8 f+16f+16]2
+!ERiff1 :f+12f+24 f+16f+16]2
+!ERiff1 f+16.f+32 f+16f+16
+E [!ERiff1 ]2
 E @TimpaniB_1
 E [[o2f16d+16]2f12d+24c16d16 : [o1a+8]3 o1a+16a+16]2
 E @sine GI15 V16 {o3ff+}16,,12& GDT5 w8 {o3f+<f+}4,,4& r16
 E @Kick3 V128
 E [o4f+4f+8f+16:f+16]4 f+32f+32 [f+32f+32f+16f+8f+4]4
-E !ERiff1 
+E ]2
 E @TimpaniB_2 _-0
 E [o1c2c2c1]2
 E _-2
-E [!ERiff2 ]3
+E [!ERiff1 ]3
 E [o2f+16]12 [o2f+24]6
 
 F p64 p~15,127
