@@ -144,11 +144,10 @@ C [!CRiff3 ]2
 D E0
 D @noise 
 D l1 r^^^^^ L
-!DRiff1aa GI12 o6b192& GD12 b192&
-!DRiff1a V0 Vs+64,32 [!DRiff1aa ]24 Vs-64,32 [!DRiff1aa ]16 r12
+!DRiff1a GI12 o6b192& GD12 b192&
 !DRiff1 [
-!DRiff1 p16 ps+80,80 !DRiff1a
-!DRiff1 ps-80,80 !DRiff1a
+!DRiff1 p16 ps+80,80 [V0 Vs+64,32 [!DRiff1a ]24 Vs-64,32 [!DRiff1a ]16 r12
+!DRiff1 : ps-80,80 ]2
 !DRiff1 ]2 p64 A12,7,4,24
 !DRiff1 r24.
 !DRiff2aa l24 V8 b V4 b48 V16
