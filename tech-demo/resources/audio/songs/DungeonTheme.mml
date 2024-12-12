@@ -1,6 +1,6 @@
 ;Dungeon Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.14
+;Made for undisbeliever's Terrific Audio Driver v0.0.15
 
 #Title Dungeon Theme
 #Game unnamed-snes-game
@@ -29,9 +29,10 @@
 @PianoC2_16 PianoC2_16 adsr 15 7 7 10
 
 #ZenLen 192
+#Timer 138
 
 !Strings8Detache_V128_E1 @Strings8Detache V128 E1
-A T138 E1
+A E1
 !ARiff1 l8 o4[e]7e16d16
 A !Strings8Detache_V128_E1 [!ARiff1 ]22
 A L E0 l4 V32 GF127 p48 [o3e>e]3 e2

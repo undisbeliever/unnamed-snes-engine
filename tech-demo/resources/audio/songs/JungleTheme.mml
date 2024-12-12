@@ -26,8 +26,9 @@
 @sine sine
 
 #ZenLen 192
+#Timer 171
 
-A T171 E0
+A E0
 A @Kick3 
 !ARiff1 l24 [V128 o4f. V32 f.]2
 !ARiff2 l24 V40 o4f48. V32 f48 [V+11 f48.]3 V80 f48 f48[f64]4

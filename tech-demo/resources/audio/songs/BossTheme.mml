@@ -27,8 +27,9 @@
 @Snare02 Snare02
 
 #ZenLen 192
+#Timer 132
 
-A T132 E0
+A E0
 !Kick3_V255_o4f32 @Kick3 V255 o4f32
 !Snare02_V192_o4a32 @Snare02 V192 o4a32
 !HatClosed_V64_o5c32 @HatClosed V64 o5c32

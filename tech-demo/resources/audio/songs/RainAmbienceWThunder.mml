@@ -22,8 +22,8 @@
 @Snare02 Snare02
 
 #ZenLen 192
+#Timer 255
 
-A T255
 A @noise GI1 V8 p48 L o5d%32&
 
 B @noise GI1 V8 p80 L o4a+%32&

@@ -1,6 +1,6 @@
 ;Foggy Forest Theme
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.14
+;Made for undisbeliever's Terrific Audio Driver v0.0.15
 
 #Title Foggy Forest Theme
 #Game unnamed-snes-game
@@ -24,8 +24,8 @@
 @PIANO_C5 PIANO_C5 adsr 15 7 7 17
 
 #ZenLen 192
+#Timer 144
 
-A T144
 A @GuitarB2 V96 E0 L
 !ARiff1 l4 o1gfd+[fg]2
 !ARiff2 l4 o2c<a+g+g
