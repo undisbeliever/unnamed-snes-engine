@@ -1,6 +1,6 @@
 ;Title Screen Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.14
+;Made for undisbeliever's Terrific Audio Driver v0.0.15
 
 #Title Title Screen Theme
 #Game unnamed-snes-game
@@ -30,8 +30,8 @@
 @Snare02 Snare02
 
 #ZenLen 192
+#Timer 144
 
-A T144
 !ARiff1 [o4e16e32e32]4
 !ARiff2 [o4d16d32d32]4
 !ARiff3 [o4f+16f+32f+32]4
