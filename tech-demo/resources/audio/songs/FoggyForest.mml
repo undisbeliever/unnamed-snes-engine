@@ -97,7 +97,7 @@ D V40 E1
 ;portamento duration in order to handle these without setting an instrument first.
 !DRiff4 {o2fg}16,32,7& w1 GT r2...
 !DRiff5 @Flute1 [
-!DRiff5 l8 Q2o5g>ddd
+!DRiff5 l8 Q2o5g>[d]3
 !DRiff5 l32 Q4c16<a+16a16ga Q8[a64a+64]4afcf :
 !DRiff5 l16 Q2o5g8>d8 Q4defg
 !DRiff5 l16 Q4o6afc<a+aa+af]2
@@ -113,12 +113,11 @@ D V40 E1
 !DRiff5 l8 o4c. <b32>c32 df
 !DRiff5 l12 o4d+d<g a+8>c8
 !DRiff5 l8 o4c. d32c32 <ba
-!DRiff5aa l16 o3g>gd<g>fc<f>c
-!DRiff5a !DRiff5aa l16 o3d+>d+<a+d+>fc<f>c
+!DRiff5aa l16 o3g>gd<g>fc<f>c o3d+>d+<a+d+
+!DRiff5a !DRiff5aa l16 o4fc<f>c
 !DRiff5 !DRiff5a !DRiff5a
 !DRiff6 !DRiff5a
-!DRiff6 !DRiff5aa
-!DRiff6 l16 o3d+>d+<a+d+>d<ada
+!DRiff6 !DRiff5aa l16 o4d<ada
 !DRiff1_2_3_4 !DRiff1 !DRiff2 !DRiff3 !DRiff4 r1^1
 !DRiffVib1_2_3_4 ~2,5 !DRiff1
 !DRiffVib1_2_3_4 ~44,2 !DRiff2
@@ -146,13 +145,13 @@ E !DRiff2
 E l1 r^^^^^ V16
 E !DRiff5 r48 L
 E @PIANO_C5 V24
-E l16 Q4o5g32g32Q8gd32g32
+E l16 Q4[o5g32]2Q8gd32g32
 E l16 o5ff32g32fc
-E l16 Q4ro5d+32d+32Q8d+<a+32>d+32
+E l16 Q4r[o5d+32]2Q8d+<a+32>d+32
 E l16 [o5f64g64]4 fc
-E l16 Q4ro5g32g32Q8gd32g32
+E l16 Q4r[o5g32]2Q8gd32g32
 E l16 o5ff32g32ga
-E l16 Q4ro5a+32a+32Q8a+g32a+32
+E l16 Q4r[o5a+32]2Q8a+g32a+32
 E l16 [o5a64a+64]4 af
 !ERiff1 l48 o4cdfga>cdfgfdc
 !ERiff2 l48 o4ga>cdfga>cdc<ag
@@ -182,13 +181,13 @@ F [o7d& GDT1 r^]2 r
 F !ERiff4 ~0
 F @PIANO_C5 L V24 [
 F [
-F l16 Q4ro4a+32a+32Q8a+a32a+32
+F l16 Q4r[o4a+32]2Q8a+a32a+32
 F l16 o5c<a+32:a32ga
-F l16 Q4ro4g32g32Q8gf32g32
+F l16 Q4r[o4g32]2Q8gf32g32
 F l16 [o4a64a+64]4 af
 F ]2
 F l16 o5c32df
-F l16 Q4ro5g32g32Q8gd32g32
+F l16 Q4r[o5g32]2Q8gd32g32
 F l16 [o5f64g64]4 fc ]2
 F r32 [
 F V12 [!ERiff1 V-3]4:
