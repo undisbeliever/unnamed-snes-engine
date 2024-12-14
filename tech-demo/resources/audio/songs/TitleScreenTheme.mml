@@ -40,16 +40,16 @@
 A !StringsDetache8_V160_E1 p48
 A !ARiff1_2_1_3
 A L E0 p64 @TimpaniB V128 [o3e12e12e24e24]3 [o3e24]6
-!Drum_HatClosed_32 @HatClosed V56 o5c32
-!Drum_Snare_32 @Snare02 V112 o5c32
-!ARiff4 @Kick3 V140 o5c16 !Drum_HatClosed_32 o5c32
-!ARiff5 !Drum_Snare_32 !Drum_HatClosed_32 !Drum_Snare_32 o5c32
-!ARiff6 @Snare02 V112 o5c16 !Drum_HatClosed_32 o5c32
+!HatClosed_V56_o5c32 @HatClosed V56 o5c32
+!Snare02_V112_o5c32 @Snare02 V112 o5c32
+!ARiff4 @Kick3 V140 o5c16 !HatClosed_V56_o5c32 o5c32
+!ARiff5 !Snare02_V112_o5c32 !HatClosed_V56_o5c32 !Snare02_V112_o5c32 o5c32
+!ARiff6 @Snare02 V112 o5c16 !HatClosed_V56_o5c32 o5c32
 A [!ARiff4 ]15 !ARiff5
 A [[!ARiff4 !ARiff6 ]3 !ARiff4 !ARiff5 ]10
 A [!ARiff4 !ARiff6 : !ARiff4 !ARiff5 ]4
-A @Kick3 V140 o5c32 !Drum_HatClosed_32 @Kick3 V140 o5c32c32
-A !Drum_Snare_32 !Drum_HatClosed_32 @Snare02 V112 [o5c64]4
+A [@Kick3 V140 o5c32 :!HatClosed_V56_o5c32 ]2 o5c32
+A !Snare02_V112_o5c32 !HatClosed_V56_o5c32 @Snare02 V112 [o5c64]4
 !Strings8_V80_GI7_E1_q48_D7 E1 @Strings8 V80 GI7 q48,D7
 A !Strings8_V80_GI7_E1_q48_D7 p56
 A [o4e2d2c2d2]2 q0
@@ -100,7 +100,7 @@ B [o3a4 @Strings8 V52 o4c4<b4:g4]2 o4d4
 B !trumpet2_V64_vib8_4 p64
 B r16o5g+32g+32 o6d+8c8d+16g16
 B o6f8d8c8<a+8 >c4g4f+4d8a8
-!BRiff6 Q4o7e32e32 Q8o7e2
+!BRiff6 Q4[o7e32]2 Q8o7e2
 B o6b4.. !BRiff6 ~0
 
 C E1 @Flute1 V12
@@ -143,11 +143,11 @@ D o6f+8d8f+8a8]2
 D o6b16>e16f+16 g+16a32g+32f+16e16d16e16f+16a16
 D o7g8e8c8g8 f+4a4
 D !DRiff2
-D !trumpet2_V64_vib8_4 Q4o7g32g32e16c16e16c16e16Q8g16
+D !trumpet2_V64_vib8_4 Q4o7[g32]2[e16:c16]3Q8g16
 D !DRiff2
-D !trumpet2_V64_vib8_4 Q4o7a32a32f+16d16f+16d16f+16Q8a16
+D !trumpet2_V64_vib8_4 Q4o7[a32]2[f+16:d16]3Q8a16
 D !DRiff2
-D !trumpet2_V64_vib8_4 Q4o7b32b32g16e16c16e16g16Q8b16
+D !trumpet2_V64_vib8_4 Q4o7[b32]2g16e16c16e16g16Q8b16
 D o7a8g8f+8d8
 D !DRiff2
 D @Clarinet V16 ~8,4 Q4o6c32d32e16c16e16g16e16>c16
@@ -159,16 +159,16 @@ D [Q8r16o4e32f32Q4g16:c16>c16<g16e16g16]2
 D Q4o3b16>b16g16d16g16Q8
 D r16o3f32g32a16b16>c16d16e16<a16
 D [
-D l48 o3bgb>d<b>dgdgbgb>d<b>d<bgbgdgd<b>d :
-D l48 o3afa>c<a>cfcfafa>c<a>c<afafcfc<a>c
+D l48 o3bgb>d<b>dgdgbgb>[d<b]2gbgdgd<b>d :
+D l48 o3afa>c<a>cfcfafa>[c<a]2fafcfc<a>c
 D ]2
-D l48 o4c<a>cfcfafa>c<a>cfcfc<a>c<afafcf
-D l48 o4d<b>dgdgbgb>d<b>dgdgd<b>d<bgbgdg
-D l48 o4d+cd+g+d+g+>c<g+>cd+cd+g+d+g+d+cd+c<g+>c<g+d+g+
-D l48 o4fdfa+fa+>d<a+>dfdfa+fa+fdfd<a+>d<a+fa+
-D l48 o4geg>c<g>cecegeg>c<g>c<gegecec<g>c
-D l48 o4af+a>d<a>df+df+af+a>d<a>d<af+af+df+d<a>d
-D [l48 o4bg+b>e<b>eg+eg+bg+b>e<b>e<bg+bg+eg+e<b>e]2
+D l48 o4c<a>cfcfafa>c<a>[cf]2c<a>c<afafcf
+D l48 o4d<b>dgdgbgb>d<b>[dg]2d<b>d<bgbgdg
+D l48 o4d+cd+g+d+g+>c<g+>[cd+]2g+d+g+d+cd+c<g+>c<g+d+g+
+D l48 o4fdfa+fa+>d<a+>dfd[fa+]2fdfd<a+>d<a+fa+
+D l48 o4geg>c<g>cecegeg>[c<g]2egecec<g>c
+D l48 o4af+a>d<a>df+df+af+a>[d<a]2f+af+df+d<a>d
+D [l48 o4bg+b>e<b>eg+eg+bg+b>[e<b]2g+bg+eg+e<b>e]2
 D !Crash2_V120 o5c1^1
 
 E E0 @Strings8 V32
