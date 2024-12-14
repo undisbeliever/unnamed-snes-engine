@@ -41,17 +41,17 @@ A E0
 !ARiff2a !Kick3_V255_o4f32 !Snare02_V192_o4a32
 !ARiff2 !ARiff2a @Kick3 V255 o4f96f48
 A [!ARiff1a ]14
-A !Snare02_V192_o4a32 o4a32 !Kick3_V255_o4f32 !HatClosed_V64_o5c32
-A !Snare02_V192_o4a32 !HatClosed_V64_o5c32 !Snare02_V192_o4a32 o4a64a64 L
-A [[[!ARiff1 !ARiff2 :
-A !ARiff1 !Kick3_V255_o4f32 o4f32 !Snare02_V192_o4a32 ]2
-A !ARiff1 : !ARiff1aa ]2 !ARiff2a o4a32]3 [
+A !Snare02_V192_o4a32 o4a32 !Kick3_V255_o4f32 [!HatClosed_V64_o5c32
+A !Snare02_V192_o4a32 ]2 o4a64a64 L
+A [[[!ARiff1 !ARiff2 !ARiff1 :
+A !Kick3_V255_o4f32 o4f32 !Snare02_V192_o4a32 ]2
+A : !ARiff1aa ]2 !ARiff2a o4a32]3 [
 A [[!ARiff1aa !ARiff1aa !Snare02_V192_o4a32 !Kick3_V255_o4f32
 A !ARiff1aa !ARiff1aa : !ARiff2a ]2
 A @Snare02 V192 [o4a48]3]4 :
 A [[[[!ARiff1a !ARiff1b ]3 !ARiff1aa !Snare02_V192_o4a32 !HatClosed_V64_o5c32 :
 A !Kick3_V255_o4f32 o4f32 !Snare02_V192_o4a32 ]2 : !ARiff2 ]2 !ARiff2a o4a32]2]2
-A @Snare02 [[V192 o4a48 V48 a48a48 V96 a48]9 V192 o4a48 V0 [V+16 o4a48]11 ]2
+A @Snare02 [[V192 o4a48 : V48 a48a48 V96 a48]10 V0 [V+16 o4a48]11 ]2
 
 B E0 @TimpaniB V156 [o2b16b8b32b32 : b16b8.]4 V0 [V+13 o2b48]12 L
 !Crash2_V136_E0 @Crash2 V136 E0
