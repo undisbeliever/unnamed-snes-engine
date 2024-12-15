@@ -249,6 +249,7 @@
   "sound_effects": [
     "collect_item",
     "explosion_hurt_enemy",
+    "explosion_hurt_something",
     "explosion",
     "player_heal",
     "pickup_bomb",
