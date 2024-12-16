@@ -322,6 +322,10 @@
     {
       "name": "MagicalAmbience",
       "source": "songs/MagicalAmbience.mml"
+    },
+    {
+      "name": "OminousAmbience",
+      "source": "songs/OminousAmbience.mml"
     }
   ]
 }
