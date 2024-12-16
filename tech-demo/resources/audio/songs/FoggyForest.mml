@@ -91,7 +91,7 @@ D V40 E1
 !DRiff2 l8 o6d+.& {o6d+c}.,,96 o5a+16>c16 dc<b>d
 !DRiff2 l8 o6c4 {o6cg}8,,255 o6d+16g16 fd+df
 !DRiff2 l8 o6d+d16d+16dc<bagd
-!DRiff2 o5g1& GDT1 r1
+!DRiff2 o5g1& GDT2 r1
 !DRiff3 @Flute1 {o3fg}16,32& w1 GET13 r2...
 ;NOTE: Manual portamento was converted from pre-compiled data using 32nd note length
 ;portamento duration in order to handle these without setting an instrument first.
