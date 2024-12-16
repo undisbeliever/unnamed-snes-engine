@@ -318,6 +318,10 @@
     {
       "name": "BossClearTheme",
       "source": "songs/BossClearTheme.mml"
+    },
+    {
+      "name": "MagicalAmbience",
+      "source": "songs/MagicalAmbience.mml"
     }
   ]
 }
