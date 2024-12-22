@@ -130,8 +130,8 @@ D l1 r^
 !DRiff1 o6e24c24e24 g8>c8<b16a16 g8f+8e8d16<b16
 !DRiff1 o6c24<g24>c24 e8c8<g16>e16 f+8g8a8f+8
 D !DRiff1
-D o6g+4.. !BRiff6 ~0
-D !Crash2_V120 o5c^ L
+D o6g+4.. !BRiff6 ~0 L
+D !Crash2_V120 o5c^
 D !DRiff1
 !DRiff2 !Crash2_V120 ~0 o5c16
 D [!DRiff2
@@ -169,7 +169,6 @@ D l48 o4fdfa+fa+>d<a+>dfd[fa+]2fdfd<a+>d<a+fa+
 D l48 o4geg>c<g>cecegeg>[c<g]2egecec<g>c
 D l48 o4af+a>d<a>df+df+af+a>[d<a]2f+af+df+d<a>d
 D [l48 o4bg+b>e<b>eg+eg+bg+b>[e<b]2g+bg+eg+e<b>e]2
-D !Crash2_V120 o5c1^1
 
 E E0 @Strings8 V32
 !ERiff1 l2 [o2agaa]2
