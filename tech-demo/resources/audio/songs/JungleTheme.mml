@@ -51,7 +51,7 @@ A ]2
 A !ARiff5 l24 o4f.o5f.
 A !ARiff5 l24 o4f.o5ff48
 !ARiff5_6_5_7 !ARiff5 !ARiff6 !ARiff5 !ARiff7
-A [!ARiff5_6_5_7 ]2
+A !ARiff5_6_5_7 !ARiff5_6_5_7
 A [!ARiff6 !ARiff7 ]2
 !ARiff8a l24 o5cc48
 !ARiff8 [l24
@@ -64,7 +64,7 @@ A [[!ARiff8a ]12 [o5f]6]2
 A [
 A [l24 [o5f.]4ff48ff.f48ff48]3
 A !o5f24_X12 :
-A [!ARiff8 ]2
+A !ARiff8 !ARiff8
 A [!ARiff5_6_5_7 ]3
 A !o5f24_X12
 A [!ARiff8a ]64
@@ -106,7 +106,7 @@ B !BRiff3
 B !BRiff4
 B !BRiff5
 B [!BRiff1 ]16
-B [!BRiff2 ]2
+B !BRiff2 !BRiff2
 
 C E0
 C @Bongo _-2
@@ -139,7 +139,7 @@ C a+16.a+32 a+16a+16]2:
 C [l24 [o4a+.]4a+a+48a+a+.a+48a+a+48]3
 C [o4a+24]12 ]2
 C @Bongo _-2 V40
-C [!CRiff3 ]2
+C !CRiff3 !CRiff3
 
 D E0
 D @noise 
@@ -186,7 +186,7 @@ E [o5c+24]12 :
 !ERiff1 [[o2f+8 f+24f+12 : f+8 f+16f+16]2
 !ERiff1 :f+12f+24 f+16f+16]2
 !ERiff1 f+16.f+32 f+16f+16
-E [!ERiff1 ]2
+E !ERiff1 !ERiff1
 E @TimpaniB_1
 E [[o2f16d+16]2f12d+24c16d16 : [o1a+8]3 o1a+16a+16]2
 E @sine GI15 V16 {o3ff+}16,,12& GDT5 w8 {o3f+<f+}4,,4& r16
