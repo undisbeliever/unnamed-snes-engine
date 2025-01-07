@@ -388,10 +388,10 @@ A @1 V160 {o4c+ o2c+}%96
 
     set_volume 80
 
-    set_instrument_and_adsr sawtooth    15 7 2 20
+    set_instrument_and_adsr sawtooth    15 7 2 25
 
-    play_note f6 no_keyoff 2
-    portamento c6 keyoff -15 12
+    play_note g+6 no_keyoff 2
+    portamento d6 keyoff -15 12
 
 
 === rook_hits_ground ===
