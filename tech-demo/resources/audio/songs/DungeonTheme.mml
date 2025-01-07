@@ -1,6 +1,6 @@
 ;Dungeon Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.15
+;Made for undisbeliever's Terrific Audio Driver v0.0.16
 
 #Title Dungeon Theme
 #Game unnamed-snes-game
@@ -62,9 +62,7 @@ B l4 o5ef+
 !Flute1_E1_V48_Vib6_2 E1 @Flute1 V48 ~6,2
 B !Flute1_E1_V48_Vib6_2 l8 o5d^c+dc+^<a^ g<b>g^^f+de
 B l8 o5ef+gf+edc<b16g16 ae16c16<e16a16>e f+g+f+16d16c+16d16
-;NOTE: Manual portamento was converted from pre-compiled data using 8th note length
-;portamento duration in order to handle these without setting an instrument first.
-!BRiff4 GI9 o4g2. GFT127 {b f+}4,8,21& f+2& GET14
+!BRiff4 ?@Flute1 GI9 o4g2. GFT127 {b f+}4,8& f+2& GET14
 B w16 ~0 !BRiff4 f+4..
 B ~16,2 o4d2. GFT127 {f+ c+}4,8& c+2& GET14 c+2
 !GET9_R1_1 l1 GET9 r^
