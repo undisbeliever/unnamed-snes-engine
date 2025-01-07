@@ -1,5 +1,37 @@
+!EnemyHurt \asm {
+    set_volume 64
+    set_instrument_and_adsr sawtooth    8 2 3 28
+    play_note c1 no_keyoff 4
+    play_note a3 no_keyoff 8
+    play_note c3 keyoff 4
+}
 
+!ExplosionEchoFadeOut \asm {
+    set_adsr 10 2 2 18
 
+    play_note  f1 no_keyoff 8
+    portamento c1 keyoff -8 48
+}
+
+!RookHitsGroundEcho \asm {
+    play_note  c2 no_keyoff 2
+    play_note  a1 no_keyoff 2
+    play_note  g2 no_keyoff 2
+    play_note  c2 no_keyoff 2
+    play_note  e1 4
+}
+
+!PlayerHurt \asm {
+    set_instrument_and_adsr triangle    10 2 1 25
+} !PlayerHurtP2
+
+!PlayerHurtP2 \asm {
+    set_volume 255
+
+    play_note  f3 no_keyoff 4
+    portamento c2 no_keyoff -25 8
+    portamento c1 keyoff -90 8
+}
 === menu_select === uninterruptible
     set_instrument  sawtooth
     set_volume      160
@@ -63,12 +95,8 @@ A @1 V160 {o4c+ o2c+}%96
     play_noise 24 10
 
 
-    ; Explosion echo and fadeout
-    set_adsr 10 2 2 18
-
-    play_note  f1 no_keyoff 8
-    portamento c1 keyoff -8 48
-
+    ; Explosion echo and fade-out
+    call_subroutine ExplosionEchoFadeOut
 === explosion_hurt_player ===
     ; I do like the gap between the explosion and the hurt-player sound.
     ; It adds more emphasis to the player-hurt portion of the sound-effect.
@@ -81,10 +109,7 @@ A @1 V160 {o4c+ o2c+}%96
 
     ; player_hurt sound effect
     set_instrument_and_adsr triangle    14 2 1 25
-    set_volume 255
-    play_note  f3 no_keyoff 4
-    portamento c2 no_keyoff -25 8
-    portamento c1 keyoff -90 8
+    call_subroutine PlayerHurtP2
 
     set_instrument noise
     set_volume 200
@@ -109,13 +134,8 @@ A @1 V160 {o4c+ o2c+}%96
     set_adsr 15 7 7 28
     play_noise 22 10
 
-
-    ; Explosion echo and fadeout
-    set_adsr 10 2 2 18
-
-    play_note  f1 no_keyoff 8
-    portamento c1 keyoff -8 48
-
+    ; Explosion echo and fade-out
+    call_subroutine ExplosionEchoFadeOut
 
 === explosion === one interruptible
     set_volume 200
@@ -129,13 +149,8 @@ A @1 V160 {o4c+ o2c+}%96
     play_note e2 4
     wait 6
 
-
-    ; Explosion echo and fadeout
-    set_adsr 10 2 2 18
-
-    play_note  f1 no_keyoff 8
-    portamento c1 keyoff -8 48
-
+    ; Explosion echo and fade-out
+    call_subroutine ExplosionEchoFadeOut
 === player_heal === one uninterruptible
     ; high pitch, same waveform as player_hurt
 
@@ -149,13 +164,7 @@ A @1 V160 {o4c+ o2c+}%96
 
 
 === player_hurt_low_health === one uninterruptible
-    set_volume 255
-
-    set_instrument_and_adsr triangle    10 2 1 25
-
-    play_note  f3 no_keyoff 4
-    portamento c2 no_keyoff -25 8
-    portamento c1 keyoff -90 8
+    call_subroutine PlayerHurt
 
 
     set_adsr 12 2 2 28
@@ -169,17 +178,7 @@ A @1 V160 {o4c+ o2c+}%96
 
 
 === player_hurt === one uninterruptible
-
-    set_volume 255
-
-    set_instrument_and_adsr triangle    10 2 1 25
-
-    play_note  f3 no_keyoff 4
-    portamento c2 no_keyoff -25 8
-    portamento c1 keyoff -90 8
-
-
-
+    call_subroutine PlayerHurt
 === door_slam === one uninterruptible
     set_volume 192
 
@@ -308,11 +307,7 @@ A @1 V160 {o4c+ o2c+}%96
 
     ; enemy hurt sfx
     ; ::TODO add more exploding/emphasis::
-    set_volume 64
-    set_instrument_and_adsr sawtooth    8 2 3 28
-    play_note c1 no_keyoff 4
-    play_note a3 no_keyoff 8
-    play_note c3 keyoff 4
+    call_subroutine EnemyHurt
 
     wait 4
 
@@ -331,11 +326,7 @@ A @1 V160 {o4c+ o2c+}%96
 
     ; Using sawtooth so it sounds different to player_hurt
 
-    set_volume 64
-    set_instrument_and_adsr sawtooth    8 2 3 28
-    play_note c1 no_keyoff 4
-    play_note a3 no_keyoff 8
-    play_note c3 keyoff 4
+    call_subroutine EnemyHurt
 
 
 === sword_swing ===
@@ -399,32 +390,19 @@ A @1 V160 {o4c+ o2c+}%96
 
     set_instrument_and_gain square  F127
 
-    play_note  c2 no_keyoff 2
-    play_note  a1 no_keyoff 2
-    play_note  g2 no_keyoff 2
-    play_note  c2 no_keyoff 2
-    play_note  e1 4
+    call_subroutine RookHitsGroundEcho
 
     wait 2
 
     set_gain F32
 
-    play_note  c2 no_keyoff 2
-    play_note  a1 no_keyoff 2
-    play_note  g2 no_keyoff 2
-    play_note  c2 no_keyoff 2
-    play_note  e1 4
+    call_subroutine RookHitsGroundEcho
 
     wait 2
 
     set_gain F4
 
-    play_note  c2 no_keyoff 2
-    play_note  a1 no_keyoff 2
-    play_note  g2 no_keyoff 2
-    play_note  c2 no_keyoff 2
-    play_note  e1 4
-
+    call_subroutine RookHitsGroundEcho
 
 === boss_shake === one interruptible
     set_volume 128
