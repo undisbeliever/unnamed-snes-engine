@@ -1,6 +1,6 @@
 ;Foggy Forest Theme
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.15
+;Made for undisbeliever's Terrific Audio Driver v0.0.16
 
 #Title Foggy Forest Theme
 #Game unnamed-snes-game
@@ -78,24 +78,22 @@ D V40 E1
 !DRiff1 {o4cd}16,32& r2...
 !DRiff1 ]2
 !DRiff2 q0 @sine
-!DRiff2 [l8 o5g.& {o5gf}32,,255& {o5fg}32,,255
+!DRiff2 [l8 o5g.& {o5f}32,,255& {o5g}32,,255
 !DRiff2 o6dfe:c<a+a
-!DRiff2 o5a+& {o5a+a}32,,255& {o5aa+}32,,255& {o5a+a}32,,255& {o5af}32,,255&
-!DRiff2 {o5fc},,255 o4a16>c16 d<a+16>d16 cd
+!DRiff2 o5a+& {o5a}32,,255& {o5a+}32,,255& {o5a}32,,255& {o5f}32,,255&
+!DRiff2 {o5c},,255 o4a16>c16 d<a+16>d16 cd
 !DRiff2 ]2
 !DRiff2 l8 o6a+af16c16
-!DRiff2 o6d.& {o6dc}32,,255& {o6cd}32,,255&
-!DRiff2 {o6dg}8,,255 o6f16 {o6fg}16,,255&
-!DRiff2 {o6ga}8,,255 {o6aa+}8,,255 {o6a+a}8,,255 {o6ag}8,,255
+!DRiff2 o6d.& {o6c}32,,255& {o6d}32,,255&
+!DRiff2 {o6g}8,,255 o6f16 {o6fg}16,,255&
+!DRiff2 {o6a}8,,255 {o6aa+}8,,255 {o6a+a}8,,255 {o6ag}8,,255
 !DRiff2 l8 o6c4 {o6cg}4,,255 o6f.d+16 dd+16f16
-!DRiff2 l8 o6d+.& {o6d+c}.,,96 o5a+16>c16 dc<b>d
+!DRiff2 l8 o6d+.& {o6c}.,,96 o5a+16>c16 dc<b>d
 !DRiff2 l8 o6c4 {o6cg}8,,255 o6d+16g16 fd+df
 !DRiff2 l8 o6d+d16d+16dc<bagd
 !DRiff2 o5g1& GDT2 r1
 !DRiff3 @Flute1 {o3fg}16,32& w1 GET13 r2...
-;NOTE: Manual portamento was converted from pre-compiled data using 32nd note length
-;portamento duration in order to handle these without setting an instrument first.
-!DRiff4 {o2fg}16,32,7& w1 GT r2...
+!DRiff4 ?@Flute1 {o2fg}16,32& w1 GT r2...
 !DRiff5 @Flute1 [
 !DRiff5 l8 Q2o5g>[d]3
 !DRiff5 l32 Q4c16<a+16a16ga Q8[a64a+64]4afcf :
