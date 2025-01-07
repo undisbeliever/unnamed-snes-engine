@@ -1,7 +1,7 @@
 {
   "_about": {
     "file_type": "Terrific Audio Driver project file",
-    "version": "0.0.14"
+    "version": "0.0.16"
   },
   "instruments": [
     {
@@ -225,22 +225,7 @@
       "comment": null
     }
   ],
-  "samples": [
-    {
-      "name": "Snare02SMP",
-      "source": "samples/nesdoug/Snare02.brr",
-      "loop": "none",
-      "evaluator": "default",
-      "ignore_gaussian_overflow": false,
-      "sample_rates": [
-        384,
-        540,
-        224
-      ],
-      "envelope": "gain F127",
-      "comment": null
-    }
-  ],
+  "samples": [],
   "default_sfx_flags": {
     "one_channel": true,
     "interruptible": true
@@ -264,6 +249,7 @@
   "sound_effects": [
     "collect_item",
     "explosion_hurt_enemy",
+    "explosion_hurt_something",
     "explosion",
     "player_heal",
     "pickup_bomb",
@@ -332,6 +318,14 @@
     {
       "name": "BossClearTheme",
       "source": "songs/BossClearTheme.mml"
+    },
+    {
+      "name": "MagicalAmbience",
+      "source": "songs/MagicalAmbience.mml"
+    },
+    {
+      "name": "OminousAmbience",
+      "source": "songs/OminousAmbience.mml"
     }
   ]
 }

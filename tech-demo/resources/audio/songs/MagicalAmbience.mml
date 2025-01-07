@@ -1,0 +1,49 @@
+;Magical Ambience for unnamed-snes-game
+;By KungFuFurby
+;Made for undisbeliever's Terrific Audio Driver v0.1.0
+
+#Title Magical Ambience
+#Game unnamed-snes-game
+#Author KungFuFurby
+#Composer KungFuFurby
+#Copyright 2024 undisbeliever
+#Date 2024
+#License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
+
+;Echo Parameters
+#EchoLength 48
+#EchoFeedback -128
+#EchoVolume 127
+#FirFilter 64 0 0 0 0 0 -63 0
+
+;Instrument Definitions
+@sine sine adsr 4 0 0 15
+
+#ZenLen 192
+#Timer 255
+
+!sine_E1_V8 @sine E1 V8
+!GIT6_w8_GDT6_w8 GIT6 w8 GDT6 w8
+;Manual vibrato was converted from pre-compiled data using MP12,6 in order to persist it through a subroutine
+A !sine_E1_V8 ~7,6 p32
+A o5f+4& L !GIT6_w8_GDT6_w8
+
+;Manual vibrato was converted from pre-compiled data using MP12,6 in order to persist it through a subroutine
+B !sine_E1_V8 ~9,6 p96
+B o5b4& L !GIT6_w8_GDT6_w8
+
+;Manual vibrato was converted from pre-compiled data using MP12,6 in order to persist it through a subroutine
+C !sine_E1_V8 ~11,6 p48
+C o6d4& L !GIT6_w8_GDT6_w8
+
+;Manual vibrato was converted from pre-compiled data using MP12,6 in order to persist it through a subroutine
+D !sine_E1_V8 ~14,6 p80
+D o6f+4& L !GIT6_w8_GDT6_w8
+
+;Manual vibrato was converted from pre-compiled data using MP12,6 in order to persist it through a subroutine
+E !sine_E1_V8 ~17,6 p64
+E o6a4& L !GIT6_w8_GDT6_w8
+
+;Manual vibrato was converted from pre-compiled data using MP12,6 in order to persist it through a subroutine
+F !sine_E1_V8 p64
+F o6a4& L !GIT6_w8_GDT6_w8

@@ -1,6 +1,6 @@
 ;Village Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.14
+;Made for undisbeliever's Terrific Audio Driver v0.1.0
 
 #Title Village Theme
 #Game unnamed-snes-game
@@ -19,8 +19,8 @@
 @Bongo Bongo
 
 #ZenLen 192
+#Timer 80
 
-A T80
 A V128 L
 A @Kick3 _+0 o6c8 @Bongo _-2 o5e16e16e8 @Kick3 _+0 o6c8
 A [@Kick3 _+0 o6c8 @Bongo _-2 o5e8]2

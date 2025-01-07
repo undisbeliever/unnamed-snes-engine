@@ -1,6 +1,6 @@
 ;Dungeon Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.14
+;Made for undisbeliever's Terrific Audio Driver v0.1.0
 
 #Title Dungeon Theme
 #Game unnamed-snes-game
@@ -29,20 +29,20 @@
 @PianoC2_16 PianoC2_16 adsr 15 7 7 10
 
 #ZenLen 192
+#Timer 138
 
 !Strings8Detache_V128_E1 @Strings8Detache V128 E1
-A T138 E1
-!ARiff1 l8 o4[e]7e16d16
-A !Strings8Detache_V128_E1 [!ARiff1 ]22
+A E1
+A !Strings8Detache_V128_E1 [l8 o4[e]7e16d16]22
 A L E0 l4 V32 GF127 p48 [o3e>e]3 e2
-!ARiff2 l32 o3eeggf+f+aa
+!ARiff1 l32 o3eeggf+f+aa
 !Strings8_V64_NoVib @Strings8 V64 ~0
-A E1 !Strings8_V64_NoVib p64 l32 [!ARiff2 ]56
+A E1 !Strings8_V64_NoVib p64 l32 [!ARiff1 ]56
 A l32 [o3aa>cc<bb>dd]6
 A l32 [o3bb>ddc+c+ee]2
-A [!ARiff2 ]16 [V-4 !ARiff2 ]16
+A [!ARiff1 ]16 [V-4 !ARiff1 ]16
 A l1 r^^^^^^^^^
-A @Strings8Detache V32 [!ARiff1 ]9 l8 o4[e]7e16g16
+A @Strings8Detache V32 [l8 o4[e]7e16:d16]10 o4g16
 !Strings8_V24_E0 @Strings8 V24 E0
 A !Strings8_V24_E0 p48 o4e1f+1g1f+1e1f+1f+1f+2g+4e4
 
@@ -62,9 +62,7 @@ B l4 o5ef+
 !Flute1_E1_V48_Vib6_2 E1 @Flute1 V48 ~6,2
 B !Flute1_E1_V48_Vib6_2 l8 o5d^c+dc+^<a^ g<b>g^^f+de
 B l8 o5ef+gf+edc<b16g16 ae16c16<e16a16>e f+g+f+16d16c+16d16
-;NOTE: Manual portamento was converted from pre-compiled data using 8th note length
-;portamento duration in order to handle these without setting an instrument first.
-!BRiff4 GI9 o4g2. GFT127 {b f+}4,8,21& f+2& GET14
+!BRiff4 ?@Flute1 GI9 o4g2. GFT127 {b f+}4,8& f+2& GET14
 B w16 ~0 !BRiff4 f+4..
 B ~16,2 o4d2. GFT127 {f+ c+}4,8& c+2& GET14 c+2
 !GET9_R1_1 l1 GET9 r^
@@ -77,8 +75,8 @@ B !Strings8_V24_E0 p80 o4c1d1e1d1c1d1d1d+2e4<b4
 
 C l1 r^^^^^^^^^^^^^^^^
 C !Strings8Detache_V128_E1 l8 o3afaf16g16afa16f16e16d16
-C w4^32 o3a16a16g16f+16 w8.. l16wo4c<ba l24[wbbag:a]2f+ l32[eeegef+:ga]2ab
-C l8o3a[aggaabb: w]2
+C r4^32 o3a16a16g16f+16 r8.. l16ro4c<ba l24[rbbag:a]2f+ l32[eeegef+:ga]2ab
+C l8o3a[aggaabb: r]2
 C L E0 [@TimpaniB l8 o3 V128 e V48 e GF127 V96 e^]3 e4 V16[e64V+6]16
 C l1 A15,7,7,9 o3e^^^^^^^
 !CRiff1 l8 o5g^f+gf+^d^
@@ -94,13 +92,13 @@ C l1 r^^^^^
 C @PianoC2_16 V64 [o3e1]14
 C !Strings8_V24_E0 o3a1a1>c1<b1a1a1b1b2b4r4
 
-D l1 r^ !Strings8_V64_NoVib E0 o2e^f^e^e^
+D l1 r^ !Strings8_V64_NoVib E0 o2e^f^[e^]2
 D E1 V4 GI2 ~32,2 o7e& GDT2 e ~16,2 o6e& GT e ~0
 D l1 r^^^^^^ @Crash2 V128 GF0 o4g2& GI4 g2
 D L l4 @Crash2A [r V128 o4e]3 o4e2
 D A15,7,7,12 l1 o3f^^^
-D @HatClosed [l16 V12 o5g V24 g V48g V24 g]8
-D [l32 V12 o5gg V24 gg V48g16 V24gV18g]184
+D @HatClosed [l16 V12 o5g V24 g V48 g V24 g]8
+D [l32 V12 o5gg V24 gg V48 g16 V24 g V18 g]184
 
 E l1 r^^^^^ !Strings8_V64_NoVib E0 o1b^a^
 E l1 o1e^^^^^ f^e^f^
@@ -113,11 +111,11 @@ E l1 r^^^^^^^
 E @Flute1 V8 GF96 E1~8,2
 E [[o6b16b32a32b16a16 o6e16e32d32e16d16 o5b16b32a32b16 :
 E o6d16 c+16d16c+16e64f+64g64a64]2
-E o5a16 : g16f+16e16>e16]6 o5g16f+16e16b16
+E o5a16g16f+16e16 : o6e16]6 o5b16
 E @PianoC2_16 V64 E0 ~0 [o3a2]12 [o3b2]3 o3b4b4 [o3e4]6 o3e2
 
 F l1 r^^^^^^^^^^^^^
-F @trumpet_2 V96 E0 o3e^f^e^f^
+F @trumpet_2 V96 E0 [o3e^f^]2
 F l4 [o3e]6e2 L V96 E0
 F l1 o3e^^^^^^^^^^^^^
 F l1 o3a.b2

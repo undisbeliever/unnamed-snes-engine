@@ -1,6 +1,6 @@
 ;Boss Clear Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.0.14
+;Made for undisbeliever's Terrific Audio Driver v0.1.0
 
 #Title Boss Clear Theme
 #Game unnamed-snes-game
@@ -26,8 +26,9 @@
 @Kick3 Kick3
 @Snare02 Snare02
 
+#Timer 160
+
 A \asm {
-	set_song_tick_clock 160
 	set_instrument Snare02
 	set_volume 192
 	start_loop 5

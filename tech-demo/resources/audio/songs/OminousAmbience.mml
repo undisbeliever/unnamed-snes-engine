@@ -1,0 +1,50 @@
+;Ominous Ambience for unnamed-snes-game
+;By KungFuFurby
+;Made for undisbeliever's Terrific Audio Driver v0.1.0
+
+#Title Ominous Ambience
+#Game unnamed-snes-game
+#Author KungFuFurby
+#Composer KungFuFurby
+#Copyright 2024 undisbeliever
+#Date 2024
+#License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
+
+;Echo Parameters
+#EchoLength 48
+#EchoFeedback -112
+#EchoVolume 127
+#FirFilter 0 1 2 4 8 16 32 64
+
+;Instrument Definitions
+@sine sine gain I1
+@square square gain 127
+@square_GI4 square gain I4
+@noise noise
+
+#ZenLen 192
+#Timer 64
+
+A w2 T255
+A @square V0
+A ~1,32 o2a+1& L w1
+
+B w2 p~16,48
+B @square_GI4 V8 E1 PM
+B ~1,32 o3f1& L w1
+
+C w2
+C @square V0 
+C ~1,31 o2a+1& L w1
+
+D p~16,48 w2
+D @square_GI4 V8 E1 PM
+D ~1,31 o3f1& L w1
+
+E w2
+E @noise V0
+E ~4,62 o1f1& L w1
+
+F w2
+F @sine V16 E1
+F PM ~48,127 o6c1& L w1
