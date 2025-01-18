@@ -1,0 +1,9 @@
+All of the Pulse32 samples are pulse wave samples with a width of 16 samples along with an opening block with some silent samples.
+
+All of the Pulse16 samples are pulse wave samples with a width of 8 samples (duplicated in order to align with the size of a BRR block) along with an opening block with some silent samples.
+
+Pulse16W5F, Pulse16W3F and Pulse16W1F are additionally inverted during the conversion process due to a glitched result in the original conversions.
+
+All of the Pulse8 samples are pulse wave samples with a width of 4 samples (duplicated in order to align with the size of a BRR block) along with an opening block with some silent samples.
+
+They were initially hex crafted, saved as a .txt file (not human readable at all except with a hex editor), raw imported as signed 8-bit samples into Schism Tracker, toggled to 16-bit quality (and converted) and saved into an .it file, then converted to BRR using SNESMod.
