@@ -70,7 +70,7 @@ A !o5f24_X12
 A [!ARiff8a ]64
 A ]2
 A [!ARiff8a ]64
-!ARiff9 l24 o5cc96<a+96>!ARiff8a c96c48c96c48c48c48c48
+!ARiff9 l24 o5cc96<a+96>!ARiff8a [c96c48]2[c48]3
 A !ARiff9
 A [l24 V32 o5c V48 c48 V128 c : V48 c48]2 c48
 A !ARiff9
@@ -88,7 +88,7 @@ B l1 r^ L V32
 !BRiff1 l24 w.o5f.w.ff48 w.o5f.wf.f48
 B [!BRiff1 ]8
 !BRiff2 [[
-!BRiff2 [l48 o5fff f.f96f : l48 o5f^ff^f]2
+!BRiff2 [l48 o5[f]3 f.f96f : l48 [o5f^f]2]2
 !BRiff2 : l24 o5f.f.]2
 !BRiff2 [o5f48]4[f96]4
 !BRiff2 ]2
@@ -100,7 +100,7 @@ B !BRiff3
 B !BRiff4
 B [!BRiff1 ]11
 B !BRiff4
-!BRiff5 [l24 V16 o5f V32 f48 V48 o5f V32 f48]32
+!BRiff5 [l24 V16 [o5f V32 f48 :V48]2]32
 B !BRiff5
 B !BRiff3
 B !BRiff4
@@ -112,7 +112,7 @@ C E0
 C @Bongo _-2
 C l1 r^^^ V40 L
 C l24
-C [r[o3f.>f.^:o3f^]2 o4f^o3f.>f.^ : o3f [o3f.c.]2]2
+C [r o3f.>f.^ o3f^ o3f.>f.^f^o3f.>f.^ : o3f [o3f.c.]2]2
 C o3f^. [f.]3
 !CRiff1 _-2 l24 o3f.f.>f.<ff48
 !CRiff2 _-2 l24 o3f.f.>f.<f>f48
@@ -121,8 +121,8 @@ C !CRiff1 l24 [o3f.c.]2
 C [!CRiff1 !CRiff2 ]2
 !CRiff3 l24 _-2
 !CRiff3 o4c^^c^^c.c.[cc48]4c.c.c^^c^^
-!CRiff3 o4cf.f.c^cf.f.c.f48
-!CRiff3 o4cf.f.c.c48[c]6
+!CRiff3 o4cf.f.c^
+!CRiff3 [o4cf.f.c.:f48]2c48[c]6
 C !CRiff3
 !CRiff4 _-2 l24 o4c.f.f.c48>[c96d96]2
 C !CRiff4 o4c.f.f.cf48
@@ -144,13 +144,13 @@ C !CRiff3 !CRiff3
 D E0
 D @noise 
 D l1 r^^^^^ L
-!DRiff1a GI12 o6b192& GD12 b192&
+!DRiff1a GI12 o6b192& GDT12 w192
 !DRiff1 [
 !DRiff1 p16 ps+80,80 [V0 Vs+64,32 [!DRiff1a ]24 Vs-64,32 [!DRiff1a ]16 r12
 !DRiff1 : ps-80,80 ]2
 !DRiff1 ]2 p64 A12,7,4,24
 !DRiff1 r24.
-!DRiff2aa l24 V8 b V4 b48 V16
+!DRiff2aa l24 V8 o6b V4 b48 V16
 !DRiff2a l24 !DRiff2aa o6b V4 b48
 !DRiff2 l24
 !DRiff2 V16 o6b V4 b48
@@ -161,7 +161,7 @@ D l1 r^^^^^ L
 !DRiff2 !DRiff2aa o6b
 D !DRiff1 l24 [!DRiff2 o6b12]2 !DRiff2 b48 [
 D !DRiff2a
-D !DRiff2aa :o6bb48]4 b48& GIT24 b96& GDT24 b96& GIT24 b96& GDT24 b96
+D !DRiff2aa :o6bb48]4 b48& GIT24 w96 GDT24 w96 GIT24 w96 GDT24 r96
 !DRiff3 l24 [V16 o6b V4 b V8 b]4
 D [
 D [!DRiff2a ]12
@@ -171,11 +171,11 @@ D !DRiff3
 D !DRiff1 l24 !DRiff2 o6b12 !DRiff2 b48]2
 D [!DRiff2a ]32
 D [
-D [A12,4,4,20 l8 V16 o6b A12,7,4,24 V4 b b b]4:
+D [A12,4,4,20 l8 V16 o6b A12,7,4,24 V4 [b]3]4:
 D [!DRiff2a ]16
 D ]2
 D [!DRiff2a ]6
-D V12 b48& [GIT24 b96&:GDT24 b96&]11 GDT24 b96
+D V12 b48& [GIT24 w96:GDT24 w96]11 GDT24 r96
 
 E l1 r^^^^^^^^^^^ L
 E @Kick3 V128
