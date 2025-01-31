@@ -30,6 +30,19 @@
       "comment": null
     },
     {
+      "name": "sineP1O",
+      "source": "samples/undisbeliever/sine.wav",
+      "freq": 1000.0,
+      "loop": "dupe_block_hack",
+      "loop_setting": 3,
+      "evaluator": "default",
+      "ignore_gaussian_overflow": false,
+      "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "adsr 12 1 1 16",
+      "comment": null
+    },
+    {
       "name": "square",
       "source": "samples/undisbeliever/square.wav",
       "freq": 500.0,
@@ -76,6 +89,18 @@
       "evaluator": "default",
       "ignore_gaussian_overflow": false,
       "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
+    },
+    {
+      "name": "Strings8M1O",
+      "source": "samples/nesdoug/Strings8.brr",
+      "freq": 2000.0,
+      "loop": "none",
+      "evaluator": "default",
+      "ignore_gaussian_overflow": false,
+      "first_octave": 1,
       "last_octave": 7,
       "envelope": "gain F127",
       "comment": null
@@ -160,6 +185,42 @@
       "evaluator": "default",
       "ignore_gaussian_overflow": false,
       "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
+    },
+    {
+      "name": "PIANO_C5P1O",
+      "source": "samples/nesdoug/PIANO_C5.brr",
+      "freq": 500.0,
+      "loop": "none",
+      "evaluator": "default",
+      "ignore_gaussian_overflow": false,
+      "first_octave": 0,
+      "last_octave": 6,
+      "envelope": "gain F127",
+      "comment": null
+    },
+    {
+      "name": "PIANO_C5M1O",
+      "source": "samples/nesdoug/PIANO_C5.brr",
+      "freq": 2000.0,
+      "loop": "none",
+      "evaluator": "default",
+      "ignore_gaussian_overflow": false,
+      "first_octave": 1,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
+    },
+    {
+      "name": "PIANO_C5M2O",
+      "source": "samples/nesdoug/PIANO_C5.brr",
+      "freq": 4000.0,
+      "loop": "none",
+      "evaluator": "default",
+      "ignore_gaussian_overflow": false,
+      "first_octave": 2,
       "last_octave": 7,
       "envelope": "gain F127",
       "comment": null
