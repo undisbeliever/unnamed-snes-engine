@@ -1,0 +1,3 @@
+The samples stored in this directory are from KungFuFurby's collection.
+
+.txt files are included detailing their origins. For the Pulse files, an extra folder is included containing the original files involved. Most of these were not actually handled through the Terrific Audio Driver itself except for SineWave16 (and even then, a glitched version of the conversion was used in addition to a non-glitched version, so for consistency reasons an extracted .brr file was used instead).

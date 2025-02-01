@@ -6,8 +6,8 @@
 #Game unnamed-snes-game
 #Author KungFuFurby
 #Composer KungFuFurby
-#Copyright 2024 undisbeliever
-#Date 2024
+#Copyright 2025 undisbeliever
+#Date 2025
 #License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
 
 ;Echo Parameters
@@ -19,6 +19,7 @@
 @Strings8 Strings8
 @Strings8Detache Strings8 adsr 15 7 7 25
 @PIANO_C5 PIANO_C5
+@PIANO_C5P1O PIANO_C5P1O
 
 #ZenLen 192
 #Timer 224
@@ -36,7 +37,7 @@ C [l16 [o4g]7g32g32 !CRiff1 ]2
 C [l16 [o3g]7g32g32 !CRiff1 ]2
 
 D E1 V20
-!DRiff1 @PIANO_C5 l48 o4c<g>c gcg >c<g>c gcg >c<g>c <gcg c<g>c <gcg
+!DRiff1 @PIANO_C5 [l48 o4c<g>[cg]2 @PIANO_C5P1O ]2 l48 o5c<g>c<[gc]2<g>c<gcg
 D L !DRiff1
 
 E E0 @Strings8 V40
