@@ -569,6 +569,15 @@
     "interruptible": true
   },
   "high_priority_sound_effects": [
+    "WindControlMute",
+    "WindControlActivate_ExamplePreset1",
+    "WindControlActivate_ExamplePreset2",
+    "WindControlEVOL1",
+    "WindControlEVOL2",
+    "WindControlEVOL3",
+    "WindControlEVOL4",
+    "WindControlEFBIncrement",
+    "WindControlEFBDecrement",
     "player_hurt_low_health",
     "menu_select",
     "menu_incorrect",
@@ -668,6 +677,10 @@
     {
       "name": "FinalDungeonTheme",
       "source": "songs/FinalDungeonTheme.mml"
+    },
+    {
+      "name": "NoMusicWWind",
+      "source": "songs/NoMusicWWind.mml"
     },
     {
       "name": "LegendaryTheme",

@@ -1,0 +1,32 @@
+;Wind Control System - No Music
+;By KungFuFurby
+;Made for undisbeliever's Terrific Audio Driver v0.1.0
+
+#Title Final Dungeon Theme
+#Game unnamed-snes-game
+#Author KungFuFurby
+#Composer KungFuFurby
+#Copyright 2025 undisbeliever
+#Date 2025
+#License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
+
+;Echo Parameters
+#DisableFirFilterLimit
+#MaxEchoLength 0
+#EchoLength 0
+#EchoFeedback 0
+#EchoVolume 0
+#FirFilter 0 0 0 0 0 0 0 0
+
+#ZenLen 192
+#Timer 64
+
+;Welcome to the wind control system! All instructions for the wind control system will be provided in this MML file.
+;MML files that have an EDL of zero are technically compatible with the wind control system, though text in the MML file itself will indicate as such.
+;This MML file is almost equivalent to a blank song, except that it has pre-defined parameters (though it just simply initializes to mute echo), and for the sake of the GUI, it is a blank looping song.
+;Wind control presets seed the echo buffer by keying on a note with echo enabled along with a set of pre-defined parameters that result in the buffer producing a self-sustaining sound.
+;Wind control modifiers set the EVOL and EFB DSP registers. EFB control is relative, EVOL control comes in fixed values.
+;Wind control presets and modifiers are provided via high priority SFX instances. They will mute a channel due to the way the SFX system works (in the presets' case, it actually keys on a note, but in the modifiers' case this is not required), but otherwise will conclude after a tick or two.
+;WARNING: It is possible for the wind control system to no longer sustain a sound in the echo buffer, usually if the perceived pitch goes too low. It might be able to be rescued, but if not, you need to reseed the echo buffer by executing a preset command.
+
+A L w1
