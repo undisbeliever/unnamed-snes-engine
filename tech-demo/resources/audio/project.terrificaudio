@@ -671,6 +671,10 @@
       "source": "songs/JungleTheme.mml"
     },
     {
+      "name": "JungleThemeNoEcho",
+      "source": "songs/JungleThemeNoEcho.mml"
+    },
+    {
       "name": "BossClearTheme",
       "source": "songs/BossClearTheme.mml"
     },
