@@ -655,6 +655,10 @@
       "source": "songs/RainAmbienceWThunder.mml"
     },
     {
+      "name": "RainAmbienceWThunderNoEcho",
+      "source": "songs/RainAmbienceWThunderNoEcho.mml"
+    },
+    {
       "name": "VillageTheme",
       "source": "songs/VillageTheme.mml"
     },
