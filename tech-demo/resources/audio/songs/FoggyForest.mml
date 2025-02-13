@@ -6,8 +6,8 @@
 #Game unnamed-snes-game
 #Author KungFuFurby
 #Composer KungFuFurby
-#Copyright 2024 undisbeliever
-#Date 2024
+#Copyright 2025 undisbeliever
+#Date 2025
 #License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
 
 ;Echo Parameters
@@ -35,37 +35,37 @@ A !ARiff2 !ARiff2
 A !ARiff1 o1a4
 
 B @GuitarB2 V48 E0 p56 r16 L
-C @GuitarB2 V48 E0 p72 L
+C @GuitarB2 V48 E0 p72 r8 L
 BC [
-B     [l8 o4d <d f>c <a+: o3d+ff
-C  r8 [l8 o3a+>c<a^   g :   o3ac^
+B  [l8 o4d <d f>c <a+: o3d+ff
+C  [l8 o3a+>c<a^   g :   o3ac^
 BC ]2 :
 B l8 o3a+f>c
-C l8   o3aa&
+C l8   o3aa^
 BC ]3
 B o3a+a>f
-C   o4c<f&
+C   o4c<f
 B   o4g<g>cc <a+d+ca
-C r o4d f<a ^ g f<a&
-!BCRiff1BSide l8   o3a+dff g
-!BCRiff1CSide l8 r o3g ac^
+C ^ o4d f<a ^ g f<a^
+!BCRiff1BSide l8 o3a+dff g
+!BCRiff1CSide l8 o3g ac^
 BC [
 B !BCRiff1BSide l8 o3gff  :
-C !BCRiff1CSide l8 o3dac& :
+C !BCRiff1CSide l8 o3dac^ :
 BC [
 B !BCRiff1BSide l8 o2a+>c c :
-C !BCRiff1CSide l8 o3d+ f<a& :
+C !BCRiff1CSide l8 o3d+ f<a^ :
 B !BCRiff1BSide o3gf>d
-C !BCRiff1CSide o3da>c&
-!BCRiff2BSide l8   o4d+<ga+>d c
-!BCRiff2CSide l8 r o4c  d<f ^ g+
+C !BCRiff1CSide o3da>c^
+!BCRiff2BSide l8 o4d+<ga+>d c
+!BCRiff2CSide l8 o4c  d<f ^ g+
 BC [
 B l8 !BCRiff2BSide o3d+gb :
-C l8 !BCRiff2CSide o3b d& :
+C l8 !BCRiff2CSide o3b d^ :
 B !BCRiff2BSide o4c<b>d
-C !BCRiff2CSide o4d<g&
+C !BCRiff2CSide o4d<g
 B   o4c<d+ff g+cd>d
-C r o3g a+d^ d+gg&
+C ^ o3g a+d^ d+gg^
 BC ]2
 BC ]2
 BC ]2
@@ -98,7 +98,7 @@ D V40 E1
 !DRiff5 l8 Q2o5g>[d]3
 !DRiff5 l32 Q4c16<a+16a16ga Q8[a64a+64]4afcf :
 !DRiff5 l16 Q2o5g8>d8 Q4defg
-!DRiff5 l16 Q4o6afc<a+aa+af]2
+!DRiff5 l16 Q4o6afc<[a+a]2f]2
 !DRiff5 l8 Q2o5gQ4d<gd
 !DRiff5 l8 Q8o4gaa+>d [
 !DRiff5 {o4a+>c}16,32& r16^24 <a+24>c24 :
@@ -106,10 +106,10 @@ D V40 E1
 !DRiff5 l12 o5d+dd+ fd+d24<a+24 ]2
 !DRiff5 {o4fg}16,32& r16^24 f24g24
 !DRiff5 {o3a+>c}16,32& r8 d16
-!DRiff5 l16 o4d+fd+d
-!DRiff5 l12 o4d+d<g a+8.a32a+32
+!DRiff5 l16 o4d+fd+d [
+!DRiff5 l12 o4d+d<g: a+8.a32a+32
 !DRiff5 l8 o4c. <b32>c32 df
-!DRiff5 l12 o4d+d<g a+8>c8
+!DRiff5 l12 ]2 o3a+8>c8
 !DRiff5 l8 o4c. d32c32 <ba
 !DRiff5aa l16 o3g>gd<g>fc<f>c o3d+>d+<a+d+
 !DRiff5a !DRiff5aa l16 o4fc<f>c
@@ -143,11 +143,12 @@ E !DRiff2
 E l1 r^^^^^ V16
 E !DRiff5 r48 L
 E @PIANO_C5 V24
-E l16 Q4[o5g32]2Q8gd32g32
+E [
+E l16 Q4[o5g32]2Q8gd32g32:
 E l16 o5ff32g32fc
 E l16 Q4r[o5d+32]2Q8d+<a+32>d+32
 E l16 [o5f64g64]4 fc
-E l16 Q4r[o5g32]2Q8gd32g32
+E l16 r]2
 E l16 o5ff32g32ga
 E l16 Q4r[o5a+32]2Q8a+g32a+32
 E l16 [o5a64a+64]4 af

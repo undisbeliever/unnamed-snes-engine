@@ -6,9 +6,11 @@
 #Game unnamed-snes-game
 #Author KungFuFurby
 #Composer KungFuFurby
-#Copyright 2024 undisbeliever
-#Date 2024
+#Copyright 2025 undisbeliever
+#Date 2025
 #License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
+
+;This song is compatible with the wind control system.
 
 ;Instrument Definitions
 @HatClosed HatClosed
@@ -29,18 +31,20 @@ B @HatClosed L V64 o5c8 V16 [o5c8]3
 
 C L l1 r^^^^^^^ @Flute1 V56
 C [[r8 Q3o5d+8f8g8 Q8a+8Q4g+16a+16 Q8g+8Q4g16g+16
-C Q8g8Q4f16g16 Q8f8Q4d+16f16 Q8o5d+8Q4d16d+16 Q8o5d8:
+!CRiff1 Q4o5f16g16
+C Q8g8!CRiff1 f8Q4d+16f16 Q8o5d+8Q4d16d+16 Q8o5d8:
 C Q8o5c8
 C o4a+8g8g+8a+8 g4.a+8 g+4a+4>c4d4
 C ]2
 C Q8o5d+8
 C o5f8d+8f8g8 a+4.g8 d+4<a+4:g+4a+4]2 o5d+4f4
-C [l8 o5d+dcdd+dd+fd+dcdd+fgd+
+!CRiff2 l8 o5d+dcdd+
+C [l8 !CRiff2 o5dd+f !CRiff2 fgd+
 C o5fd+dd+fd+<a+>d+fd+fgg+: o5g8f8d+8
 C r8Q3o5d+8g+8a+8Q8>c8Q4<a+16>c16Q8<g+8Q4d+16g+16
-C Q8o5a+8>c8<a+8g+8 g8Q4f16g16 Q8d+8<a+8
+C Q8o5a+8>c8<a+8g+8 g8!CRiff1 d+8<a+8
 C r8o4f8a+8>f8d8<a+8>d8f8
-C l8 o5d+dcdd+<a+>d+f
+C l8 !CRiff2 o4a+>d+f
 C ]2 o5a+8d+8a+8
 C o6c8[d32c32]12d16c16<a+4g+4g4d+8g8
 C o5f4d+4d4f4d+1
@@ -52,7 +56,7 @@ D [[o4d+8.^24d+4^48]14 [o3a+8.^24a+4^48]2]2
 
 !ERiff1 [o4g8.^48g4^24]2
 E r8^24 !GuitarB2_1_V56 p80 L
-E [[!ERiff1 :[o4f8.^48f4^24]2]2[o4g+8.^48g+4^24]2 ]6
+E [!ERiff1 [o4f8.^48f4^24]2 !ERiff1 [o4g+8.^48g+4^24]2 ]6
 E [[[o4g+8.^48g+4^24]2 !ERiff1 [o4f8.^48f4^24]2:!ERiff1 ]2
 E [o4d+8.^48d+4^24]2]2
 

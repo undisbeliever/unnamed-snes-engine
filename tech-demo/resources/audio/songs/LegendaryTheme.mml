@@ -1,0 +1,105 @@
+;Legendary Theme for unnamed-snes-game
+;By KungFuFurby
+;Made for undisbeliever's Terrific Audio Driver v0.1.0
+
+#Title Legendary Theme
+#Game unnamed-snes-game
+#Author KungFuFurby
+#Composer KungFuFurby
+#Copyright 2025 undisbeliever
+#Date 2025
+#License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
+
+;Echo Parameters
+#EchoLength 48
+#EchoFeedback 116
+#EchoVolume 40
+#EchoInvert right
+#FirFilter 127 0 0 0 0 0 0 0
+
+;Instrument Definitions
+@Strings8 Strings8
+@Strings8M1O Strings8M1O
+@PIANO_C5 PIANO_C5 adsr 15 7 7 24
+@PIANO_C5M1O PIANO_C5M1O adsr 15 7 7 24
+@PIANO_C5M2O PIANO_C5M2O adsr 15 7 7 24
+@PIANO_C5P1O PIANO_C5P1O adsr 15 7 7 24
+
+#Timer 128
+#ZenLen 192
+
+A @Strings8 V24 E1 q8,D20 L
+A l16 p56N16p72N16[p56N19p72N19:[p56N22p72N22:[p56N25p72N25:
+A l16 p56N28p72N28]2]2]2
+
+!Strings8_V36 @Strings8 V36
+B !Strings8_V36 GIT6 p56 L l2 o4ced<b [o4cedg: o4f4e4[d4c4]2<b4>d4]2
+B p64 o4a^b^>c^d^e^dga^b^>c+^<b^a^g+^f+^& GDT2 r^
+B p56 l1 o3ab
+
+C !Strings8_V36 GIT6 L l2 o3a>c<bg [o3a>c<b>d: o3a^bg]2 iB
+C [D-1 o4a192& D0 a192&]95 r96 [D-1 o4b192& D0 b192&]95 r96
+!CRiff1 D-1 o5d192& D0 d192&
+C [D-1 o5c192& D0 c192&]95 r96 [!CRiff1 ]95 r96
+C [D-1 o5e192& D0 e192&]95 r96 [!CRiff1 ]47 r96 [D-1 o5g192& D0 g192&]47 r96
+C [[D-1 o5a192& D0 a192&]95 r96 : [[D-1 o5b192& D0 b192&]95 r96 :
+C [D-1 o6c+192& D0 c+192&]95 r96 ]2
+C ]2 [D-1 o5g+192& D0 g+192&]95 r96
+!CRiff2 D-1 o5f+192& D0 f+192&
+C [!CRiff2 ]96 GDT2 [!CRiff2 ]95 r96 i0
+C l1 o3f+g
+
+D !Strings8_V36 GIT6 p72 L l2 o3fagd [o3fagb: o3f^gd]2
+!PIANO_C5 @PIANO_C5
+!PIANO_C5M1O @PIANO_C5M1O
+D !PIANO_C5 V64 E1
+!DRiff1 l8 p48 o4e p64 >e p96 <e <a p64 >e p48 a p64
+!DRiff2 l8 p48 o4d p64 >d p96 <d <b p64
+D l8 r !DRiff1 o4e
+D l8 ^ !DRiff2 o4d p48 g p64 b
+D l8 ^ !DRiff1 o5a
+!DRiff3 l24 o5bgd gd<b
+D p48 ps+48,192 [l24 !DRiff3 o5d<bg !PIANO_C5M1O ]2 @PIANO_C5M2O !DRiff3
+D !PIANO_C5
+D l8 r !DRiff1 o5e
+D l8 ^ !DRiff2 o4g p48 b p64 >d
+D ^8 p48 o4e32>e16.< p64 >e32>e16.< p96 <e32>e16.< <a32>a16.< p64 >e32>e16.< p48 a32>a16.< p64 >a32>a16.<
+D p48 o5b32>b8..< p96 g32>g8..< p48 d32>d8..< p96 <b32>b8..< p48 [
+D ps+48, 192
+!DRiff4 l48 o5e>e<[c+>c+<<a>a]2<e>e
+D l48 [!DRiff4 o4a>a<e>e<c+>c+ !PIANO_C5M1O ]2
+D @PIANO_C5M2O !DRiff4
+D ps-48, 192 : 
+!DRiff5 l48 o5b<b>g<g>[b<b>>d<d]2
+D l48 [!DRiff5 o6g<g>d<d>g<g !PIANO_C5M1O ]2
+D !PIANO_C5 !DRiff5 ]2 !PIANO_C5 
+!DRiff6 l48 o5e>e<<[b>b<g+>g+]2<e>e
+D [l48 !DRiff6 o4g+>g+<e>e<<b>b !PIANO_C5M1O ]2
+D @PIANO_C5M2O !DRiff6
+D ps+48, 192
+!DRiff7a l48 o4a>a<f+>f+
+!DRiff7b l48 o4[a>ad>d]2
+!DRiff7 !DRiff7a !DRiff7b
+!DRiff8 l48 o5f+>f+<d>d<f+>f+
+D [!DRiff7 !DRiff8 !PIANO_C5M1O ]2
+D !PIANO_C5 !DRiff7 ps-48, 192 !DRiff8
+D @PIANO_C5P1O
+D !DRiff7
+D V24 !DRiff7
+D V8 !DRiff7
+D V4 l48 !DRiff7a o4a>a E0
+D !Strings8_V36 p72 l1 o3de
+
+!ERiff1 l1 [o3cd]4 [o4cd]4
+E !Strings8_V36 GIT6 L !ERiff1
+E l1 o4edc+<ba^ o2ab
+
+F @Strings8M1O V36 GIT6 L !ERiff1
+!FRiff1 l1 o3edeed^
+F @Strings8 !FRiff1 @Strings8M1O l1 o2ab
+
+G L l1 r^^^^^^^
+G !Strings8_V36 l1 [o3ab]4 o4c+<bag+f+^r^
+
+H L l1 r^^^^^^^
+H @Strings8M1O V36 l1 [o3cd]4 !FRiff1 r^

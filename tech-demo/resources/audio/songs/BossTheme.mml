@@ -6,8 +6,8 @@
 #Game unnamed-snes-game
 #Author KungFuFurby
 #Composer KungFuFurby
-#Copyright 2024 undisbeliever
-#Date 2024
+#Copyright 2025 undisbeliever
+#Date 2025
 #License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
 
 ;Echo Parameters
@@ -67,7 +67,7 @@ B [!BRiff1 !BRiff1 !BRiff2 !BRiff2 !BRiff1 !BRiff1 : !BRiff3 !BRiff3 ]4
 B !BRiff4 !BRiff4
 B !Crash2_V136_E0 [o5c4]8
 B A15,7,7,13 o3f+1. @TimpaniB V0 [V+6 o3f+48]24
-B !Crash2_V136_E0 o5c4 @Flute1 E1 V6 !BRiff5 [V+3 !BRiff4 ]2 [V+3 !BRiff5 ]2 [V+3 !BRiff4 ]2
+B !Crash2_V136_E0 o5c4 @Flute1 E1 V6 !BRiff5 [[V+3 !BRiff4 ]2: [V+3 !BRiff5 ]2]2
 B [!BRiff5 !BRiff5 !BRiff4 !BRiff4 ]3
 B !BRiff1 !BRiff1 [!BRiff4 !BRiff4 !BRiff5 !BRiff5 ]2
 B [l48 o7c<fc<fc<fcf>cf>cf]2
@@ -78,18 +78,20 @@ B [o7e<ae<ae<aea>ea>ea]2]2
 B [o7f+<bf+<bf+<bf+b>f+b>f+b]8
 
 !CRiff1 o5b32b32b16
-C @trumpet_2 V72 ~8,2 E1 r16 !CRiff1 o5b16>f+16<b16>f+16a16
+C @trumpet_2 V72 ~8,2 E1 r16 !CRiff1 o5[b16>f+16]2a16
 C o6g8f+16g16f+16e16d16e16 f4c+8f8 f+8d8f+8a8
 C o6b16 L r4.. r2 l1r^^
 C [r16 !CRiff1 o6c+16d16<b16>d16f+16 : o6e8d16e32d32c+16<a16e16a16]2
 C o6g8c8<g8>c16g16
 C [o6f+8.b8a16:g16f+16 o6e8.d8c+16d16e16]2
 C o6a16b16 o7c8<g8>c8g8
-C o7f+4<b8>f+8 o7e8d16d32d32[d16]3e16
-C o7f+4<b8f+8 o6g4>c8g8
-C o7f+4<b8>c+16d16 c+8<a8e8a16>e16
-C o7f+4<b8>c+8 d8.e16f+12g12a12
-C Q4 [[o7b32<b32:b32]3 [o7b32<b32b32]2 : o7a32<a32]4 o7b32<b32 Q8
+!CRiff2 o7f+4<b8
+C !CRiff2 o7f+8 o7e8d16d32d32[d16]3e16
+C !CRiff2 o6f+8 o6g4>c8g8
+C !CRiff2 o7c+16d16 c+8<a8e8a16>e16
+C !CRiff2 o7c+8 d8.e16f+12g12a12
+!CRiff3 Q4o7b32<b32
+C Q4 [[[!CRiff3 o6b32]2:!CRiff3 ]2 : o7a32<a32]4 !CRiff3 Q8
 C @Flute1 V224 ~0 [o3b64>c64]16 V64 [o4b64>c64]16 V32 [o5b64>c64]16
 C V16 [o6b64>c64]4 V32 [o5b64>c64]4 V64 [o4b64>c64]4 V224 [o3b64>c64]4
 C @trumpet_2 V72 ~8,2 [r8 o5b8>e8f+8 g8.f+32g32f+8:d8]2 a8
@@ -103,11 +105,11 @@ C o6g16!CRiff1 o6g16f+16!CRiff1 o6f+16
 C [o6f16e16e16:f16]2d16
 C o6c+4^24<b24>c+24f+24c+24f+24 g4.r8
 C o6g+4^24c+24d+24g+24d+24g+24 a4b4
-C Q6o7c+12c+12Q8c+48&d48&c+48&<b48& o7c+16<f+16a16>c+16
+C [Q6o7c+12]2Q8c+48&d48&c+48&<b48& o7c+16<f+16a16>c+16
 C o7d16c+16c+16d16d16e16e16d16
 C o7d+16.<g+16.>g+32d+32 c+32c32<a+32>c32c+32d+32e32f+32
 C o7g16.f+16.e32d32 c+32<b32>c+32d32e32f+32g32a32
-C [Q6[o7b12b12b24b24]3 [b24]6]2
+C [Q6[o7[b12]2[b24]2]3 [b24]6]2
 C o7b16
 
 D @PianoC2_16 V104 E0
@@ -129,8 +131,8 @@ E o2b>cc+d L
 E V48 p56 [o2bab:>c]6 o3d
 E l4 o2b>d<bab>c+de
 E V72 p64 o2b1^1
-E V48 p56 l2 o3edef+gf+ga
-E o3baaf+gf+gf
+E V48 p56 l2 o3ede[[f+g]2:a
+E o3baa]2f
 !ERiff1 l2 o3f+gg+a
 E !ERiff1
 E V40 o4c+dd+e
@@ -142,7 +144,7 @@ F V48 p56 [o2f+ef+:g]6 o2a
 F l4 o2f+af+ef+g+ab
 F V72 p64 o1b1^1
 F V48 p72 l2 o2bab>d[ed]3
-F o3f+dedec
+F o3f+[de]2c
 !FRiff1 l2 o3c+dd+e
 F !FRiff1
 F V40 !ERiff1
@@ -150,8 +152,8 @@ F V72 p64 o1b1^1
 
 G !Strings8_V48_E0
 G l1 r^^^^^^^^^^^^^^^^^^^2 L
-G l2 o2[ab]2>f+
-G o3gf+d<[ab]2r
+G l2 [o2[ab]2:>f+
+G o3gf+d<]2r
 G r1^1
 G !FRiff1
 G l1 r^^^^^^^^^^^^^^^^^^^2

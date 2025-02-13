@@ -1,0 +1,33 @@
+;Rain Ambience + Thunder for unnamed-snes-game
+;By KungFuFurby
+;Made for undisbeliever's Terrific Audio Driver v0.1.0
+
+#Title Rain Ambience + Thunder (No Echo)
+#Game unnamed-snes-game
+#Author KungFuFurby
+#Composer KungFuFurby
+#Copyright 2025 undisbeliever
+#Date 2025
+#License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
+
+;This song is compatible with the wind control system, at the cost of no echo.
+
+;Instrument Definitions
+@noise noise
+@HatClosed HatClosed
+@Snare02 Snare02
+
+#ZenLen 192
+#Timer 255
+
+A @noise GI1 V8 p48 L o5d%32&
+
+B @noise GI1 V8 p80 L o4a+%32&
+
+!CRiff1 o5b%4f+%5>f+%6d%7<b%6>c+%6d%6e%5f+%6d%5c%5
+C @HatClosed p~64,72 V2 [!CRiff1 V+2]8 L !CRiff1
+D @HatClosed V20 w%654 p~64,75 L o5a%11g%11f+%12g%13a%14 w%24 a%16g%8f%64 d%31 d%15 f+%49 d%16 e%48 f+%32 g%25 g%21 g%20
+
+;Disable channels E and F to disable thunder FX
+E @Snare02 V255 w%3321 p~16,64 w%128 L P69,%80 P28,%256 w%543 P28,%256 w%555 P28,%256 w%684
+F @Snare02 V255 w%3449 p~16,64 L P49,%48 P49,%128 w%1555 P49,%160 w%739
