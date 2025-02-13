@@ -10,6 +10,8 @@
 #Date 2025
 #License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
 
+;This song is compatible with the wind control system.
+
 ;Instrument Definitions
 @noise noise
 @HatClosed HatClosed
