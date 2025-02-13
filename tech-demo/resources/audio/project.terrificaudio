@@ -663,6 +663,10 @@
       "source": "songs/FoggyForest.mml"
     },
     {
+      "name": "FoggyForestNoEcho",
+      "source": "songs/FoggyForestNoEcho.mml"
+    },
+    {
       "name": "JungleTheme",
       "source": "songs/JungleTheme.mml"
     },
