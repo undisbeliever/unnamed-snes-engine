@@ -647,6 +647,10 @@
       "source": "songs/TitleScreenTheme.mml"
     },
     {
+      "name": "TitleScreenThemeNoEcho",
+      "source": "songs/TitleScreenThemeNoEcho.mml"
+    },
+    {
       "name": "RainAmbience",
       "source": "songs/RainAmbience.mml"
     },
