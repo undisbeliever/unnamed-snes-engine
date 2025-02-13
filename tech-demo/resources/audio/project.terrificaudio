@@ -668,6 +668,10 @@
     {
       "name": "FinalDungeonTheme",
       "source": "songs/FinalDungeonTheme.mml"
+    },
+    {
+      "name": "LegendaryTheme",
+      "source": "songs/LegendaryTheme.mml"
     }
   ]
 }
