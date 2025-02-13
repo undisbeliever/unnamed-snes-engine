@@ -10,6 +10,12 @@
 #Date 2025
 #License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
 
+;WARNING: The global music volume must be kept at its maximum value!
+;This song uses the echo buffer for distortion, and the distortion itself is sensitive to volume changes.
+;WARNING: The echo must be stopped when switching and/or stopping this song!
+;This is because the distortion and/or echo synthesis can accidentally sustain itself where it isn't supposed to otherwise.
+;This would result in a tone being output through the echo buffer like a stuck note instead of the expected decaying reverb effect you would normally hear.
+
 ;Echo Parameters
 #DisableFirFilterLimit
 #MaxEchoLength 48
