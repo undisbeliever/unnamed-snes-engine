@@ -627,6 +627,10 @@
       "source": "songs/DungeonTheme.mml"
     },
     {
+      "name": "DungeonThemeNoEcho",
+      "source": "songs/DungeonThemeNoEcho.mml"
+    },
+    {
       "name": "BossTheme",
       "source": "songs/BossTheme.mml"
     },
