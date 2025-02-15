@@ -15,6 +15,17 @@ namespace audio {
 // ::TODO add menu to set/clear monoFlag::
 
 
+// Default Configuration
+//
+// Custom to unnamed-snes-engine.  Not TAD
+    // must be between MIN_TRANSFER_PER_FRAME and MAX_TRANSFER_PER_FRAME
+    let DEFAULT_TRANSFER_PER_FRAME = 256;
+    // Must not contain RELOAD_COMMON_AUDIO_DATA
+    let TAD_DEFAULT_FLAGS = Flags.PLAY_SONG_IMMEDIATELY | Flags.RESET_GLOBAL_VOLUMES_ON_SONG_START;
+    let TAD_DEFAULT_AUDIO_MODE = AudioMode.MONO;
+
+
+
 // Address to store the loader (in Audio-RAM).
 // Address (in Audio-RAM) to execute after loading the Loader.
 // MUST match LOADER_ADDR in `audio-driver/src/common_memmap.wiz`
@@ -30,8 +41,6 @@ let CENTER_PAN = MAX_PAN / 2;
 let MIN_TRANSFER_PER_FRAME = 32;
 // The loader can transfer ~849 bytes per 60Hz frame SlowROM or FastROM
 let MAX_TRANSFER_PER_FRAME = 800;
-// MUST BE > 0
-let DEFAULT_TRANSFER_PER_FRAME = 256;
 
 let N_SONGS = resources.N_SONGS;
 
@@ -41,8 +50,8 @@ namespace IO {
     namespace ToDriver {
         // The command to execute.
         //
-        //      iii0ccci
-        //          ccc = command
+        //      iiicccci
+        //         cccc = command
         //            0 = reserved for future expansion
         //            i = command id, MUST be different on every command.
         //                Used to detect when a new command has been sent to the driver.
@@ -54,8 +63,7 @@ namespace IO {
         //    has been acknowledged.
         extern writeonly command @ &APUIO_OUT_0 : u8;
 
-        let N_COMMANDS = 8;
-        let COMMAND_MASK   = 0b00001110;
+        let COMMAND_MASK   = 0b00011110;
         let COMMAND_I_MASK = 0b11100001;
 
         // The two command parameter bytes
@@ -120,8 +128,15 @@ enum Command : u8 {
     // Unpauses the music and sound effect channels.
     UNPAUSE = 4,
 
-    // SHOULD NOT USE PLAY_SOUND_EFFECT in `queue_command`
-    // (command queue only holds 1 parameter byte and PLAY_SOUND_EFFECT has 2 parameters)
+    // Play a sound effect
+    //  * parameter0: sound effect id
+    //  * parameter1: pan (0-128) (not bounds checked)
+    //
+    // The sound-effect might not play if both sound effect channels are active.
+    // See the Sound Effects documentation for more details
+    //
+    // CAUTION: a PLAY_SOUND_EFFECT command has a higher priority than the sound-effect queue.
+    PLAY_SOUND_EFFECT = 6,
 
     // Stop all active sound effects
     STOP_SOUND_EFFECTS = 8,
@@ -144,37 +159,66 @@ enum Command : u8 {
     //
     // NOTE: The song can still change the tempo.
     SET_SONG_TEMPO = 14,
+
+    // Set the global music volume
+    //  * parameter0: the music volume.
+    //    A 255 music-volume will not modify the channel volume.
+    //
+    // NOTE: If the `RESET_GLOBAL_VOLUMES_ON_SONG_START` flag is set, the global volumes
+    // will be reset when a songs starts.
+    SET_GLOBAL_MUSIC_VOLUME = 16,
+
+    // Set the global sound-effect volume
+    //  * parameter0: the music volume.
+    //    A 255 sfx-volume will not modify the channel volume.
+    //
+    // NOTE: If the `RESET_GLOBAL_VOLUMES_ON_SONG_START` flag is set, the global volumes
+    // will be reset when a songs starts.
+    SET_GLOBAL_SFX_VOLUME = 18,
+
+    // Set the global music and sound-effect volumes
+    //  * parameter0: the music volume.
+    //  * parameter1: the sound-effect volume.
+    //
+    // NOTE: If the `RESET_GLOBAL_VOLUMES_ON_SONG_START` flag is set, the global volumes
+    // will be reset when a songs starts.
+    SET_GLOBAL_VOLUMES = 20,
 };
-
-
-// Play a sound effect command
-//  * parameter0: sound effect id
-//  * parameter1: pan (0-128) (not bounds checked)
-let __PLAY_SOUND_EFFECT_COMMAND  = 6;
 
 
 // MUST match `audio-driver/src/io-commands.wiz`
 namespace LoaderDataType {
     let CODE             = 0;
     let COMMON_DATA      = 1;
-    let MIN_SONG_VALUE   = 2;
 
-    let STEREO_FLAG      = 1 << 7;
-    let PLAY_SONG_FLAG   = 1 << 6;
+    let SONG_DATA_FLAG            = 1 << 7;
+    let PLAY_SONG_FLAG            = 1 << 6;
+    let RESET_GLOBAL_VOLUMES_FLAG = 1 << 5;
+
+    let STEREO_FLAG               = 1 << 1;
+    let SURROUND_FLAG             = 1 << 0;
 };
 
 namespace Flags {
-    let STEREO                   = LoaderDataType.STEREO_FLAG;
-    let PLAY_SONG_IMMEDIATELY    = LoaderDataType.PLAY_SONG_FLAG;
-    let RELOAD_COMMON_AUDIO_DATA = 1 << 0;
+    let RELOAD_COMMON_AUDIO_DATA = 1 << 7;
+    let PLAY_SONG_IMMEDIATELY = 1 << 6;
+    let RESET_GLOBAL_VOLUMES_ON_SONG_START = 1 << 5;
 
-    let LOADER_MASK = STEREO | PLAY_SONG_IMMEDIATELY;
+    let _ALL_FLAGS = RELOAD_COMMON_AUDIO_DATA | PLAY_SONG_IMMEDIATELY | RESET_GLOBAL_VOLUMES_ON_SONG_START;
+}
+
+enum AudioMode : u8 {
+    MONO = 0,
+    STEREO = 1,
+    SURROUND = 2,
 }
 
 enum State : u8 {
     NULL                                =    0,
-    // Waiting for loader to send the ready signal.
-    WAITING_FOR_LOADER                  = 0x7c,
+    // Waiting for loader to send the ready signal before loading common-audio-data
+    WAITING_FOR_LOADER_COMMON           = 0x7b,
+    // Waiting for loader to send the ready signal before loading song data
+    WAITING_FOR_LOADER_SONG             = 0x7c,
     // Loading common audio data.
     LOADING_COMMON_AUDIO_DATA           = 0x7d,
     // Loading a song and the LoaderDataType.PLAY_SONG_FLAG was clear.
@@ -190,8 +234,10 @@ enum State : u8 {
     PLAYING                             = 0x82,
 }
 
+let __FIRST_WAITING_STATE = State.WAITING_FOR_LOADER_COMMON;
 let __FIRST_LOADING_STATE = State.LOADING_COMMON_AUDIO_DATA;
 let __FIRST_LOADING_SONG_STATE = State.LOADING_SONG_DATA_PAUSED;
+
 
 in rodata0 {
     const __LoaderBinary = embed "gen/audio-loader.bin";
@@ -200,8 +246,6 @@ in rodata0 {
     let LOADER_SIZE = sizeof(typeof(__LoaderBinary));
 
     const AudioDriver = embed "gen/audio-driver.bin";
-
-    const BlankSong = embed "gen/audio-blank-song.bin";
 }
 
 
@@ -216,8 +260,11 @@ in lowram {
     var _state : State;
 
     // See `Flags` namespace
-    var _flags : u8;
+    var flags : u8;
 
+    // Mono/Stereo/Surround audio mode.
+    // Changes to `audioMode` will not take effect until the next song is loaded into Audio-RAM.
+    var audioMode : AudioMode;
 
     // Number of bytes to transfer on per `Process` call
     //
@@ -246,7 +293,7 @@ in lowram {
 // Queue 2 - The next song to load into Audio-RAM
 in lowram {
     // The next song to load into Audio-RAM
-    // Used by the `WAITING_FOR_LOADER` state
+    // Used by the `WAITING_FOR_LOADER_SONG` state
     // If this value is 0 or > N_SONGS, a blank silent song will be loaded instead.
     var _nextSong : u8;
 }
@@ -258,8 +305,9 @@ in lowram {
     // If this value is negative, the queue is empty.
     var _nextCommand_id : u8;
 
-    // The parameter of the next next command (if any)
-    var _nextCommand_parameter : u8;
+    // The two parameters of the next command (if any)
+    var _nextCommand_parameter0 : u8;
+    var _nextCommand_parameter1 : u8;
 }
 
 
@@ -329,7 +377,7 @@ func load_audio_data(id: u8 in a) : bool in carry {
 //  * Loads the loader into Audio-RAM
 //  * Loads the audio driver into Audio-RAM
 //  * Sets the song to 0 (silence)
-//  * Resets the state and flags
+//  * Initialises `flags` and `audioMode`
 //  * Queues a common audio data transfer
 //
 // This function will require multiple frames of execution time.
@@ -350,7 +398,13 @@ inline func setup__inline() {
     __Loader.transfer_loader_via_ipl__inline();
 
     _state = State.NULL;
-    _flags = a = Flags.RELOAD_COMMON_AUDIO_DATA | Flags.PLAY_SONG_IMMEDIATELY;
+
+    // Assumes (TAD_DEFAULT_FLAGS) & Flags.RELOAD_COMMON_AUDIO_DATA == 0
+    // Assumes (TAD_DEFAULT_FLAGS) & Flags._ALL_FLAGS == (TAD_DEFAULT_FLAGS)
+    // Assumes (TAD_DEFAULT_AUDIO_MODE) >= 0 && (TAD_DEFAULT_AUDIO_MODE) < TAD_N_AUDIO_MODES
+    // Assumes flags + 1 == audioMode
+    *(&flags as *u16) = xx = (TAD_DEFAULT_FLAGS) | (TAD_DEFAULT_AUDIO_MODE as u16 << 8) ;
+
     _bytesToTransferPerFrame = xx = DEFAULT_TRANSFER_PER_FRAME;
 
     __Loader.set_data_to_transfer(#:far &AudioDriver, &AudioDriver as u16, sizeof(typeof(AudioDriver)));
@@ -369,7 +423,7 @@ inline func setup__inline() {
         carry = __Loader.transfer_data();
     } while !carry;
 
-    a = State.WAITING_FOR_LOADER as u8;
+    a = State.WAITING_FOR_LOADER_COMMON as u8;
     _state = a as State;
 }
 
@@ -388,7 +442,8 @@ func __process__send_command__return_idx16(previousCommand: u8 in a, nextCommand
     a ^= IO.ToDriver.COMMAND_I_MASK;
     a |= _nextCommand_id;
 
-    IO.ToDriver.parameter0 = x = _nextCommand_parameter;
+    IO.ToDriver.parameter0 = x = _nextCommand_parameter0;
+    IO.ToDriver.parameter1 = x = _nextCommand_parameter1;
     IO.ToDriver.command = a;
     _previousCommand = a;
 
@@ -424,7 +479,7 @@ inline func __process__send_sfx_command__inline(previousCommand : u8 in a, sfx: 
     // Clear the non i bits of commands
     a &= IO.ToDriver.COMMAND_I_MASK as u8;
     //  Change the i bits and set the play sound effect command
-    a ^= IO.ToDriver.COMMAND_I_MASK | (__PLAY_SOUND_EFFECT_COMMAND as u8);
+    a ^= IO.ToDriver.COMMAND_I_MASK | (Command.PLAY_SOUND_EFFECT as u8);
 
     // parameter 0 = sfx_id
     IO.ToDriver.parameter0 = y;
@@ -459,7 +514,7 @@ inline func __process__send_sfx_command__inline(previousCommand : u8 in a, sfx: 
 //
 // TIMING:
 //  * Should be called once per frame.
-//  * MUST be called after Tad_Init.
+//  * MUST be called after `setup__inline()`.
 //  * MUST NOT be called in an interrupt.
 //
 // DB access registers
@@ -498,27 +553,26 @@ func process() {
     }
 
     // Song is not loaded into Audio-RAM
-    // ASSUMES __FIRST_LOADING_STATE == State::WAITING_FOR_LOADER + 1
-    cmp(a, State.WAITING_FOR_LOADER);
-    goto __process__waiting_for_loader if zero;
-    goto __process__loading if carry;
+
+    // Assumes __FIRST_LOADING_STATE > __FIRST_WAITING_STATE
+    // Assumes __FIRST_LOADING_STATE = State.WAITING_FOR_LOADER_SONG + 1
+    goto __process__loading if a >= __FIRST_LOADING_STATE as u8;
+    goto __process__waiting_for_loader if a >= __FIRST_WAITING_STATE as u8;
 }
 
 
 
-// Process the WAITING_FOR_LOADER state.
+// Process the WAITING_FOR_LOADER_* states.
+//
+// IN: A = state
 //
 // DB access registers
 #[mem8, idx16]
-func __process__waiting_for_loader() {
-    a = _flags;
-    if (a & Flags.RELOAD_COMMON_AUDIO_DATA) != 0 {
+func __process__waiting_for_loader(state: u8 in a) {
+    if a == State.WAITING_FOR_LOADER_COMMON as u8 {
         // Common audio data
         carry = __Loader.check_ready_and_send_loader_data_type(LoaderDataType.COMMON_DATA);
         goto Return if !carry;
-
-        a = Flags.RELOAD_COMMON_AUDIO_DATA;
-        test_and_reset(_flags, a);
 
         // Must store state AFTER `load_audio_data()`
         // `load_audio_data()` might call `finish_loading_data()`.
@@ -530,14 +584,36 @@ func __process__waiting_for_loader() {
     else {
         // Songs
 
-        // a == _flags
-        a = (a & Flags.LOADER_MASK) | (LoaderDataType.MIN_SONG_VALUE as u8);
+        // `flags` MUST NOT have the stereo/surround loader flag set
+        // ASSUMES Flags._ALL_FLAGS & LoaderDataType.STEREO_FLAG == 0
+        // ASSUMES Flags._ALL_FLAGS & LoaderDataType.SURROUND_FLAG == 0
+
+        // SONG_DATA_FLAG must always be sent and it also masks the RELOAD_COMMON_AUDIO_DATA flag in LoaderDataType
+        // ASSUMES Flags.RELOAD_COMMON_AUDIO_DATA == LoaderDataType.SONG_DATA_FLAG
+
+        // ASSUMES Flags.PLAY_SONG_IMMEDIATELY == LoaderDataType.PLAY_SONG_FLAG
+        // ASSUMES Flags.RESET_GLOBAL_VOLUMES_ON_SONG_START == LoaderDataType.RESET_GLOBAL_VOLUMES_FLAG
+
+        // Clear unused flags
+        a = 0xff ^ Flags._ALL_FLAGS;
+        test_and_reset(flags, a);
+
+        // Convert `audioMode` to LoaderDataType and combine with `flags`
+        // ASSUMES ((0 + 1) & 3) == LoaderDataType.SURROUND_FLAG (mono)
+        // ASSUMES ((1 + 1) & 3) == LoaderDataType.STEREO_FLAG (stereo)
+        // ASSUMES ((2 + 1) & 3) == LoaderDataType.STEREO_FLAG | LoaderDataType.SURROUND_FLAG (surround)
+        a = audioMode as u8;
+        a++;
+        a &= 3;
+
+        a = a | flags | LoaderDataType.SONG_DATA_FLAG;
+
         carry = __Loader.check_ready_and_send_loader_data_type(a);
         goto Return if !carry;
 
         // assumes Flags.PLAY_SONG_IMMEDIATELY == 0x40
         // assumes State.LOADING_SONG_DATA_PAUSED + 1 == State.LOADING_SONG_DATA_PLAY
-        a = _flags;
+        a = flags;
         a <<<= 2;
         // carry = PLAY_SONG_IMMEDIATELY flag
         a = 0 +# (State.LOADING_SONG_DATA_PAUSED as u8);
@@ -550,9 +626,12 @@ func __process__waiting_for_loader() {
     carry = load_audio_data(a);
     goto DataIsValid if carry;
         UseBlankSong:
-            xx = &BlankSong as u16;
-            a = #:far &BlankSong;
-            yy = sizeof(typeof(BlankSong));
+            // The blank song is a single zero byte.
+            // ::HACK use the 3rd byte of `ldy #1` (which is `0x00`) for the blank song data::
+            yy = 1;
+        _AfterLdy:
+            xx = &_AfterLdy as u16 - 1;
+            a = #:far &_AfterLdy;
 DataIsValid:
 
     // STACK holds next state
@@ -578,7 +657,7 @@ func __process__loading() {
         a = _state as u8;
         if a == State.LOADING_COMMON_AUDIO_DATA as u8 {
             // Loader is still active
-            a = State.WAITING_FOR_LOADER as u8;
+            a = State.WAITING_FOR_LOADER_SONG as u8;
         }
         else {
             // Song audio data was loaded into Audio-RAM.
@@ -593,7 +672,7 @@ func __process__loading() {
             sfxQueue_pan = a;
 
             // Use `_state` to determine if the song is playing or paused.
-            // Cannot use `_flags` as it may have changed after the `LoaderDataType` was sent to
+            // Cannot use `flags` as it may have changed after the `LoaderDataType` was sent to
             // the loader (while the song was loaded).
 
             // Assumes ((State::LOADING_SONG_DATA_PAUSED & 1) << 1) | $80 = State::PAUSED
@@ -634,11 +713,12 @@ func finish_loading_data() {
 //
 // DB access lowram
 #[mem8, idx8]
-func queue_command(command : Command in a, parameter0: u8 in x) : bool in carry {
+func queue_command(command : Command in a, parameter0: u8 in x, parameter1: u8 in y) : bool in carry {
     bit(_nextCommand_id);
     if negative {
         _nextCommand_id = a = a & IO.ToDriver.COMMAND_MASK;
-        _nextCommand_parameter = x;
+        _nextCommand_parameter0 = x;
+        _nextCommand_parameter1 = y;
 
         return true;
     }
@@ -664,9 +744,10 @@ let queue_command_no_parameter = queue_command as func(command : Command in a): 
 //
 // DB access lowram
 #[mem8, idx8]
-func queue_command_override(command : Command in a, parameter0: u8 in x) {
+func queue_command_override(command : Command in a, parameter0: u8 in x, parameter1: u8 in y) {
     _nextCommand_id = a = a & IO.ToDriver.COMMAND_MASK;
-    _nextCommand_parameter = x;
+    _nextCommand_parameter0 = x;
+    _nextCommand_parameter1 = x;
 }
 
 // Adds a command with no parameter to the queue, overriding any previously unsent commands.
@@ -717,30 +798,49 @@ func queue_sound_effect(effect_id : sound_effects in a) {
 }
 
 
-
-// Disables the audio driver, starts the loader and queues a song transfer.
+// Disables the audio driver, starts the loader and queues a song or common-audio-data transfer.
 //
-// CAUTION: The audio driver starts in the paused state if the PlaySongImmediatly flag is false.
-// CAUTION: Tad_Process will call LoadSongData (which can take a while if it decompresses song data).
+// This subroutine will clear the `RELOAD_COMMON_AUDIO_DATA` flag.
+//
+// CAUTION: `song_song()` will switch the state to `WAITING_FOR_LOADER_*`.  `load_audio_data()` will
+// not be called until `process()` is called **and** the audio-driver has switched to the loader.
+// While the state remains `WAITING_FOR_LOADER_*`, no audio data will be transferred and calling
+// `finish_loading_data()` will not transfer any audio data.
+//
+// CAUTION: The audio driver starts in the paused state if the `PLAY_SONG_IMMEDIATELY`
+// flag is clear when `process()` receives the ready signal from the loader.
+//
+// IN: A = 0 - play a blank (silent song)
+// IN: A >= 1 - Play song number `A`
 //
 // KEEP: Y
 //
 // DB access lowram
 #[mem8]
 func load_song(songId : resources.songs in a) {
-    // ::TODO test calling this function in the middle of a song transfer::
+    // CAUTION: Spaghetti code
 
     _nextSong = a;
 
-    a = _state as u8;
-    if a >= __FIRST_LOADING_SONG_STATE as u8 {
-         // State is not NULL, WAITING_FOR_LOADER or LOADING_COMMON_AUDIO_DATA
-
-        __Loader.send_switch_to_loader_command__inline__db_unknown();
-
-        a = State.WAITING_FOR_LOADER as u8;
-        _state = a as State;
+    a = Flags.RELOAD_COMMON_AUDIO_DATA;
+    test_and_reset(flags, a);
+    if !zero {
+        // Common audio data requested
+        a = State.WAITING_FOR_LOADER_COMMON as u8;
     }
+    else {
+        a = _state as u8;
+        goto Return if a < __FIRST_LOADING_SONG_STATE as u8;
+
+            // State is not NULL, WAITING_FOR_LOADER_* or LOADING_COMMON_AUDIO_DATA
+            a = State.WAITING_FOR_LOADER_SONG as u8;
+    }
+
+    _state = a as State;
+
+    __Loader.send_switch_to_loader_command__inline__db_unknown();
+
+Return:
 }
 
 
@@ -782,46 +882,7 @@ inline func get_song() : u8 in a {
 #[mem8]
 func reload_common_audio_data() {
     a = Flags.RELOAD_COMMON_AUDIO_DATA;
-    test_and_set(_flags, a);
-}
-
-
-
-// Clears the stereo flag.
-// This will not take effect until the next `load_song` call.
-//
-// DB access lowram
-#[mem8]
-func set_mono() {
-    a = Flags.STEREO;
-    test_and_reset(_flags, a);
-}
-
-
-
-// Sets the stereo flag.
-// This will not take effect until the next `load_song` call.
-//
-// DB access lowram
-#[mem8]
-func set_stereo() {
-    a = Flags.STEREO;
-    test_and_set(_flags, a);
-}
-
-
-
-// Reads the stereo flag
-//
-// Returns true if stereo
-//
-// DB access lowram
-#[mem8]
-func get_stereo_flag() : bool in carry {
-    // assumes STEREO_FLAG == 0x80
-    a = _flags;
-    cmp(a, Flags.STEREO);
-    return carry;
+    test_and_set(flags, a);
 }
 
 
@@ -833,7 +894,7 @@ func get_stereo_flag() : bool in carry {
 #[mem8]
 func songs_start_immediately() {
     a = Flags.PLAY_SONG_IMMEDIATELY;
-    test_and_set(_flags, a);
+    test_and_set(flags, a);
 }
 
 
@@ -844,7 +905,20 @@ func songs_start_immediately() {
 #[mem8]
 func songs_start_paused() {
     a = Flags.PLAY_SONG_IMMEDIATELY;
-    test_and_reset(_flags, a);
+    test_and_reset(flags, a);
+}
+
+
+// Not porting `Tad_GlobalVolumesResetOnSongStart`
+// Not porting `Tad_GlobalVolumesPersist`
+
+
+// Sets the audio mode
+//
+// DB access lowram
+#[mem8]
+inline func set_audio_mode(mode : AudioMode in a) {
+    audioMode = a as AudioMode;
 }
 
 
@@ -874,7 +948,7 @@ func set_transfer_size(bytes_per_frame: u16 in xx) {
 // DB access lowram
 #[mem8]
 func is_loader_active() : bool in carry {
-    // Assumes NULL and WAITING_FOR_LOADER are < __FIRST_LOADING_STATE
+    // Assumes NULL and WAITING_FOR_LOADER_* are < __FIRST_LOADING_STATE
     // Assumes (State.PAUSED | State.PLAYING) & 0x7f < __FIRST_LOADING_STATE state.
     a = _state as u8;
     a &= 0x7f;

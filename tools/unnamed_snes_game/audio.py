@@ -26,7 +26,7 @@ def _verify_tad_compiler_binary(tad_compiler_binary: str) -> None:
 
     if c.returncode != 0:
         raise RuntimeError("tad_compiler_binary did not return EXIT_SUCCESS")
-    if re.match(r"^tad-compiler \d+\.\d+\.\d+$", c.stdout.strip()) is None:
+    if re.match(r"^tad-compiler \d+\.\d+\.\d+(-beta.\d+)?$", c.stdout.strip()) is None:
         raise RuntimeError("tad_compiler_binary is not tad-compiler")
 
 

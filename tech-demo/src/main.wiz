@@ -48,7 +48,9 @@ inline func __initialise_audio__inline() {
     let PALETTE = resources.palettes.title_screen;
 
     audio.setup__inline();
-    audio.set_stereo();
+
+    // ::TODO options menu to set audio mode::
+    audio.set_audio_mode(audio.AudioMode.SURROUND);
 
 
     INIDISP = a = INIDISP_FORCE_BLANK;
