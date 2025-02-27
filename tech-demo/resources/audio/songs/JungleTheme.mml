@@ -60,24 +60,23 @@ A [!ARiff6 !ARiff7 ]2
 !ARiff8 ]2
 A !ARiff8
 A [[!ARiff8a ]12 [o5f]6]2
-!o5f24_X12 [o5f24]12
-A [
-A [l24 [o5f.]4ff48ff.f48ff48]3
-A !o5f24_X12 :
+!ARiff9 [l24 [o5f.]4ff48ff.f48ff48]3
+!ARiff9 [o5f24]12
+A !ARiff9
 A !ARiff8 !ARiff8
 A [!ARiff5_6_5_7 ]3
-A !o5f24_X12
+A [o5f24]12
 A [!ARiff8a ]64
-A ]2
-A [!ARiff8a ]64
-!ARiff9 l24 o5cc96<a+96>!ARiff8a [c96c48]2[c48]3
 A !ARiff9
+A [!ARiff8a ]64
+!ARiff10 l24 o5cc96<a+96>!ARiff8a [c96c48]2[c48]3
+A !ARiff10
 A [l24 V32 o5c V48 c48 V128 c : V48 c48]2 c48
-A !ARiff9
+A !ARiff10
 A V40 o5c48. V32 c48 [V+11 c48.]3 V80 c48 c48[c64]4 V128
-A !ARiff9
+A !ARiff10
 A [!ARiff8a ]4
-A !ARiff9
+A !ARiff10
 A l24 [o5c]6 [
 A [!ARiff1 ]3 !ARiff2
 A [!ARiff1 ]3 !ARiff3 ]4
@@ -132,12 +131,11 @@ C o5fc48cc48ff48 [
 C [l24 [r.o5f.]3 rf48cf48 : [r.o5f.]3 rf48ff48]2
 C [o5f24]12 :
 C [!CRiff1 !CRiff2 ]8]2
-C @Kick3 V128 _-0 [[
-C [[o4a+8 a+24a+12: a+8 a+16a+16]2 :
-C a+12a+24 a+16a+16]2
-C a+16.a+32 a+16a+16]2:
-C [l24 [o4a+.]4a+a+48a+a+.a+48a+a+48]3
-C [o4a+24]12 ]2
+C @Kick3 V128 _-0 D-952 [[
+C [[o5f8 f24f12: f8 f16f16]2 :
+C f12f24 f16f16]2
+C f16.f32 f16f16]2:
+C !ARiff9 ]2 D0
 C @Bongo _-2 V40
 C !CRiff3 !CRiff3
 
@@ -179,9 +177,7 @@ D V12 b48& [GIT24 w96:GDT24 w96]11 GDT24 r96
 
 E l1 r^^^^^^^^^^^ L
 E @Kick3 V128
-E [
-E [l24 [o5c+.]4c+c+48c+c+.c+48c+c+48]3
-E [o5c+24]12 :
+E [D-590 !ARiff9 D0 :
 !ERiff1 @Bongo _-2
 !ERiff1 [[o2f+8 f+24f+12 : f+8 f+16f+16]2
 !ERiff1 :f+12f+24 f+16f+16]2
