@@ -298,7 +298,7 @@
       "comment": null
     },
     {
-      "name": "Tom3",
+      "name": "Tom5",
       "source": "samples/nesdoug/Tom5.brr",
       "freq": 1000.0,
       "loop": "none",
