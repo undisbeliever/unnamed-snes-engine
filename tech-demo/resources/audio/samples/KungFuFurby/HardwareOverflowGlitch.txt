@@ -1,0 +1,20 @@
+;Crafted by hand through a hex editor and tested manually.
+;Deliberately exploits a Gaussian overflow glitch.
+
+;Assembly shown below will compile a .brr file through asar 1.91.
+
+norom
+arch spc700
+org $0000
+
+	dw $00 ;Loop point (bytes)
+;Block 1
+	db (12<<4)|(0<<2)|%11 ;Shift 12, filter 0, loop+end
+	db $88
+	db $88
+	db $88
+	db $88
+	db $88
+	db $88
+	db $88
+	db $88

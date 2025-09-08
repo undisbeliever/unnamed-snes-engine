@@ -561,6 +561,42 @@
       "last_octave": 7,
       "envelope": "gain F127",
       "comment": null
+    },
+    {
+      "name": "fingerbass32",
+      "source": "samples/nesdoug/fingerbass32.brr",
+      "freq": 1000.0,
+      "loop": "none",
+      "evaluator": "default",
+      "ignore_gaussian_overflow": false,
+      "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
+    },
+    {
+      "name": "SuperMiniGlitchNoise2",
+      "source": "samples/KungFuFurby/SuperMiniGlitchNoise2.brr",
+      "freq": 1000.0,
+      "loop": "none",
+      "evaluator": "default",
+      "ignore_gaussian_overflow": false,
+      "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
+    },
+    {
+      "name": "HardwareOverflowGlitch",
+      "source": "samples/KungFuFurby/HardwareOverflowGlitch.brr",
+      "freq": 1000.0,
+      "loop": "none",
+      "evaluator": "default",
+      "ignore_gaussian_overflow": true,
+      "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
     }
   ],
   "samples": [],
@@ -705,6 +741,10 @@
     {
       "name": "LegendaryTheme",
       "source": "songs/LegendaryTheme.mml"
+    },
+    {
+      "name": "FactoryTheme",
+      "source": "songs/FactoryTheme.mml"
     }
   ]
 }
