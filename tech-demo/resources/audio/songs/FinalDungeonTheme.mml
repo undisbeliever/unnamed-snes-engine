@@ -1,6 +1,6 @@
 ;Final Dungeon Theme
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.1.0
+;Made for undisbeliever's Terrific Audio Driver v0.1.1
 
 #Title Final Dungeon Theme
 #Game unnamed-snes-game
@@ -336,8 +336,8 @@ C @SineWave16Glitch V40 PM
 C !BRiff9 o5b2^8
 C o5b4[a32b32>c+32d32: [c+8^32<b32]3 b32>c+32
 C o6d4]2 e2^8 V36 p~40,12
-C [o4a48&b48&]12
-C [o5e48&f+48&]12
+C {{o4ab}}2,48,1&
+C {{o5ef+}}2,48,1&
 C {{o5ab}}2,48,1 p64
 C l8 o6c<aga
 C l24 [o5b]6[b12]3
