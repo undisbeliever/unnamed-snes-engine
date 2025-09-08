@@ -294,7 +294,7 @@
       "ignore_gaussian_overflow": false,
       "first_octave": 0,
       "last_octave": 7,
-      "envelope": "adsr 12 2 2 15",
+      "envelope": "gain F127",
       "comment": null
     },
     {
