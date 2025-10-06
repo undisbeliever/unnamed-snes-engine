@@ -1,6 +1,6 @@
 ;Jungle Theme
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.1.1
+;Made for undisbeliever's Terrific Audio Driver v0.1.2
 
 #Title Jungle Theme
 #Game unnamed-snes-game
@@ -34,49 +34,49 @@ A @Kick3
 !ARiff2 l24 V40 o4f48. V32 f48 [V+11 f48.]3 V80 f48 f48[f64]4
 !ARiff3 l24 [V+16 o4f]6
 !ARiff4 V128 l24 o4fcc
+!ARiff5 [l24 V32 o4f V48 f48 V128 f : V48 f48]2 f48
 A !ARiff1 !ARiff2
 A !ARiff1 !ARiff3 L [
-A !ARiff1 [l24 V32 o4f V48 f48 V128 f : V48 f48]2 f48
+A !ARiff1 !ARiff5
 A !ARiff1 :!ARiff4 l32 [o4f]4]2
 A !ARiff2
 A !ARiff1 !ARiff4 l24 [o4f]3
 A !ARiff1 !ARiff3 V128
-A [l24
-A [o4f.]6 [ff48]2
-A [o4f.]4 [ff48]4
-A ]2
-!ARiff5 l24 o4f.o5fo4f48
-!ARiff6 l24 o4ff48>f<f48
-!ARiff7 l24 o4ff48>ff48
-A !ARiff5 l24 o4f.o5f.
-A !ARiff5 l24 o4f.o5ff48
-!ARiff5_6_5_7 !ARiff5 !ARiff6 !ARiff5 !ARiff7
-A !ARiff5_6_5_7 !ARiff5_6_5_7
-A [!ARiff6 !ARiff7 ]2
-!ARiff8a l24 o5cc48
-!ARiff8 [l24
-!ARiff8 [o5c.]6 !ARiff8a !ARiff8a
-!ARiff8 [o5c.]4 [!ARiff8a ]4
-!ARiff8 ]2
-A !ARiff8
-A [[!ARiff8a ]12 [o5f]6]2
-!ARiff9 [l24 [o5f.]4ff48ff.f48ff48]3
-!ARiff9 [o5f24]12
-A !ARiff9
-A !ARiff8 !ARiff8
-A [!ARiff5_6_5_7 ]3
+!ARiff6a l24 o4ff48
+!ARiff6 [l24
+!ARiff6 [o4f.]6 !ARiff6a !ARiff6a
+!ARiff6 [o4f.]4 [!ARiff6a ]4
+!ARiff6 ]2
+!ARiff7 l24 o4f.o5fo4f48
+!ARiff8 l24 !ARiff6a o5f<f48
+!ARiff9a l24 o5ff48
+!ARiff9 l24 !ARiff6a !ARiff9a
+A !ARiff6
+A !ARiff7 l24 o4f.o5f.
+A !ARiff7 l24 o4f. !ARiff9a
+!ARiff7_8_7_9 !ARiff7 !ARiff8 !ARiff7 !ARiff9
+A !ARiff7_8_7_9 !ARiff7_8_7_9
+A [!ARiff8 !ARiff9 ]2
+!ARiff10 l24 o5cc48
+A _+7 !ARiff6 _+0
+A [[!ARiff10 ]12 [o5f]6]2
+!ARiff11 [l24 [o5f.]4 !ARiff9a ff.f48 !ARiff9a ]3
+!ARiff11 [o5f24]12
+A !ARiff11
+A _+7 !ARiff6 !ARiff6 _+0
+A [!ARiff7_8_7_9 ]3
 A [o5f24]12
-A [!ARiff8a ]64
-A !ARiff9
-A [!ARiff8a ]64
-!ARiff10 l24 o5cc96<a+96>!ARiff8a [c96c48]2[c48]3
-A !ARiff10
-A [l24 V32 o5c V48 c48 V128 c : V48 c48]2 c48
-A !ARiff10
-A V40 o5c48. V32 c48 [V+11 c48.]3 V80 c48 c48[c64]4 V128
-A !ARiff10
-A [!ARiff8a ]4
-A !ARiff10
+A [!ARiff10 ]64
+A !ARiff11
+A [!ARiff10 ]64
+!ARiff12 l24 o5cc96<a+96>!ARiff10 [c96c48]2[c48]3
+A !ARiff12
+A _+7 !ARiff5 _-0 V128
+A !ARiff12
+A _+7 !ARiff2 _-0 V128
+A !ARiff12
+A [!ARiff10 ]4
+A !ARiff12
 A l24 [o5c]6 [
 A [!ARiff1 ]3 !ARiff2
 A [!ARiff1 ]3 !ARiff3 ]4
@@ -84,7 +84,7 @@ A [!ARiff1 ]3 !ARiff3 ]4
 B E0 
 B @HatClosed 
 B l1 r^ L V32
-!BRiff1 l24 w.o5f.w.ff48 w.o5f.wf.f48
+!BRiff1 l24 w.o5f.w. !ARiff9a w.o5f.wf.f48
 B [!BRiff1 ]8
 !BRiff2 [[
 !BRiff2 [l48 o5[f]3 f.f96f : l48 [o5f^f]2]2
@@ -93,7 +93,7 @@ B [!BRiff1 ]8
 !BRiff2 ]2
 B !BRiff2
 B [!BRiff1 ]8
-!BRiff3 [l24 V48 o5f V24 f48ff48]12
+!BRiff3 [l24 V48 o5f V24 f48 !ARiff9a ]12
 !BRiff4 V48 o5f32 V15 [o5f64 V+1]30
 B !BRiff3
 B !BRiff4
@@ -113,29 +113,29 @@ C l1 r^^^ V40 L
 C l24
 C [r o3f.>f.^ o3f^ o3f.>f.^f^o3f.>f.^ : o3f [o3f.c.]2]2
 C o3f^. [f.]3
-!CRiff1 _-2 l24 o3f.f.>f.<ff48
-!CRiff2 _-2 l24 o3f.f.>f.<f>f48
+!CRiff1 l24 o3f.f.>f.<ff48
+!CRiff2 l24 o3f.f.>f.<f>f48
 C !CRiff1 !CRiff2
 C !CRiff1 l24 [o3f.c.]2
 C [!CRiff1 !CRiff2 ]2
-!CRiff3 l24 _-2
+!CRiff3 l24
 !CRiff3 o4c^^c^^c.c.[cc48]4c.c.c^^c^^
 !CRiff3 o4cf.f.c^
 !CRiff3 [o4cf.f.c.:f48]2c48[c]6
 C !CRiff3
-!CRiff4 _-2 l24 o4c.f.f.c48>[c96d96]2
+!CRiff4 l24 o4c.f.f.c48>[c96d96]2
 C !CRiff4 o4c.f.f.cf48
 C !CRiff4 o5c<fc<f>cf [
-C !CRiff4 o5cc48:o4f>c48<ff48cf48]2
-C o5fc48cc48ff48 [
-C [l24 [r.o5f.]3 rf48cf48 : [r.o5f.]3 rf48ff48]2
+C !CRiff4 !ARiff10 :o4f>c48<!ARiff6a cf48]2
+C o5fc48!ARiff10 !ARiff9a  [
+C [l24 [r.o5f.]3 rf48cf48 : [r.o5f.]3 rf48!ARiff9a ]2
 C [o5f24]12 :
 C [!CRiff1 !CRiff2 ]8]2
-C @Kick3 V128 _-0 D-952 [[
+C @Kick3 V128 _-7 [[
 C [[o5f8 f24f12: f8 f16f16]2 :
 C f12f24 f16f16]2
 C f16.f32 f16f16]2:
-C !ARiff9 ]2 D0
+C !ARiff11 ]2
 C @Bongo _-2 V40
 C !CRiff3 !CRiff3
 
@@ -175,10 +175,11 @@ D ]2
 D [!DRiff2a ]6
 D V12 b48& [GIT24 w96:GDT24 w96]11 GDT24 r96
 
+E E0
 E l1 r^^^^^^^^^^^ L
 E @Kick3 V128
-E [D-590 !ARiff9 D0 :
-!ERiff1 @Bongo _-2
+E [_-4 !ARiff11 _-0 :
+!ERiff1 @Bongo _M-2
 !ERiff1 [[o2f+8 f+24f+12 : f+8 f+16f+16]2
 !ERiff1 :f+12f+24 f+16f+16]2
 !ERiff1 f+16.f+32 f+16f+16
@@ -189,9 +190,9 @@ E @sine GI15 V16 {o3ff+}16,,12& GDT5 w8 {o3f+<f+}4,,4& r16
 E @Kick3 V128
 E [o4f+4f+8f+16:f+16]4 f+32f+32 [f+32f+32f+16f+8f+4]4
 E ]2
-E @TimpaniB_2 _-0
+E @TimpaniB_2 _M-0
 E [o1c2c2c1]2
-E _-2
+E _M-2
 E [!ERiff1 ]3
 E [o2f+16]12 [o2f+24]6
 
