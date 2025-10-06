@@ -1,6 +1,6 @@
 ;Village Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.1.1
+;Made for undisbeliever's Terrific Audio Driver v0.1.2
 
 #Title Village Theme
 #Game unnamed-snes-game
@@ -9,6 +9,7 @@
 #Copyright 2025 undisbeliever
 #Date 2025
 #License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
+#OldTranspose
 
 ;This song is compatible with the wind control system.
 
