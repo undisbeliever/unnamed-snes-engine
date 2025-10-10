@@ -467,3 +467,49 @@ A @1 V160 {o4c+ o2c+}%96
     play_note  e-5 no_keyoff 1
     portamento g6 keyoff +90 15
 
+
+=== WindControlActivate_ExamplePreset1 === uninterruptible
+;Wind Control Example Preset 1
+;Gives out a stronger gust-like effect.
+;WARNING: This seeds the echo buffer!
+;After playing this preset once, set EVOL to a non-zero value using one of the SFX instances provided to hear this in-game
+set_fir_filter 0 0 127 0 0 96 0 0
+set_echo_feedback 112
+set_instrument_and_gain sine F1
+set_volume 255
+enable_echo
+play_note c0 2
+=== WindControlActivate_ExamplePreset2 === uninterruptible
+;Wind Control Example Preset 2
+;Gives out a more "whispy" effect.
+;WARNING: This seeds the echo buffer!
+;After playing this preset once, set EVOL to a non-zero value using one of the SFX instances provided to hear this in-game
+set_fir_filter 2 2 40 2 2 127 0 0
+set_echo_feedback 120
+set_instrument_and_gain sine F1
+set_volume 255
+enable_echo
+play_note c0 2
+=== WindControlMute === uninterruptible
+;Wind Control - Mute
+;Simply sets EVOL to zero. Does NOT stop the wind control from running in the background, nor does it cause the echo buffer to no longer sustain itself.
+set_echo_volume 0
+wait 1
+=== WindControlEVOL1 === uninterruptible
+set_echo_volume 1
+wait 1
+=== WindControlEVOL2 === uninterruptible
+set_echo_volume 2
+wait 1
+=== WindControlEVOL3 === uninterruptible
+set_echo_volume 3
+wait 1
+=== WindControlEVOL4 === uninterruptible
+set_echo_volume 4
+wait 1
+=== WindControlEFBIncrement === uninterruptible
+adjust_echo_feedback +1
+wait 1
+=== WindControlEFBDecrement === uninterruptible
+adjust_echo_feedback -1
+wait 1

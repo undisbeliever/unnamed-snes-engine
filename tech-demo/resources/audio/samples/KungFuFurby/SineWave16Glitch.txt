@@ -1,0 +1,7 @@
+Created using Terrific Audio Driver v0.0.13 using a 16 sample sine wave, then using the converter in a way to produce an unintended result using a loop setting of Dupe Block Hack, BRR Filter 2, 1 duplicate block. To avoid inconsistencies from converter bugfixes, a BRR file was used here so that the result can be preserved for, though the .wav of the file itself that was imported from is also provided.
+
+For the sine wave itself, it was generated with Audacity 2.4.2:
+Project rate was set to 8363hz
+Waveform was set to Sine
+Frequency was set to 522.6875hz (a 16th of the project rate, meaning the sine wave does one cycle)
+Amplitude was set to 1

@@ -1,0 +1,39 @@
+;Crafted by hand through a hex editor and tested manually.
+
+;Assembly shown below will compile a .brr file through asar 1.91.
+
+norom
+arch spc700
+org $0000
+
+	dw $09 ;Loop point (bytes)
+;Block 1
+	db (12<<4)|(0<<2) ;Shift 12, filter 0
+	db $00
+	db $00
+	db $00
+	db $77
+	db $77
+	db $77
+	db $77
+	db $77
+;Block 2
+	db (12<<4)|(2<<2) ;Shift 12, filter 2
+	db $12
+	db $34
+	db $56
+	db $78
+	db $9A
+	db $BC
+	db $DE
+	db $FC
+;Block 3
+	db (1<<4)|(2<<2)|%11 ;Shift 1, filter 2, loop+end
+	db $12
+	db $34
+	db $56
+	db $78
+	db $9A
+	db $BC
+	db $DE
+	db $FC
