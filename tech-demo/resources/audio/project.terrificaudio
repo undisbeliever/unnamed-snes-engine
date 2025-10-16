@@ -609,6 +609,19 @@
       "last_octave": 3,
       "envelope": "gain F127",
       "comment": null
+    },
+    {
+      "name": "SineWave8",
+      "source": "samples/KungFuFurby/SineWave8.wav",
+      "freq": 1000.0,
+      "loop": "dupe_block_hack",
+      "loop_setting": 2,
+      "evaluator": "default",
+      "ignore_gaussian_overflow": true,
+      "first_octave": 0,
+      "last_octave": 7,
+      "envelope": "gain F127",
+      "comment": null
     }
   ],
   "samples": [],
@@ -737,6 +750,10 @@
     {
       "name": "MagicalAmbience",
       "source": "songs/MagicalAmbience.mml"
+    },
+    {
+      "name": "MagicalJingle",
+      "source": "songs/MagicalJingle.mml"
     },
     {
       "name": "OminousAmbience",

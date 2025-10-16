@@ -1,0 +1,63 @@
+;Magical Jingle for unnamed-snes-game
+;By KungFuFurby
+;Made for undisbeliever's Terrific Audio Driver v0.2.0
+
+#Title Magical Jingle
+#Game unnamed-snes-game
+#Author KungFuFurby
+#Composer KungFuFurby
+#Copyright 2025 undisbeliever
+#Date 2025
+#License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
+
+;Echo Parameters
+#EchoLength 48
+#EchoFeedback -124
+#EchoVolume 80
+#EchoInvert right
+#FirFilter -64 -32 -16 -8 -4 -2 -1 -0
+
+;Instrument Definitions
+@Strings8 Strings8
+@SineWave8 SineWave8
+@SineWave8_A15_7_7_19 SineWave8 adsr 15 7 7 19
+@PIANO_C5 PIANO_C5
+
+#ZenLen 192
+#Timer 112
+
+A @Strings8 V48 p56 o4e2T128f+2g+1
+
+!BRiff1 @Strings8 V48 o4c2d2e1
+B !BRiff1
+
+C @Strings8 V48 p72 o3g2a2b1
+
+!DRiff1 _M+3 l8 r o5g>edcdef+
+!DRiff2 _M+3 l64 o5g+b>eg+
+D @SineWave8 V0 !DRiff1 [!DRiff2 ]16
+
+E @SineWave8_A15_7_7_19 V16 PM1 ~1,4 _-4 !DRiff1 E1 p~32,12
+E GF127 !DRiff2
+E GF120 !DRiff2
+E GF112 !DRiff2
+E GF104 !DRiff2
+E GF96 !DRiff2
+E GF88 !DRiff2
+E GF80 !DRiff2
+E GF72 !DRiff2
+E GF64 !DRiff2
+E GF56 !DRiff2
+E GF48 !DRiff2
+E GF40 !DRiff2
+E GF32 !DRiff2
+E GF24 !DRiff2
+E GF16 !DRiff2
+E GF8 !DRiff2
+
+F _-24 !BRiff1
+
+!GRiff1 @PIANO_C5 A15,7,7,16 r8 o4e16f16g8c8>c8<g8>c8d8e1
+G V48 !GRiff1
+
+H V24 r12 !GRiff1
