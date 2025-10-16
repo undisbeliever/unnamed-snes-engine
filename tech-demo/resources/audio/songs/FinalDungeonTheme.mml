@@ -1,6 +1,6 @@
 ;Final Dungeon Theme
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.1.1
+;Made for undisbeliever's Terrific Audio Driver v0.2.0
 
 #Title Final Dungeon Theme
 #Game unnamed-snes-game
@@ -38,9 +38,6 @@
 @sine_A10_7_7_4 sine adsr 10 7 7 4
 @sine_A14_7_7_7 sine adsr 14 7 7 7
 @PIANO_C5 PIANO_C5
-@PIANO_C5P1O PIANO_C5P1O
-@PIANO_C5M1O PIANO_C5M1O
-@PIANO_C5M2O PIANO_C5M2O
 @Pulse32WFF Pulse32WFF
 @Pulse32WEF Pulse32WEF
 @Pulse32WDF Pulse32WDF
@@ -70,7 +67,6 @@
 @PianoC2_16_A15_7_7_10 PianoC2_16 adsr 15 7 7 10
 @SineWave16 SineWave16
 @sineP1O_A7_7_7_4 sineP1O adsr 7 7 7 4
-@Strings8M1O Strings8M1O
 
 #ZenLen 192
 #Timer 112
@@ -121,7 +117,8 @@ A !ARiff4 [
 A !ARiff2a
 A !ARiff2aaa : !A15_7_7_20_o7b16 !Snare02_V128_o5c16 ]8
 !Snare02_V128_o5c24 !Snare02_V128 o5c24
-!ARiff5 !SuperMiniGlitchNoise_V20 A15,7,7,25 o7b24 A15,7,7,20 o7b24
+!SuperMiniGlitchNoise_V20_A15_7_7_25 !SuperMiniGlitchNoise_V20 A15,7,7,25
+!ARiff5 !SuperMiniGlitchNoise_V20_A15_7_7_25 o7b24 A15,7,7,20 o7b24
 A [!Snare02_V128_o5c24 ]3 [[
 A !Kick3_V192_o4fS24 !ARiff5
 A !Snare02_V128_o5c24 : !SuperMiniGlitchNoise_V20 A15,7,7,20 o7b24 A15,7,7,25 o7b24]4 o5c24c24]3
@@ -137,7 +134,7 @@ A [!Snare02_V128_o5c24 ]3
 !ARiff6 !Kick3_V192_o4fS24 !ARiff5
 A [
 A !ARiff6
-A !Snare02_V128_o5c24 !SuperMiniGlitchNoise_V20 A15,7,7,25 o7b24 !Snare02_V128_o5c24
+A !Snare02_V128_o5c24 !SuperMiniGlitchNoise_V20_A15_7_7_25 o7b24 !Snare02_V128_o5c24
 A !ARiff6
 A !Snare02_V128_o5c24 o5c24c48c48
 A !ARiff6
@@ -151,7 +148,7 @@ B @SuperMiniGlitchNoise V4
 B [!ARiff3 V+1]16
 B [!ARiff3 ]160 L
 !Crash2_A15_7_7_18_V64_o5fS8 !Crash2_A15_7_7_18_V64 o5f+8
-B [[!SuperMiniGlitchNoise_V20 A15,7,7,25 [o7b24]3 !Crash2_A15_7_7_18_V64_o5fS8 ]3 o5f+8f+8]3
+B [[!SuperMiniGlitchNoise_V20_A15_7_7_25 [o7b24]3 !Crash2_A15_7_7_18_V64_o5fS8 ]3 o5f+8f+8]3
 B !SuperMiniGlitchNoise_V20
 B [!ARiff3 ]10
 B !ARiff4
@@ -182,12 +179,10 @@ B @sine_A7_7_7_4 V0
 !BRiff2 {o4b>c}4.,16,8 o4b16>c16 {o4ab}4.,16,12 o4a16b16
 !BRiff2 {o4ga}4.,16,12 o4g16a16 {o4cd}2,16,12
 B !BRiff2
-!BRiff3 l32 o4d&e&
-!BRiff4 l32 o4f&g&
-!BRiff5 l32 o4g&a&
-!BRiff6 l32 o4e&f+&
-B @sine [l32 [!BRiff3 ]16 [o4c&d&]16 : [!BRiff5 ]16 [!BRiff4 ]32 [o4d+&f&]16]2
-B [[o3b&>c+&]16 [o3a&b&]16 : [[!BRiff6 ]16 [!BRiff3 ]16]2]2
+!BRiff3a l32 [o4d&e&]16
+!BRiff3 !BRiff3a __-2 !BRiff3a __+2
+B @sine _+0 !BRiff3 _+5 !BRiff3 _+3 !BRiff3 _+0 !BRiff3
+B _-3 !BRiff3 _+2 !BRiff3 !BRiff3 _-3 !BRiff3 _+0
 B l1 GET4 o3e^^^^^^^
 B o3e1& {d}1,,1 [l32 o3d&:e&]96 e
 B l1 @Pulse32WFF GF48 o2e^^^^^^^
@@ -195,10 +190,10 @@ B @Strings8 V48 p64 o2e^^^^^dr2
 B [!Kick3_V192_o4fS16 o4f+16 !Snare02_V128_o5c16 ]2 !Kick3_V192_o4fS16 !Snare02_V128_o5c16 [
 B !Crash2_A15_7_7_18_V64_o5fS8
 B @Pulse8WBF V24 p64
-!BRiff7 [o2g8r16]3
-B !BRiff7 o2f+4^16
-B r8 !BRiff7 o2a4^16 :
-B r8 !BRiff7 o2f+4^16
+!BRiff4 [o2g8r16]3
+B !BRiff4 o2f+4^16
+B r8 !BRiff4 o2a4^16 :
+B r8 !BRiff4 o2f+4^16
 B o2e2f+2 ]2
 B r8 o2[b8r16]3a4^16
 B o2g2a2 [
@@ -208,28 +203,31 @@ B !Crash2_A15_7_7_18_V64_o5fS8
 B @trumpet_2 V64 [Q4o6b24]3 Q8b12.Q4a12b24 >Q8c12.Q4c12c24 Q8c8d8
 B Q8o7e8 [Q4o7e24]3 Q8e12f24e12d24 o7e8d8e4
 B @Crash2_A15_7_7_4 V128 [o1f+1^1^1^1]2
-!BRiff8 @SineWave16Glitch
-!BRiff8 o3c+8.>c+8.<g+4.f+8g+8 a8.g+8.a4g+8e8f+8
-!BRiff8 o3e8.d+8.e4 f+8e8d+8 c+8.<b8.>c+2 <b8
-!BRiff8 o3c+8.>c+8.f+4g+8a8b8 [{o4b>c+}8.,16,24]2 {o4b>c+}4,16,24 o4b8a8g+8
-!BRiff8 l24 o4[ag+]2e<b>c+<b>f+ede [f+e]2d+e[d+c+]2<b>c+
-!BRiff8 l24 o3ba[b>c+]2d+c+[d+e]2 f+e[f+g+]2ag+aab>c+
-!BRiff8 [{o4ab}8.,16,24]2 {o4ab}4.,16,24 o4a8g8
-!BRiff8 l12 o4f+ef+gf+edc+<bab>e
-!BRiff8 l24 o4[ed]2c+d[c+<b]2ab [ag+]2f+g+[f+e]2de
-!BRiff8 l24 o3dc+[de]2f+e[f+g]2 ag[ab]2 l48 o4c+def+gab>c+d 
+!BRiff5 @SineWave16Glitch
+!BRiff5 o3c+8.>c+8.<g+4.f+8g+8 a8.g+8.a4g+8e8f+8
+!BRiff5 o3e8.d+8.e4 f+8e8d+8 c+8.<b8.>c+2 <b8
+!BRiff5 o3c+8.>c+8.f+4g+8a8b8 [{o4b>c+}8.,16,24]2 {o4b>c+}4,16,24 o4b8a8g+8
+!BRiff5 l24 o4[ag+]2e<b>c+<b>f+ede [f+e]2d+e[d+c+]2<b>c+
+!BRiff5 l24 o3ba[b>c+]2d+c+[d+e]2 f+e[f+g+]2ag+aab>c+
+!BRiff5 [{o4ab}8.,16,24]2 {o4ab}4.,16,24 o4a8g8
+!BRiff5 l12 o4f+ef+gf+edc+<bab>e
+!BRiff5 l24 o4[ed]2c+d[c+<b]2ab [ag+]2f+g+[f+e]2de
+!BRiff5 l24 o3dc+[de]2f+e[f+g]2 ag[ab]2 l48 o4c+def+gab>c+d 
 B V40
-B !BRiff8 l48 o5ef+g
+B !BRiff5 l48 o5ef+g
 B ~4,4 V24 p56 o5a4g+8a8g+4e4f+4e8f+8e8d8c+8d8
-B o5c+4<b8>[c+8d8]2g+8f+4e4f+8.g+8.a8
-B {{o5ab}}8,48,0 {{o5b>c+}}8,48,0 {{o6c+d}}8,48,0 {{o6de}}8,48,0
+B o5c+4<b8>[c+8d8]2g+8f+4e4f+8.g+8.
+!BRiff6a {{o5ab}}8,48,0 __+2
+!BRiff6 o5a8
+!BRiff6 !BRiff6a !BRiff6a _M-4 {{o6c+d}}8,48,0 __+1 !BRiff6a _+0
+B !BRiff6
 B [o6f+8^32e32]2 o6f+32a8^32f+24e24d24<b16a16f+16e16d16<b16a16f+16e16d16e16f+16a16
-B l24 o5baf+ed<baf+ed<b>d ef+ab>def+ab>def+
-B [o6a32b8^32]4 l32 o6af+ed<baf+e @sine_A9_7_7_15 V0 p64 [
-!BRiff9 o5f+4e32f+32g+32a32 [g+8^32f+32]3 f+32g+32
-!BRiff9 o5a4e32f+32g+32a32
-B !BRiff9 : o5b4.& GIT7 {f+}4 ]2
-B {o5bf+}4.,4,64& GIT7 r4
+B l24 [o5baf+ed __-12]2 [o5b>def+:a __+12]3
+B [o6a32b8^32]4 l32 o6af+ed<baf+e @sine_A9_7_7_15 V0 p64
+!BRiff7 o5f+4e32f+32g+32a32 [g+8^32f+32]3 f+32g+32
+!BRiff7 o5a4e32f+32g+32a32
+B !BRiff7 o5b4.& GIT7 {f+}4
+B !BRiff7 {o5bf+}4.,4,64& GIT7 r4
 B @SineWave16
 B [l48 [o2a&b&]2>[e&f+&]2[a&b&]2>[e&f+&]2[a&b&]2>:[e&f+&]2]3 e&f+&e&f+
 B A9,7,7,16 l8 o4c<aga
@@ -250,9 +248,8 @@ C V48 p~24,12
 !CRiff1a GF4 !CRiff1aa
 !CRiff1a GF2 !CRiff1aa
 !CRiff1a GF1
-!CRiff1 @PIANO_C5P1O [!CRiff1a !CRiff1aa @PIANO_C5 ]2
-!CRiff1 @PIANO_C5M1O !CRiff1a !CRiff1aa
-!CRiff1 @PIANO_C5M2O !CRiff1a l24 o5baf+
+!CRiff1 @PIANO_C5 _+12 [!CRiff1a !CRiff1aa __-12 ]3
+!CRiff1 !CRiff1a l24 o5baf+ _+0
 C !CRiff1 l24 o5d<ba p64
 C !Strings8_V24
 C ]2 L
@@ -278,71 +275,54 @@ C o6b& GET8 r^^^4^32 ~4,4
 C V20 !BRiff1 o5d16. ~8,5
 C @square V16 PM
 C !BRiff2 ~0
-!CRiff3a l32 o5d&e&
-!CRiff3b l32 o5g&a&
-!CRiff3c l32 o6d&e&
-!CRiff3d l32 o6g&a&
-!CRiff3 @Pulse32WFF !BRiff3 !BRiff5 !CRiff3a !CRiff3b [!CRiff3c !CRiff3d @Pulse16WFF ]2
-!CRiff3 @Pulse8WFF [!CRiff3c !CRiff3b @Pulse16WFF ]2 @Pulse32WFF !CRiff3c !CRiff3b !CRiff3a !BRiff5 
-C p~32,96 V15 [
-C !CRiff3
-!CRiff4 l32 o5c&d&
-!CRiff5 l32 o6c&d&
-!CRiff6 l32 o5f&g&
-!CRiff7 l32 o6f&g&
-!CRiff8 l32 o5a+&>c&
-!CRiff9 l32 o6d+&f&<g+&a+&
-!CRiff10a l32 o5e&f+&
-!CRiff10 l32 o5b&>c+&!CRiff10a
-!CRiff11 l32 o6e&f+&
-!CRiff12 l32 o4a&b&
-!CRiff13 l32 o5a&b&
-C @Pulse32WFF l32 o4c&d&!BRiff4 !CRiff4 !CRiff6 [!CRiff5 !CRiff7 @Pulse16WFF ]2
-C @Pulse8WFF [!CRiff5 !CRiff6  @Pulse16WFF ]2 @Pulse32WFF !CRiff5 !CRiff6 !CRiff4 !BRiff4 :
-C @Pulse32WFF !BRiff5 !CRiff4 !CRiff3b [!CRiff5 !CRiff3d  @Pulse16WFF ]2 @Pulse8WFF !CRiff5 
-C @Pulse8WFF [!CRiff3d !CRiff5  @Pulse16WFF ]2 @Pulse32WFF !CRiff3d !CRiff5 !CRiff3b !CRiff4  [
-C @Pulse32WFF l32 !BRiff4 o4a+&>c& !CRiff6 [!CRiff8 !CRiff7 @Pulse16WFF ]2  @Pulse8WFF !CRiff8
-C @Pulse8WFF [!CRiff7 !CRiff8 @Pulse16WFF ]2 @Pulse32WFF !CRiff7 !CRiff8 !CRiff6 l32 o4a+&>c& ]2
-C @Pulse32WFF l32 o4d+&f&g+&a+&>d+&f&g+&a+& [o6d+&f&g+&a+& @Pulse16WFF ]2
-C @Pulse8WFF [l32 !CRiff9  @Pulse16WFF ]2 @Pulse32WFF !CRiff9 o5d+&f&<g+&a+& ]2 [
-C @Pulse32WFF l32 o3b&>c+&!BRiff6 b&>c+&!CRiff10a b&>c+&!CRiff11 b& @Pulse16WFF c+&!CRiff11
-C @Pulse8WFF !CRiff10 @Pulse16WFF !CRiff10 @Pulse32WFF !CRiff10 o4b&>c+&!BRiff6
-C @Pulse32WFF l32 o3a&b& !BRiff3 !CRiff12 !CRiff3a !CRiff13 !CRiff3c o6a&b& @Pulse16WFF !CRiff3c 
-C @Pulse8WFF [!CRiff13 !CRiff3a @Pulse16WFF ]2 @Pulse32WFF !CRiff13 !CRiff3a !CRiff12 !BRiff3 : [
-C @Pulse32WFF l32 !BRiff6 !CRiff12 !CRiff10a !CRiff13 [!CRiff11 o6a&b& @Pulse16WFF ]2
-C @Pulse8WFF [!CRiff11 !CRiff13 @Pulse16WFF ]2  @Pulse32WFF !CRiff11 !CRiff13 !CRiff10a !CRiff12 
-C !CRiff3 ]2]2
-C [[o4e&b&>e&<b&: [o5e&b&>e&<b&: o6e&b&>e&<b&]2]2
-C [o3e&b&>e&:<b& o2e&b&>e&<b&]2:o3b& GE8]4 o3b p64
+!CRiff3a l32 o4d&e&g&a&
+!CRiff3b l32 o4d&e&<g&a&
+!CRiff3 @Pulse32WFF [!CRiff3a __+12]2 [!CRiff3a @Pulse16WFF ]2
+!CRiff3 @Pulse8WFF [!CRiff3b @Pulse16WFF ]2 @Pulse32WFF !CRiff3b __-12 !CRiff3b __-12
+C p~32,96 V15
+C [_+0 !CRiff3
+C _-2 !CRiff3 : 
+C _+5 !CRiff3
+C _+3 !CRiff3 !CRiff3
+C _+1 !CRiff3 ]2 [
+C _-3 !CRiff3
+C _-5 !CRiff3 : [
+C _+2 !CRiff3
+C _+0 !CRiff3 ]2]2 _+0
+!CRiff4 l32 o4e&b&>e&<b&
+C [[!CRiff4 __+12]2 [!CRiff4 __-12]4 : [!CRiff4 __+12]2 GT]4
+C !CRiff4 __+12 l32 o4e&b&>e& __+12 o3b32 p64
 C l1 r^^^
-C GI2 o6e& {d},,2 p~24,6 @Pulse32WFF [!CRiff3c ]16 GE6 [!CRiff3c ]79 l32 o6d&e p64
+C GI2 o6e& {d},,2 p~24,6 @Pulse32WFF [l32 o6d&e&]16 GE6 [l32 o6d&e&]79 l32 o6d&e p64
 C l1 @Pulse32WFF V24 p~16,48 GI12 o2e^^^^^^.& GDT6 r2 PM0
 C \edl 48 \efb 120 \fir {127 0 0 0 0 0 0 0} \evol 24 E1 ~0
-!CRiff14 @Flute1 GI18 [
-!CRiff14 [l24 o6be<be<be<b>eb>eb>e]2
-!CRiff14 [l24 o6ad<ad<ad<a>da>da>d]2 :
-!CRiff14 [l24 o6f+<bf+<bf+<bf+b>f+b>f+b]2
-!CRiff14 [l24 o6e<ae<ae<aea>ea>ea]2]2
-!CRiff14 [l24 o7d<ad<ad<ada>da>da]2
-!CRiff14 [l24 o7e<be<be<beb>eb>eb]2
+!CRiff5a [l24 [o6be __-12]3 [o6b>e __+12]3]2
+!CRiff5b [l24 [o7e<b __-12]3 [o7eb __+12]3]2
+!CRiff5 @Flute1 GI18 [
+!CRiff5 _+0 !CRiff5a
+!CRiff5 _-2 !CRiff5a :
+!CRiff5 _-5 !CRiff5a
+!CRiff5 _-7 !CRiff5a ]2
+!CRiff5 _-2 !CRiff5b
+!CRiff5 _+0 !CRiff5b
 C V24 p~16,48
-C !CRiff14 E0
+C !CRiff5 E0
 C @Strings8 V48 p64 [o2e^^c2d2]2
 C @sine_A7_7_7_4 V24 o2e1^1^1 A8,7,7,18 o3e12d12<e12 a+12a12e12 a12g12e12 d12c12d12
 C A7,7,7,7 [l1 o2e^^^]2
 C A5,7,7,6 [l1 o2f+^^^]2 o2e^^^
 C A7,7,7,7 l1 [o2f+^]2b..a4b^
 C @SineWave16Glitch V40 PM
-C !BRiff9 o5b2^8
-C o5b4[a32b32>c+32d32: [c+8^32<b32]3 b32>c+32
-C o6d4]2 e2^8 V36 p~40,12
+C [!BRiff7 o5b2^8 _+5]2
+C _+0 V36 p~40,12
 C {{o4ab}}2,48,1&
 C {{o5ef+}}2,48,1&
 C {{o5ab}}2,48,1 p64
 C l8 o6c<aga
-C l24 [o5b]6[b12]3
-C l24 [o5f+]6[f+12]3
-C l24 [o4b]6[b12]3
+!CRiff6 l24 [o5b]6[b12]3
+C !CRiff6
+C _-5 !CRiff6
+C _-12 !CRiff6 _+0
 C o3b2
 C PM0 @Strings8
 
@@ -374,8 +354,8 @@ D !GuitarB2_V24 E1 p56 L
 !DRiff3 !DRiff3a \ftap 2,24
 D [!DRiff2
 D \efb 60 \fir {0 0 24 127 0 127 0 127}
-D l96 o3b& !DRiff3 o4c& !DRiff3 o4d& !DRiff3 o4e& !DRiff3 o4f+& !DRiff3 :
-D l96 o4e& !DRiff3 o4d& !DRiff3 o4c& !DRiff3 o3b& !DRiff3a
+D l96 o3b& !DRiff3 [o4c& !DRiff3 __+2]4 :
+D __-2 l96 [__-2 o4c& !DRiff3 ]3 o3b& !DRiff3a
 D !DRiff2
 !ftap_7_127_ftap_5_127_ftap_3_127 \ftap 7,127 \ftap 5,127 \ftap 3,127
 !ftap_7_127_ftap_5_127_ftap_4_127 \ftap 7,127 \ftap 5,127 \ftap 4,127
@@ -383,7 +363,7 @@ D !efb_66 !ftap_7_127_ftap_5_127_ftap_3_127 o3b24& !ftapM_7_1_ftapM_5_1_ftapM_3_
 D !efb_66 !ftap_7_127_ftap_5_127_ftap_3_127 o3g24& !ftapM_7_1_ftapM_5_1_ftapM_3_1_w24_X2_r24
 D !efb_66 !ftap_7_127_ftap_5_127_ftap_3_127 o3a24& !ftapM_7_1_ftapM_5_1_ftapM_3_1_w24_X2_r24
 D ]2
-D l96 o4g& !DRiff3 o4a& !DRiff3 o4b& !DRiff3 o5c+& !DRiff3a
+D [l96 o3b& !DRiff3 __+2]3 _+0 o5c+& !DRiff3a
 !ftapM_2_1_r16 \ftap- 2,1 r16
 D \ftap 2,20 o5d16& [[\ftap- 2,1 : w16]3 r16 :
 D \ftap 2,20 o5c+16& !ftapM_2_1_r16
@@ -587,26 +567,19 @@ D o5f+1& ps+64,192 r2. o5e4 ps-64,192 o5f+1& ps+64,192 r1 PM0
 
 D !GuitarB2_V24 p56 D-5
 D \evol 4 !efb_65 \fir {0 0 0 0 127 127 0 127}
-!efb_65_ftap_7_127_ftap_5_127_ftap_4_127 !efb_65 !ftap_7_127_ftap_5_127_ftap_4_127
-!DRiff11 !ftapM_7_1 w16 \ftap- 5,1 w16 \ftap- 4,1 w8 !ftapM_7_1 r16
-!DRiff11 !efb_65_ftap_7_127_ftap_5_127_ftap_4_127
-!DRiff12 !ftapM_7_1_w16_ftapM_5_1_w16 \ftap- 4,1
-!DRiff12 w8 !ftapM_7_1_w16_ftapM_5_1_w16 \ftap- 4,1
-!DRiff12 w16
-!DRiff12 \efb- 1 !ftap_7_127_ftap_5_127_ftap_4_127
-!DRiff12 w16 !ftapM_7_1
-!DRiff12 r16 \ftap- 5,1
-D o3b16& !DRiff11
-D o4c+16& !DRiff12
-D !efb_65_ftap_7_127_ftap_5_127_ftap_4_127 
-D o4d16& !DRiff11
-D o4e16& !DRiff12
-D !efb_65_ftap_7_127_ftap_5_127_ftap_4_127 
-D o4f+16& !DRiff11
-D o4g+16& !DRiff12
-D !efb_65_ftap_7_127_ftap_5_127_ftap_4_127 
-D o4a16& !DRiff11
-D o4b16& !DRiff12 D0 GF127
+D [[
+D o3b16& !ftapM_7_1 w16 \ftap- 5,1 w16 \ftap- 4,1 w8 !ftapM_7_1 r16
+D !efb_65 !ftap_7_127_ftap_5_127_ftap_4_127
+D o4c+16& !ftapM_7_1_w16_ftapM_5_1_w16 \ftap- 4,1
+D w8 !ftapM_7_1_w16_ftapM_5_1_w16 \ftap- 4,1
+D w16
+D \efb- 1 !ftap_7_127_ftap_5_127_ftap_4_127
+D w16 !ftapM_7_1
+D r16 \ftap- 5,1
+D __+3 :
+D !efb_65 !ftap_7_127_ftap_5_127_ftap_4_127
+D ]2 : !efb_65 !ftap_7_127_ftap_5_127_ftap_4_127 __+1]2
+D _+0 D0 GF127
 
 !efb_66_ftapP_3_21_ftapM_4_21 !efb_66 \ftap+ 3, 21 \ftap- 4, 21
 !efb_66_ftapP_2_21_ftapM_3_21 !efb_66 \ftap+ 2, 21 \ftap- 3, 21
@@ -614,40 +587,40 @@ D o4b16& !DRiff12 D0 GF127
 !efbM_1_w48_X2_r48 [\efb- 1 w48]2 r48
 !o3b48_efbM_1_w48_X2_r48 o3b48& !efbM_1_w48_X2_r48
 !o3a48_efbM_1_w48_X2_r48 o3a48& !efbM_1_w48_X2_r48
-!DRiff13 !efb_66_ftapP_3_21_ftapM_4_21 !o3b48_efbM_1_w48_X2_r48
-!DRiff13 !efb_66_ftapP_3_21_ftapM_4_21 !o3a48_efbM_1_w48_X2_r48
-!DRiff13 !efb_66 \ftap+ 3, 22 \ftap- 4, 22
-!DRiff14 !efb_66_ftapP_2_21_ftapM_3_21 !o3b48_efbM_1_w48_X2_r48
-!DRiff14 !efb_66_ftapP_2_21_ftapM_3_21 !o3a48_efbM_1_w48_X2_r48
-!DRiff14 !efb_66 \ftap+ 2, 22 \ftap- 3, 22
-!DRiff15 !efb_66_ftapP_1_21_ftapM_2_21 !o3b48_efbM_1_w48_X2_r48
-!DRiff15 !efb_66_ftapP_1_21_ftapM_2_21 !o3a48_efbM_1_w48_X2_r48
-!DRiff15 !efb_66 \ftap+ 1, 22 \ftap- 2, 22
+!DRiff11 !efb_66_ftapP_3_21_ftapM_4_21 !o3b48_efbM_1_w48_X2_r48
+!DRiff11 !efb_66_ftapP_3_21_ftapM_4_21 !o3a48_efbM_1_w48_X2_r48
+!DRiff11 !efb_66 \ftap+ 3, 22 \ftap- 4, 22
+!DRiff12 !efb_66_ftapP_2_21_ftapM_3_21 !o3b48_efbM_1_w48_X2_r48
+!DRiff12 !efb_66_ftapP_2_21_ftapM_3_21 !o3a48_efbM_1_w48_X2_r48
+!DRiff12 !efb_66 \ftap+ 2, 22 \ftap- 3, 22
+!DRiff13 !efb_66_ftapP_1_21_ftapM_2_21 !o3b48_efbM_1_w48_X2_r48
+!DRiff13 !efb_66_ftapP_1_21_ftapM_2_21 !o3a48_efbM_1_w48_X2_r48
+!DRiff13 !efb_66 \ftap+ 1, 22 \ftap- 2, 22
 D [
 D [!DRiff2a \ftap+ 3, 4 \ftap- 4, 4 ]6 :
 D \ftap 3, 0 \ftap 4, 127
-D !DRiff13
+D !DRiff11
 D !o3b48_efbM_1_w48_X2_r48
 D ]2
 D \ftap 3, 64 \ftap 4, 64
-D !DRiff13
+D !DRiff11
 D o4d48& !efbM_1_w48_X2_r48 [
 D [!DRiff2a \ftap+ 2, 4 \ftap- 3, 4 ]6 :
 D \ftap 2, 0 \ftap 3, 127
-D !DRiff14
+D !DRiff12
 D !o3b48_efbM_1_w48_X2_r48
 D !efb_65 o4c8<a8g8a8
 D ]2
 D \ftap 2, 64 \ftap 3, 64
-D !DRiff14
+D !DRiff12
 D !o3b48_efbM_1_w48_X2_r48 [
 D [!DRiff2a \ftap+ 1, 4 \ftap- 2, 4 ]6 :
 D \ftap 1, 0 \ftap 2, 127
-D !DRiff15
+D !DRiff13
 D o4d48& !efbM_1_w48_X2_r48
 D ]2
 D \ftap 1, 64 \ftap 2, 64
-D !DRiff15
+D !DRiff13
 D !o3b48_efbM_1_w48_X2_r48
 D !efb_65
 D [o2b64& \ftap- 1, 8 \ftap+ 2, 8]15 r64 \ftap- 1, 8 \ftap+ 2, 8
@@ -695,9 +668,9 @@ E l16 o2f+[f+>c+]2<f+ab
 E [l16 o1b[b>b]2<b>a:b]2 o3d
 E !ERiff6
 E o3b8<b16>a8<b16>d16e16
-E l16 o3e[e>e]3d
+E l16 _+5 !ERiff6aa _+0 o3d
 E l16 !ERiff6aa o4d
-E l16 o2a[a>a]3e
+E l16 _-2 !ERiff6aa _+0 o3e
 E o3d8.e8.f+8
 E l1 o3[d^]4[c^]2<[b^]12 E0
 E r16 ~1,4 V12 p64 !DRiff7 ~0 r16 V24
@@ -711,12 +684,12 @@ E o2e2f+2
 E @PianoC2_16_A15_7_7_10 V64 [o3e1]3
 E !Crash2_A15_7_7_18_V64 [p16 o5f+4 p96 f+4]2 p64
 E @PianoC2_16_A15_7_7_10 V64 [o3e1]8
-E r16 V24 ~4,2 !BRiff8
+E r16 V24 ~4,2 !BRiff5
 E V24 p72 ~4,4 o5f+4e8f+8e4<b4>c+4<b8>c+8<b8a8g+8a8
-E o4f+4e8f+8a8g+8a8>c+8c+4<b4>c+8.d+8.e8
-E {{o5ef+}}8,48,0 {{o5f+g+}}8,48,0 {{o5g+a}}8,48,0 {{o5ab}}8,48,0
+E o4f+4e8f+8a8g+8a8>c+8c+4<b4>c+8.d+8.
+E _-5 !BRiff6
 E [o6c+8^32<b32]2 o6c+32e8^32<b24a24a24f+16e16<b16b16a16f+16e16c+16<b16a16b16b16>d16
-E l24 o5f+ed<baf+ed<baf+ab>def+ab>def+ab>d
+E l24 [o5f+ed<ba __-12]2 [o5f+ab>d:e __+12]3
 E [o6e32f+8^32]4 l32 o6f+d<baf+ed<b ~0
 E !GuitarB2_V24 A15,7,7,2 p72 E1
 E o3f+4.g+2^8 o3a4.b2^8
@@ -729,49 +702,46 @@ E o3g8e8d8e8 ]2
 E o2f+4>f+4
 
 F @GuitarB2 V96 p~16,64
-!FRiff1 l16 o0b[b>b]3a
+!FRiff1a l16 o0b[b>b]3
+!FRiff1 l16 !FRiff1a o1a
 F [!FRiff1 ]60 [
 F [l16 o0a[a>a]2gae]4 :
 F [!FRiff1 ]12 ]2
 F [!FRiff1 ]8 L
 F [[[o1b24]3 : o2c8]3 l24 o0[b]3>[b<bb]2]3
-!FRiff2 l16 o1dd>[d<d]3
-F !FRiff2 
-F l16 o1c+c+>[c+<c+]3
-F [l16 o0bb>[b<b]3]4
-F [!FRiff1 ]56
-!FRiff3 l16 o1e[e>e]3d
-F [!FRiff3 ]22
-!FRiff4 l16 o1d[d>d]3
-F !FRiff4 o1a
-F l16 o1g<gg>a<aa>b<b
-F [!FRiff4 o2c]16
-F [l16 o1c[c>c]3<a+]8
-F [!FRiff1 ]8
-F [!FRiff3 ]68
-F !FRiff2 !FRiff2
-!FRiff5 l16 o1ee>[e<e]3
-F [!FRiff5 ]8 [
-F l16 o1cc>[c<c]3 :
-F !FRiff2 
-F [!FRiff5 ]6
+!FRiff2 l16 !FRiff1a o0b
+F _+3 !FRiff2
+F _+2 !FRiff2 _+0
+F [!FRiff2 ]4
+F [!FRiff1 ]56 _+5
+F [!FRiff1 ]22 _+3
+F l16 !FRiff1a o1f+ _+0
+F l16 o1g<gg>a<aa>b<b _+3
+F [!FRiff1a o1a]16 _+1
+F [!FRiff1 ]8 _+0
+F [!FRiff1 ]8 _+5
+F [!FRiff1 ]68
+F _+3 !FRiff2 !FRiff2 _+5
+F [!FRiff2 ]8 [ _+1
+F !FRiff2 :
+F _+3 !FRiff2 _+5
+F [!FRiff2 ]6
 F ]2
-F !FRiff2 
-!FRiff6 l24 o1ee[e>e]2
-F [[l24 o1eee>e<ee]3 !FRiff6 ]3
-F [!FRiff6 ]4
-F [!FRiff5 ]16
-!FRiff7 [l16 o1f+f+>[f+<f+]3]8
-F !FRiff7 !FRiff7
+F _+3 !FRiff2 _+0
+!FRiff3 l24 o1eee>e<e
+F [[l24 !FRiff3 o1e]3 !FRiff3 o2e ]3
+F [!FRiff3 o2e ]4 _+5
+F [!FRiff2 ]16 _+7
+F [!FRiff2 ]16 _+5
+F [!FRiff2 ]8 _+7
+F [!FRiff2 ]8 _+12
+F [!FRiff2 ]8 [_+0 [
+!FRiff4 l16 o0bb>[b<b]2
+F l16 !FRiff4 __+2 !FRiff4 o0bb>b<b __+1]2]2 _+0
+!FRiff5 l24 o0[b]3>b<bb
+F [!FRiff5 ]6
+F _+1 !FRiff5 _-3 !FRiff5 _+0
 F [!FRiff5 ]8
-F !FRiff7
-F [l16 o1bb>[b<b]3]8 [
-F l16 o0bb>[b<b]2 l16 o1c+c+>[c+<c+]2 o1c+c+>c+<c+
-F l16 o1dd>[d<d]2 l16 o1ee>[e<e]2 o1ee>e<e]2
-!FRiff8 l24 o0[b]3>b<bb
-F [!FRiff8 ]6
-F l24 o1[c]3>c<cc l24 o0[a]3>a<aa
-F [!FRiff8 ]8
 
 G l1 r^^^ [
 G !Strings8_V24
@@ -785,9 +755,9 @@ G o1g2f+2e1^1
 !GRiff1 l1 o1[b]28 >[e]11 d2d8.e8.f+8
 !GRiff1 l1 o2[d]8 [c]4 <[b]4
 G V48 !GRiff1 l1 [o2e]28
-G V8 E1 p64 r8
-G !CRiff14 E0 r1^1^1...
-G @Pulse8WBF V24 p64
+G V8 E1 r8
+G !CRiff5 E0 r1^1^1...
+G @Pulse8WBF V24
 G r8 !ERiff7 o2[e8r16]3d4^16
 G o2c2d2
 G @Strings8 V48
@@ -804,7 +774,7 @@ H r8
 H V6
 H !CRiff1 ]2
 H L
-H l1 r^^^^^ @Strings8M1O
+H l1 r^^^^^ @Strings8 _-12
 H V64 !GRiff1 [o2e]34 o2d V48 o3e
 H V64 [l1 [o2e]3 c2d2]2
 H !GRiff2
