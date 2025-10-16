@@ -696,6 +696,10 @@
       "source": "songs/BossTheme.mml"
     },
     {
+      "name": "BossThemeNoEcho",
+      "source": "songs/BossThemeNoEcho.mml"
+    },
+    {
       "name": "GameOverTheme",
       "source": "songs/GameOverTheme.mml"
     },
