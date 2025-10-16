@@ -9,7 +9,6 @@
 #Copyright 2025 undisbeliever
 #Date 2025
 #License This work by KungFuFurby is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
-#OldTranspose
 
 ;This song is compatible with the wind control system.
 
@@ -25,8 +24,8 @@
 #Timer 80
 
 A V128 L
-A @Kick3 _+0 o6c8 @Bongo _-2 o5e16e16e8 @Kick3 _+0 o6c8
-A [@Kick3 _+0 o6c8 @Bongo _-2 o5e8]2
+A @Kick3 _M+0 o6c8 @Bongo _M-2 o5e16e16e8 @Kick3 _M+0 o6c8
+A [@Kick3 _M+0 o6c8 @Bongo _M-2 o5e8]2
 
 B @HatClosed L V64 o5c8 V16 [o5c8]3
 
@@ -57,9 +56,9 @@ D [[o4d+8.^24d+4^48]14 [o3a+8.^24a+4^48]2]2
 
 !ERiff1 [o4g8.^48g4^24]2
 E r8^24 !GuitarB2_1_V56 p80 L
-E [!ERiff1 [o4f8.^48f4^24]2 !ERiff1 [o4g+8.^48g+4^24]2 ]6
-E [[[o4g+8.^48g+4^24]2 !ERiff1 [o4f8.^48f4^24]2:!ERiff1 ]2
-E [o4d+8.^48d+4^24]2]2
+E [_-0 !ERiff1 _-2 !ERiff1 _-0 !ERiff1 _+1 !ERiff1 ]6
+E [[_+1 !ERiff1 _+0 !ERiff1 _-2 !ERiff1 :_-0 !ERiff1 ]2
+E _-4 !ERiff1 ]2
 
 F @GuitarB2_2 V64 L
 F l2 [o2d+d+c+c+[d+]4]6
