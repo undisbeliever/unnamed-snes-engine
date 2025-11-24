@@ -66,7 +66,6 @@
 @PianoC2_16 PianoC2_16
 @PianoC2_16_A15_7_7_10 PianoC2_16 adsr 15 7 7 10
 @SineWave16 SineWave16
-@sineP1O_A7_7_7_4 sineP1O adsr 7 7 7 4
 
 #ZenLen 192
 #Timer 112
@@ -331,14 +330,13 @@ D l1 o0b^^^ D0
 D @sine_A10_7_7_4 V0
 D [o1b^^^]4
 D A15,7,7,4 [o0b^^^]2
-D @sineP1O_A7_7_7_4
-!DRiff1 ?@sineP1O_A7_7_7_4
+D @sine_A7_7_7_4 _-12
 !DRiff1 l1 o4b^4 l8 b>c+dedc+dc+<a1e4a4>c+4
 !DRiff1 l1 o4b^^^
 !DRiff1 {o5ab}4,8^1 l8 b>c+dedc+dc+a1e4a4>c+4
 D !DRiff1
 D [l24 o6baf+ed<bab>def+a]4
-D l1 o6b^
+D l1 o6b^ _-0
 !efb_66 \efb 66
 D !efb_66 \evol 4
 D !GuitarB2_V24 E1 p56 L

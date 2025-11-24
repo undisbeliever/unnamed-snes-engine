@@ -30,19 +30,6 @@
       "comment": null
     },
     {
-      "name": "sineP1O",
-      "source": "samples/undisbeliever/sine.wav",
-      "freq": 1000.0,
-      "loop": "dupe_block_hack",
-      "loop_setting": 3,
-      "evaluator": "default",
-      "ignore_gaussian_overflow": false,
-      "first_octave": 0,
-      "last_octave": 7,
-      "envelope": "adsr 12 1 1 16",
-      "comment": null
-    },
-    {
       "name": "square",
       "source": "samples/undisbeliever/square.wav",
       "freq": 500.0,
