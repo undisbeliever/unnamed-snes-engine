@@ -83,12 +83,11 @@ C !CRiff2 o7f+8 o7e8d16d32d32[d16]3e16
 C !CRiff2 o6f+8 o6g4>c8g8
 C !CRiff2 o7c+16d16 c+8<a8e8a16>e16
 C !CRiff2 o7c+8 d8.e16f+12g12a12
-!CRiff3 Q4o7b32<b32
-C Q4 [[[!CRiff3 o6b32]2:!CRiff3 ]2 : o7a32<a32]4 !CRiff3 Q8
-!CRiff4X4 [!CRiff4 ]4
-!CRiff4 [o3b64>c64]4
-C @Flute1 V224 ~0 !CRiff4X4 V64 _+12 !CRiff4X4 V32 _+24 !CRiff4X4
-C V16 _+36 !CRiff4 V32 _+24 !CRiff4 V64 _+12 !CRiff4 V224 _+0 !CRiff4
+C q2 [[[o7b32<b32b32]2:o7b32<b32]2 : o7a32<a32]4 o7b32<b32 q0
+!CRiff3X4 [!CRiff3 ]4
+!CRiff3 [o3b64>c64]4
+C @Flute1 V224 ~0 !CRiff3X4 V64 _+12 !CRiff3X4 V32 _+24 !CRiff3X4
+C V16 _+36 !CRiff3 V32 _+24 !CRiff3 V64 _+12 !CRiff3 V224 _+0 !CRiff3
 C @trumpet_2 V72 ~8,2 [r8 o5b8>e8f+8 g8.f+32g32f+8:d8]2 a8
 C r8 o6b8g8e8f+8.f+32g32f+16d16<b16>e16
 C r8 o6g8b8>c+8 d8.<a32g32f+16d16<a16>d16
