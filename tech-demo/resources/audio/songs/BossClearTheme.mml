@@ -65,23 +65,30 @@ C \asm {
 	set_early_release 254 4 D12
 }
 
-D \asm {
-	call_subroutine Strings8_V48_q254_4_D12
+!DRiff1 \asm {
+	start_loop 2
 	play_note f+4 18
 	start_loop 3
 	play_note f+4 6
 	end_loop
-	play_note e4 18
-	start_loop 3
-	play_note e4 6
+	adjust_transpose -2
 	end_loop
-	play_note f+4 12
-	play_note d+4 6
+	play_note a+4 12
+}
+
+!DRiff2 \asm {
 	disable_early_release
-	play_note f+4 no_keyoff 36
+	play_note a+4 no_keyoff 36
 	set_temp_gain_and_rest D8 36
 	set_adsr 15 7 7 19
-	play_note b3 192
+}
+
+D \asm {
+	call_subroutine Strings8_V48_q254_4_D12
+	call_subroutine DRiff1
+	play_note g4 6
+	call_subroutine DRiff2
+	play_note d+4 192
 }
 
 !ERiff1 \asm {
@@ -148,38 +155,18 @@ F \asm {
 
 G \asm {
 	call_subroutine Strings8_V48_q254_4_D12
-	play_note d+4 18
-	start_loop 3
-	play_note d+4 6
-	end_loop
-	play_note c+4 18
-	start_loop 3
-	play_note c+4 6
-	end_loop
-	play_note d+4 12
-	play_note b3 6
-	disable_early_release
-	play_note d+4 no_keyoff 36
-	set_temp_gain_and_rest D8 36
-	set_adsr 15 7 7 19
-	play_note b2 192
+	set_transpose -3
+	call_subroutine DRiff1
+	play_note f+4 6
+	call_subroutine DRiff2
+	play_note f+3 192
 }
 
 H \asm {
 	call_subroutine Strings8_V48_q254_4_D12
-	play_note b3 18
-	start_loop 3
-	play_note b3 6
-	end_loop
-	play_note a3 18
-	start_loop 3
-	play_note a3 6
-	end_loop
-	play_note b3 12
-	play_note f+3 6
-	disable_early_release
-	play_note b3 no_keyoff 36
-	set_temp_gain_and_rest D8 36
-	set_adsr 15 7 7 19
-	play_note b1 192
+	set_transpose -7
+	call_subroutine DRiff1
+	play_note f4 6
+	call_subroutine DRiff2
+	play_note a+2 192
 }
