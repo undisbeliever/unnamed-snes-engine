@@ -135,18 +135,16 @@ D o7g8e8c8g8 f+4a4
 !DRiff3 Q4o7[g32]2[e16:c16]3Q8g16
 D !DRiff2 !DRiff3
 D !DRiff2 _+2 !DRiff3 _+0
-D !DRiff2 Q4o7[b32]2g16e16c16e16g16Q8b16
+D !DRiff2 Q4o7[b32]2Q8q5g16e16c16e16g16q0b16
 D o7a8g8f+8d8
 D !DRiff2
-!Q4o6e16 Q4o6e16
-!Q4o6c16 Q4o6c16
-D @Clarinet V16 Q4o6c32d32!Q4o6e16 !Q4o6c16 !Q4o6e16 g16!Q4o6e16 >c16
-D r16 o5b32>c32d16g16d16!Q4o6c16 <b16>b16
-D r16 o5a32b32>!Q4o6c16 <a16>!Q4o6c16 d16!Q4o6e16 a16
-D Q8 o6g8d8<g8d8
-D ~0 @PIANO_C5 V32 
-D [Q8r16o4e32f32Q4g16:c16>c16<g16e16g16]2
-D Q4o3b16>b16g16d16g16Q8
+D @Clarinet V16 q12,7 Q4o6c32d32Q8o6e16c16e16g16e16>c16
+D r16 Q4o5b32>c32Q8d16g16d16c16<b16>b16
+D r16 Q4o5a32b32>Q8c16<a16>c16d16e16a16 q0
+D o6g8d8<g8d8
+D ~0 @PIANO_C5 V32 q12,7
+D [r16o4e32f32g16:c16>c16<g16e16g16]2
+D o3b16>b16g16d16g16q0
 D r16o3f32g32a16b16>c16d16e16<a16
 !DRiff4 l48 o3bg[b>d]2gd[gb]2>[d<b]2gb[gd]2<b>d
 D !DRiff4 _-2 !DRiff4 _-0 !DRiff4
