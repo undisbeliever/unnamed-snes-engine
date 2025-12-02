@@ -90,11 +90,11 @@ D V40
 !DRiff2 o5g1& GDT2 r1
 !DRiff3 @Flute1 {o3fg}16,32& w1 GET13 r2...
 !DRiff4 @Flute1 [
-!DRiff4 l8 Q2o5g>[d]3
-!DRiff4 l32 Q4c16<a+16a16ga Q8[a64a+64]4afcf :
-!DRiff4 l16 Q2o5g8>d8 Q4defg
-!DRiff4 l16 Q4o6afc<[a+a]2f]2
-!DRiff4 l8 Q2o5gQ4d<gd
+!DRiff4 l8 q18,6o5g>[d]3
+!DRiff4 l32 c16<a+16a16Q4ga Q8[a64a+64]4afcf :
+!DRiff4 l16 o5g8>d8 defg
+!DRiff4 l16 o6afc<[a+a]2f]2
+!DRiff4 l8 o5gq0Q4d<gd
 !DRiff4 l8 Q8o4gaa+>d [
 !DRiff4 {o4a+>c}16,32& r16^24 <a+24>c24 :
 !DRiff4 {o5fg}16,32& r16^24 f24g24
