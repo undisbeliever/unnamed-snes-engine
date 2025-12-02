@@ -132,7 +132,8 @@ F o5a32b32>c32d32e32f+32g48a48b48
 F o7c4<b8>c16<b16 e8d8e8b8 a4g4f+4d4
 F o6e4]2 o6f+8g16a16
 F o6b4{f+>f+}4,8& r4 {o6b>b}4,12& r4 a8g+8 a8g+16f+16 g+16e16<b16g+16
-F [o6e8e12Q4e24Q8e4 : o7e8e12Q4e24Q8e4]2 o5e2 ~0
+!FRiff1 o6e8e12Q4e24Q8e4
+F !FRiff1 _+12 !FRiff1 _+0 !FRiff1 o5e2 ~0
 
 G l1 r^^^^^^^^^^^^^
 G !Strings8Detache_V128_E1
