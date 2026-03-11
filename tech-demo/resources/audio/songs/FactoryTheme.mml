@@ -1,6 +1,6 @@
 ;Factory Theme
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.1.1
+;Made for undisbeliever's Terrific Audio Driver v0.2.0
 
 #Title Factory Theme
 #Game unnamed-snes-game
@@ -38,6 +38,7 @@
 @fingerbass32 fingerbass32
 @sine sine gain 127
 @Pulse32W0F Pulse32W0F
+@HardwareOverflowGlitch_AltPitchTable HardwareOverflowGlitch_AltPitchTable
 
 A E1
 A l1 r^^^^^^^^^^^^^
@@ -104,20 +105,21 @@ D l1 r^^^^^^^
 D @HardwareOverflowGlitch V64 GF3 [o6a2r2]4
 !DRiff1 @Crash2 V48 r8 o7g4a8 r8 o7a+4c8
 D [!DRiff1 ]16
+!DRiff2aa l32 o2c<c
+!DRiff2a l32 !DRiff2aa o3c<c
 !DRiff2 [[
-!DRiff2 l32 P32P16P64P32P16P32:P48P43
-!DRiff2 l32 ]2 P43P48 : [
-!DRiff2 l32 P16P8P32P16:P4P8P11P8
+!DRiff2 l32 _-12 !DRiff2a _-0 o0c>c:gf]2 o1fg : [
+!DRiff2 l32 o0c P8 o1c<c : P4P8P11P8
 !DRiff2 l32 ]2 P12P6P4P6
 !DRiff2 ]2 [
-!DRiff2 l32 P64P32P128[P64]2P32:P97P86
+!DRiff2 l32 !DRiff2a !DRiff2aa :P97P86
 !DRiff2 ]2 P86P97
-!HardwareOverflowGlitch_V128_GF16_pb16_8 @HardwareOverflowGlitch V128 GF16 p~16,8
-D !HardwareOverflowGlitch_V128_GF16_pb16_8 [!DRiff2 !DRiff2 E0 V96]2 L
+!HardwareOverflowGlitch_AltPitchTable_V128_GF16_pb16_8 @HardwareOverflowGlitch_AltPitchTable V128 GF16 p~16,8
+D !HardwareOverflowGlitch_AltPitchTable_V128_GF16_pb16_8 [!DRiff2 !DRiff2 E0 V96]2 L
 D p64 V192 [[r16Q4P1,16]7r8]10 Q8
 D [!DRiff1 ]4 E1
 D [!DRiff1 ]12
-D !HardwareOverflowGlitch_V128_GF16_pb16_8 [!DRiff2 !DRiff2 E0 V96]3
+D !HardwareOverflowGlitch_AltPitchTable_V128_GF16_pb16_8 [!DRiff2 !DRiff2 E0 V96]3
 
 !SuperMiniGlitchNoise2_o1f1 @SuperMiniGlitchNoise2 o1f1
 !SuperMiniGlitchNoiseA15_7_7_8_o1f1 @SuperMiniGlitchNoiseA15_7_7_8 o1f1
@@ -131,12 +133,12 @@ E @SuperMiniGlitchNoiseA15_7_7_8 o1f1^1^1
 !ERiff1 @sine V0 GI4 o2c2& GD4 r1.
 E !ERiff1 !ERiff1
 E @Pulse32W0F V32 [[
-E [l32 o2c<c>>c<c : o2gfd+f
+E [l32 !DRiff2a : o2gfd+f
 E ]2 : l32 o1c>c>c<c]2
 E l32 o1c>cfc
 E [[
-E l32 o0g>c>c>c : o2c<c<cg
-E ]2 : l32 o2c<cfg
+E l32 o0g>c>c>c : !DRiff2aa o1cg
+E ]2 : l32 !DRiff2aa o2fg
 E ]2
 E l32 o2gf<a+>c ]4 E1
 E @HardwareOverflowGlitch V64 GF10 [o6a2r2]8

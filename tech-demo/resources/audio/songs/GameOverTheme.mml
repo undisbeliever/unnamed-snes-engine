@@ -1,6 +1,6 @@
 ;Game Over Theme for unnamed-snes-game
 ;By KungFuFurby
-;Made for undisbeliever's Terrific Audio Driver v0.1.1
+;Made for undisbeliever's Terrific Audio Driver v0.2.0
 
 #Title Game Over Theme
 #Game unnamed-snes-game
@@ -18,11 +18,9 @@
 
 ;Instrument Definitions
 @Strings8 Strings8
-@Strings8M1O Strings8M1O
 @Strings8WF Strings8 adsr 2 7 7 0
 @trumpet_2 trumpet_2
 @PIANO_C5 PIANO_C5 adsr 15 7 7 14
-@PIANO_C5P1O PIANO_C5P1O adsr 15 7 7 14
 @PianoC2_16 PianoC2_16 adsr 15 7 7 10
 
 #ZenLen 192
@@ -62,7 +60,7 @@ B [!BRiff1 ]4
 B l16 [o4c<geg]2 [o3bgeg]2 [o3bf+ef+]2 [o3bf+d+f+]2
 B E0 @PianoC2_16 V160 o3e1^1
 B !PIANO_C5 V12 E1 L
-B !BRiff1 !BRiff1 [o4e<bb>ed<aa>d]2
+B !BRiff1 !BRiff1 [o4[e<bb>e__-2]2_-0]2
 B [!BRiff1 ]12
 
 C !PIANO_C5_V64_E1 p56
@@ -80,7 +78,7 @@ D !Strings8_V24_E0 p48
 D !DRiff1
 D V64 p64 o2e2& !GET9_r1D
 D l1 r^^^^^64
-D @PIANO_C5P1O V12 E1 p80 L
+D !PIANO_C5 _+12 V12 E1 p80 L
 D [
 D l32 !ARiff4 o3b !ARiff5 o3a
 D l32 !ARiff6 o4e !ARiff7 o4d o3af+d: 
@@ -96,9 +94,9 @@ F !Strings8_V24_E0 p80
 F [o3g4f+4]4 [o3e2]3d+2
 F @trumpet_2 V128 p64 o3e2& !GET9_r1D
 
-G @Strings8M1O V24 E0
+G !Strings8_V24_E0 _-12
 G !DRiff1
 G V192 o1e2& !GET9_r1D
 
 H E0 l1 r.. T168 r8 T172 r8 T176 r4 T180 r4 T184 r4 T188 r4 T192 r4 T200 r4 T208
-H @Strings8 V48 o1b4& T216 b16& T232 b16& T240 b16& T255 b16
+H @Strings8 V48 o1b4& T216 b16& T232 b16& T240 b16& T256 b16
